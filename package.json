@@ -1,0 +1,23 @@
+{
+  "name": "careeros",
+  "version": "0.1.0",
+  "private": true,
+  "description": "CareerOS AI MVP monorepo foundation.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm --workspace @careeros/web run dev",
+    "build": "npm --workspace @careeros/web run build",
+    "lint": "npm --workspace @careeros/web run lint",
+    "start": "npm --workspace @careeros/web run start",
+    "typecheck": "npm --workspace @careeros/web run typecheck",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "engines": {
+    "node": ">=20.11.0",
+    "npm": ">=10.0.0"
+  }
+}

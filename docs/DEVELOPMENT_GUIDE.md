@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This guide explains how future developers should work in the CareerOS AI repository once implementation begins. The repository currently contains scaffold and documentation only.
+This guide explains how developers should work in the CareerOS AI repository. The repository currently contains documentation plus the Phase 5 MVP application foundation.
 
 ## First-Day Onboarding
 
@@ -44,14 +44,14 @@ Use separate environments:
 
 Environment files should not be committed.
 
-Expected future files:
+Expected files:
 
 - `.env.local`
 - `.env.example`
 
 Rules:
 
-- Commit `.env.example` when implementation begins.
+- Keep `.env.example` updated when environment requirements change.
 - Never commit secrets.
 - Keep public browser-safe values prefixed consistently, such as `NEXT_PUBLIC_`.
 - Keep server-only values unprefixed and only read them in server code.
@@ -59,16 +59,23 @@ Rules:
 
 ## Local Development Expectations
 
-When the app is scaffolded, local setup should eventually include:
+Local setup:
 
 1. Install dependencies.
 2. Copy `.env.example` to `.env.local`.
 3. Configure Supabase project values.
-4. Run database migrations.
-5. Start the local web app.
-6. Run tests before opening a pull request.
+4. Start the local web app.
+5. Run checks before opening a pull request.
 
-Do not add these commands until package manifests and tooling exist.
+Commands:
+
+```bash
+npm install
+npm run dev
+npm run lint
+npm run typecheck
+npm run build
+```
 
 ## AI-Assisted Development Rules
 
@@ -90,4 +97,3 @@ A change is done when:
 - It does not leak secrets or sensitive user data.
 - It is documented if it changes architecture, setup, or workflow.
 - It passes local checks once tooling exists.
-
