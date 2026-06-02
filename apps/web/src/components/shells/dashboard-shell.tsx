@@ -34,7 +34,11 @@ const dashboardCards = [
   },
 ];
 
-export function DashboardShell() {
+type DashboardShellProps = {
+  userEmail?: string;
+};
+
+export function DashboardShell({ userEmail }: DashboardShellProps) {
   return (
     <div className="mx-auto max-w-shell space-y-6">
       <section className="rounded-lg border bg-card p-6">
@@ -46,6 +50,9 @@ export function DashboardShell() {
               The MVP dashboard foundation is ready for onboarding status, report scores, job
               recommendations, learning actions, and application tracking.
             </p>
+            {userEmail ? (
+              <p className="text-sm text-muted-foreground">Signed in as {userEmail}</p>
+            ) : null}
           </div>
           <Link href="/onboarding" className={buttonVariants()}>
             Start onboarding

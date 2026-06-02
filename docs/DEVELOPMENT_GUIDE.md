@@ -57,6 +57,17 @@ Rules:
 - Keep server-only values unprefixed and only read them in server code.
 - Rotate credentials after accidental exposure.
 
+Supabase authentication values:
+
+- `NEXT_PUBLIC_SUPABASE_URL`: Supabase project URL.
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase publishable or legacy anon key for browser-safe auth.
+- `SUPABASE_SERVICE_ROLE_KEY`: server-only key reserved for future admin operations; do not expose it to client code.
+
+For local auth testing, add the web app URL to Supabase Auth redirect URLs:
+
+- `http://localhost:3000/auth/callback`
+- `http://localhost:3000/dashboard`
+
 ## Local Development Expectations
 
 Local setup:
