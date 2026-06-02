@@ -4,7 +4,7 @@
 
 CareerOS local development should run against a local PostgreSQL database by default. This makes development faster, repeatable, offline-friendly, and less dependent on a hosted vendor. Production can later use any PostgreSQL-compatible provider.
 
-This document defines the target local database setup. It is a plan only; code and infrastructure changes should follow in a later phase.
+This document defines the implemented local database foundation introduced in Phase 10. The existing app still uses Supabase Auth and has not yet moved all data access to Drizzle, but new database work should use this PostgreSQL-first foundation.
 
 ## Target Local Stack
 
@@ -24,15 +24,15 @@ Optional local services later:
 - Mailpit for email testing.
 - OpenTelemetry collector for local telemetry.
 
-## Proposed Docker Compose
+## Docker Compose
 
-Future file location:
+File location:
 
 ```text
 infrastructure/docker/docker-compose.yml
 ```
 
-Proposed service:
+PostgreSQL service:
 
 ```yaml
 services:
@@ -45,7 +45,7 @@ services:
       POSTGRES_PASSWORD: careeros_dev_password
       POSTGRES_DB: careeros_dev
     ports:
-      - "5432:5432"
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
       - careeros_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -65,8 +65,9 @@ Do not commit real production credentials. Local credentials are intentionally l
 Target local database variables:
 
 ```env
-DATABASE_URL=postgresql://careeros:careeros_dev_password@localhost:5432/careeros_dev
-DATABASE_DIRECT_URL=postgresql://careeros:careeros_dev_password@localhost:5432/careeros_dev
+DATABASE_URL=postgresql://careeros:careeros_dev_password@localhost:5433/careeros_dev
+DATABASE_DIRECT_URL=postgresql://careeros:careeros_dev_password@localhost:5433/careeros_dev
+POSTGRES_HOST_PORT=5433
 ```
 
 Recommended future auth variables while Supabase Auth remains temporary:
@@ -87,32 +88,24 @@ SUPABASE_AUTH_ANON_KEY=
 
 ## Migration Location
 
-Current:
+Legacy Supabase migrations remain here until the app has fully moved to PostgreSQL-first data access:
 
 ```text
 infrastructure/supabase/migrations/
 ```
 
-Target:
+PostgreSQL-first Drizzle schema and migrations now live here:
 
 ```text
 packages/database/src/schema/
 packages/database/migrations/
 ```
 
-Alternative acceptable target:
-
-```text
-infrastructure/postgres/migrations/
-```
-
-Recommendation:
-
-Use `packages/database` because schema, migrations, and typed database access should travel together when future services need the same schema package.
+This keeps schema, migrations, database client code, and repositories together so future services can import the same package.
 
 ## Local Workflow
 
-Target commands:
+Available commands:
 
 ```bash
 npm run db:up
@@ -123,14 +116,70 @@ npm run db:reset
 
 Proposed behavior:
 
-| Command       | Purpose                                           |
-| ------------- | ------------------------------------------------- |
-| `db:up`       | Start local Postgres with Docker Compose          |
-| `db:down`     | Stop local Postgres                               |
-| `db:migrate`  | Apply committed migrations                        |
-| `db:generate` | Generate a new migration from schema changes      |
-| `db:studio`   | Open database inspection UI                       |
-| `db:reset`    | Drop/recreate local schema and reapply migrations |
+| Command       | Purpose                                              |
+| ------------- | ---------------------------------------------------- |
+| `db:up`       | Start local Postgres with Docker Compose             |
+| `db:down`     | Stop local Postgres                                  |
+| `db:migrate`  | Apply committed Drizzle migrations                   |
+| `db:generate` | Generate a new Drizzle migration from schema changes |
+| `db:studio`   | Open Drizzle Studio for database inspection          |
+| `db:reset`    | Drop the local Postgres volume, restart, and migrate |
+
+## How To Start Local Postgres
+
+From the repository root:
+
+```bash
+npm run db:up
+```
+
+This starts `careerOS-postgres` as a Docker Compose service using:
+
+```env
+DATABASE_URL=postgresql://careeros:careeros_dev_password@localhost:5433/careeros_dev
+```
+
+The container name is `careeros-postgres`, and the database is exposed on local port `5433` by default to avoid colliding with an existing local PostgreSQL server. Override `POSTGRES_HOST_PORT` if needed.
+
+## How To Run Migrations
+
+Start Postgres first, then run:
+
+```bash
+npm run db:migrate
+```
+
+The migration runner lives in `packages/database/src/migrate.ts` and applies committed migrations from:
+
+```text
+packages/database/migrations/
+```
+
+To generate future migrations after editing `packages/database/src/schema/index.ts`:
+
+```bash
+npm run db:generate
+```
+
+Review generated SQL before committing it.
+
+## How To Inspect The Database
+
+Use Drizzle Studio:
+
+```bash
+npm run db:studio
+```
+
+Or connect with any PostgreSQL client:
+
+```text
+Host: localhost
+Port: 5433
+Database: careeros_dev
+User: careeros
+Password: careeros_dev_password
+```
 
 ## PostgreSQL-First Schema Requirements
 
@@ -181,7 +230,7 @@ Recommended layers:
 Use a separate database for tests:
 
 ```env
-TEST_DATABASE_URL=postgresql://careeros:careeros_dev_password@localhost:5432/careeros_test
+TEST_DATABASE_URL=postgresql://careeros:careeros_dev_password@localhost:5433/careeros_test
 ```
 
 ## Supabase During Local Development
@@ -217,6 +266,33 @@ Cons:
 Recommendation:
 
 Use hosted Supabase Auth temporarily only if needed, but run domain data on local PostgreSQL. Do not make the Supabase local stack the default development database.
+
+## Temporary Supabase Auth Mapping
+
+Supabase Auth remains the current authentication provider. PostgreSQL-first domain tables use app-owned user records in `public.users`, not `auth.users`.
+
+The temporary bridge is:
+
+```mermaid
+flowchart LR
+    SupabaseUser[Supabase Auth user] --> Identity[auth_identities]
+    Identity --> AppUser[users]
+    AppUser --> DomainRows[profiles, resumes, career_profiles, reports]
+```
+
+Mapping rules:
+
+- `auth_identities.provider` is `supabase`.
+- `auth_identities.provider_subject` stores the Supabase Auth user ID.
+- `auth_identities.user_id` points to the stable CareerOS `users.id`.
+- Domain tables always reference `users.id`.
+- If CareerOS later moves to better-auth or Auth.js, a new identity provider can map to the same app-owned user record.
+
+The initial repository method for this bridge is `findOrCreateFromAuthIdentity` in:
+
+```text
+packages/database/src/repositories/users.repository.ts
+```
 
 ## Production Compatibility
 

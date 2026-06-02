@@ -1,0 +1,77 @@
+import { desc, eq, and } from "drizzle-orm";
+
+import type { Database } from "../client.js";
+import { careerReports, type CareerReport } from "../schema/index.js";
+
+type ReportListItem = {
+  title: string;
+  detail: string;
+};
+
+export type CreateCareerReportInput = {
+  careerProfileId?: string | null;
+  resumeId?: string | null;
+  linkedinProfileId?: string | null;
+  status?: string;
+  careerSummary?: string | null;
+  strengths?: ReportListItem[];
+  skillAnalysis?: ReportListItem[];
+  missingSkills?: ReportListItem[];
+  targetRoleFit?: {
+    rating?: string;
+    explanation?: string;
+  };
+  careerOpportunities?: Array<Record<string, unknown>>;
+  marketDemand?: Record<string, unknown>;
+  recommendedLearningPath?: ReportListItem[];
+  resumeQualityScore?: number | null;
+  careerReadinessScore?: number | null;
+  recommendedActions?: ReportListItem[];
+  modelName?: string | null;
+  promptVersion?: string | null;
+  generatedAt?: Date | null;
+};
+
+export function createCareerReportsRepository(db: Database) {
+  return {
+    async getLatestReadyForUser(userId: string): Promise<CareerReport | null> {
+      const [report] = await db
+        .select()
+        .from(careerReports)
+        .where(and(eq(careerReports.userId, userId), eq(careerReports.status, "ready")))
+        .orderBy(desc(careerReports.createdAt))
+        .limit(1);
+
+      return report ?? null;
+    },
+
+    async createForUser(userId: string, input: CreateCareerReportInput): Promise<CareerReport> {
+      const [report] = await db
+        .insert(careerReports)
+        .values({
+          userId,
+          careerProfileId: input.careerProfileId ?? null,
+          resumeId: input.resumeId ?? null,
+          linkedinProfileId: input.linkedinProfileId ?? null,
+          status: input.status ?? "ready",
+          careerSummary: input.careerSummary ?? null,
+          strengths: input.strengths ?? [],
+          skillAnalysis: input.skillAnalysis ?? input.strengths ?? [],
+          missingSkills: input.missingSkills ?? [],
+          targetRoleFit: input.targetRoleFit ?? {},
+          careerOpportunities: input.careerOpportunities ?? [],
+          marketDemand: input.marketDemand ?? {},
+          recommendedLearningPath: input.recommendedLearningPath ?? [],
+          resumeQualityScore: input.resumeQualityScore ?? null,
+          careerReadinessScore: input.careerReadinessScore ?? null,
+          recommendedActions: input.recommendedActions ?? [],
+          modelName: input.modelName ?? null,
+          promptVersion: input.promptVersion ?? null,
+          generatedAt: input.generatedAt ?? null,
+        })
+        .returning();
+
+      return report;
+    },
+  };
+}

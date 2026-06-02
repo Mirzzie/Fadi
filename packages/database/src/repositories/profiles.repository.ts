@@ -1,0 +1,49 @@
+import { eq } from "drizzle-orm";
+
+import type { Database } from "../client.js";
+import { profiles, type Profile } from "../schema/index.js";
+
+export type UpsertProfileInput = {
+  fullName: string;
+  email: string;
+  onboardingCompleted?: boolean;
+  onboardingCompletedAt?: Date | null;
+};
+
+export function createProfilesRepository(db: Database) {
+  return {
+    async getByUserId(userId: string): Promise<Profile | null> {
+      const [profile] = await db
+        .select()
+        .from(profiles)
+        .where(eq(profiles.userId, userId))
+        .limit(1);
+      return profile ?? null;
+    },
+
+    async upsertForUser(userId: string, input: UpsertProfileInput): Promise<Profile> {
+      const [profile] = await db
+        .insert(profiles)
+        .values({
+          userId,
+          fullName: input.fullName,
+          email: input.email,
+          onboardingCompleted: input.onboardingCompleted ?? false,
+          onboardingCompletedAt: input.onboardingCompletedAt ?? null,
+        })
+        .onConflictDoUpdate({
+          target: profiles.userId,
+          set: {
+            fullName: input.fullName,
+            email: input.email,
+            onboardingCompleted: input.onboardingCompleted ?? false,
+            onboardingCompletedAt: input.onboardingCompletedAt ?? null,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+
+      return profile;
+    },
+  };
+}

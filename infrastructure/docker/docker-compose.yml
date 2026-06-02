@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: careeros-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: careeros
+      POSTGRES_PASSWORD: careeros_dev_password
+      POSTGRES_DB: careeros_dev
+    ports:
+      - "${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - careeros_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U careeros -d careeros_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  careeros_postgres_data:
