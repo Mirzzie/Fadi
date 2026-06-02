@@ -1,11 +1,8 @@
 import { Upload, UserRoundCheck, WandSparkles } from "lucide-react";
 
+import { OnboardingForm } from "@/components/onboarding/onboarding-form";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 
 const steps = [
   {
@@ -33,8 +30,8 @@ export function OnboardingShell() {
         <div className="space-y-3">
           <h1 className="text-3xl font-semibold tracking-tight">Build your career profile</h1>
           <p className="text-muted-foreground">
-            This foundation captures the MVP onboarding structure without parsing files, importing
-            LinkedIn, or generating AI output yet.
+            Paste your career context so CareerOS AI can prepare your profile foundation. This phase
+            saves data only; AI report generation comes later.
           </p>
         </div>
         <div className="grid gap-3">
@@ -57,33 +54,12 @@ export function OnboardingShell() {
       <Card>
         <CardHeader>
           <CardTitle>Profile foundation</CardTitle>
-          <CardDescription>Static form shell for the first onboarding pass.</CardDescription>
+          <CardDescription>
+            Complete these steps to unlock your protected dashboard.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="target-role">Target role</Label>
-              <Input id="target-role" placeholder="Product Analyst" />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="location">Preferred location</Label>
-              <Input id="location" placeholder="Ireland, UK, remote" />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="linkedin">LinkedIn profile text</Label>
-            <Textarea id="linkedin" placeholder="Paste LinkedIn context here..." />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="goals">Career goal</Label>
-            <Textarea
-              id="goals"
-              placeholder="Describe what you want CareerOS AI to optimize for."
-            />
-          </div>
-          <Button type="button" className="w-full">
-            Continue to report preview
-          </Button>
+        <CardContent>
+          <OnboardingForm />
         </CardContent>
       </Card>
     </div>

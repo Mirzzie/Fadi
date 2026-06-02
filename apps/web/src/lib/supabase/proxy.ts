@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { publicEnv } from "@/lib/env";
 
-const protectedRoutes = ["/dashboard"];
+const protectedRoutes = ["/dashboard", "/onboarding"];
 const authRoutes = ["/auth/sign-in", "/auth/sign-up"];
 
 function isProtectedRoute(pathname: string) {

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { DashboardShell } from "@/components/shells/dashboard-shell";
 import { getCurrentAuthUser } from "@/lib/auth/session";
+import { getOnboardingStatus } from "@/lib/onboarding/status";
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -16,6 +17,12 @@ export default async function DashboardPage() {
 
   if (!user) {
     redirect("/auth/sign-in");
+  }
+
+  const onboardingStatus = await getOnboardingStatus(user.id);
+
+  if (onboardingStatus !== "completed") {
+    redirect("/onboarding");
   }
 
   return (

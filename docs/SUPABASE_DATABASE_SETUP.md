@@ -9,6 +9,7 @@ This guide explains how to apply the CareerOS AI MVP database foundation. The mi
 ```text
 infrastructure/supabase/migrations/
 └── 20260602224500_create_mvp_foundation.sql
+└── 20260602231500_add_experience_level_to_career_profiles.sql
 ```
 
 ## Tables Created
@@ -167,4 +168,3 @@ No seed data is included in this phase. The schema references `auth.users`, so s
 - No job integrations are implemented.
 - No storage buckets are created in this migration.
 - No global job catalog is created.
-
