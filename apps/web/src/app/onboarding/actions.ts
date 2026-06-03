@@ -9,6 +9,7 @@ import {
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
+import { logger } from "@/lib/observability/logger";
 import { onboardingFormSchema, type OnboardingFormValues } from "@/lib/onboarding/validation";
 
 export type OnboardingActionResult = {
@@ -33,6 +34,8 @@ export async function completeOnboardingAction(
   const validationMessage = firstValidationMessage(values);
 
   if (validationMessage) {
+    logger.warn("onboarding.complete.validation_failed");
+
     return {
       ok: false,
       message: validationMessage,
@@ -45,6 +48,8 @@ export async function completeOnboardingAction(
     const user = await getCurrentAuthUser();
 
     if (!user?.email) {
+      logger.warn("onboarding.complete.unauthenticated");
+
       return {
         ok: false,
         message: "You need to be signed in to complete onboarding.",
@@ -93,16 +98,23 @@ export async function completeOnboardingAction(
     });
 
     await profilesRepository.markOnboardingCompleted(user.id);
+    logger.info("onboarding.complete.succeeded", {
+      userId: user.id,
+    });
 
     return {
       ok: true,
       message: "Onboarding complete. Your career profile has been saved.",
       redirectTo: "/dashboard",
     };
-  } catch {
+  } catch (error) {
+    logger.error("onboarding.complete.failed", {
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    });
+
     return {
       ok: false,
-      message: "Could not save onboarding data. Check PostgreSQL configuration and migrations.",
+      message: "Could not save onboarding data right now. Please try again later.",
     };
   }
 }

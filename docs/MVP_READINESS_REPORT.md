@@ -4,7 +4,7 @@
 
 CareerOS is close to a private alpha candidate, but it is not ready for real-user private alpha until the launch blockers below are resolved. The MVP has a coherent product loop: Supabase Auth, PostgreSQL-owned app users, onboarding, AI Career Intelligence Report generation, local job discovery, saved jobs, and manual application tracking. The codebase validates cleanly and the Supabase-to-app-user decoupling is directionally sound.
 
-Readiness verdict: **Conditional no-go for real users today.**
+Readiness verdict after Phase 14: **Ready for a very small private alpha after a production-like smoke test passes.**
 
 Recommended alpha gate: complete the P0 and P1 items in this report, then run a browser-level smoke test against a production-like environment with real Supabase Auth, production PostgreSQL, and OpenAI keys.
 
@@ -77,13 +77,13 @@ Note: legacy Supabase migration files still reference `auth.users` and `auth.uid
 
 ## Launch Blockers
 
-| ID      | Issue                                                                                                                                         | Severity | Recommendation                                                                                                 | Effort     |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------- | ---------- |
-| MVP-001 | No rate limiting for auth actions, report generation, or job mutation actions                                                                 | High     | Add per-user and per-IP rate limits for server actions, especially OpenAI report generation                    | Medium     |
-| MVP-002 | No production logging, error tracking, or audit event trail                                                                                   | High     | Add structured server logs and basic error monitoring; log security-relevant events without sensitive payloads | Medium     |
-| MVP-003 | AI report generation sends raw resume and LinkedIn text to OpenAI without explicit per-action consent, usage limits, or retention explanation | High     | Add explicit consent copy, privacy notice, token/cost limits, and safer prompt logging policy                  | Medium     |
-| MVP-004 | Production database provider and deployment configuration are not finalized                                                                   | High     | Choose production PostgreSQL provider, configure SSL, migration process, backups, and connection pooling       | Medium     |
-| MVP-005 | Dependency audit has moderate advisories in `drizzle-kit`/`esbuild` and `next`/`postcss` dependency trees                                     | Medium   | Track upstream fixes; avoid exposing dev servers; update when compatible versions are available                | Low-medium |
+| ID      | Issue                                                                                                     | Severity | Recommendation                                                                                               | Effort     |
+| ------- | --------------------------------------------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------ | ---------- |
+| MVP-001 | No durable distributed rate limiting for all server actions                                               | Medium   | Phase 14 added in-process AI report rate limiting and cooldown; add Redis/provider-backed limits before beta | Medium     |
+| MVP-002 | No external error monitoring or audit event trail                                                         | Medium   | Phase 14 added basic structured logs; add Sentry/Axiom/etc. after first alpha cohort                         | Medium     |
+| MVP-003 | AI processing needed explicit per-action consent and repeated-call guardrails                             | Resolved | Phase 14 added required consent, safe errors, sanitized logs, hourly limit, and cooldown                     | Done       |
+| MVP-004 | Production database provider and deployment configuration are not finalized                               | High     | Choose production PostgreSQL provider, configure SSL, migration process, backups, and connection pooling     | Medium     |
+| MVP-005 | Dependency audit has moderate advisories in `drizzle-kit`/`esbuild` and `next`/`postcss` dependency trees | Medium   | Track upstream fixes; avoid exposing dev servers; update when compatible versions are available              | Low-medium |
 
 ## Non-Blocking Risks
 
@@ -173,12 +173,12 @@ No production secret values were found. Local Postgres passwords are intentional
 
 ## Private Alpha Recommendation
 
-Do not invite real users until:
+Proceed to a very small private alpha only after:
 
-1. Add rate limiting for AI report generation and auth-sensitive actions.
-2. Add a production error/logging solution.
-3. Add explicit AI/privacy consent language before report generation.
-4. Choose and configure a production PostgreSQL provider.
-5. Run an end-to-end browser smoke test in a production-like environment.
+1. Choose and configure a production PostgreSQL provider.
+2. Configure production Supabase Auth callback URLs.
+3. Configure server-only OpenAI credentials.
+4. Run the production-like browser smoke test in `PRODUCTION_CHECKLIST.md`.
+5. Confirm structured logs contain no secrets, prompts, resume text, or LinkedIn text.
 
-After those are complete, CareerOS is suitable for a small private alpha of 5-20 trusted users.
+After those are complete, CareerOS is suitable for a small private alpha of 5-20 trusted users. Keep the alpha small because rate limiting is currently in-process and not distributed across multiple runtime instances.

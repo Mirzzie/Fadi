@@ -2,22 +2,22 @@
 
 ## Summary
 
-CareerOS has reasonable MVP security foundations for local development and controlled testing: server-side auth checks, app-owned user IDs, repository-scoped data access, and server-only OpenAI calls. It is not yet ready for real-user private alpha because rate limiting, observability, privacy consent, and production secret procedures are incomplete.
+CareerOS has reasonable MVP security foundations for local development and controlled testing: server-side auth checks, app-owned user IDs, repository-scoped data access, and server-only OpenAI calls. Phase 14 added minimum alpha guardrails for AI consent, report-generation rate limiting, safer user-facing errors, and redacted structured logs.
 
 ## Findings
 
-| ID      | Area                  | Issue                                                                                  | Severity | Recommendation                                                                                            | Effort     |
-| ------- | --------------------- | -------------------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------- | ---------- |
-| SEC-001 | Rate limiting         | No rate limits for sign-in, sign-up, report generation, save/unsave, or status updates | High     | Add per-IP and per-user rate limiting using Redis or provider middleware                                  | Medium     |
-| SEC-002 | AI privacy            | Resume and LinkedIn text are sent to OpenAI without explicit just-in-time consent      | High     | Add clear consent copy and privacy notice before report generation                                        | Medium     |
-| SEC-003 | Error disclosure      | AI provider errors can be returned directly to users                                   | Medium   | Return safe generic messages; log provider detail server-side only                                        | Low        |
-| SEC-004 | Auth metadata         | Full Supabase claims are stored in `auth_identities.provider_profile`                  | Medium   | Store minimal metadata: provider, subject, email, email verification, last seen                           | Low        |
-| SEC-005 | Authorization         | Active PostgreSQL schema has no RLS                                                    | Medium   | Keep repository scoping; consider portable RLS using transaction-local app user context                   | Medium     |
-| SEC-006 | Secrets process       | No production secret storage/rotation process documented                               | Medium   | Add secret ownership, rotation, and environment separation to production checklist                        | Low        |
-| SEC-007 | Dependency advisories | `npm audit` reports moderate advisories in build/dev dependency paths                  | Medium   | Track upstream updates; avoid unsafe dev server exposure                                                  | Low-medium |
-| SEC-008 | CSRF posture          | Server actions rely on framework/session behavior; no explicit CSRF review documented  | Medium   | Verify Next.js server action CSRF behavior and add origin checks where needed                             | Medium     |
-| SEC-009 | Audit logging         | No audit/security event logs                                                           | Medium   | Log auth mapping, report generation, job saves, and application status changes without sensitive payloads | Medium     |
-| SEC-010 | Data retention        | No policy for raw resume/LinkedIn text retention                                       | Medium   | Define retention/deletion policy before real-user alpha                                                   | Medium     |
+| ID      | Area                  | Issue                                                                                                     | Severity | Recommendation                                                                                            | Effort     |
+| ------- | --------------------- | --------------------------------------------------------------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------- | ---------- |
+| SEC-001 | Rate limiting         | AI report generation now has in-process limits, but auth and job mutations do not have distributed limits | Medium   | Add Redis/provider-backed rate limiting before wider beta                                                 | Medium     |
+| SEC-002 | AI privacy            | Report generation now requires just-in-time consent; formal privacy policy still needed                   | Medium   | Add privacy policy and retention/deletion language before broader launch                                  | Medium     |
+| SEC-003 | Error disclosure      | AI provider errors are now mapped to safer user-facing messages                                           | Resolved | Continue logging sanitized internal error names only                                                      | Done       |
+| SEC-004 | Auth metadata         | Full Supabase claims are stored in `auth_identities.provider_profile`                                     | Medium   | Store minimal metadata: provider, subject, email, email verification, last seen                           | Low        |
+| SEC-005 | Authorization         | Active PostgreSQL schema has no RLS                                                                       | Medium   | Keep repository scoping; consider portable RLS using transaction-local app user context                   | Medium     |
+| SEC-006 | Secrets process       | No production secret storage/rotation process documented                                                  | Medium   | Add secret ownership, rotation, and environment separation to production checklist                        | Low        |
+| SEC-007 | Dependency advisories | `npm audit` reports moderate advisories in build/dev dependency paths                                     | Medium   | Track upstream updates; avoid unsafe dev server exposure                                                  | Low-medium |
+| SEC-008 | CSRF posture          | Server actions rely on framework/session behavior; no explicit CSRF review documented                     | Medium   | Verify Next.js server action CSRF behavior and add origin checks where needed                             | Medium     |
+| SEC-009 | Audit logging         | No audit/security event logs                                                                              | Medium   | Log auth mapping, report generation, job saves, and application status changes without sensitive payloads | Medium     |
+| SEC-010 | Data retention        | No policy for raw resume/LinkedIn text retention                                                          | Medium   | Define retention/deletion policy before real-user alpha                                                   | Medium     |
 
 ## Authentication
 
@@ -67,6 +67,20 @@ Search result:
 - No direct Supabase domain table access found in `apps/web/src`.
 - Supabase usage remains in auth/session/callback/proxy code.
 - Legacy Supabase migrations remain under `infrastructure/supabase`.
+
+## Phase 14 Security Guardrails
+
+Added:
+
+- Required AI/privacy checkbox before report generation.
+- Server-side AI report rate limit: 3 attempts per user per hour.
+- Persistent report cooldown: 10 minutes after latest generated report.
+- Sanitized structured logging for report generation, onboarding completion, and job mutations.
+- Safer user-facing errors for AI/report and mutation failures.
+
+Known limitation:
+
+- The current rate limiter is in-process. It is acceptable for a single-instance very small alpha, but not sufficient for multi-instance production or broader beta.
 
 ## Dependency Audit
 

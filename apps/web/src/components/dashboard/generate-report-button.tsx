@@ -14,12 +14,15 @@ export function GenerateReportButton() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<GenerateCareerReportResult | null>(null);
+  const [aiPrivacyConsentAccepted, setAiPrivacyConsentAccepted] = useState(false);
 
   function generateReport() {
     setResult(null);
 
     startTransition(async () => {
-      const actionResult = await generateCareerReportAction();
+      const actionResult = await generateCareerReportAction({
+        aiPrivacyConsentAccepted,
+      });
       setResult(actionResult);
 
       if (actionResult.ok) {
@@ -30,7 +33,24 @@ export function GenerateReportButton() {
 
   return (
     <div className="space-y-3">
-      <Button type="button" onClick={generateReport} disabled={isPending}>
+      <label className="flex gap-3 rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
+        <input
+          type="checkbox"
+          checked={aiPrivacyConsentAccepted}
+          onChange={(event) => setAiPrivacyConsentAccepted(event.target.checked)}
+          className="mt-1"
+        />
+        <span>
+          I understand CareerOS will send my onboarding profile, resume text, LinkedIn context, and
+          career goals to the AI provider to generate this report. I will review recommendations
+          before acting on them.
+        </span>
+      </label>
+      <Button
+        type="button"
+        onClick={generateReport}
+        disabled={isPending || !aiPrivacyConsentAccepted}
+      >
         {isPending ? (
           <Loader2 className="size-4 animate-spin" aria-hidden="true" />
         ) : (

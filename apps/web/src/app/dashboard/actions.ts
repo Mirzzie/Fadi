@@ -10,6 +10,8 @@ import { getCareerReportContext } from "@/lib/career-report/data";
 import { careerIntelligenceReportSchema } from "@/lib/career-report/schema";
 import { getDatabase } from "@/lib/database/client";
 import { serverEnv } from "@/lib/env.server";
+import { logger } from "@/lib/observability/logger";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 
 export type GenerateCareerReportResult = {
   ok: boolean;
@@ -17,6 +19,13 @@ export type GenerateCareerReportResult = {
 };
 
 const REPORT_PROMPT_VERSION = "career-report-mvp-v1";
+const REPORT_GENERATION_LIMIT = 3;
+const REPORT_GENERATION_WINDOW_MS = 60 * 60 * 1000;
+const REPORT_GENERATION_COOLDOWN_MS = 10 * 60 * 1000;
+
+type GenerateCareerReportInput = {
+  aiPrivacyConsentAccepted: boolean;
+};
 
 function truncate(value: string | null | undefined, maxLength: number) {
   if (!value) {
@@ -26,26 +35,83 @@ function truncate(value: string | null | undefined, maxLength: number) {
   return value.length > maxLength ? `${value.slice(0, maxLength)}\n[truncated]` : value;
 }
 
-export async function generateCareerReportAction(): Promise<GenerateCareerReportResult> {
+function minutesUntil(value: Date) {
+  return Math.max(1, Math.ceil((value.getTime() - Date.now()) / 60000));
+}
+
+function getReportCooldown(latestGeneratedAt: Date | string | null) {
+  if (!latestGeneratedAt) {
+    return null;
+  }
+
+  const generatedAt =
+    latestGeneratedAt instanceof Date ? latestGeneratedAt : new Date(latestGeneratedAt);
+  const cooldownEndsAt = new Date(generatedAt.getTime() + REPORT_GENERATION_COOLDOWN_MS);
+
+  return cooldownEndsAt.getTime() > Date.now() ? cooldownEndsAt : null;
+}
+
+export async function generateCareerReportAction(
+  input: GenerateCareerReportInput
+): Promise<GenerateCareerReportResult> {
   const user = await getCurrentAuthUser();
 
   if (!user) {
+    logger.warn("career_report.generate.unauthenticated");
+
     return {
       ok: false,
       message: "You need to be signed in to generate a report.",
     };
   }
 
-  if (!serverEnv.OPENAI_API_KEY) {
+  if (!input.aiPrivacyConsentAccepted) {
+    logger.warn("career_report.generate.consent_missing", {
+      userId: user.id,
+    });
+
     return {
       ok: false,
-      message: "OpenAI is not configured. Add OPENAI_API_KEY to apps/web/.env.local.",
+      message: "Review and accept the AI privacy notice before generating a report.",
+    };
+  }
+
+  if (!serverEnv.OPENAI_API_KEY) {
+    logger.error("career_report.generate.openai_not_configured", {
+      userId: user.id,
+    });
+
+    return {
+      ok: false,
+      message: "Career report generation is not available right now.",
+    };
+  }
+
+  const rateLimit = consumeRateLimit({
+    key: `career-report:${user.id}`,
+    limit: REPORT_GENERATION_LIMIT,
+    windowMs: REPORT_GENERATION_WINDOW_MS,
+  });
+
+  if (!rateLimit.allowed) {
+    logger.warn("career_report.generate.rate_limited", {
+      userId: user.id,
+      retryAfterSeconds: rateLimit.retryAfterSeconds,
+    });
+
+    return {
+      ok: false,
+      message: `Please wait ${Math.ceil(rateLimit.retryAfterSeconds / 60)} minute(s) before generating another report.`,
     };
   }
 
   const context = await getCareerReportContext(user.id);
 
   if (!context) {
+    logger.warn("career_report.generate.context_missing", {
+      userId: user.id,
+    });
+
     return {
       ok: false,
       message: "Complete onboarding before generating a Career Intelligence Report.",
@@ -53,6 +119,10 @@ export async function generateCareerReportAction(): Promise<GenerateCareerReport
   }
 
   if (!context.resumeText || !context.careerGoals || !context.targetRole) {
+    logger.warn("career_report.generate.context_incomplete", {
+      userId: user.id,
+    });
+
     return {
       ok: false,
       message: "Your onboarding data is incomplete. Add resume text, target role, and goals first.",
@@ -63,6 +133,23 @@ export async function generateCareerReportAction(): Promise<GenerateCareerReport
   const openai = new OpenAI({
     apiKey: serverEnv.OPENAI_API_KEY,
   });
+  const careerReportsRepository = createCareerReportsRepository(getDatabase());
+  const latestReport = await careerReportsRepository.getLatestReadyForUser(user.id);
+  const cooldownEndsAt = getReportCooldown(
+    latestReport?.generatedAt ?? latestReport?.createdAt ?? null
+  );
+
+  if (cooldownEndsAt) {
+    logger.warn("career_report.generate.cooldown_active", {
+      userId: user.id,
+      cooldownMinutesRemaining: minutesUntil(cooldownEndsAt),
+    });
+
+    return {
+      ok: false,
+      message: `A report was generated recently. Please wait ${minutesUntil(cooldownEndsAt)} minute(s) before generating another one.`,
+    };
+  }
 
   const userContext = `
 User profile:
@@ -80,6 +167,12 @@ ${truncate(context.resumeText, 9000)}
 `;
 
   try {
+    logger.info("career_report.generate.started", {
+      userId: user.id,
+      model,
+      rateLimitRemaining: rateLimit.remaining,
+    });
+
     const completion = await openai.chat.completions.parse({
       model,
       messages: [
@@ -104,13 +197,17 @@ ${truncate(context.resumeText, 9000)}
     const report = completion.choices[0]?.message.parsed;
 
     if (!report) {
+      logger.error("career_report.generate.parse_failed", {
+        userId: user.id,
+        model,
+      });
+
       return {
         ok: false,
-        message: "The AI response could not be parsed into a report. Please try again.",
+        message: "CareerOS could not generate a complete report. Please try again later.",
       };
     }
 
-    const careerReportsRepository = createCareerReportsRepository(getDatabase());
     await careerReportsRepository.createForUser(user.id, {
       careerProfileId: context.careerProfileId,
       resumeId: context.resumeId,
@@ -140,15 +237,25 @@ ${truncate(context.resumeText, 9000)}
     });
 
     revalidatePath("/dashboard");
+    logger.info("career_report.generate.completed", {
+      userId: user.id,
+      model,
+    });
 
     return {
       ok: true,
       message: "Career Intelligence Report generated.",
     };
   } catch (error) {
+    logger.error("career_report.generate.failed", {
+      userId: user.id,
+      model,
+      errorName: error instanceof Error ? error.name : "UnknownError",
+    });
+
     return {
       ok: false,
-      message: error instanceof Error ? error.message : "Could not generate the report.",
+      message: "CareerOS could not generate the report right now. Please try again later.",
     };
   }
 }
