@@ -7,6 +7,7 @@ import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDashboardProfileSummary, getLatestCareerReport } from "@/lib/career-report/data";
 import { getRecommendedJobsForUser } from "@/lib/jobs/data";
 import { getOnboardingStatus } from "@/lib/onboarding/status";
+import { getMomentumSummary } from "@/lib/resilience/service";
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -27,10 +28,11 @@ export default async function DashboardPage() {
     redirect("/onboarding");
   }
 
-  const [profileSummary, latestReport, recommendedJobsPreview] = await Promise.all([
+  const [profileSummary, latestReport, recommendedJobsPreview, momentum] = await Promise.all([
     getDashboardProfileSummary(user.id),
     getLatestCareerReport(user.id),
     getRecommendedJobsForUser(user.id, 3),
+    getMomentumSummary(user.id),
   ]);
 
   return (
@@ -40,6 +42,7 @@ export default async function DashboardPage() {
         profileSummary={profileSummary}
         latestReport={latestReport}
         recommendedJobsPreview={recommendedJobsPreview}
+        momentum={momentum}
       />
     </AppShell>
   );

@@ -53,4 +53,21 @@ export interface KaiUserContext {
       reason: string;
     }>;
   };
+
+  /**
+   * The user's resilience/momentum state. Kai uses this to calibrate TONE and
+   * pacing, never to shame: score the process (quality applications, autopsies,
+   * referrals), protect rest, and frame setbacks with locus-of-control.
+   */
+  momentum: {
+    available: boolean;
+    score: number;
+    band: string;
+    bandMessage: string;
+    isResting: boolean;
+    cadenceTarget: number | null;
+    cadencePeriod: string;
+    cadenceMessage: string;
+    qualityApplicationsThisPeriod: number;
+  };
 }

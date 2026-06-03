@@ -9,6 +9,7 @@ import {
 
 import { getDatabase } from "@/lib/database/client";
 import { getMarketIntelligence } from "@/lib/data-sources/service";
+import { getMomentumSummary } from "@/lib/resilience/service";
 
 import type { KaiUserContext } from "./types";
 
@@ -33,14 +34,16 @@ export async function buildKaiContext(
 ): Promise<KaiUserContext | null> {
   const db = getDatabase();
 
-  const [careerProfile, profile, resume, linkedIn, report, savedJobsList] = await Promise.all([
-    createCareerProfilesRepository(db).getLatestForUser(userId),
-    createProfilesRepository(db).getByUserId(userId),
-    createResumesRepository(db).getLatestForUser(userId),
-    createLinkedInProfilesRepository(db).getLatestForUser(userId),
-    createCareerReportsRepository(db).getLatestReadyForUser(userId),
-    createSavedJobsRepository(db).listForUser(userId),
-  ]);
+  const [careerProfile, profile, resume, linkedIn, report, savedJobsList, momentum] =
+    await Promise.all([
+      createCareerProfilesRepository(db).getLatestForUser(userId),
+      createProfilesRepository(db).getByUserId(userId),
+      createResumesRepository(db).getLatestForUser(userId),
+      createLinkedInProfilesRepository(db).getLatestForUser(userId),
+      createCareerReportsRepository(db).getLatestReadyForUser(userId),
+      createSavedJobsRepository(db).listForUser(userId),
+      getMomentumSummary(userId),
+    ]);
 
   if (!careerProfile) return null;
 
@@ -129,6 +132,18 @@ export async function buildKaiContext(
     },
 
     marketContext,
+
+    momentum: {
+      available: true,
+      score: momentum.momentum,
+      band: momentum.band,
+      bandMessage: momentum.bandMessage,
+      isResting: momentum.isResting,
+      cadenceTarget: momentum.cadenceTarget,
+      cadencePeriod: momentum.cadencePeriod,
+      cadenceMessage: momentum.cadenceMessage,
+      qualityApplicationsThisPeriod: momentum.qualityApplicationsThisPeriod,
+    },
   };
 }
 
@@ -228,6 +243,21 @@ export function formatKaiContextAsPrompt(ctx: KaiUserContext): string {
       lines.push(`  - [${s.kind}] ${s.title}${s.url ? ` (${s.url})` : ""} — ${s.reason}`);
     });
   }
+
+  lines.push("");
+  lines.push("## Momentum & Resilience");
+  lines.push(
+    "Use this to calibrate your tone and pacing — never to shame or pressure. Score the process, protect rest.",
+  );
+  lines.push(`Momentum: ${ctx.momentum.score}/100 (${ctx.momentum.band}) — ${ctx.momentum.bandMessage}`);
+  if (ctx.momentum.isResting) {
+    lines.push("The user is in a protected rest period. Do not push for output; affirm the recovery.");
+  }
+  lines.push(
+    ctx.momentum.cadenceTarget
+      ? `Commitment cadence: ${ctx.momentum.qualityApplicationsThisPeriod}/${ctx.momentum.cadenceTarget} quality applications this ${ctx.momentum.cadencePeriod}. ${ctx.momentum.cadenceMessage}`
+      : `Quality applications this ${ctx.momentum.cadencePeriod}: ${ctx.momentum.qualityApplicationsThisPeriod}. No cadence target set yet.`,
+  );
 
   return lines.join("\n");
 }
