@@ -67,3 +67,22 @@ export function consumeRateLimit({ key, limit, windowMs }: RateLimitOptions): Ra
     retryAfterSeconds: 0,
   };
 }
+
+export function refundRateLimit(key: string) {
+  const store = getStore();
+  const existing = store.get(key);
+
+  if (!existing) {
+    return;
+  }
+
+  if (existing.count <= 1) {
+    store.delete(key);
+    return;
+  }
+
+  store.set(key, {
+    ...existing,
+    count: existing.count - 1,
+  });
+}

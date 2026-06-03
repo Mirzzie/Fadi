@@ -54,6 +54,85 @@ export const authIdentities = pgTable(
   ]
 );
 
+export const user = pgTable(
+  "user",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    email: text("email").notNull(),
+    emailVerified: boolean("email_verified").notNull(),
+    image: text("image"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("better_auth_user_email_idx").on(table.email),
+    index("better_auth_user_created_at_idx").on(table.createdAt),
+  ]
+);
+
+export const session = pgTable(
+  "session",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    token: text("token").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("better_auth_session_token_idx").on(table.token),
+    index("better_auth_session_user_id_idx").on(table.userId),
+    index("better_auth_session_expires_at_idx").on(table.expiresAt),
+  ]
+);
+
+export const account = pgTable(
+  "account",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    accountId: text("account_id").notNull(),
+    providerId: text("provider_id").notNull(),
+    accessToken: text("access_token"),
+    refreshToken: text("refresh_token"),
+    accessTokenExpiresAt: timestamp("access_token_expires_at", { withTimezone: true }),
+    refreshTokenExpiresAt: timestamp("refresh_token_expires_at", { withTimezone: true }),
+    scope: text("scope"),
+    idToken: text("id_token"),
+    password: text("password"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index("better_auth_account_user_id_idx").on(table.userId),
+    index("better_auth_account_provider_idx").on(table.providerId, table.accountId),
+  ]
+);
+
+export const verification = pgTable(
+  "verification",
+  {
+    id: text("id").primaryKey(),
+    identifier: text("identifier").notNull(),
+    value: text("value").notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }),
+    updatedAt: timestamp("updated_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("better_auth_verification_identifier_idx").on(table.identifier),
+    index("better_auth_verification_expires_at_idx").on(table.expiresAt),
+  ]
+);
+
 export const profiles = pgTable(
   "profiles",
   {
@@ -274,13 +353,77 @@ export const applications = pgTable(
     nextAction: text("next_action"),
     deadlineAt: timestamp("deadline_at", { withTimezone: true }),
     appliedAt: timestamp("applied_at", { withTimezone: true }),
+    // ── Outcome tracking (Resilience Engine) ──
+    // outcome is the controllable-vs-uncontrollable boundary: we record it for
+    // honest pattern analysis, but NEVER reward the outcome itself.
+    outcome: text("outcome").notNull().default("pending"), // pending | rejected | ghosted | interview | offer | withdrawn
+    outcomeAt: timestamp("outcome_at", { withTimezone: true }),
+    rejectionStage: text("rejection_stage"), // keyword | screen | interview | final
+    rejectionVerified: boolean("rejection_verified").notNull().default(false),
+    // AQS captured at send time — gates the "quality application" reward.
+    qualityScore: integer("quality_score"),
     ...timestamps,
   },
   (table) => [
     index("applications_user_id_idx").on(table.userId),
     index("applications_status_idx").on(table.status),
     index("applications_user_status_idx").on(table.userId, table.status),
+    index("applications_outcome_idx").on(table.outcome),
   ]
+);
+
+// ── Resilience & Momentum Engine ──────────────────────────────────────────────
+// Forward-motion ledger. Every row is a CONTROLLABLE action the user took
+// (quality applications, rejection autopsies, skill closures, referrals, rest).
+// We score the process, never the outcome — this is what makes the system
+// honest and un-fakeable: there is no points-for-rejections to farm.
+export const resilienceEvents = pgTable(
+  "resilience_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // quality_application | rejection_logged | rejection_autopsy |
+    // skill_closed | referral_added | rest_day | comeback
+    kind: text("kind").notNull(),
+    momentumDelta: integer("momentum_delta").notNull().default(0),
+    // Provenance link — rejection-related events must reference a real application.
+    applicationId: uuid("application_id").references(() => applications.id, {
+      onDelete: "set null",
+    }),
+    // Free-form payload: { stage, lesson, nextAction, verification, skillName, ... }
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("resilience_events_user_id_idx").on(table.userId),
+    index("resilience_events_kind_idx").on(table.kind),
+    index("resilience_events_user_created_at_idx").on(table.userId, table.createdAt),
+  ]
+);
+
+// Per-user momentum snapshot. Momentum decays gently and never resets to zero
+// (no shame cliff). Rest is protected. Peak is remembered so the user always
+// has a personal best to climb back toward — you-vs-past-self, never vs others.
+export const momentumStates = pgTable(
+  "momentum_states",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    momentum: integer("momentum").notNull().default(0), // 0–100, decayed snapshot
+    peakMomentum: integer("peak_momentum").notNull().default(0),
+    lastActionAt: timestamp("last_action_at", { withTimezone: true }),
+    // Commitment cadence the user set for themselves (their terms, not ours).
+    cadenceTarget: integer("cadence_target"), // quality applications per period
+    cadencePeriod: text("cadence_period").notNull().default("week"),
+    // Deliberate rest that pauses decay — Kai protects momentum during recovery.
+    restingUntil: timestamp("resting_until", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [uniqueIndex("momentum_states_user_id_idx").on(table.userId)]
 );
 
 export const learningRecommendations = pgTable(
@@ -348,6 +491,10 @@ export const productEvents = pgTable(
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type AuthIdentity = typeof authIdentities.$inferSelect;
+export type BetterAuthUser = typeof user.$inferSelect;
+export type BetterAuthSession = typeof session.$inferSelect;
+export type BetterAuthAccount = typeof account.$inferSelect;
+export type BetterAuthVerification = typeof verification.$inferSelect;
 export type Profile = typeof profiles.$inferSelect;
 export type CareerProfile = typeof careerProfiles.$inferSelect;
 export type Resume = typeof resumes.$inferSelect;
@@ -356,3 +503,6 @@ export type CareerReport = typeof careerReports.$inferSelect;
 export type Job = typeof jobs.$inferSelect;
 export type SavedJob = typeof savedJobs.$inferSelect;
 export type Application = typeof applications.$inferSelect;
+export type ResilienceEvent = typeof resilienceEvents.$inferSelect;
+export type NewResilienceEvent = typeof resilienceEvents.$inferInsert;
+export type MomentumState = typeof momentumStates.$inferSelect;

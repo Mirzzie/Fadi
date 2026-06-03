@@ -19,13 +19,13 @@ export const appNavigation: NavItem[] = [
     icon: BriefcaseBusiness,
   },
   {
-    href: "/dashboard#learning-path",
+    href: "/dashboard/learning",
     label: "Learning",
     icon: GraduationCap,
   },
   {
-    href: "/dashboard#ai-assistant",
-    label: "Assistant",
+    href: "/dashboard/kai",
+    label: "Ask Kai",
     icon: MessageSquareText,
   },
 ];

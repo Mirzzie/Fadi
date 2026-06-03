@@ -138,7 +138,7 @@ export function scoreJobForUser({
     locationScore(careerProfile?.location ?? null, job) +
     experienceScore(careerProfile?.experienceLevel ?? null, job) +
     keywordMatch.score;
-  const matchScore = Math.max(35, Math.min(98, score));
+  const matchScore = Math.min(98, Math.max(5, score));
 
   const reasonParts = [
     careerProfile?.targetRole ? `target role alignment with ${careerProfile.targetRole}` : null,
@@ -154,6 +154,6 @@ export function scoreJobForUser({
     matchReason:
       reasonParts.length > 0
         ? `Matched on ${reasonParts.join("; ")}.`
-        : "Recommended from local MVP jobs while CareerOS builds your profile signal.",
+        : "Limited overlap with your profile. Review the job description before applying.",
   };
 }

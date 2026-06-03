@@ -15,6 +15,20 @@
       "when": 1780479474648,
       "tag": "0001_numerous_gunslinger",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1780486588717,
+      "tag": "0002_thankful_polaris",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1780523513474,
+      "tag": "0003_known_human_robot",
+      "breakpoints": true
     }
   ]
 }

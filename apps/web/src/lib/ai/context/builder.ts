@@ -1,0 +1,233 @@
+import {
+  createCareerProfilesRepository,
+  createCareerReportsRepository,
+  createLinkedInProfilesRepository,
+  createProfilesRepository,
+  createResumesRepository,
+  createSavedJobsRepository,
+} from "@careeros/database";
+
+import { getDatabase } from "@/lib/database/client";
+import { getMarketIntelligence } from "@/lib/data-sources/service";
+
+import type { KaiUserContext } from "./types";
+
+export interface BuildKaiContextOptions {
+  /**
+   * Fetch live market signals from external sources. Adds network latency, so
+   * it's OFF by default (the per-message chat path stays fast). The dashboard
+   * brief and scheduled refresh pass `true`. Once the cached `market_signals`
+   * store lands, the chat path can read cached signals and flip this on.
+   */
+  includeLiveMarket?: boolean;
+}
+
+function truncate(text: string | null | undefined, max: number): string | null {
+  if (!text) return null;
+  return text.length > max ? `${text.slice(0, max)}\n[truncated for context]` : text;
+}
+
+export async function buildKaiContext(
+  userId: string,
+  options: BuildKaiContextOptions = {},
+): Promise<KaiUserContext | null> {
+  const db = getDatabase();
+
+  const [careerProfile, profile, resume, linkedIn, report, savedJobsList] = await Promise.all([
+    createCareerProfilesRepository(db).getLatestForUser(userId),
+    createProfilesRepository(db).getByUserId(userId),
+    createResumesRepository(db).getLatestForUser(userId),
+    createLinkedInProfilesRepository(db).getLatestForUser(userId),
+    createCareerReportsRepository(db).getLatestReadyForUser(userId),
+    createSavedJobsRepository(db).listForUser(userId),
+  ]);
+
+  if (!careerProfile) return null;
+
+  // Live, personalized market intelligence — opt-in (see options doc above).
+  const skillGaps = (report?.missingSkills as Array<{ title: string; detail: string }>) ?? [];
+  let marketContext: KaiUserContext["marketContext"] = {
+    available: false,
+    note: "Live market intelligence is available but not loaded for this turn (kept off to keep chat fast). The dashboard market brief shows the full picture.",
+    signals: [],
+  };
+
+  if (options.includeLiveMarket) {
+    const intel = await getMarketIntelligence({
+      targetRole: careerProfile.targetRole,
+      skills: ((report?.strengths as Array<{ title: string }>) ?? []).map((s) => s.title),
+      skillGaps: skillGaps.map((g) => g.title),
+      region: careerProfile.location,
+    });
+
+    marketContext = {
+      available: intel.signals.length > 0,
+      note:
+        intel.signals.length > 0
+          ? "Live signals below are already scored for relevance to this user. Use them for honest context — never to alarm."
+          : "No live market signals currently clear the relevance threshold for this user's profile.",
+      signals: intel.signals.map((s) => ({
+        title: s.title,
+        url: s.url,
+        kind: s.kind,
+        relevance: s.relevance,
+        reason: s.reasons[0] ?? "relevant to your profile",
+      })),
+    };
+  }
+
+  return {
+    userId,
+
+    profile: {
+      fullName: profile?.fullName ?? null,
+      email: profile?.email ?? null,
+      targetRole: careerProfile.targetRole,
+      experienceLevel: careerProfile.experienceLevel,
+      locationPreference: careerProfile.location,
+      careerGoals: careerProfile.careerGoal,
+    },
+
+    evidence: {
+      resumeText: truncate(resume?.parsedText ?? resume?.rawText, 8000),
+      linkedInText: truncate(linkedIn?.rawText ?? linkedIn?.profileUrl, 4000),
+      hasResume: Boolean(resume?.rawText ?? resume?.parsedText),
+      hasLinkedIn: Boolean(linkedIn?.rawText ?? linkedIn?.profileUrl),
+    },
+
+    analysis: {
+      hasReport: Boolean(report),
+      generatedAt: report?.generatedAt
+        ? new Date(report.generatedAt).toISOString()
+        : report?.createdAt
+          ? new Date(report.createdAt).toISOString()
+          : null,
+      careerReadinessScore: report?.careerReadinessScore ?? null,
+      resumeQualityScore: report?.resumeQualityScore ?? null,
+      careerSummary: report?.careerSummary ?? null,
+      strengths: (report?.strengths as Array<{ title: string; detail: string }>) ?? [],
+      skillGaps: (report?.missingSkills as Array<{ title: string; detail: string }>) ?? [],
+      targetRoleFit:
+        (report?.targetRoleFit as { rating?: string; explanation?: string } | null) ?? null,
+      recommendedActions:
+        (report?.recommendedActions as Array<{ title: string; detail: string }>) ?? [],
+      learningPath:
+        (report?.recommendedLearningPath as Array<{ title: string; detail: string }>) ?? [],
+    },
+
+    opportunities: {
+      savedJobsCount: savedJobsList.length,
+      activeApplicationsCount: savedJobsList.filter(
+        (j) => j.status !== "saved" && j.status !== "rejected",
+      ).length,
+      savedJobs: savedJobsList.slice(0, 10).map((j) => ({
+        title: "Saved role",
+        company: "Company",
+        matchScore: j.matchScore,
+        status: j.status,
+      })),
+    },
+
+    marketContext,
+  };
+}
+
+export function formatKaiContextAsPrompt(ctx: KaiUserContext): string {
+  const lines: string[] = [];
+
+  lines.push("# User Career Context");
+  lines.push("");
+  lines.push("## Profile");
+  lines.push(`Name: ${ctx.profile.fullName ?? "Not provided"}`);
+  lines.push(`Target role: ${ctx.profile.targetRole ?? "Not specified"}`);
+  lines.push(`Experience level: ${ctx.profile.experienceLevel ?? "Not specified"}`);
+  lines.push(`Location preference: ${ctx.profile.locationPreference ?? "Not specified"}`);
+  lines.push(`Career goals: ${ctx.profile.careerGoals ?? "Not provided"}`);
+
+  lines.push("");
+  lines.push("## Career Evidence");
+
+  if (ctx.evidence.hasResume && ctx.evidence.resumeText) {
+    lines.push("### Resume");
+    lines.push(ctx.evidence.resumeText);
+  } else {
+    lines.push("Resume: Not provided yet.");
+  }
+
+  if (ctx.evidence.hasLinkedIn && ctx.evidence.linkedInText) {
+    lines.push("### LinkedIn");
+    lines.push(ctx.evidence.linkedInText);
+  } else {
+    lines.push("LinkedIn: Not provided yet.");
+  }
+
+  if (ctx.analysis.hasReport) {
+    lines.push("");
+    lines.push("## Career Intelligence Analysis");
+    lines.push(
+      `Generated: ${ctx.analysis.generatedAt ? new Date(ctx.analysis.generatedAt).toLocaleDateString() : "recently"}`,
+    );
+    lines.push(`Career readiness score: ${ctx.analysis.careerReadinessScore ?? "N/A"}/100`);
+    lines.push(`Resume quality score: ${ctx.analysis.resumeQualityScore ?? "N/A"}/100`);
+
+    if (ctx.analysis.careerSummary) {
+      lines.push(`Summary: ${ctx.analysis.careerSummary}`);
+    }
+
+    if (ctx.analysis.strengths.length > 0) {
+      lines.push(
+        `Key strengths: ${ctx.analysis.strengths.map((s) => s.title).join(", ")}`,
+      );
+    }
+
+    if (ctx.analysis.skillGaps.length > 0) {
+      lines.push(
+        `Skill gaps: ${ctx.analysis.skillGaps.map((g) => g.title).join(", ")}`,
+      );
+    }
+
+    if (ctx.analysis.targetRoleFit) {
+      lines.push(
+        `Target role fit: ${ctx.analysis.targetRoleFit.rating ?? "unknown"} — ${ctx.analysis.targetRoleFit.explanation ?? ""}`,
+      );
+    }
+
+    if (ctx.analysis.recommendedActions.length > 0) {
+      lines.push("Recommended next actions:");
+      ctx.analysis.recommendedActions.forEach((a) => lines.push(`  - ${a.title}: ${a.detail}`));
+    }
+
+    if (ctx.analysis.learningPath.length > 0) {
+      lines.push("Learning path:");
+      ctx.analysis.learningPath.forEach((l) => lines.push(`  - ${l.title}`));
+    }
+  } else {
+    lines.push("");
+    lines.push("## Career Analysis");
+    lines.push("No Career Intelligence Report has been generated yet.");
+  }
+
+  lines.push("");
+  lines.push("## Active Opportunities");
+  lines.push(`Saved jobs: ${ctx.opportunities.savedJobsCount}`);
+  lines.push(`Active applications: ${ctx.opportunities.activeApplicationsCount}`);
+
+  if (ctx.opportunities.savedJobs.length > 0) {
+    ctx.opportunities.savedJobs.forEach((j) => {
+      lines.push(
+        `  - ${j.title} at ${j.company} (match: ${j.matchScore ?? "?"}%, status: ${j.status})`,
+      );
+    });
+  }
+
+  lines.push("");
+  lines.push("## Live Market Context");
+  lines.push(ctx.marketContext.note);
+  if (ctx.marketContext.signals.length > 0) {
+    ctx.marketContext.signals.forEach((s) => {
+      lines.push(`  - [${s.kind}] ${s.title}${s.url ? ` (${s.url})` : ""} — ${s.reason}`);
+    });
+  }
+
+  return lines.join("\n");
+}

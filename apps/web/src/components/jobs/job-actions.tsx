@@ -1,6 +1,7 @@
 "use client";
 
-import { Bookmark, BookmarkCheck, Loader2 } from "lucide-react";
+import { Bookmark, BookmarkCheck, Loader2, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { useState, useTransition } from "react";
 
 import {
@@ -9,7 +10,7 @@ import {
   unsaveJobAction,
   updateApplicationStatusAction,
 } from "@/app/dashboard/jobs/actions";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import type { ApplicationStatus } from "@/lib/jobs/types";
 
 const applicationStatuses: Array<{ value: ApplicationStatus; label: string }> = [
@@ -56,6 +57,13 @@ export function JobActions({ jobId, isSaved, applicationStatus }: JobActionsProp
           )}
           {isSaved ? "Saved" : "Save job"}
         </Button>
+        <Link
+          href={`/dashboard/applications/${jobId}/workspace`}
+          className={buttonVariants({ variant: "outline" })}
+        >
+          <Sparkles className="size-4" aria-hidden="true" />
+          Open workspace
+        </Link>
         <select
           value={applicationStatus ?? ""}
           disabled={isPending}
