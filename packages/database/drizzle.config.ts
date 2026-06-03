@@ -9,7 +9,7 @@ export default defineConfig({
   dbCredentials: {
     url:
       process.env.DATABASE_URL ??
-      "postgresql://careeros:careeros_dev_password@localhost:5433/careeros_dev",
+      "postgres://careeros:careeros@localhost:5433/careeros",
   },
   casing: "snake_case",
   strict: true,

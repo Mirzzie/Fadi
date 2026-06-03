@@ -6,18 +6,19 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 
-import {
-  signInWithPasswordAction,
-  signUpWithPasswordAction,
-  type AuthActionResult,
-} from "@/app/auth/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { authClient } from "@/lib/auth/client";
 import { authFormSchema, type AuthFormValues } from "@/lib/auth/validation";
 
 type AuthFormProps = {
   mode: "sign-in" | "sign-up";
+};
+
+type AuthActionResult = {
+  ok: boolean;
+  message?: string;
 };
 
 function getSafeNextPath(next: string | null) {
@@ -26,6 +27,22 @@ function getSafeNextPath(next: string | null) {
   }
 
   return next;
+}
+
+function getSafeAuthMessage(message?: string) {
+  if (!message) {
+    return "Authentication failed. Please try again.";
+  }
+
+  if (/rate limit/i.test(message)) {
+    return "Too many authentication attempts. Please wait a moment and try again.";
+  }
+
+  return message;
+}
+
+function getDefaultDisplayName(email: string) {
+  return email.split("@")[0] ?? "CareerOS user";
 }
 
 export function AuthForm({ mode }: AuthFormProps) {
@@ -58,17 +75,36 @@ export function AuthForm({ mode }: AuthFormProps) {
 
     startTransition(async () => {
       const actionResult = isSignUp
-        ? await signUpWithPasswordAction(values)
-        : await signInWithPasswordAction(values);
+        ? await authClient.signUp.email({
+            email: values.email,
+            password: values.password,
+            name: getDefaultDisplayName(values.email),
+          })
+        : await authClient.signIn.email({
+            email: values.email,
+            password: values.password,
+            rememberMe: true,
+          });
 
-      if (actionResult.redirectTo) {
+      if (actionResult.error) {
+        setResult({
+          ok: false,
+          message: getSafeAuthMessage(actionResult.error.message),
+        });
+        return;
+      }
+
+      if (actionResult.data) {
         const next = getSafeNextPath(searchParams.get("next"));
-        router.push(!isSignUp && next ? next : actionResult.redirectTo);
+        router.push(!isSignUp && next ? next : "/dashboard");
         router.refresh();
         return;
       }
 
-      setResult(actionResult);
+      setResult({
+        ok: false,
+        message: "Authentication failed. Please try again.",
+      });
     });
   }
 

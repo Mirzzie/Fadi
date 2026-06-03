@@ -1,49 +1,52 @@
 import { createUsersRepository } from "@careeros/database";
+import { headers } from "next/headers";
 
+import { auth } from "@/lib/auth/auth";
 import { getDatabase } from "@/lib/database/client";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { logger } from "@/lib/observability/logger";
 
 export type AuthUser = {
   id: string;
   email?: string;
-  externalAuthProvider: "supabase";
+  externalAuthProvider: "better_auth";
   externalAuthUserId: string;
 };
 
 export async function getCurrentAuthUser(): Promise<AuthUser | null> {
   try {
-    const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase.auth.getClaims();
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
 
-    if (error || !data?.claims?.sub) {
+    if (!session?.user?.id || !session.user.email) {
       return null;
     }
 
-    const emailClaim = data.claims.email;
-    const email = typeof emailClaim === "string" ? emailClaim : undefined;
-
-    if (!email) {
-      return null;
-    }
+    const emailVerifiedAt = session.user.emailVerified ? new Date() : null;
 
     const usersRepository = createUsersRepository(getDatabase());
     const appUser = await usersRepository.findOrCreateFromAuthIdentity({
-      provider: "supabase",
-      providerSubject: String(data.claims.sub),
-      email,
-      emailVerifiedAt: data.claims.email_verified ? new Date() : null,
+      provider: "better_auth",
+      providerSubject: session.user.id,
+      email: session.user.email,
+      emailVerifiedAt,
+      fullName: session.user.name,
       providerProfile: {
-        supabaseClaims: data.claims,
+        betterAuthUserId: session.user.id,
+        emailVerified: session.user.emailVerified,
       },
     });
 
     return {
       id: appUser.id,
       email: appUser.email,
-      externalAuthProvider: "supabase",
-      externalAuthUserId: String(data.claims.sub),
+      externalAuthProvider: "better_auth",
+      externalAuthUserId: session.user.id,
     };
-  } catch {
+  } catch (error) {
+    logger.error("auth.session.resolve_failed", {
+      error: error instanceof Error ? error.message : "unknown",
+    });
     return null;
   }
 }

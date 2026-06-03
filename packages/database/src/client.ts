@@ -7,8 +7,7 @@ const { Pool } = pg;
 
 export type Database = NodePgDatabase<typeof schema>;
 
-const DEFAULT_LOCAL_DATABASE_URL =
-  "postgresql://careeros:careeros_dev_password@localhost:5433/careeros_dev";
+const DEFAULT_LOCAL_DATABASE_URL = "postgres://careeros:careeros@localhost:5433/careeros";
 
 export function createDatabaseClient(databaseUrl = process.env.DATABASE_URL ?? DEFAULT_LOCAL_DATABASE_URL): {
   db: Database;
