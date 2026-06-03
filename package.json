@@ -14,6 +14,7 @@
     "db:generate": "npm --workspace @careeros/database run db:generate",
     "db:migrate": "npm --workspace @careeros/database run db:migrate",
     "db:reset": "docker compose -f infrastructure/docker/docker-compose.yml down --volumes && docker compose -f infrastructure/docker/docker-compose.yml up -d postgres && npm run db:migrate",
+    "db:seed:jobs": "npm --workspace @careeros/database run db:seed:jobs",
     "db:studio": "npm --workspace @careeros/database run db:studio",
     "db:up": "docker compose -f infrastructure/docker/docker-compose.yml up -d postgres",
     "lint": "npm --workspace @careeros/web run lint",

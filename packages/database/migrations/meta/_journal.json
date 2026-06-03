@@ -8,6 +8,13 @@
       "when": 1780441814450,
       "tag": "0000_fat_tarot",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1780479474648,
+      "tag": "0001_numerous_gunslinger",
+      "breakpoints": true
     }
   ]
 }

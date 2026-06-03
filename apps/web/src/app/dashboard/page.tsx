@@ -5,6 +5,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { DashboardShell } from "@/components/shells/dashboard-shell";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDashboardProfileSummary, getLatestCareerReport } from "@/lib/career-report/data";
+import { getRecommendedJobsForUser } from "@/lib/jobs/data";
 import { getOnboardingStatus } from "@/lib/onboarding/status";
 
 export const metadata: Metadata = {
@@ -26,9 +27,10 @@ export default async function DashboardPage() {
     redirect("/onboarding");
   }
 
-  const [profileSummary, latestReport] = await Promise.all([
+  const [profileSummary, latestReport, recommendedJobsPreview] = await Promise.all([
     getDashboardProfileSummary(user.id),
     getLatestCareerReport(user.id),
+    getRecommendedJobsForUser(user.id, 3),
   ]);
 
   return (
@@ -37,6 +39,7 @@ export default async function DashboardPage() {
         userEmail={user.email}
         profileSummary={profileSummary}
         latestReport={latestReport}
+        recommendedJobsPreview={recommendedJobsPreview}
       />
     </AppShell>
   );

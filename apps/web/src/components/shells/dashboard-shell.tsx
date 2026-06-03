@@ -1,19 +1,33 @@
 import Link from "next/link";
-import { ArrowRight, GraduationCap, Sparkles, Target, TrendingUp } from "lucide-react";
+import {
+  ArrowRight,
+  BriefcaseBusiness,
+  GraduationCap,
+  Sparkles,
+  Target,
+  TrendingUp,
+} from "lucide-react";
 
 import { GenerateReportButton } from "@/components/dashboard/generate-report-button";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DashboardProfileSummary, StoredCareerReport } from "@/lib/career-report/schema";
+import type { RecommendedJob } from "@/lib/jobs/types";
 
 type DashboardShellProps = {
   userEmail?: string;
   profileSummary: DashboardProfileSummary | null;
   latestReport: StoredCareerReport | null;
+  recommendedJobsPreview: RecommendedJob[];
 };
 
-export function DashboardShell({ userEmail, profileSummary, latestReport }: DashboardShellProps) {
+export function DashboardShell({
+  userEmail,
+  profileSummary,
+  latestReport,
+  recommendedJobsPreview,
+}: DashboardShellProps) {
   return (
     <div className="mx-auto max-w-shell space-y-6">
       <section className="rounded-lg border bg-card p-6">
@@ -111,6 +125,48 @@ export function DashboardShell({ userEmail, profileSummary, latestReport }: Dash
           icon={GraduationCap}
         />
       </section>
+
+      <Card id="recommended-jobs">
+        <CardHeader className="flex flex-row items-start gap-4 space-y-0">
+          <div className="grid size-10 place-items-center rounded-md bg-primary/10 text-primary">
+            <BriefcaseBusiness className="size-5" aria-hidden="true" />
+          </div>
+          <div className="flex-1">
+            <CardTitle>Recommended jobs</CardTitle>
+            <CardDescription>
+              Local MVP job matches based on your onboarding profile and resume text.
+            </CardDescription>
+          </div>
+          <Link href="/dashboard/jobs" className={buttonVariants({ variant: "outline" })}>
+            View jobs
+            <ArrowRight className="size-4" aria-hidden="true" />
+          </Link>
+        </CardHeader>
+        <CardContent>
+          {recommendedJobsPreview.length > 0 ? (
+            <div className="grid gap-3 md:grid-cols-3">
+              {recommendedJobsPreview.map((job) => (
+                <div key={job.id} className="rounded-md border p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-medium">{job.title}</h3>
+                      <p className="text-sm text-muted-foreground">{job.company}</p>
+                    </div>
+                    <Badge variant="secondary">{job.matchScore}%</Badge>
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {[job.location, job.remoteMode, job.seniority].filter(Boolean).join(" / ")}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+              No seeded local jobs found yet. Run `npm run db:seed:jobs` to add example MVP jobs.
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

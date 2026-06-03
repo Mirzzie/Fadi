@@ -211,6 +211,8 @@ export const jobs = pgTable(
     company: text("company").notNull(),
     location: text("location"),
     remoteMode: text("remote_mode"),
+    employmentType: text("employment_type"),
+    seniority: text("seniority"),
     description: text("description"),
     url: text("url"),
     salaryText: text("salary_text"),
@@ -351,3 +353,6 @@ export type CareerProfile = typeof careerProfiles.$inferSelect;
 export type Resume = typeof resumes.$inferSelect;
 export type LinkedInProfile = typeof linkedinProfiles.$inferSelect;
 export type CareerReport = typeof careerReports.$inferSelect;
+export type Job = typeof jobs.$inferSelect;
+export type SavedJob = typeof savedJobs.$inferSelect;
+export type Application = typeof applications.$inferSelect;

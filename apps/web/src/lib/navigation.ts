@@ -14,7 +14,7 @@ export const appNavigation: NavItem[] = [
     icon: LayoutDashboard,
   },
   {
-    href: "/dashboard#recommended-jobs",
+    href: "/dashboard/jobs",
     label: "Jobs",
     icon: BriefcaseBusiness,
   },

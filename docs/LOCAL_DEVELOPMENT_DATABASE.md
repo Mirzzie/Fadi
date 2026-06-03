@@ -110,20 +110,22 @@ Available commands:
 ```bash
 npm run db:up
 npm run db:migrate
+npm run db:seed:jobs
 npm run db:studio
 npm run db:reset
 ```
 
 Proposed behavior:
 
-| Command       | Purpose                                              |
-| ------------- | ---------------------------------------------------- |
-| `db:up`       | Start local Postgres with Docker Compose             |
-| `db:down`     | Stop local Postgres                                  |
-| `db:migrate`  | Apply committed Drizzle migrations                   |
-| `db:generate` | Generate a new Drizzle migration from schema changes |
-| `db:studio`   | Open Drizzle Studio for database inspection          |
-| `db:reset`    | Drop the local Postgres volume, restart, and migrate |
+| Command        | Purpose                                              |
+| -------------- | ---------------------------------------------------- |
+| `db:up`        | Start local Postgres with Docker Compose             |
+| `db:down`      | Stop local Postgres                                  |
+| `db:migrate`   | Apply committed Drizzle migrations                   |
+| `db:generate`  | Generate a new Drizzle migration from schema changes |
+| `db:seed:jobs` | Insert or update local example MVP jobs              |
+| `db:studio`    | Open Drizzle Studio for database inspection          |
+| `db:reset`     | Drop the local Postgres volume, restart, and migrate |
 
 ## How To Start Local Postgres
 
@@ -162,6 +164,24 @@ npm run db:generate
 ```
 
 Review generated SQL before committing it.
+
+## How To Seed Local MVP Jobs
+
+The Phase 12 Job Discovery MVP uses local PostgreSQL data only. It does not call external job APIs, scrape websites, or use OpenAI for job matching.
+
+After migrations are applied, insert example MVP jobs with:
+
+```bash
+npm run db:seed:jobs
+```
+
+The seed script lives at:
+
+```text
+packages/database/src/seeds/mvp-jobs.ts
+```
+
+It uses deterministic `source` and `external_id` values, so it can be safely rerun to update the same local seed records.
 
 ## How To Inspect The Database
 
@@ -316,8 +336,22 @@ The following MVP data paths now use Drizzle repositories:
 | Dashboard profile summary        | Profile, career profile, LinkedIn, and resume repositories |
 | Career report generation context | Profile, career profile, LinkedIn, and resume repositories |
 | Career report persistence        | `createCareerReportsRepository`                            |
+| Local job discovery              | `createJobsRepository`                                     |
+| Saved jobs                       | `createSavedJobsRepository`                                |
+| Manual application tracking      | `createApplicationsRepository`                             |
 
 Supabase should now appear only in auth/session/callback/proxy code until the auth provider decision is revisited.
+
+## Current Job Discovery MVP
+
+The first job discovery experience is intentionally local-first:
+
+- Jobs are seeded into `jobs`.
+- Recommendations are computed deterministically from target role, location preference, experience level, and profile/resume keywords.
+- Saved jobs are stored in `saved_jobs`.
+- Manual application statuses are stored in `applications`.
+- Supported statuses are `interested`, `applied`, `interviewing`, `offer`, `rejected`, and `withdrawn`.
+- External job APIs, scraping, auto-apply, and AI job matching are not implemented in this phase.
 
 ## Production Compatibility
 
