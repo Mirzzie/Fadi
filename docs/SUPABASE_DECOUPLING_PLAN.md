@@ -10,10 +10,11 @@ Recommended path:
 
 1. Keep Supabase Auth temporarily.
 2. Stop adding new direct Supabase database access.
-3. Introduce PostgreSQL-first schema and repositories.
-4. Move domain tables away from `auth.users` and toward an application-owned `users` table.
-5. Keep Supabase as an optional production provider only if it is used as standard managed Postgres and/or temporary auth.
-6. Reevaluate auth after the MVP has real users.
+3. Introduce PostgreSQL-first schema and repositories. Completed in Phase 10.
+4. Move MVP domain data access from Supabase table calls to Drizzle repositories. Completed for onboarding, dashboard reads, and Career Intelligence Report generation in Phase 11.
+5. Move domain tables away from `auth.users` and toward an application-owned `users` table.
+6. Keep Supabase as an optional production provider only if it is used as standard managed Postgres and/or temporary auth.
+7. Reevaluate auth after the MVP has real users.
 
 Do not remove Supabase immediately. The current product is too early, and the highest-risk part of replacing Supabase Auth is user/session correctness, not code volume.
 
@@ -246,11 +247,29 @@ Once the repository contract is stable, add a Drizzle implementation.
 
 Move these call sites in order:
 
-1. `getOnboardingStatus`
-2. `getDashboardProfileSummary`
-3. `getLatestCareerReport`
-4. `completeOnboardingAction`
-5. `generateCareerReportAction`
+1. `getOnboardingStatus` - completed in Phase 11.
+2. `getDashboardProfileSummary` - completed in Phase 11.
+3. `getLatestCareerReport` - completed in Phase 11.
+4. `completeOnboardingAction` - completed in Phase 11.
+5. `generateCareerReportAction` - completed in Phase 11.
+
+Phase 11 mapping:
+
+```mermaid
+sequenceDiagram
+    participant App as Next.js App
+    participant Supa as Supabase Auth
+    participant Users as UsersRepository
+    participant Domain as Domain Repositories
+    participant PG as Local PostgreSQL
+
+    App->>Supa: Read session claims
+    Supa-->>App: sub, email
+    App->>Users: findOrCreateFromAuthIdentity(provider, sub, email)
+    Users->>PG: upsert users/auth_identities
+    App->>Domain: read/write with app users.id
+    Domain->>PG: Drizzle queries
+```
 
 ### Step 5: Replace Supabase SQL Migrations
 

@@ -1,25 +1,19 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createProfilesRepository } from "@careeros/database";
+
+import { getDatabase } from "@/lib/database/client";
 
 export type OnboardingStatus = "not_started" | "in_progress" | "completed";
 
 export async function getOnboardingStatus(userId: string): Promise<OnboardingStatus> {
   try {
-    const supabase = await createSupabaseServerClient();
-    const { data, error } = await supabase
-      .from("profiles")
-      .select("onboarding_status")
-      .eq("user_id", userId)
-      .maybeSingle();
+    const profilesRepository = createProfilesRepository(getDatabase());
+    const profile = await profilesRepository.getByUserId(userId);
 
-    if (error || !data?.onboarding_status) {
+    if (!profile) {
       return "not_started";
     }
 
-    if (data.onboarding_status === "completed" || data.onboarding_status === "in_progress") {
-      return data.onboarding_status;
-    }
-
-    return "not_started";
+    return profile.onboardingCompleted ? "completed" : "in_progress";
   } catch {
     return "not_started";
   }

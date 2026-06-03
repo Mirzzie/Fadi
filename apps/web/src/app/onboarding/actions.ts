@@ -1,7 +1,15 @@
 "use server";
 
+import {
+  createCareerProfilesRepository,
+  createLinkedInProfilesRepository,
+  createProfilesRepository,
+  createResumesRepository,
+} from "@careeros/database";
+
+import { getCurrentAuthUser } from "@/lib/auth/session";
+import { getDatabase } from "@/lib/database/client";
 import { onboardingFormSchema, type OnboardingFormValues } from "@/lib/onboarding/validation";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type OnboardingActionResult = {
   ok: boolean;
@@ -34,130 +42,57 @@ export async function completeOnboardingAction(
   const parsed = onboardingFormSchema.parse(values);
 
   try {
-    const supabase = await createSupabaseServerClient();
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims();
-    const userId = claimsData?.claims?.sub ? String(claimsData.claims.sub) : null;
-    const emailClaim = claimsData?.claims?.email;
+    const user = await getCurrentAuthUser();
 
-    if (claimsError || !userId) {
+    if (!user?.email) {
       return {
         ok: false,
         message: "You need to be signed in to complete onboarding.",
       };
     }
 
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .upsert(
-        {
-          user_id: userId,
-          full_name: parsed.fullName,
-          email: typeof emailClaim === "string" ? emailClaim : null,
-          onboarding_status: "in_progress",
-        },
-        {
-          onConflict: "user_id",
-        }
-      )
-      .select("id")
-      .single();
+    const db = getDatabase();
+    const profilesRepository = createProfilesRepository(db);
+    const careerProfilesRepository = createCareerProfilesRepository(db);
+    const linkedInProfilesRepository = createLinkedInProfilesRepository(db);
+    const resumesRepository = createResumesRepository(db);
 
-    if (profileError || !profile) {
-      return {
-        ok: false,
-        message: profileError?.message ?? "Could not save your profile.",
-      };
-    }
+    const profile = await profilesRepository.upsertForUser(user.id, {
+      fullName: parsed.fullName,
+      email: user.email,
+      onboardingCompleted: false,
+    });
 
-    const { data: existingCareerProfile } = await supabase
-      .from("career_profiles")
-      .select("id")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const careerProfilePayload = {
-      user_id: userId,
-      profile_id: profile.id,
-      target_role: parsed.targetRole,
+    await careerProfilesRepository.createForUser(user.id, {
+      profileId: profile.id,
+      targetRole: parsed.targetRole,
       location: parsed.locationPreference,
-      preferred_locations: [parsed.locationPreference],
-      experience_level: parsed.experienceLevel,
-      career_goal: parsed.careerGoals,
-    };
-
-    const careerProfileMutation = existingCareerProfile?.id
-      ? supabase
-          .from("career_profiles")
-          .update(careerProfilePayload)
-          .eq("id", existingCareerProfile.id)
-          .select("id")
-          .single()
-      : supabase.from("career_profiles").insert(careerProfilePayload).select("id").single();
-
-    const { data: careerProfile, error: careerProfileError } = await careerProfileMutation;
-
-    if (careerProfileError || !careerProfile) {
-      return {
-        ok: false,
-        message: careerProfileError?.message ?? "Could not save your career profile.",
-      };
-    }
+      experienceLevel: parsed.experienceLevel,
+      careerGoal: parsed.careerGoals,
+    });
 
     const linkedInText = parsed.linkedInProfile?.trim();
 
     if (linkedInText) {
-      const { error: linkedInError } = await supabase.from("linkedin_profiles").insert({
-        user_id: userId,
-        career_profile_id: careerProfile.id,
-        source_type: linkedInText.startsWith("http") ? "profile_url" : "pasted_text",
-        profile_url: linkedInText.startsWith("http") ? linkedInText : null,
-        raw_text: linkedInText,
-        import_status: "pending",
+      await linkedInProfilesRepository.createForUser(user.id, {
+        profileId: profile.id,
+        profileUrl: linkedInText.startsWith("http") ? linkedInText : null,
+        rawText: linkedInText,
+        importStatus: "pending",
       });
-
-      if (linkedInError) {
-        return {
-          ok: false,
-          message: linkedInError.message,
-        };
-      }
     }
 
-    const { error: resumeError } = await supabase.from("resumes").insert({
-      user_id: userId,
-      career_profile_id: careerProfile.id,
-      file_path: `text-paste/${userId}/${Date.now()}`,
-      file_name: "pasted-resume.txt",
-      file_type: "text/plain",
-      parsed_text: parsed.resumeText,
-      summary: null,
-      parse_status: "parsed",
-      is_primary: true,
+    await resumesRepository.createForUser(user.id, {
+      profileId: profile.id,
+      filePath: `text-paste/${user.id}/${Date.now()}`,
+      fileName: "pasted-resume.txt",
+      fileMimeType: "text/plain",
+      rawText: parsed.resumeText,
+      parsedText: parsed.resumeText,
+      parseStatus: "parsed",
     });
 
-    if (resumeError) {
-      return {
-        ok: false,
-        message: resumeError.message,
-      };
-    }
-
-    const { error: completionError } = await supabase
-      .from("profiles")
-      .update({
-        onboarding_status: "completed",
-      })
-      .eq("id", profile.id)
-      .eq("user_id", userId);
-
-    if (completionError) {
-      return {
-        ok: false,
-        message: completionError.message,
-      };
-    }
+    await profilesRepository.markOnboardingCompleted(user.id);
 
     return {
       ok: true,
@@ -167,7 +102,7 @@ export async function completeOnboardingAction(
   } catch {
     return {
       ok: false,
-      message: "Could not save onboarding data. Check Supabase configuration and migrations.",
+      message: "Could not save onboarding data. Check PostgreSQL configuration and migrations.",
     };
   }
 }

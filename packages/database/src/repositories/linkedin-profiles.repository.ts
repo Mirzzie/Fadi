@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 
-import type { Database } from "../client.js";
-import { linkedinProfiles, type LinkedInProfile } from "../schema/index.js";
+import type { Database } from "../client";
+import { linkedinProfiles, type LinkedInProfile } from "../schema/index";
 
 export type CreateLinkedInProfileInput = {
   profileId?: string | null;

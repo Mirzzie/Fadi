@@ -1,7 +1,7 @@
 import { desc, eq, and } from "drizzle-orm";
 
-import type { Database } from "../client.js";
-import { careerReports, type CareerReport } from "../schema/index.js";
+import type { Database } from "../client";
+import { careerReports, type CareerReport } from "../schema/index";
 
 type ReportListItem = {
   title: string;

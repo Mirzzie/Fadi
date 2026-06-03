@@ -1,5 +1,6 @@
 "use server";
 
+import { createCareerReportsRepository } from "@careeros/database";
 import OpenAI from "openai";
 import { revalidatePath } from "next/cache";
 import { zodResponseFormat } from "openai/helpers/zod";
@@ -7,8 +8,8 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getCareerReportContext } from "@/lib/career-report/data";
 import { careerIntelligenceReportSchema } from "@/lib/career-report/schema";
+import { getDatabase } from "@/lib/database/client";
 import { serverEnv } from "@/lib/env.server";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export type GenerateCareerReportResult = {
   ok: boolean;
@@ -109,42 +110,34 @@ ${truncate(context.resumeText, 9000)}
       };
     }
 
-    const supabase = await createSupabaseServerClient();
-    const { error } = await supabase.from("career_reports").insert({
-      user_id: user.id,
-      career_profile_id: context.careerProfileId,
-      resume_id: context.resumeId,
-      linkedin_profile_id: context.linkedInProfileId,
+    const careerReportsRepository = createCareerReportsRepository(getDatabase());
+    await careerReportsRepository.createForUser(user.id, {
+      careerProfileId: context.careerProfileId,
+      resumeId: context.resumeId,
+      linkedinProfileId: context.linkedInProfileId,
       status: "ready",
-      career_summary: report.careerSummary,
+      careerSummary: report.careerSummary,
       strengths: report.strengths,
-      skill_analysis: report.strengths,
-      missing_skills: report.missingSkills,
-      target_role_fit: report.targetRoleFit,
-      career_opportunities: [
+      skillAnalysis: report.strengths,
+      missingSkills: report.missingSkills,
+      targetRoleFit: report.targetRoleFit,
+      careerOpportunities: [
         {
           title: context.targetRole ?? "Target role",
           detail: report.targetRoleFit.explanation,
         },
       ],
-      market_demand: {
+      marketDemand: {
         note: "Real-time market intelligence is not implemented in the MVP.",
       },
-      recommended_learning_path: report.learningRecommendations,
-      resume_quality_score: report.resumeQualityScore,
-      career_readiness_score: report.careerReadinessScore,
-      recommended_actions: report.recommendedNextSteps,
-      model_name: model,
-      prompt_version: REPORT_PROMPT_VERSION,
-      generated_at: new Date().toISOString(),
+      recommendedLearningPath: report.learningRecommendations,
+      resumeQualityScore: report.resumeQualityScore,
+      careerReadinessScore: report.careerReadinessScore,
+      recommendedActions: report.recommendedNextSteps,
+      modelName: model,
+      promptVersion: REPORT_PROMPT_VERSION,
+      generatedAt: new Date(),
     });
-
-    if (error) {
-      return {
-        ok: false,
-        message: error.message,
-      };
-    }
 
     revalidatePath("/dashboard");
 

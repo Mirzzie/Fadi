@@ -2,7 +2,7 @@ import "dotenv/config";
 
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 
-import { createDatabaseClient } from "./client.js";
+import { createDatabaseClient } from "./client";
 
 const { db, pool } = createDatabaseClient();
 

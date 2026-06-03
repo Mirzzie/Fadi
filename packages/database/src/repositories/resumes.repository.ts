@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 
-import type { Database } from "../client.js";
-import { resumes, type Resume } from "../schema/index.js";
+import type { Database } from "../client";
+import { resumes, type Resume } from "../schema/index";
 
 export type CreateResumeInput = {
   profileId?: string | null;

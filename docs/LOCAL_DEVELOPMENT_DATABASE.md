@@ -4,7 +4,7 @@
 
 CareerOS local development should run against a local PostgreSQL database by default. This makes development faster, repeatable, offline-friendly, and less dependent on a hosted vendor. Production can later use any PostgreSQL-compatible provider.
 
-This document defines the implemented local database foundation introduced in Phase 10. The existing app still uses Supabase Auth and has not yet moved all data access to Drizzle, but new database work should use this PostgreSQL-first foundation.
+This document defines the implemented local database foundation introduced in Phase 10 and adopted for MVP domain data access in Phase 11. The existing app still uses Supabase Auth, but onboarding, dashboard profile reads, and Career Intelligence Report persistence now use PostgreSQL through Drizzle repositories.
 
 ## Target Local Stack
 
@@ -288,11 +288,36 @@ Mapping rules:
 - Domain tables always reference `users.id`.
 - If CareerOS later moves to better-auth or Auth.js, a new identity provider can map to the same app-owned user record.
 
-The initial repository method for this bridge is `findOrCreateFromAuthIdentity` in:
+The bridge runs in the web app session helper:
+
+```text
+apps/web/src/lib/auth/session.ts
+```
+
+That helper reads Supabase claims for login/session only, then calls `findOrCreateFromAuthIdentity` in:
 
 ```text
 packages/database/src/repositories/users.repository.ts
 ```
+
+After that point, app code receives the app-owned `users.id`. MVP domain operations should not use the Supabase Auth subject as a table owner.
+
+## Current MVP Repository Migration
+
+The following MVP data paths now use Drizzle repositories:
+
+| Flow                             | Repository Layer                                           |
+| -------------------------------- | ---------------------------------------------------------- |
+| Ensure app-owned user            | `createUsersRepository`                                    |
+| Onboarding profile save          | `createProfilesRepository`                                 |
+| Career profile save              | `createCareerProfilesRepository`                           |
+| LinkedIn text/URL save           | `createLinkedInProfilesRepository`                         |
+| Resume text save                 | `createResumesRepository`                                  |
+| Dashboard profile summary        | Profile, career profile, LinkedIn, and resume repositories |
+| Career report generation context | Profile, career profile, LinkedIn, and resume repositories |
+| Career report persistence        | `createCareerReportsRepository`                            |
+
+Supabase should now appear only in auth/session/callback/proxy code until the auth provider decision is revisited.
 
 ## Production Compatibility
 

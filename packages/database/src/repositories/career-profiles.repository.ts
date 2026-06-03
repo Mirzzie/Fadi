@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 
-import type { Database } from "../client.js";
-import { careerProfiles, type CareerProfile } from "../schema/index.js";
+import type { Database } from "../client";
+import { careerProfiles, type CareerProfile } from "../schema/index";
 
 export type CreateCareerProfileInput = {
   profileId?: string | null;

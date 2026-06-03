@@ -1,4 +1,12 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  createCareerProfilesRepository,
+  createCareerReportsRepository,
+  createLinkedInProfilesRepository,
+  createProfilesRepository,
+  createResumesRepository,
+} from "@careeros/database";
+
+import { getDatabase } from "@/lib/database/client";
 import type { DashboardProfileSummary, StoredCareerReport } from "@/lib/career-report/schema";
 
 type CareerReportContext = {
@@ -17,32 +25,6 @@ type CareerReportContext = {
   resumeText: string | null;
 };
 
-type CareerProfileRow = {
-  id: string;
-  profile_id: string | null;
-  target_role: string | null;
-  location: string | null;
-  experience_level: string | null;
-  career_goal: string | null;
-};
-
-type ProfileRow = {
-  id: string;
-  full_name: string | null;
-  email: string | null;
-};
-
-type ResumeRow = {
-  id: string;
-  parsed_text: string | null;
-};
-
-type LinkedInProfileRow = {
-  id: string;
-  raw_text: string | null;
-  profile_url: string | null;
-};
-
 function preview(value: string | null | undefined, maxLength = 220) {
   if (!value) {
     return null;
@@ -51,57 +33,47 @@ function preview(value: string | null | undefined, maxLength = 220) {
   return value.length > maxLength ? `${value.slice(0, maxLength)}...` : value;
 }
 
-export async function getCareerReportContext(userId: string): Promise<CareerReportContext | null> {
-  const supabase = await createSupabaseServerClient();
+function toIsoString(value: Date | string | null) {
+  if (!value) {
+    return null;
+  }
 
-  const { data: careerProfile } = await supabase
-    .from("career_profiles")
-    .select("id, profile_id, target_role, location, experience_level, career_goal")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle<CareerProfileRow>();
+  return value instanceof Date ? value.toISOString() : value;
+}
+
+export async function getCareerReportContext(userId: string): Promise<CareerReportContext | null> {
+  const db = getDatabase();
+  const careerProfilesRepository = createCareerProfilesRepository(db);
+  const profilesRepository = createProfilesRepository(db);
+  const resumesRepository = createResumesRepository(db);
+  const linkedInProfilesRepository = createLinkedInProfilesRepository(db);
+
+  const careerProfile = await careerProfilesRepository.getLatestForUser(userId);
 
   if (!careerProfile) {
     return null;
   }
 
-  const [{ data: profile }, { data: resume }, { data: linkedInProfile }] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id, full_name, email")
-      .eq("user_id", userId)
-      .maybeSingle<ProfileRow>(),
-    supabase
-      .from("resumes")
-      .select("id, parsed_text")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle<ResumeRow>(),
-    supabase
-      .from("linkedin_profiles")
-      .select("id, raw_text, profile_url")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle<LinkedInProfileRow>(),
+  const [profile, resume, linkedInProfile] = await Promise.all([
+    profilesRepository.getByUserId(userId),
+    resumesRepository.getLatestForUser(userId),
+    linkedInProfilesRepository.getLatestForUser(userId),
   ]);
 
   return {
     userId,
-    profileId: profile?.id ?? careerProfile.profile_id ?? null,
+    profileId: profile?.id ?? careerProfile.profileId ?? null,
     careerProfileId: careerProfile.id,
     resumeId: resume?.id ?? null,
     linkedInProfileId: linkedInProfile?.id ?? null,
-    fullName: profile?.full_name ?? null,
+    fullName: profile?.fullName ?? null,
     email: profile?.email ?? undefined,
-    targetRole: careerProfile.target_role,
+    targetRole: careerProfile.targetRole,
     locationPreference: careerProfile.location,
-    experienceLevel: careerProfile.experience_level,
-    careerGoals: careerProfile.career_goal,
-    linkedInProfileText: linkedInProfile?.raw_text ?? linkedInProfile?.profile_url ?? null,
-    resumeText: resume?.parsed_text ?? null,
+    experienceLevel: careerProfile.experienceLevel,
+    careerGoals: careerProfile.careerGoal,
+    linkedInProfileText: linkedInProfile?.rawText ?? linkedInProfile?.profileUrl ?? null,
+    resumeText: resume?.parsedText ?? resume?.rawText ?? null,
   };
 }
 
@@ -127,17 +99,25 @@ export async function getDashboardProfileSummary(
 }
 
 export async function getLatestCareerReport(userId: string): Promise<StoredCareerReport | null> {
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from("career_reports")
-    .select(
-      "id, career_summary, strengths, missing_skills, target_role_fit, resume_quality_score, career_readiness_score, recommended_actions, recommended_learning_path, model_name, generated_at, created_at"
-    )
-    .eq("user_id", userId)
-    .eq("status", "ready")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle<StoredCareerReport>();
+  const careerReportsRepository = createCareerReportsRepository(getDatabase());
+  const report = await careerReportsRepository.getLatestReadyForUser(userId);
 
-  return data ?? null;
+  if (!report) {
+    return null;
+  }
+
+  return {
+    id: report.id,
+    career_summary: report.careerSummary,
+    strengths: report.strengths,
+    missing_skills: report.missingSkills,
+    target_role_fit: report.targetRoleFit,
+    resume_quality_score: report.resumeQualityScore,
+    career_readiness_score: report.careerReadinessScore,
+    recommended_actions: report.recommendedActions,
+    recommended_learning_path: report.recommendedLearningPath,
+    model_name: report.modelName,
+    generated_at: toIsoString(report.generatedAt),
+    created_at: toIsoString(report.createdAt) ?? new Date().toISOString(),
+  };
 }

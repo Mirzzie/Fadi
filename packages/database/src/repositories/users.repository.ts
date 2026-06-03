@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 
-import type { Database } from "../client.js";
-import { authIdentities, users, type User } from "../schema/index.js";
+import type { Database } from "../client";
+import { authIdentities, users, type User } from "../schema/index";
 
 export type AuthProvider = "supabase" | "better_auth" | "authjs" | "custom";
 

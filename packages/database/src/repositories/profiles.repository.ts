@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 
-import type { Database } from "../client.js";
-import { profiles, type Profile } from "../schema/index.js";
+import type { Database } from "../client";
+import { profiles, type Profile } from "../schema/index";
 
 export type UpsertProfileInput = {
   fullName: string;
@@ -44,6 +44,20 @@ export function createProfilesRepository(db: Database) {
         .returning();
 
       return profile;
+    },
+
+    async markOnboardingCompleted(userId: string): Promise<Profile | null> {
+      const [profile] = await db
+        .update(profiles)
+        .set({
+          onboardingCompleted: true,
+          onboardingCompletedAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(profiles.userId, userId))
+        .returning();
+
+      return profile ?? null;
     },
   };
 }
