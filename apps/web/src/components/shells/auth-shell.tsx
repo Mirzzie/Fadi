@@ -40,6 +40,17 @@ export function AuthShell({ mode }: AuthShellProps) {
         }}
         aria-hidden="true"
       />
+      {/* Aurora glows */}
+      <div
+        className="pointer-events-none fixed -left-32 top-1/4 size-[520px] rounded-full opacity-[0.12] blur-3xl"
+        style={{ background: "oklch(0.72 0.19 192)" }}
+        aria-hidden="true"
+      />
+      <div
+        className="pointer-events-none fixed -right-24 bottom-0 size-[480px] rounded-full opacity-[0.1] blur-3xl"
+        style={{ background: "oklch(0.66 0.22 285)" }}
+        aria-hidden="true"
+      />
 
       {/* Header */}
       <header className="relative z-10 border-b border-border/60 bg-background/80 backdrop-blur-sm">
