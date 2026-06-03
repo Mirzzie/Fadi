@@ -1,14 +1,16 @@
 # MVP User Journeys
 
-## Primary User
+## Primary Users
 
-The MVP serves individual professionals looking for career clarity, better job targeting, and practical next steps. The first 100 users can include job seekers, career switchers, graduates, early-career professionals, and professionals exploring a move.
+The MVP serves individual professionals looking for career clarity, honest guidance, and practical next steps. The first 100 users can include job seekers, career switchers, graduates, early-career professionals, and experienced professionals considering a move.
+
+Kai behaves differently for each stage. A fresh graduate gets guidance on building a first professional identity. A mid-career switcher gets a niche validation and bridge-building plan. An experienced professional gets strategic positioning intelligence. The underlying system is the same; the output is personalised.
 
 ## Journey 1: New User Activation
 
 ### Goal
 
-Get the user from signup to first useful career analysis in one session.
+Get the user from sign-up to first honest career analysis in one session.
 
 ### Flow
 
@@ -19,47 +21,50 @@ flowchart TD
     Resume --> LinkedIn[Import or Paste LinkedIn]
     LinkedIn --> Profile[Confirm Profile Fields]
     Profile --> Goals[Set Career Goals]
-    Goals --> Analyze[Generate Career Analysis]
-    Analyze --> Dashboard[Career Dashboard]
+    Goals --> Niche[Niche Discovery with Kai]
+    Niche --> Validate[Kai Niche Validation]
+    Validate --> Analyze[Generate Career Analysis]
+    Analyze --> Dashboard[Kai Command Center]
 ```
 
-### MVP Requirements
+### Phase 1 Requirements
 
-- User can sign up with email or Google.
+- User can sign up with email/password (Better Auth).
 - User can upload PDF or DOCX resume.
-- User can paste LinkedIn profile text or URL metadata where available.
+- User can paste LinkedIn profile text or URL metadata.
 - User can edit target role, location, salary expectation, skills, and industries.
-- User receives analysis with strengths, gaps, readiness score, and next actions.
+- Kai conducts a niche discovery conversation and returns an honest assessment.
+- User receives analysis with strengths, gaps, niche assessment, readiness score, and a prescribed next system.
 
 ### Success Metric
 
-Career analysis generated within 10 minutes of signup.
+Career analysis with honest niche assessment generated within 15 minutes of sign-up.
 
-## Journey 2: Career Dashboard Review
+## Journey 2: Kai Command Center Review
 
 ### Goal
 
-Help the user understand their career status and next best actions.
+Help the user understand their career status and Kai's recommended next actions.
 
 ### Flow
 
 ```mermaid
 flowchart TD
-    Dashboard[Dashboard] --> Summary[Career Summary]
-    Dashboard --> Gaps[Skill Gaps]
+    Dashboard[Kai Command Center] --> Summary[Career Summary and Niche Validation]
+    Dashboard --> Gaps[Skill and Evidence Gaps]
     Dashboard --> Jobs[Recommended Jobs]
     Dashboard --> Learning[Learning Recommendations]
     Dashboard --> Apps[Application Tracker]
-    Dashboard --> Assistant[AI Assistant]
+    Dashboard --> Assistant[Kai Assistant]
 ```
 
-### MVP Requirements
+### Phase 1 Requirements
 
-- Dashboard shows current target role.
-- Dashboard shows readiness score and explanation.
-- Dashboard shows 3-5 recommended actions.
-- Dashboard shows top job recommendations.
-- Dashboard shows application tracker summary.
+- Command center shows the user's current target role and niche assessment.
+- Command center shows readiness score with evidence breakdown.
+- Kai surfaces three to five recommended next actions with reasoning.
+- Top job recommendations visible.
+- Application tracker summary visible.
 
 ### Success Metric
 
@@ -69,26 +74,26 @@ User understands what to do next without asking support.
 
 ### Goal
 
-Show users jobs that feel meaningfully matched to their profile.
+Show users jobs that feel meaningfully matched to their profile, with Kai's reasoning.
 
 ### Flow
 
 ```mermaid
 flowchart TD
-    Profile[Profile and Goals] --> Search[Job Search]
+    Profile[Profile and Goals] --> Search[Job Discovery]
     Search --> Match[Match Scoring]
-    Match --> Explain[AI Explanation]
+    Match --> Explain[Kai Explanation]
     Explain --> User[User Reviews]
     User --> Save[Save Job]
     User --> Reject[Reject Job]
     Save --> Track[Create Application Item]
 ```
 
-### MVP Requirements
+### Phase 1 Requirements
 
 - User can search jobs by role and location.
-- System can display recommended jobs.
-- Each recommendation includes match score, matched skills, missing skills, and explanation.
+- Kai displays recommended jobs with match score.
+- Each recommendation includes matched skills, missing skills, and Kai's explanation.
 - User can save or reject a job.
 - User can convert a saved job into an application tracker item.
 
@@ -96,64 +101,66 @@ flowchart TD
 
 User saves at least one recommended job.
 
-## Journey 4: AI Career Assistant
+## Journey 4: Kai Career Assistant
 
 ### Goal
 
-Let the user ask grounded career questions using their profile context.
+Let the user ask grounded career questions — including hard ones — and receive honest, evidence-based answers.
 
 ### Flow
 
 ```mermaid
 flowchart TD
-    User[User Question] --> Assistant[AI Assistant]
-    Assistant --> Context[Profile, Analysis, Jobs, Applications]
-    Context --> Response[Grounded Answer]
-    Response --> Action[Suggested Next Action]
+    User[User Question] --> Assistant[Kai Agent]
+    Assistant --> Context[Profile, Analysis, Niche Validation, Jobs, Applications]
+    Context --> Response[Grounded Honest Answer]
+    Response --> Challenge[Kai Challenges If Data Warrants]
+    Challenge --> Action[Specific Next Action Suggested]
 ```
 
-### MVP Requirements
+### Phase 1 Requirements
 
-- Assistant answers career, resume, job targeting, learning, and application tracking questions.
-- Assistant uses stored profile and career analysis context.
-- Assistant does not claim to submit applications or perform external actions.
-- Assistant suggests actions inside the app.
+- Kai answers career, resume, job targeting, learning, niche, and application tracking questions.
+- Kai uses stored profile and career analysis context.
+- Kai challenges user's direction when the available data supports doing so.
+- Kai does not claim to submit applications or perform external actions.
+- Kai suggests specific next actions inside CareerOS.
 
 ### Success Metric
 
-User asks at least one assistant question after analysis.
+User asks at least one Kai question after analysis. Bonus: user engages with a contrarian or challenging Kai response.
 
 ## Journey 5: Learning Recommendation
 
 ### Goal
 
-Convert missing skills into realistic learning actions.
+Convert missing skills and evidence gaps into realistic, market-demand-prioritized learning actions.
 
 ### Flow
 
 ```mermaid
 flowchart TD
-    Gaps[Skill Gaps] --> Resources[Curated Resources]
-    Resources --> Recommend[Recommended Learning]
+    Gaps[Skill and Evidence Gaps] --> Market[Market Demand Signals]
+    Market --> Recommend[Market-Prioritized Recommendations]
     Recommend --> Save[Save Learning Item]
     Save --> Dashboard[Dashboard Next Action]
 ```
 
-### MVP Requirements
+### Phase 1 Requirements
 
-- Learning recommendations are generated from skill gaps.
-- Recommendations include title, provider, estimated effort, and reason.
-- User can mark learning item as saved or completed.
+- Learning recommendations are generated from skill gaps, prioritized by available market demand data.
+- Recommendations include title, provider, estimated effort, and reason tied to career goals.
+- User can mark learning items as saved or completed.
 
 ### Success Metric
 
-User saves or completes at least one learning recommendation.
+User saves or engages with at least one learning recommendation.
 
 ## Journey 6: Application Tracking
 
 ### Goal
 
-Give users a simple place to manage applications.
+Give users a simple place to manage applications with Kai's context.
 
 ### Flow
 
@@ -166,7 +173,7 @@ flowchart TD
     Next --> Dashboard[Dashboard Reminder]
 ```
 
-### MVP Requirements
+### Phase 1 Requirements
 
 - User can create manual application entries.
 - User can link entries to saved jobs.
@@ -176,4 +183,3 @@ flowchart TD
 ### Success Metric
 
 User tracks at least one application.
-

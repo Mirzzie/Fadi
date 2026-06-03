@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This guide explains how developers should work in the CareerOS AI repository. The repository currently contains documentation plus the Phase 5 MVP application foundation.
+This guide explains how developers should work in the CareerOS repository. The repository contains the Phase 1 MVP application foundation built on Next.js 16, Better Auth, PostgreSQL, and Drizzle ORM.
 
 ## First-Day Onboarding
 
@@ -12,7 +12,8 @@ This guide explains how developers should work in the CareerOS AI repository. Th
 4. Read `docs/MVP_IMPLEMENTATION_PLAN.md`.
 5. Read `docs/CODING_STANDARDS.md`.
 6. Read `docs/GIT_WORKFLOW.md`.
-7. Review open issues before starting work.
+7. Read `docs/LOCAL_DEVELOPMENT_DATABASE.md`.
+8. Review open issues before starting work.
 
 ## MVP Engineering Principles
 
@@ -23,26 +24,27 @@ This guide explains how developers should work in the CareerOS AI repository. Th
 - Do not build future-vision architecture inside MVP code.
 - Keep AI usage observable, bounded, and reviewable.
 - Protect user career data as sensitive personal data.
+- Kai is the product — design features from the user's perspective of interacting with Kai, not a generic dashboard.
 
-## Planned Stack
+## Current Stack
 
-- Web app: Next.js App Router with TypeScript.
-- UI: Tailwind CSS and a small component library.
-- Database: Supabase Postgres.
-- Auth: Supabase Auth.
-- Storage: Supabase Storage.
-- Hosting: Vercel.
-- AI: OpenAI API behind an internal model client.
+- **Web app**: Next.js 16 App Router with TypeScript.
+- **UI**: Tailwind v4, shadcn/ui.
+- **Database**: PostgreSQL (Docker locally), Drizzle ORM.
+- **Migrations**: `drizzle-kit`, committed to `packages/database/migrations`.
+- **Auth**: Better Auth with Drizzle adapter.
+- **AI**: Pluggable model gateway — currently OpenAI SDK.
+- **Hosting**: Vercel (Next.js).
 
 ## Environment Strategy
 
 Use separate environments:
 
 - `local`: developer machine.
-- `preview`: pull request and staging-style deployments.
+- `preview`: pull request and staging deployments.
 - `production`: live user environment.
 
-Environment files should not be committed.
+Environment files must not be committed.
 
 Expected files:
 
@@ -53,40 +55,46 @@ Rules:
 
 - Keep `.env.example` updated when environment requirements change.
 - Never commit secrets.
-- Keep public browser-safe values prefixed consistently, such as `NEXT_PUBLIC_`.
+- Keep public browser-safe values prefixed with `NEXT_PUBLIC_`.
 - Keep server-only values unprefixed and only read them in server code.
 - Rotate credentials after accidental exposure.
 
-Supabase authentication values:
+Environment variables required:
 
-- `NEXT_PUBLIC_SUPABASE_URL`: Supabase project URL.
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Supabase publishable or legacy anon key for browser-safe auth.
-- `SUPABASE_SERVICE_ROLE_KEY`: server-only key reserved for future admin operations; do not expose it to client code.
+```env
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+BETTER_AUTH_URL=http://localhost:3000
+BETTER_AUTH_SECRET=replace-with-strong-secret
+DATABASE_URL=postgres://careeros:careeros@localhost:5433/careeros
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4.1-mini
+```
 
-For local auth testing, add the web app URL to Supabase Auth redirect URLs:
+Production must use a strong unique `BETTER_AUTH_SECRET` and SSL-enabled `DATABASE_URL`.
 
-- `http://localhost:3000/auth/callback`
-- `http://localhost:3000/dashboard`
-
-## Local Development Expectations
-
-Local setup:
+## Local Development Setup
 
 1. Install dependencies.
 2. Copy `.env.example` to `.env.local`.
-3. Configure Supabase project values.
-4. Start the local web app.
-5. Run checks before opening a pull request.
+3. Configure environment values.
+4. Start local PostgreSQL with Docker.
+5. Run database migrations.
+6. Start the local web app.
+7. Run checks before opening a pull request.
 
 Commands:
 
 ```bash
 npm install
+npm run db:up
+npm run db:migrate
 npm run dev
 npm run lint
 npm run typecheck
 npm run build
 ```
+
+See `docs/LOCAL_DEVELOPMENT_DATABASE.md` for full database setup and inspection commands.
 
 ## AI-Assisted Development Rules
 
@@ -107,4 +115,6 @@ A change is done when:
 - It handles loading, empty, error, and unauthorized states where applicable.
 - It does not leak secrets or sensitive user data.
 - It is documented if it changes architecture, setup, or workflow.
-- It passes local checks once tooling exists.
+- It passes local checks (`lint`, `typecheck`, `build`).
+- It does not introduce new direct database access outside of repositories and server actions.
+- It does not hard-code model provider assumptions.

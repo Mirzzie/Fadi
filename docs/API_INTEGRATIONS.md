@@ -1,10 +1,10 @@
-# CareerOS AI API Integrations
+# CareerOS API Integrations
 
 ## Purpose
 
-CareerOS AI depends on integrations for identity, profile discovery, opportunity discovery, market intelligence, documents, communication, scheduling, and learning recommendations. This document defines the initial integration landscape and the questions that must be resolved before implementation.
+CareerOS depends on integrations for identity, profile discovery, opportunity discovery, market intelligence, documents, communication, scheduling, and learning recommendations. This document defines the integration landscape and the review requirements before any integration is implemented.
 
-No integrations should be implemented before legal, product, and technical review of provider terms, data permissions, and user consent requirements.
+No integration should be implemented before legal, product, and technical review of provider terms, data permissions, and user consent requirements.
 
 ## Integration Principles
 
@@ -13,59 +13,42 @@ No integrations should be implemented before legal, product, and technical revie
 - Make user consent explicit.
 - Store integration tokens securely.
 - Keep audit logs for external actions.
-- Do not submit applications, send messages, or update external profiles without approval.
-- Avoid scraping strategies until platform policies and compliance implications are reviewed.
+- Approval-gate every external action — never submit applications, send messages, or update external profiles without explicit user consent.
+- Never scrape without full legal and platform policy review.
+- All source attribution must be stored and displayed with market intelligence data.
 
 ## Authentication Providers
 
-Initial options from the brief:
+Current (Phase 1):
 
-- LinkedIn
-- Google
-- Email
+- Better Auth — email/password
+
+Future additions:
+
+- LinkedIn (OAuth)
+- Google (OAuth)
 - Phone number
-
-Required capabilities:
-
-- Account creation
-- Login
-- Account linking
-- Session management
-- Secure logout
-- Account deletion support
-
-Open decisions:
-
-- Whether LinkedIn authentication is available and sufficient for profile import.
-- Whether phone number authentication is needed for MVP.
-- Whether enterprise SSO should be considered later.
+- Enterprise SSO
 
 ## Profile Discovery Integrations
 
 Potential profile sources:
 
-- LinkedIn profile data
-- Resume upload
+- LinkedIn profile data (official API or pasted/imported text)
+- Resume upload (PDF, DOCX)
 - Manual profile input
-- Public portfolio or website URLs
-
-Required capabilities:
-
-- Import profile facts.
-- Parse resume content.
-- Normalize skills, roles, education, and certifications.
-- Detect missing profile data.
-- Let users review and correct imported facts.
+- GitHub profile and repositories
+- Public portfolio URLs
 
 Key constraints:
 
-- LinkedIn data access may be limited by API permissions.
+- LinkedIn data access may be limited by API permissions — paste/import fallback required.
 - Resume parsing must handle sensitive personal data carefully.
-- Imported data should never be treated as final without user review.
+- Imported data must never be treated as final without user review.
 
 ## Job Discovery Integrations
 
-Potential sources from the brief:
+Potential sources:
 
 - LinkedIn Jobs
 - Indeed
@@ -76,147 +59,98 @@ Potential sources from the brief:
 - TotalJobs
 - EURES
 - Company career pages
+- Partner or aggregator APIs
 
 Required capabilities:
 
 - Search jobs by role, skill, location, salary, remote mode, and seniority.
-- Normalize job descriptions.
-- Detect duplicate postings.
-- Monitor new opportunities.
+- Normalize and deduplicate job descriptions.
+- Monitor new opportunities continuously (background workers).
 - Store source URLs and attribution.
 - Track deadlines and application links.
+- Remove stale or closed postings.
 
-Open decisions:
+Phase 3+ integration — Phase 1 uses curated seeded jobs.
 
-- Which sources provide official APIs.
-- Which sources permit automated access.
-- Whether a third-party jobs aggregation API is needed.
-- How often each source can be checked.
-- How to handle stale or closed jobs.
+## AI and Model Integrations
+
+CareerOS uses a pluggable model gateway. All AI calls route through this abstraction. No feature code imports provider SDKs directly.
+
+Currently wired:
+
+- OpenAI SDK (GPT-4.1-mini and equivalents)
+
+Supported by design (swap at model gateway layer):
+
+- Anthropic Claude
+- Google Gemini
+- Local models
+- Future agentic entities
+
+The model gateway provides routing, fallback, cost controls, rate limits, and evaluation fixtures.
+
+## Market Intelligence Integrations
+
+Sources for trusted market data:
+
+- Government labor statistics (CSO, ONS, BLS, Eurostat)
+- Economic indicators
+- Licensed salary datasets
+- Industry reports and publications
+- Trusted news feeds
+- Company announcements and hiring signals
+- Layoff tracking datasets (where legally usable)
+- Geo-political context APIs
+
+Required capabilities:
+
+- Monitor hiring trends by role, sector, and geography.
+- Track salary intelligence by seniority and geography.
+- Summarize industry changes and emerging skill demand.
+- Detect layoff and hiring signals.
+- Provide geo-political context relevant to career sectors.
+- Connect signals to specific user goals.
+
+Every market intelligence output must include source attribution, publication date, and confidence level.
+
+Phase 3+ integration — Phase 1 uses directional curated data.
 
 ## Application Automation Integrations
 
 Potential integration areas:
 
-- Resume generation and export
-- Cover letter generation and export
-- Application tracking
-- Email drafts
-- Calendar reminders
-- Form preparation
+- Document rendering (PDF, DOCX export)
+- Email providers (approval-gated message sending)
+- Calendar providers (approval-gated scheduling)
+- Job application platforms (browser-assisted form preparation — future, high-risk, full safety review required)
 
-Required capabilities:
+Approval boundaries:
 
-- Generate application documents.
-- Export documents in common formats.
-- Track application stages.
-- Create reminders for deadlines and interviews.
-- Prepare messages for recruiters or hiring managers.
-
-High-risk actions requiring approval:
-
-- Submitting a job application.
-- Sending an email or message.
-- Uploading a resume to an external site.
-- Updating a LinkedIn or external profile.
-- Scheduling an interview.
+- Drafting: allowed without approval.
+- Sending: never allowed without explicit user approval.
+- Scheduling: never allowed without explicit user approval.
 
 ## Learning Integrations
 
 Potential sources:
 
-- Course platforms
+- Course platforms (Coursera, Udemy, LinkedIn Learning, etc.)
 - Certification providers
-- Public learning resources
-- Internal curated content
+- Public learning resources (free alternatives)
+- GitHub as proof-of-work scaffolding platform
 
 Required capabilities:
 
-- Recommend learning resources based on skill gaps.
-- Map courses to target roles and missing skills.
+- Recommend learning resources by skill gap and market demand.
+- Distinguish high-certificate-value vs high-portfolio-value roles.
 - Track progress.
-- Prioritize high-return learning actions.
-
-Open decisions:
-
-- Which learning providers should be used in MVP.
-- Whether affiliate relationships affect recommendation neutrality.
-- How to rank free versus paid learning options.
-
-## Market Intelligence Integrations
-
-Potential sources from the brief:
-
-- Government reports
-- Labor statistics
-- Industry reports
-- News feeds
-- Economic indicators
-
-Required capabilities:
-
-- Monitor hiring trends.
-- Track salary intelligence.
-- Summarize industry changes.
-- Detect layoff and hiring signals.
-- Track skill demand.
-- Connect market signals to user goals.
-
-Important requirement:
-
-Market intelligence must be presented with source attribution, dates, and uncertainty. Users should be able to distinguish current signals from older trend data.
-
-## Communication and Scheduling Integrations
-
-Potential sources:
-
-- Email providers
-- Calendar providers
-- Notification services
-
-Required capabilities:
-
-- Draft messages.
-- Create reminders.
-- Track deadlines.
-- Prepare interview schedules.
-- Notify users about urgent actions.
-
-Approval boundaries:
-
-- Drafting is allowed without approval.
-- Sending is not allowed without explicit approval.
-- Scheduling is not allowed without explicit approval.
-
-## AI and Model Integrations
-
-The product will require AI models for:
-
-- Conversation
-- Career analysis
-- Resume and cover letter generation
-- Job matching
-- Market summarization
-- Skill mapping
-- Planning
-- Tool orchestration
-- Voice interaction
-
-Future decisions:
-
-- Model provider
-- Model routing strategy
-- Evaluation framework
-- Cost controls
-- Prompt and memory privacy
-- Safety review process
-- Human review triggers
+- Recommend free and paid alternatives.
 
 ## Integration Readiness Checklist
 
 Before enabling any integration:
 
-- Terms of service reviewed.
+- Terms of service reviewed and approved.
 - User consent model defined.
 - Data storage requirements documented.
 - Token handling approach defined.
@@ -224,4 +158,4 @@ Before enabling any integration:
 - Error handling planned.
 - Audit logs designed.
 - User disconnect and deletion flows defined.
-
+- Source attribution stored for all market data.

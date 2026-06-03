@@ -2,14 +2,15 @@
 
 ## Purpose
 
-Analytics and telemetry should help CareerOS AI improve product quality, agent reliability, recommendation usefulness, system performance, and business health while respecting user privacy.
+Analytics and telemetry help CareerOS improve product quality, Kai's intelligence quality, recommendation usefulness, system performance, and business health — while respecting user privacy.
 
 ## Measurement Categories
 
 - Product analytics
-- Agent task telemetry
+- Kai task and agent telemetry
 - Recommendation analytics
 - AI quality metrics
+- Model gateway cost and performance metrics
 - Operational metrics
 - Billing and usage metrics
 - Safety and approval metrics
@@ -20,91 +21,91 @@ Analytics and telemetry should help CareerOS AI improve product quality, agent r
 flowchart TD
     App[Application Events] --> Collector[Event Collector]
     Services[Service Metrics] --> Collector
-    Agent[Agent Traces] --> Collector
+    Agent[Kai Agent Traces] --> Collector
+    Gateway[Model Gateway Metrics] --> Collector
     Collector --> Stream[Analytics Stream]
     Stream --> Warehouse[(Data Warehouse)]
     Stream --> Monitoring[Operational Monitoring]
-    Warehouse --> Dashboards[Dashboards]
+    Warehouse --> Dashboards[Product Dashboards]
     Warehouse --> Evaluation[AI Evaluation]
+    Warehouse --> NicheCalibration[Niche Validation Calibration]
 ```
 
-## MVP Metrics
+## Phase 1 Metrics
 
 Product:
 
 - Onboarding completion
 - Profile completion
+- Niche discovery engagement rate
+- Niche validation engagement (read, accepted, challenged, revised)
 - Career analysis generated
-- Recommendation accepted
+- Recommendation accepted or dismissed
 - Opportunity saved
 - Application asset generated
 - Learning plan created
+- Kai assistant questions asked
 
-Agent:
+Kai/Agent:
 
 - Task created
 - Task completed
 - Task failed
-- Tool call latency
-- Model cost
+- Model gateway call latency
+- Model gateway cost per operation
 - Approval requested
 - Approval granted or denied
 
 Quality:
 
-- User rating
+- User rating on career analysis
+- Niche validation usefulness rating
 - Recommendation dismissal reason
-- Generated asset edited heavily
+- Generated asset edited heavily (indicator of poor quality)
 - Match explanation feedback
+- Honest-assessment engagement (did user engage with contrarian Kai output?)
 
-## MVP Version
+## Phase 1 MVP Version
 
-For MVP:
-
-- Use structured application events.
-- Add correlation IDs.
-- Capture model usage and cost.
-- Capture key conversion funnels.
-- Avoid storing sensitive raw text in analytics systems.
+- Use structured application events with correlation IDs.
+- Capture model gateway usage metadata and cost estimates.
+- Capture key conversion funnels (onboarding → niche → report → jobs).
+- Never store sensitive raw text in analytics: no resume content, LinkedIn text, prompt content, or salary data in events.
+- Track niche validation outcomes to calibrate Kai's honest-mentor accuracy over time.
 
 ## Future Scale Version
 
 At scale:
 
-- Add data warehouse.
-- Add experimentation platform.
-- Add AI evaluation dashboards.
-- Add anomaly detection for agent failures.
-- Add privacy-preserving aggregate cohort analytics.
-- Add real-time operational dashboards.
+- Data warehouse.
+- Experimentation platform.
+- AI evaluation dashboards.
+- Niche validation calibration pipeline.
+- Anomaly detection for Kai task failures.
+- Privacy-preserving aggregate cohort analytics.
+- Real-time operational dashboards.
 
 ## Implementation Recommendations
 
 - Define analytics event contracts.
-- Separate analytics from audit logs.
-- Redact sensitive content.
-- Include tenant, region, plan, and feature context.
+- Separate analytics from security audit logs.
+- Redact all sensitive content.
+- Include user stage, plan, and feature context.
 - Track user consent for analytics where required.
 - Make telemetry sampling configurable.
-
-## Tradeoffs and Alternatives
-
-- Full event capture improves insight but increases privacy and cost concerns.
-- Minimal analytics reduces risk but slows product learning.
-- Session replay is high-risk for sensitive data and should be avoided initially.
-- Aggregate analytics are safer but less diagnostic.
+- Add niche validation accuracy tracking as a first-class quality metric — it is core to Kai's identity.
 
 ## Complexity
 
-- MVP complexity: Medium.
+- Phase 1 complexity: Medium.
 - Scale complexity: High.
-- Main risks: sensitive data leakage, metric ambiguity, poor AI cost visibility.
+- Main risks: sensitive data leakage in events, metric ambiguity, poor AI cost visibility, niche validation calibration blind spots.
 
 ## Implementation Order
 
-1. Define event taxonomy.
-2. Add product and agent events.
-3. Add model usage tracking.
-4. Add basic dashboards.
-5. Add warehouse and experimentation later.
-
+1. Define event taxonomy (include niche validation events).
+2. Add product and Kai agent events.
+3. Add model gateway usage tracking.
+4. Add basic product funnel dashboards.
+5. Add niche validation quality metrics.
+6. Add warehouse and experimentation later.

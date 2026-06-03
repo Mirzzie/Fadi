@@ -1,28 +1,31 @@
-# CareerOS AI Technical Blueprint
+# CareerOS Technical Blueprint
 
 ## Purpose
 
-This blueprint links the CareerOS AI architecture documents into one implementation-ready technical foundation. The system is designed as an Agentic AI Career Operating System for global users, with a path from MVP to millions of users.
+This blueprint links the CareerOS architecture documents into one implementation-ready technical foundation. The system is designed as an Agentic AI Career Operating System built around Kai — an AI that IS the entire product, not a widget inside it.
 
 ## Product Architecture North Star
 
-CareerOS AI is not a chatbot, job board, or ATS. It is an AI operating layer that observes, reasons, recommends, and executes approved career workflows on behalf of users.
+CareerOS is not a chatbot, job board, or ATS. It is an AI operating layer — called Kai — that observes, reasons, validates, recommends, and executes approved career workflows on behalf of users, proactively and around the clock.
 
 Core architecture themes:
 
-- Agent orchestration as the control plane.
-- Event-driven workflows for proactive behavior.
-- Persistent, inspectable memory.
-- Domain engines for career, jobs, applications, learning, market, recommendations, and motivation.
-- Strict safety and approval controls.
-- Multi-tenant SaaS foundations from day one.
-- Search, RAG, vector retrieval, and knowledge graph support for grounded intelligence.
+- **Kai is the product**: every screen and workflow expresses Kai's intelligence; there is no non-Kai surface.
+- **Pluggable AI core**: the model powering Kai is a replaceable backend behind a model gateway abstraction; Claude, GPT, Gemini, local models, or future agents can be swapped in.
+- **Real-time grounding**: market intelligence, job discovery, and niche validation must be grounded in current data from trusted third-party APIs — not static caches.
+- **Agent orchestration as the control plane**: Kai plans, tools, memory retrieval, and workflow execution are coordinated by an orchestration layer.
+- **Event-driven workflows for proactive behavior**: profile changes, market signals, new jobs, and deadlines trigger Kai actions without user intervention.
+- **Persistent, inspectable memory**: Kai remembers the user's career trajectory and adapts over time.
+- **Domain engines**: career, jobs, applications, learning, market, networking, recommendations, and motivation are separable domains each owned by a dedicated engine.
+- **Strict safety and approval controls**: all external actions are approval-gated; Kai never acts externally without user consent.
+- **Multi-tenant SaaS foundations**: designed to serve millions of users from day one in architecture, even while building for first 100 in implementation.
+- **Voice as a core channel**: voice interaction (Browser Web Speech API) is Phase 2, not a future maybe.
 
 ## System Map
 
 ```mermaid
 flowchart TD
-    UX[Career Command Center] --> API[API Layer]
+    KaiUX[Kai Interface] --> API[Next.js API Layer]
     API --> Agent[Agent Orchestration]
     Agent --> Memory[Memory System]
     Agent --> Rec[Recommendation Engine]
@@ -31,11 +34,12 @@ flowchart TD
     Agent --> Apps[Application Automation]
     Agent --> Learning[Learning Intelligence]
     Agent --> Market[Market Intelligence]
+    Agent --> Networking[Networking Intelligence]
     Agent --> Safety[Safety and Approval]
     Career --> Graph[Knowledge Graph]
     Jobs --> Search[RAG and Search]
     Learning --> Graph
-    Market --> Data[Data Pipelines]
+    Market --> Data[Real-Time Data Pipelines]
     Search --> Vector[Vector Database]
     Rec --> Events[Event Bus]
     Events --> Analytics[Analytics and Telemetry]
@@ -44,30 +48,32 @@ flowchart TD
     SaaS --> Security[Security and Compliance]
     SaaS --> Billing[Subscriptions]
     Security --> Infra[Infrastructure]
+    Agent --> Gateway[Model Gateway]
+    Gateway --> Model[Pluggable AI Model]
 ```
 
 ## Architecture Documents
 
 ### Foundation
 
-- [PROJECT_INIT.md](PROJECT_INIT.md): product vision, onboarding, modules, and long-term maturity.
-- [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md): conceptual system architecture.
-- [AGENT_FRAMEWORK.md](AGENT_FRAMEWORK.md): base agent modes, tools, memory, and approval rules.
-- [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md): initial conceptual data model.
+- [PROJECT_INIT.md](PROJECT_INIT.md): product vision, Kai identity, modules, and long-term maturity.
+- [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md): system architecture with pluggable AI core and real-time data layer.
+- [AGENT_FRAMEWORK.md](AGENT_FRAMEWORK.md): agent modes, tools, memory, and approval rules.
+- [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md): conceptual data model.
 - [API_INTEGRATIONS.md](API_INTEGRATIONS.md): integration landscape and constraints.
-- [UI_UX_GUIDELINES.md](UI_UX_GUIDELINES.md): agent-first UX direction.
+- [UI_UX_GUIDELINES.md](UI_UX_GUIDELINES.md): Kai-first UX direction.
 - [MVP_ROADMAP.md](MVP_ROADMAP.md): phased product roadmap.
-- [AI_PERSONA_DESIGN.md](AI_PERSONA_DESIGN.md): AI persona behavior and guardrails.
+- [AI_PERSONA_DESIGN.md](AI_PERSONA_DESIGN.md): Kai persona, behavior, and guardrails.
 
 ### Implementation Architecture
 
 - [AGENT_ORCHESTRATION_ARCHITECTURE.md](AGENT_ORCHESTRATION_ARCHITECTURE.md): agent control plane, planning, tools, task execution.
 - [MEMORY_SYSTEM_ARCHITECTURE.md](MEMORY_SYSTEM_ARCHITECTURE.md): explicit, inferred, episodic, semantic, and operational memory.
-- [CAREER_INTELLIGENCE_ENGINE.md](CAREER_INTELLIGENCE_ENGINE.md): profile analysis, readiness, and career scoring.
-- [JOB_DISCOVERY_ENGINE.md](JOB_DISCOVERY_ENGINE.md): job ingestion, normalization, matching, and monitoring.
+- [CAREER_INTELLIGENCE_ENGINE.md](CAREER_INTELLIGENCE_ENGINE.md): profile analysis, niche validation, readiness, and career scoring.
+- [JOB_DISCOVERY_ENGINE.md](JOB_DISCOVERY_ENGINE.md): proactive job ingestion, normalization, matching, and monitoring.
 - [APPLICATION_AUTOMATION_ENGINE.md](APPLICATION_AUTOMATION_ENGINE.md): resume, cover letter, tracker, and interview workflow automation.
-- [LEARNING_INTELLIGENCE_ENGINE.md](LEARNING_INTELLIGENCE_ENGINE.md): skill gap to learning plan workflows.
-- [MARKET_INTELLIGENCE_ENGINE.md](MARKET_INTELLIGENCE_ENGINE.md): labor market, salary, hiring, layoff, and skill demand signals.
+- [LEARNING_INTELLIGENCE_ENGINE.md](LEARNING_INTELLIGENCE_ENGINE.md): skill gap to learning plan and proof-of-work scaffolding.
+- [MARKET_INTELLIGENCE_ENGINE.md](MARKET_INTELLIGENCE_ENGINE.md): real-time labor market, salary, hiring, layoff, and skill demand signals.
 - [RECOMMENDATION_ENGINE.md](RECOMMENDATION_ENGINE.md): prioritized action feed and next-best-action system.
 - [EVENT_DRIVEN_ARCHITECTURE.md](EVENT_DRIVEN_ARCHITECTURE.md): events, workers, outbox, and async workflow foundation.
 - [AI_SAFETY_AND_APPROVAL_SYSTEM.md](AI_SAFETY_AND_APPROVAL_SYSTEM.md): risk levels, approval gates, and audit controls.
@@ -82,25 +88,40 @@ flowchart TD
 - [INFRASTRUCTURE_AND_DEPLOYMENT.md](INFRASTRUCTURE_AND_DEPLOYMENT.md): hosting, services, queues, storage, observability, and deployment.
 - [SECURITY_AND_COMPLIANCE.md](SECURITY_AND_COMPLIANCE.md): privacy, consent, auditability, authorization, and compliance foundations.
 
-## Recommended MVP Implementation Order
+## Current Technical Stack
 
-1. Security, tenancy, and core data model.
-2. Authentication and profile onboarding.
-3. Career Intelligence Engine.
-4. Memory System.
-5. Agent Orchestration MVP.
-6. Event table, outbox, and background workers.
-7. Recommendation Engine MVP.
-8. Job Discovery MVP with one compliant source.
-9. Application Automation MVP.
+| Layer | Technology |
+| --- | --- |
+| Frontend framework | Next.js 16, React 19, TypeScript |
+| Styling | Tailwind v4, shadcn/ui |
+| Authentication | Better Auth with Drizzle adapter |
+| Database | PostgreSQL (Docker local, production TBD) |
+| ORM | Drizzle ORM with committed migrations |
+| AI model | Pluggable — currently OpenAI SDK via model gateway |
+| Voice | Browser Web Speech API (Phase 2) |
+| Monorepo | npm workspaces |
+| Real-time data | Trusted third-party APIs (Phase 3+) |
+
+## MVP Implementation Order
+
+1. Authentication and core data model (Better Auth, PostgreSQL, Drizzle).
+2. Profile onboarding (resume, LinkedIn, manual fields).
+3. Career Intelligence Engine: initial niche discovery and profile analysis.
+4. Memory System for profile facts and preferences.
+5. Agent Orchestration MVP with synchronous workflows.
+6. Event table, outbox, and background workers foundation.
+7. Recommendation Engine MVP: rules-based action feed.
+8. Job Discovery MVP with one compliant job source.
+9. Application Automation MVP: resume tailoring and cover letters.
 10. AI Safety and Approval System.
-11. Learning Intelligence MVP.
+11. Learning Intelligence MVP and proof-of-work scaffolding.
 12. Analytics and telemetry.
-13. RAG/search and vector retrieval.
-14. Market Intelligence MVP.
+13. RAG, search, and vector retrieval.
+14. Market Intelligence MVP with real-time data sources.
 15. Motivation Engine MVP.
-16. Subscription entitlements and monetization.
-17. Scale infrastructure, data pipelines, graph, and multi-region readiness.
+16. Voice interaction (Phase 2, Browser Web Speech API).
+17. Subscription entitlements and monetization.
+18. Scale infrastructure, data pipelines, graph, and multi-region readiness.
 
 ## Complexity Overview
 
@@ -108,35 +129,33 @@ flowchart TD
 | --- | --- | --- |
 | Agent orchestration | High | Very high |
 | Memory system | Medium-high | Very high |
-| Career intelligence | Medium | High |
-| Job discovery | Medium-high | Very high |
+| Career intelligence + niche validation | Medium | High |
+| Job discovery (proactive, real-time) | Medium-high | Very high |
 | Application automation | Medium | High |
 | Learning intelligence | Medium | High |
-| Market intelligence | Medium | High |
+| Market intelligence (real-time) | Medium | High |
 | Recommendation engine | Medium | Very high |
 | Event architecture | Medium | High |
 | Safety and approvals | Medium | High |
+| Model gateway (pluggable AI) | Medium | High |
 | Multi-tenant SaaS | Medium | High |
 | Security and compliance | High | Very high |
-| Data pipelines | Medium | Very high |
+| Data pipelines (real-time) | Medium | Very high |
 | Infrastructure | Medium | Very high |
+| Voice (Phase 2) | Medium | Medium |
 
 ## MVP Architectural Shape
 
-Recommended MVP shape:
-
-- Modular monolith backend.
-- Shared relational database with tenant-scoped tables.
-- Durable background queue.
+- Modular monolith backend (Next.js API routes and server actions).
+- Shared PostgreSQL database (local Docker, production TBD) with user-scoped tables.
+- Durable background queue for async tasks.
 - Append-only event table with outbox pattern.
-- Managed object storage.
-- Managed vector search or database-native vector extension.
-- One model provider behind a model gateway abstraction.
+- Object storage for documents and files.
+- Database-native vector extension or lightweight managed vector search.
+- Model gateway abstraction with one current provider (OpenAI).
 - Hard-coded policy evaluator for approvals.
-- Rule-based recommendation ranker.
+- Rules-based recommendation ranker.
 - Curated role and skill taxonomy.
-
-This keeps the product buildable while preserving future scale boundaries.
 
 ## Future Scale Shape
 
@@ -147,32 +166,17 @@ At millions of users:
 - Managed event streaming.
 - Dedicated vector indexes by domain and region.
 - Knowledge graph and feature store.
-- Model gateway with routing, cost controls, fallbacks, and evaluation.
+- Model gateway with routing across Claude, GPT, Gemini, and local models — with cost controls, fallbacks, and evaluation.
 - Enterprise tenant isolation options.
 - Advanced privacy, compliance, audit, and data residency controls.
-
-## Key Engineering Decisions Still Required
-
-- Frontend framework.
-- Backend framework.
-- Cloud provider.
-- Database technology.
-- Vector database approach.
-- Search technology.
-- Identity provider.
-- Billing provider.
-- Event bus and queue technology.
-- LLM provider and model routing strategy.
-- Workflow engine versus custom queue.
-- Observability stack.
 
 ## Non-Negotiable Guardrails
 
 - No external submissions without explicit user approval.
-- No invented job, salary, credential, or experience claims.
+- No invented job data, salary facts, market trends, or credentials.
+- No hard-coded model provider assumptions in feature or engine design.
+- No static market intelligence presented as current.
 - No memory leakage across users or tenants.
 - No sensitive data in analytics payloads.
 - No unreviewed scraping strategy.
 - No opaque scores without explanation.
-- No chatbot-only product architecture.
-

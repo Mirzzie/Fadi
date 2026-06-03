@@ -2,31 +2,32 @@
 
 ## Purpose
 
-Empty states should reduce anxiety, explain why a section is empty, and guide the user toward one useful action. They should not feel like errors or dead ends.
+Empty states should reduce anxiety, explain why a section is empty, and guide the user toward one useful action. They should not feel like errors or dead ends. All empty states come from Kai — there is no part of CareerOS that exists outside Kai.
 
 ## Empty State Principles
 
-- Say what is missing.
-- Explain why it matters.
+- Kai says what is missing.
+- Kai explains why it matters.
 - Offer one primary action.
-- Keep the AI calm and specific.
+- Keep Kai's tone calm and specific.
 - Avoid blame.
+- Never use a generic loading spinner without Kai narrating what is happening.
 
-## Dashboard Empty State
+## Kai Command Center Empty State
 
 When onboarding is incomplete:
 
 ```text
-[Career Dashboard]
-Your dashboard will appear after your first Career Intelligence Report.
+[Kai Command Center]
+Your command center will be ready after your first Career Intelligence Report.
 
-[AI message]
+[Kai speaks]
 [Continue onboarding button]
 ```
 
-AI says:
+Kai says:
 
-> I need your CV, profile details, and career goal before I can build a useful dashboard. Continue onboarding and I will prepare your first report.
+> I need your CV, profile details, and career goal before I can build a useful command center. Complete onboarding and I will prepare your first analysis — including an honest assessment of your direction.
 
 Primary action:
 
@@ -44,7 +45,7 @@ No CV uploaded yet.
 [Continue manually]
 ```
 
-AI says:
+Kai says:
 
 > A CV helps me understand your experience quickly. If you do not have one ready, you can continue manually and add it later.
 
@@ -68,13 +69,32 @@ No LinkedIn profile added.
 [Skip for now]
 ```
 
-AI says:
+Kai says:
 
-> LinkedIn context helps me compare your public profile with your CV. You can skip this now, but the report may be less complete.
+> LinkedIn context helps me compare your public profile with your CV. You can skip this now, but the analysis may be less precise.
 
 Primary action:
 
 - Paste LinkedIn profile text
+
+## Niche Validation Empty State
+
+When niche discovery has not been completed:
+
+```text
+[Niche Assessment]
+Not yet assessed.
+
+[Start niche discovery]
+```
+
+Kai says:
+
+> I have not yet assessed your career direction against market data. This is an important step — it tells you whether the path you are planning is supported by current hiring reality.
+
+Primary action:
+
+- Start niche discovery
 
 ## Career Analysis Empty State
 
@@ -87,9 +107,9 @@ No report generated yet.
 [Generate report]
 ```
 
-AI says:
+Kai says:
 
-> Once your profile is ready, I can generate your first Career Intelligence Report with strengths, gaps, opportunities, learning recommendations, and readiness scores.
+> Once your profile is ready, I can generate your first Career Intelligence Report — with strengths, gaps, an honest niche assessment, learning recommendations, and readiness scores.
 
 Primary action:
 
@@ -107,9 +127,9 @@ No recommendations yet.
 [Update target role]
 ```
 
-AI says:
+Kai says:
 
-> I do not have enough job data yet to recommend strong matches. Search for a target role or update your goals so I can try again.
+> I do not have enough job data yet to surface strong matches. Search for a target role or update your goals so I can refine the recommendations.
 
 Primary action:
 
@@ -127,13 +147,13 @@ When no applications exist:
 [Application Tracker]
 No applications tracked yet.
 
-[Add application]
 [Review recommended jobs]
+[Add application manually]
 ```
 
-AI says:
+Kai says:
 
-> When you save a role or apply somewhere, track it here so I can help you stay organized.
+> When you save a role or apply somewhere, track it here so I can help you stay organised and follow up.
 
 Primary action:
 
@@ -154,34 +174,35 @@ No learning path yet.
 [Generate from skill gaps]
 ```
 
-AI says:
+Kai says:
 
-> I can recommend learning actions after I understand your target role and skill gaps.
+> I can recommend learning actions after I understand your target role and skill gaps. I prioritise recommendations by what the market currently values most for your direction.
 
 Primary action:
 
 - Generate from skill gaps
 
-## Assistant Empty State
+## Kai Assistant Empty State
 
-Before first message:
+Before the first message:
 
 ```text
-[AI Career Assistant]
-Ask about your report, skills, jobs, or next steps.
+[Kai]
+Ask about your report, your direction, your skills, or what to do next.
 
 [Starter prompts]
 ```
 
-AI says:
+Kai says:
 
-> Ask me about your report, your strongest opportunities, or the fastest way to improve your readiness score.
+> Ask me about your career report, your niche assessment, your strongest opportunities, or the fastest way to improve your readiness score. I will give you a straight answer.
 
 Starter prompts:
 
 - Why did I get this readiness score?
+- Is my career direction realistic?
 - Which job should I target first?
-- What skill should I learn next?
+- What skill or evidence gap matters most?
 - How can I improve my CV?
 
 ## Error State Principles
@@ -192,8 +213,8 @@ When something fails:
 - Explain the failure simply.
 - Offer retry or fallback.
 - Do not blame the user.
+- Do not expose technical errors.
 
 Example:
 
-> I could not complete that analysis, but your profile data is saved. Try again, or continue to the dashboard and generate the report later.
-
+> I could not complete that analysis, but your profile data is saved. Try again, or continue to the command center and generate the report later.

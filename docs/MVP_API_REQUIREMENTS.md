@@ -2,31 +2,34 @@
 
 ## Purpose
 
-This document defines the API surface required for MVP. The API should be small, product-driven, and implementable by one developer.
+This document defines the API surface required for the Phase 1 MVP. The API should be small, product-driven, and implementable by one developer using Next.js server actions and route handlers.
 
 ## API Style
 
-Use Next.js Route Handlers and Server Actions for MVP. Keep endpoint behavior explicit and typed. Avoid building a broad public API until product workflows stabilize.
+Use Next.js Route Handlers and Server Actions for all MVP endpoints. Keep endpoint behavior explicit and typed. Avoid building a broad public API until product workflows stabilize.
+
+All AI calls route through the model gateway abstraction — not directly against provider SDKs in route handlers.
 
 ## Authentication
 
-All authenticated routes require Supabase Auth session.
+All authenticated routes require a valid Better Auth session resolved through `getCurrentAuthUser()`. All domain data access uses the CareerOS app-owned `users.id`, not the auth provider's user ID.
 
 Public routes:
 
 - Landing page
-- Signup/login pages
+- Sign-in and sign-up pages
 
 Authenticated routes:
 
 - Profile
 - Resume upload
 - Career analysis
+- Niche validation
 - Job search
 - Recommendations
 - Applications
 - Learning recommendations
-- Assistant
+- Kai assistant
 
 ## Endpoint Requirements
 
@@ -38,19 +41,24 @@ Authenticated routes:
 
 ### Resume
 
-- `POST /api/resume/upload`: upload resume to storage and create resume record.
+- `POST /api/resume/upload`: upload resume to object storage and create resume record.
 - `POST /api/resume/:id/parse`: parse resume text and update resume record.
 - `GET /api/resume/current`: return current resume summary.
 
+### Niche
+
+- `POST /api/niche/discover`: save niche discovery conversation output.
+- `POST /api/niche/validate`: validate user's stated direction against available market data.
+- `GET /api/niche/latest`: return latest niche validation result.
+
 ### Career Analysis
 
-- `POST /api/career-analysis`: generate analysis from profile, resume, LinkedIn data, and goals.
+- `POST /api/career-analysis`: generate analysis from profile, resume, LinkedIn data, goals, and niche validation through model gateway.
 - `GET /api/career-analysis/latest`: return latest analysis.
 
 ### Jobs
 
 - `GET /api/jobs/search`: search jobs by role, location, and remote preference.
-- `POST /api/jobs/recommend`: generate recommendations for current user.
 - `GET /api/jobs/recommendations`: list recommendations.
 - `POST /api/jobs/:id/save`: save recommendation.
 - `POST /api/jobs/:id/reject`: reject recommendation.
@@ -64,13 +72,13 @@ Authenticated routes:
 
 ### Learning
 
-- `POST /api/learning/recommend`: generate learning recommendations from skill gaps.
+- `POST /api/learning/recommend`: generate learning recommendations from skill gaps, market demand prioritized.
 - `GET /api/learning`: list recommendations.
 - `PATCH /api/learning/:id`: update status.
 
-### Assistant
+### Kai Assistant
 
-- `POST /api/assistant/message`: send message and receive grounded assistant response.
+- `POST /api/assistant/message`: send message and receive grounded Kai response through model gateway.
 - `GET /api/assistant/messages`: list recent messages.
 
 ### Events
@@ -81,40 +89,43 @@ Authenticated routes:
 
 ```mermaid
 flowchart TD
-    Auth[Auth Session] --> Profile[Profile API]
+    Auth[Better Auth Session] --> Profile[Profile API]
     Profile --> Resume[Resume API]
-    Resume --> Analysis[Career Analysis API]
+    Resume --> Niche[Niche Validation API]
+    Niche --> Analysis[Career Analysis API]
     Analysis --> Jobs[Job Recommendation API]
     Analysis --> Learning[Learning API]
     Jobs --> Applications[Application API]
-    Profile --> Assistant[Assistant API]
+    Profile --> Assistant[Kai Assistant API]
     Analysis --> Assistant
 ```
 
 ## AI API Requirements
 
-AI calls must:
+All AI calls must:
 
-- Use prompt versions.
-- Log model name and approximate usage.
-- Include only necessary user context.
-- Return structured JSON where possible.
-- Validate output before storing.
-- Fail gracefully with retry option.
+- Route through the model gateway abstraction.
+- Use versioned prompt templates.
+- Log model name and operation type only (no sensitive content).
+- Include only necessary user context (summarized, not raw).
+- Return structured JSON validated with Zod.
+- Fail gracefully with safe user-facing messages and retry option.
+- Never expose provider SDK errors directly to users.
+- Never log resume text, LinkedIn text, or raw prompt content.
 
 ## Error Handling
 
-API responses should distinguish:
+API responses must distinguish:
 
 - Authentication errors
 - Validation errors
 - Missing profile data
-- AI generation errors
+- AI generation errors (safe user-facing message)
 - Job source errors
 - File parsing errors
 - Database errors
 
-## Excluded API Capabilities
+## Excluded API Capabilities in Phase 1
 
 - External job application submission.
 - Message sending.
@@ -123,4 +134,4 @@ API responses should distinguish:
 - Enterprise admin endpoints.
 - Billing endpoints.
 - Public developer API.
-
+- Voice API (Phase 2 — Browser Web Speech API is client-side).

@@ -1,112 +1,125 @@
-# CareerOS AI Project Initialization
+# CareerOS — Project Initialization
 
 ## Project Name
 
-CareerOS AI
-
-Alternative working names:
-
-- CareerSoul AI
-- Mirsad Career Agent
-- PathPilot AI
-- Career Navigator
-- Career Intelligence OS
+CareerOS
 
 ## Vision
 
-CareerOS AI is an agentic AI-first career operating system. It is not a job board, applicant tracking system, or chatbot. It is designed to become a persistent AI career companion that helps users manage their professional life with minimal friction.
+CareerOS is an agentic AI-first career operating system. It is not a job board, an applicant tracking system, or a chatbot. It is a living, proactive career intelligence platform where Kai — the AI — IS the product. Every screen, action, and data surface in CareerOS is Kai.
 
-The product should feel like a personal career strategist, recruiter, researcher, coach, analyst, and executive assistant working continuously on behalf of the user.
+The product should feel like a dedicated AI career professional working for the user 24 hours a day: discovering opportunities, validating niche decisions, surfacing market intelligence, building proof of work, and advancing the user's career even when they are not actively using the app.
 
 ## Product Thesis
 
-Traditional career platforms ask users to search, compare, apply, track, learn, and stay motivated on their own. CareerOS AI reverses that burden. The system should proactively interpret the user's career state, monitor the market, recommend decisions, and execute career workflows.
+Traditional career platforms ask users to search, compare, apply, track, learn, and stay motivated on their own. CareerOS reverses that burden entirely.
 
 Core product contrasts:
 
-- Traditional platforms are search-first; CareerOS AI is agent-first.
-- Traditional platforms react to user input; CareerOS AI proactively acts.
-- Traditional dashboards show data; CareerOS AI interprets data and recommends action.
-- Traditional tools fragment resumes, applications, learning, and market research; CareerOS AI unifies them into one career operating layer.
+- Traditional platforms are search-first; CareerOS is agent-first — Kai acts, the user approves.
+- Traditional platforms react to user input; CareerOS proactively monitors and surfaces what matters.
+- Traditional dashboards show data; CareerOS interprets data, validates decisions, and prescribes action.
+- Traditional tools fragment resumes, applications, learning, and market research; CareerOS unifies them under one operating intelligence called Kai.
+
+## What Kai Is
+
+Kai is not a chatbot widget or corner overlay. Kai is the entire CareerOS system. There is no non-Kai part of the product. The UI renders Kai's intelligence; the data layer feeds Kai; the agent layer executes Kai's actions.
+
+### Pluggable AI Core
+
+CareerOS is the product layer. The AI model powering Kai is a replaceable backend. Kai can be driven by Claude, GPT, Gemini, local models, or future agentic entities. No feature design should hard-code model-specific assumptions.
+
+### Multi-Modal
+
+Kai is voice and text. The user can speak to Kai and Kai speaks back. Text interaction ships in Phase 1. Voice interaction via the Browser Web Speech API ships in Phase 2. Voice is core to Kai's identity.
+
+### Always-On and Proactive
+
+Kai works in the background 24x7 even when the user is offline. It discovers opportunities, monitors market shifts, tracks deadlines, and prepares actions for the user's review.
+
+### Honest Mentor, Not an Assistant
+
+Kai is a trusted mentor and guru — not a yes-man. It gives sometimes contrarian, fact-checked advice. It validates decisions against geo-political context, job market reality, and current affairs. It tells the user when something is hype, when a niche is declining, and when a pivot would serve them better.
 
 ## Primary Goal
 
-Create a zero-friction career growth experience where users spend minimal effort while receiving high-value career guidance, opportunity discovery, application support, market intelligence, and learning recommendations.
+Create a zero-friction career growth experience where users receive high-value career guidance grounded in real-time data. Kai should continuously:
 
-The system should continuously help users:
-
-- Discover relevant career opportunities.
-- Analyze career progress and employability.
-- Identify skill gaps.
-- Track market and industry changes.
-- Prepare stronger applications.
-- Improve resumes and professional profiles.
-- Create learning and certification plans.
-- Increase interview readiness.
-- Maintain momentum during difficult job markets.
+- Discover relevant career opportunities, events, and communities.
+- Validate and challenge career niche decisions with market evidence.
+- Analyze career progress, profile strength, and market readiness.
+- Identify skill gaps and prescribe a concrete learning path.
+- Track market shifts, hiring trends, geo-political signals, and industry changes.
+- Build proof of work: scaffold projects, portfolio pieces, GitHub repos, and case studies.
+- Prepare stronger applications tailored to each specific role.
+- Guide networking: who to meet, where, and why.
+- Tell the user when to pivot and when to stay the course.
+- Maintain momentum through a realistic, evidence-based system.
 
 ## Core Experience
 
-The AI persona is the central interface of the application. It should not appear as a small chatbot widget attached to a conventional dashboard. The product experience should feel like entering a career command center where the AI is the operating system.
+Kai is the central interface of CareerOS. The product experience should feel like entering a career command center where Kai is the operating system. There is no part of the UI that exists separately from Kai.
 
-The AI must be able to:
+Kai must be able to:
 
-- Speak and listen where voice interaction is supported.
-- Analyze user data and external market signals.
-- Research opportunities and career paths.
-- Learn from user goals, preferences, outcomes, and feedback.
-- Plan career actions and explain recommendations.
+- Speak and listen (Phase 2, Browser Web Speech API).
+- Analyze user data and external market signals grounded in current data.
+- Research opportunities, career paths, and niche viability.
+- Validate decisions against real-world data — including contrarian positions.
+- Build proof of work for the user's target career area.
+- Learn from goals, preferences, outcomes, and feedback.
+- Plan career actions and explain recommendations with evidence.
 - Execute approved workflows.
-- Recommend decisions with clear reasoning.
-- Monitor opportunities, deadlines, trends, and progress.
+- Monitor opportunities, deadlines, trends, and progress around the clock.
+- Tell the user WHO to meet, WHERE, and WHY.
 
 ## Required Onboarding Flow
 
 ### 1. Welcome Experience
 
-The user is introduced to the AI career agent.
+Kai introduces itself and communicates what it will do.
 
 Example tone:
 
-> Hello. I am your Career Agent. I will help manage your career growth, applications, learning, opportunities, and professional development. Let's build your professional future together.
+> I am Kai, your career operating system. I will help you find and validate your niche, discover opportunities, build proof of work, and create a concrete system for advancing your career. I work 24x7 on your behalf. Let's start.
 
 ### 2. Authentication
 
-Authentication is required. There is no guest mode for the initial product because the system depends on durable user identity, memory, preferences, and application history.
-
-Supported authentication options to evaluate:
-
-- LinkedIn
-- Google
-- Email
-- Phone number
+Authentication is required. The system depends on durable user identity, memory, preferences, and history. Supported: email/password. OAuth providers are a future addition.
 
 ### 3. Profile Discovery
 
-The AI gathers and normalizes career profile data:
+Kai gathers and normalizes career profile data:
 
-- LinkedIn profile data
-- Resume data
-- Skills
-- Education
-- Work experience
-- Certifications
-- Interests
-- Target industries
-- Geographic preferences
-- Salary expectations
+- LinkedIn profile data or guided profile creation
+- Resume or CV data
+- Skills, education, work experience, certifications
+- Interests, values, and ambitions
+- Target industries and roles
+- Geographic preferences and constraints
+- Salary expectations and timeline
 
-### 4. AI Career Analysis
+### 4. Niche Discovery and Validation
 
-The AI produces an initial career intelligence report:
+Kai does not accept the user's stated goal at face value. It validates the goal against:
 
-- Career summary
-- Professional strengths
-- Weaknesses and risk areas
-- Missing skills
-- Opportunity score
-- Market readiness score
-- Growth recommendations
+- Current job market data for the user's geography
+- Geo-political and economic context
+- Industry trends and signal data
+- The user's actual transferable skills and experience
+
+Kai then either confirms the direction with evidence, challenges it with data, or proposes alternatives worth exploring. This is the honest mentor moment.
+
+### 5. AI Career Analysis
+
+Kai produces an initial career intelligence report:
+
+- Career identity and positioning summary
+- Professional strengths grounded in evidence
+- Gap analysis relative to target direction
+- Niche viability assessment with data sources cited
+- Opportunity score and market readiness score
+- Concrete growth system: what to do, in what order, and why
 
 ## Major Product Modules
 
@@ -115,8 +128,10 @@ The AI produces an initial career intelligence report:
 - Application Automation Engine
 - Learning Intelligence Engine
 - Market Intelligence Engine
-- Motivation Engine
-- Agentic Automation Layer
+- Networking Intelligence Layer
+- Proof-of-Work Scaffolding
+- Motivation and Progress Engine
+- Agent Orchestration Layer
 - AI Memory System
 
 ## Main Product Screens
@@ -124,26 +139,37 @@ The AI produces an initial career intelligence report:
 1. Welcome Experience
 2. Authentication
 3. Profile Discovery
-4. Career Analysis
-5. Career Command Center
-6. Opportunity Center
-7. Application Workspace
-8. Learning Hub
-9. Market Intelligence Hub
-10. Progress and Motivation Hub
-11. AI Agent Workspace
+4. Niche Discovery and Validation
+5. Career Analysis
+6. Career Command Center (main Kai operating surface)
+7. Opportunity Center
+8. Application Workspace
+9. Networking Guide
+10. Learning and Proof-of-Work Hub
+11. Market Intelligence Hub
+12. Progress Hub
+13. AI Agent Workspace
+
+## Personalisation by Career Stage
+
+Kai delivers completely different experiences for:
+
+- **Fresh graduates**: guidance on building a first professional identity, where to start, what to build.
+- **Mid-career switchers**: validation of the pivot, bridge-building, transferable skills reframing.
+- **Experienced professionals**: senior market intelligence, executive networking, strategic positioning.
+
+Kai adapts to the user's geography, language, industry, and pace.
 
 ## Long-Term Vision
 
-CareerOS AI should evolve across five maturity stages:
+CareerOS should evolve across five maturity stages:
 
-1. Assistant: answers questions and helps draft assets.
-2. Advisor: interprets user profile, goals, and market context.
-3. Strategist: creates plans and prioritizes next actions.
-4. Operator: executes approved workflows on behalf of the user.
-5. Autonomous Career Agent: continuously monitors and advances the user's career with human oversight.
+1. **Advisor**: explains options, analyzes gaps, answers questions.
+2. **Strategist**: creates systems, prescribes concrete plans.
+3. **Operator**: executes approved workflows autonomously.
+4. **Monitor**: proactively watches the market and user's career state.
+5. **Autonomous Career Agent**: continuously advances the user's career within approved boundaries, 24x7.
 
-The final product promise is:
+The final product promise:
 
-> I have a dedicated AI professional working for my career 24 hours a day.
-
+> I have a dedicated AI career professional working for me around the clock. I don't search for jobs. Kai does.

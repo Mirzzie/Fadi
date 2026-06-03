@@ -1,50 +1,54 @@
-# CareerOS AI UI and UX Guidelines
+# CareerOS UI and UX Guidelines
 
 ## Experience Direction
 
-CareerOS AI should feel like a modern AI career operating system: a calm, intelligent, professional command center where the AI agent is the primary interface and the user can see meaningful progress without doing constant manual work.
+CareerOS is Kai. Every screen the user sees is Kai's operating surface. The interface is not a dashboard with an AI assistant widget attached — it is the physical form that Kai takes in the browser. The entire product should feel like entering the mind of a calm, intelligent career strategist who is working on your behalf.
 
-The interface should avoid feeling like:
+The interface must never feel like:
 
 - A traditional job board
 - A generic analytics dashboard
 - A static applicant tracker
-- A chatbot bolted onto a conventional app
+- A chatbot widget bolted onto a conventional app
 
-The interface should instead feel like:
+The interface must feel like:
 
 - A mission control center for career growth
-- A professional command hub
+- A professional command hub driven by intelligence
 - A dynamic AI action workspace
-- A personal career strategy environment
+- A personal career strategy environment where Kai is always present
 
 ## Core UX Principles
 
-### Agent First
+### Kai-First, Always
 
-The AI persona should be present as the central product experience. It should guide users, explain reasoning, surface recommended actions, and coordinate workflows.
+Kai is present as the central product experience on every screen. The user should always see what Kai is doing, what Kai has prepared, what Kai recommends, and what needs their attention. There is no screen where Kai is absent.
 
 ### Low Friction
 
-The product should reduce user effort. The user should not need to repeatedly search, compare, rewrite, track, and remember everything manually.
+The product reduces user effort. The user should not need to search, compare, rewrite, track, and remember everything manually. Kai does the heavy lifting; the user approves and adjusts.
 
 ### Action Oriented
 
-Every major screen should help the user answer:
+Every major screen helps the user answer:
 
 - What is happening?
 - What should I do next?
-- What is the AI doing for me?
+- What is Kai doing for me right now?
 - What needs my approval?
-- What changed since last time?
+- What changed since I last logged in?
 
 ### Explainable Intelligence
 
-Scores, rankings, and recommendations must include clear reasoning. The user should understand why an opportunity, learning path, or application strategy is recommended.
+Scores, rankings, and recommendations include clear reasoning and evidence sources. The user must understand why Kai recommends something — especially when Kai challenges a decision.
+
+### Honest, Not Comfortable
+
+Kai's interface reflects Kai's honest-mentor identity. The UI does not hide bad news. If a niche is risky, if a score is low, or if a direction is not supported by data, the interface surfaces that clearly and constructively — with a path forward.
 
 ### Calm Professionalism
 
-The product should feel supportive and strategic, not noisy, gimmicky, or overly gamified.
+The product feels supportive and strategic, not noisy, gimmicky, or anxious. Kai is calm even when the market is not.
 
 ## Main Screens
 
@@ -52,213 +56,199 @@ The product should feel supportive and strategic, not noisy, gimmicky, or overly
 
 Purpose:
 
-- Introduce the AI career agent.
+- Introduce Kai as the career operating system.
 - Establish trust.
-- Communicate that the product will actively help manage career growth.
+- Communicate that Kai will actively work on the user's career.
 
 Key elements:
 
-- AI introduction
-- Clear authentication path
-- Short explanation of what the agent will do after onboarding
+- Kai introduction in first person.
+- Clear authentication path.
+- Short explanation of what Kai will do after onboarding.
 
 ### Authentication
 
 Purpose:
 
-- Create a durable account.
-- Prepare for persistent memory, profile discovery, and application tracking.
+- Create a durable account so Kai can remember everything.
 
-Supported options to evaluate:
+Current options:
 
-- LinkedIn
-- Google
-- Email
-- Phone number
+- Email/password (Better Auth).
+- OAuth providers (future).
 
-### Profile Discovery
+### Profile Discovery and Niche Discovery
 
 Purpose:
 
-- Gather resume, profile, skills, education, experience, goals, preferences, and constraints.
+- Gather career data AND have Kai begin the first substantive conversation about the user's direction.
 
 Key UX requirements:
 
-- Show what data is being gathered.
+- Kai guides the process conversationally, not through a cold form sequence.
+- Show what data is being gathered and why.
+- Niche discovery: Kai asks about the user's goals, interests, and ambitions.
+- Niche validation: Kai returns a candid assessment of that direction with evidence — not just confirmation.
 - Let users review and correct important profile facts.
-- Make missing data visible.
-- Keep the process guided and lightweight.
+- Keep the process guided, intelligent, and lightweight.
 
 ### Career Analysis
 
 Purpose:
 
-- Present the first AI-generated understanding of the user's career state.
+- Present Kai's honest, evidence-grounded understanding of the user's career state and direction.
 
 Key elements:
 
-- Career summary
-- Strengths
-- Weaknesses
-- Missing skills
-- Opportunity score
-- Market readiness score
-- Growth recommendations
+- Career summary: who the user is professionally.
+- Niche assessment: is the stated direction viable? What does the data say?
+- Strengths with evidence.
+- Gaps and missing evidence — presented constructively.
+- Opportunity score and market readiness score with component breakdown.
+- Growth system prescription: a concrete ordered plan.
 
 ### Career Command Center
 
 Purpose:
 
-- Serve as the main operating screen after onboarding.
+- The main Kai operating surface after onboarding. This is where the user lives in CareerOS.
 
 Key elements:
 
-- AI action feed
-- Priority recommendations
-- Active agent tasks
-- Upcoming deadlines
-- Career progress snapshot
-- Opportunities requiring review
-- Learning and application next steps
+- Kai action feed: what Kai has prepared, found, or wants to surface.
+- Priority recommendations with evidence.
+- Active agent tasks and status.
+- Upcoming deadlines.
+- Career progress snapshot.
+- Market signals relevant to the user's direction.
+- Opportunities requiring review.
+- Learning and application next steps.
+- Voice input entry point (Phase 2).
 
 ### Opportunity Center
 
 Purpose:
 
-- Show discovered jobs and explain fit.
+- Show Kai-discovered opportunities and explain fit.
 
 Key elements:
 
-- Ranked opportunities
-- Match explanations
-- Skill matches and gaps
-- Salary and location fit
-- Save, reject, prepare application, and monitor actions
+- Ranked opportunities with match and gap explanations.
+- Salary and location fit.
+- Market context for each opportunity.
+- Save, reject, and prepare application actions.
 
 ### Application Workspace
 
 Purpose:
 
-- Help users prepare, track, and improve applications.
+- Help users prepare, track, and improve applications — with Kai's help.
 
 Key elements:
 
-- Application status
-- Tailored resume
-- Cover letter
-- Interview plan
-- Deadline tracking
-- Next action
-- Approval controls for external actions
+- Application status.
+- Tailored resume draft (role-specific).
+- Cover letter draft.
+- Interview plan.
+- Deadline tracking.
+- Next action.
+- Approval controls for every external action.
 
-### Learning Hub
+### Learning and Proof-of-Work Hub
 
 Purpose:
 
-- Convert skill gaps into practical learning plans.
+- Convert skill gaps into practical learning progress and visible portfolio evidence.
 
 Key elements:
 
-- Target role
-- Missing skills
-- Recommended courses or certifications
-- Progress tracking
-- Time estimates
-- Priority ranking
+- Target role and gap mapping.
+- Recommended courses prioritized by market demand.
+- Portfolio project suggestions (proof-of-work, not just courses).
+- GitHub repo scaffolding suggestions.
+- Progress tracking tied to readiness score.
 
 ### Market Intelligence Hub
 
 Purpose:
 
-- Show relevant hiring, salary, industry, technology, and economic trends.
+- Show the real-time market context Kai is using to assess the user's direction.
 
 Key elements:
 
-- Market signals
-- Role and industry trend summaries
-- Salary intelligence
-- Hiring and layoff context
-- Source attribution and dates
-
-### Progress and Motivation Hub
-
-Purpose:
-
-- Maintain momentum and confidence.
-
-Key elements:
-
-- Progress tracking
-- Achievement system
-- Streaks
-- Career confidence score
-- Encouragement
-- Small next actions
+- Hiring and layoff trends.
+- Salary intelligence.
+- Industry and technology shift summaries.
+- Geo-political and economic context.
+- Source attribution and freshness dates.
+- How signals connect to the user's specific goals.
 
 ### AI Agent Workspace
 
 Purpose:
 
-- Show what the AI is doing, what it has prepared, what is pending approval, and what it has learned.
+- Make Kai's work transparent: what it is doing, what it has prepared, what is pending approval.
 
 Key elements:
 
-- Agent task queue
-- Completed tasks
-- Pending approvals
-- Agent reasoning summaries
-- Memory updates
-- User feedback controls
+- Agent task queue and history.
+- Completed tasks.
+- Pending approvals with content preview.
+- Reasoning summaries per task.
+- Memory updates visible to the user.
+- User feedback controls.
 
 ## Interaction Patterns
 
 Preferred patterns:
 
-- Dynamic cards
-- AI action feeds
-- Timeline systems
-- Voice interaction
-- Real-time updates
-- Smart recommendations
-- Approval queues
-- Inline reasoning
+- Kai conversation cards with evidence inlining.
+- AI action feeds with approval queues.
+- Timeline of Kai activity.
+- Voice interaction (Phase 2, Browser Web Speech API).
+- Real-time market signal updates.
+- Smart recommendations with source attribution.
+- Inline reasoning and challenge surfaces.
+- Approval queues for external actions.
 
 Avoid:
 
-- Large static tables as the primary interface
-- Generic chatbot-only workflows
-- Opaque scores
-- Overwhelming dashboards
-- Actions without context
+- Large static tables as the primary interface.
+- Generic chatbot-only workflows.
+- Opaque scores without explanation.
+- Overwhelming dashboards.
+- Actions without context or reasoning.
+- Hiding negative or challenging information to keep the UX "positive."
 
 ## Tone and Content Guidelines
 
-The product voice should be:
+The product voice matches Kai's persona:
 
 - Intelligent
 - Professional
 - Calm
-- Supportive
-- Motivating
-- Honest
+- Honest — sometimes challenging
 - Strategic
+- Specific
+- Evidence-backed
 
-The AI should:
+Kai should:
 
-- Explain its reasoning.
-- Be direct about gaps and risks.
-- Offer practical next steps.
+- Explain reasoning and cite evidence.
+- Surface uncomfortable truths constructively.
+- Offer practical, grounded next steps.
 - Avoid robotic or generic phrasing.
-- Avoid exaggerating certainty.
+- Avoid exaggerating certainty or suppressing uncertainty.
 
 ## Trust and Control
 
 The user must always understand:
 
-- What data the AI has used.
-- What the AI recommends.
-- Why the AI recommends it.
-- What the AI wants to do next.
+- What data Kai has used and where it came from.
+- What Kai recommends and why.
+- When Kai is being contrarian and what data supports that position.
+- What Kai wants to do next.
 - Whether an action will affect an external system.
-- How to approve, edit, reject, or undo actions where possible.
+- How to approve, edit, reject, or undo actions.
 
+Kai's transparency is the foundation of trust. Never hide the reasoning.

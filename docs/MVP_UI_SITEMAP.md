@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The MVP sitemap keeps the product small enough for one developer while preserving the feeling of an AI-first career operating system.
+The MVP sitemap keeps the product small enough for one developer while establishing Kai's identity as the entire CareerOS operating system — not a feature bolted onto a dashboard.
 
 ## Sitemap
 
@@ -13,16 +13,17 @@ flowchart TD
     Public --> Login[Login]
     Public --> Signup[Signup]
 
-    App[Authenticated App]
+    App[Authenticated App — Kai's Domain]
     App --> Onboarding[Onboarding]
     Onboarding --> Resume[Resume Upload]
     Onboarding --> LinkedIn[LinkedIn Import]
     Onboarding --> Profile[Profile Details]
     Onboarding --> Goals[Career Goals]
+    Onboarding --> Niche[Niche Discovery and Validation]
     Onboarding --> Analysis[Career Analysis]
 
-    App --> Dashboard[Career Dashboard]
-    Dashboard --> Assistant[AI Assistant]
+    App --> Dashboard[Kai Command Center]
+    Dashboard --> Assistant[Kai Assistant]
     Dashboard --> Jobs[Job Recommendations]
     Dashboard --> Applications[Application Tracker]
     Dashboard --> Learning[Learning Recommendations]
@@ -33,7 +34,7 @@ flowchart TD
 
 ### Public
 
-- Welcome
+- Welcome (Kai introduction)
 - Login
 - Signup
 
@@ -43,13 +44,14 @@ flowchart TD
 - LinkedIn Import
 - Profile Details
 - Career Goals
-- Career Analysis Loading
+- Niche Discovery and Validation (Kai validates the user's direction)
+- Career Analysis Loading (with Kai narration)
 - Career Analysis Result
 
-### App
+### Authenticated App
 
-- Career Dashboard
-- AI Assistant
+- Kai Command Center (main operating surface)
+- Kai Assistant
 - Job Recommendations
 - Job Detail
 - Application Tracker
@@ -59,13 +61,13 @@ flowchart TD
 
 ## MVP Navigation
 
-Primary navigation:
+Primary navigation (Kai's domains):
 
-- Dashboard
+- Command Center
 - Jobs
 - Applications
 - Learning
-- Assistant
+- Kai (assistant)
 
 Secondary navigation:
 
@@ -73,20 +75,26 @@ Secondary navigation:
 - Settings
 - Logout
 
-## Excluded Screens
+## Phase 2 Additions
 
-- Market Intelligence Hub
-- AI Agent Workspace
-- Voice interface
+- Voice entry point (microphone button) in Kai Command Center and Kai Assistant.
+- Market Intelligence Hub (once real-time data sources are integrated).
+
+## Excluded Screens in Phase 1
+
+- Market Intelligence Hub (Phase 3)
+- AI Agent Workspace (future)
 - Enterprise admin
-- Billing
-- Subscription management
+- Billing and subscription management
 - Recruiter simulation
 - Salary negotiation
 - Browser automation console
 - Knowledge graph explorer
+- Networking Intelligence Hub (Phase 6)
+- Proof-of-Work Hub (Phase 5)
 
 ## UX Priority
 
-The first screen after onboarding must be the Career Dashboard, not a generic chat page. The assistant should be visible as part of the operating system, but the dashboard should carry the product value through analysis, recommendations, jobs, learning, and applications.
+The first screen after onboarding must be the Kai Command Center, not a generic chat page. Kai is present across every screen, but the command center carries the operating system identity through its action feed, analysis summary, job recommendations, learning path, and application tracker.
 
+Voice must be designable in Phase 1 even if not implemented: no UI pattern should structurally prevent voice from being added in Phase 2.

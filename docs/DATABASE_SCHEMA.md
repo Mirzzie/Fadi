@@ -1,48 +1,92 @@
-# CareerOS AI Database Schema
+# CareerOS Database Schema
 
 ## Purpose
 
-This document defines an initial conceptual data model for CareerOS AI. It is not tied to a specific database technology yet. The model should support user identity, career profiles, AI memory, opportunities, applications, learning plans, market intelligence, motivation, and agent activity.
+This document defines the conceptual data model for CareerOS. The active schema is implemented in PostgreSQL using Drizzle ORM, with committed migrations in `packages/database/migrations`.
 
-## Core Entities
+The model supports user identity, career profiles, AI memory, opportunities, applications, learning plans, market intelligence, motivation, and agent activity.
 
-### users
+## Technology
 
-Stores the durable identity of each user.
+- **Database**: PostgreSQL (Docker locally, managed provider for production).
+- **ORM**: Drizzle ORM.
+- **Auth**: Better Auth — owns `user`, `session`, `account`, `verification` tables.
+- **Domain tables**: reference CareerOS app-owned `users.id`, not the auth provider's user ID.
+
+## Identity
+
+### users (CareerOS-owned)
+
+Application identity, separate from auth provider identity.
+
+Suggested fields:
+
+- id (uuid, primary key)
+- email (text, not null)
+- email_verified_at (timestamptz, nullable)
+- created_at (timestamptz)
+- updated_at (timestamptz)
+
+### auth_identities
+
+Maps auth provider identity to CareerOS app identity.
 
 Suggested fields:
 
 - id
-- email
-- phone_number
-- display_name
-- auth_provider
+- user_id (references users.id)
+- provider (text: `better_auth`)
+- provider_subject (text: Better Auth user.id)
+- provider_profile (jsonb: minimal metadata only)
 - created_at
-- updated_at
-- last_active_at
-- account_status
 
-### user_profiles
+### Better Auth tables (auth-owned)
 
-Stores normalized professional profile data.
+- `user`
+- `session`
+- `account`
+- `verification`
+
+Domain tables always reference CareerOS `users.id`, not Better Auth `user.id`.
+
+## Career Profile Entities
+
+### profiles
+
+Stores the user's career profile.
 
 Suggested fields:
 
 - id
 - user_id
+- full_name
 - headline
-- summary
 - current_title
 - current_company
-- years_experience
 - location
-- preferred_locations
-- preferred_remote_mode
-- salary_expectation_min
-- salary_expectation_max
-- target_industries
-- target_roles
-- career_goals
+- target_role
+- target_industries (jsonb)
+- preferred_locations (jsonb)
+- remote_preference
+- salary_expectation (jsonb)
+- years_experience
+- career_goal
+- created_at
+- updated_at
+
+### career_profiles
+
+Stores richer career profile data from onboarding.
+
+Suggested fields:
+
+- id
+- user_id
+- career_summary
+- experience_level
+- primary_skills (jsonb)
+- industry_focus
+- onboarding_status
 - created_at
 - updated_at
 
@@ -56,12 +100,27 @@ Suggested fields:
 - user_id
 - title
 - source_type
-- file_url
-- parsed_content
+- file_path (object storage reference)
+- parsed_text
+- summary
+- parse_status
 - version
 - is_primary
 - created_at
 - updated_at
+
+### linkedin_profiles
+
+Stores LinkedIn profile input from paste/import.
+
+Suggested fields:
+
+- id
+- user_id
+- source_type (pasted_text, profile_url, manual)
+- raw_text
+- parsed_summary
+- imported_at
 
 ### experiences
 
@@ -78,8 +137,8 @@ Suggested fields:
 - end_date
 - is_current
 - description
-- achievements
-- skills_used
+- achievements (jsonb)
+- skills_used (jsonb)
 
 ### education
 
@@ -95,7 +154,6 @@ Suggested fields:
 - start_date
 - end_date
 - location
-- description
 
 ### certifications
 
@@ -112,35 +170,24 @@ Suggested fields:
 - credential_url
 - status
 
-### skills
-
-Stores canonical skills known by the platform.
-
-Suggested fields:
-
-- id
-- name
-- category
-- aliases
-- description
-
 ### user_skills
 
-Links users to skills and proficiency signals.
+Links users to extracted or confirmed skills.
 
 Suggested fields:
 
 - id
 - user_id
-- skill_id
+- name
+- source
 - proficiency_level
 - evidence
-- source
-- last_validated_at
+- confidence
+- created_at
 
 ## Intelligence and Scoring Entities
 
-### career_analyses
+### career_reports
 
 Stores AI-generated career analysis outputs.
 
@@ -149,13 +196,19 @@ Suggested fields:
 - id
 - user_id
 - career_summary
-- strengths
-- weaknesses
-- missing_skills
+- niche_assessment_status (supported, challenged, redirected)
+- niche_assessment_evidence (jsonb)
+- strengths (jsonb)
+- weaknesses (jsonb)
+- missing_skills (jsonb)
+- readiness_score
 - opportunity_score
-- market_readiness_score
-- recommendations
-- model_version
+- career_system_prescription (jsonb)
+- recommendations (jsonb)
+- model_name
+- prompt_version
+- market_data_snapshot_date
+- status (generating, ready, failed)
 - created_at
 
 ### career_goals
@@ -177,7 +230,7 @@ Suggested fields:
 
 ### ai_memories
 
-Stores persistent AI memory.
+Stores persistent Kai memory.
 
 Suggested fields:
 
@@ -197,81 +250,68 @@ Memory types:
 - explicit_preference
 - inferred_preference
 - career_fact
+- niche_validation_result
 - application_history
 - interview_feedback
 - learning_progress
+- networking_target
 - communication_preference
 
 ## Opportunity Entities
 
-### companies
+### jobs
 
-Stores company records.
-
-Suggested fields:
-
-- id
-- name
-- website
-- industry
-- size
-- headquarters_location
-- description
-
-### job_sources
-
-Stores external source metadata.
+Stores discovered or imported jobs.
 
 Suggested fields:
 
 - id
-- name
-- source_type
-- base_url
-- integration_status
-- last_checked_at
-
-### job_opportunities
-
-Stores discovered roles.
-
-Suggested fields:
-
-- id
-- source_id
-- company_id
+- source
 - external_id
 - title
-- description
+- company
 - location
 - remote_mode
-- salary_min
-- salary_max
+- description
+- url
+- salary_text
+- salary_min (numeric, nullable)
+- salary_max (numeric, nullable)
 - currency
 - seniority
 - employment_type
-- url
+- required_skills (jsonb)
 - posted_at
 - expires_at
 - discovered_at
+- raw_payload (jsonb, original source payload)
 
-### opportunity_matches
+### job_recommendations
 
-Stores per-user match analysis for jobs.
+Stores per-user job match analysis.
 
 Suggested fields:
 
 - id
 - user_id
-- job_opportunity_id
+- job_id
 - match_score
-- match_explanation
-- skill_matches
-- skill_gaps
-- salary_fit
-- location_fit
-- status
+- matched_skills (jsonb)
+- missing_skills (jsonb)
+- explanation
+- status (new, viewed, saved, rejected)
 - created_at
+
+### saved_jobs
+
+Stores user-saved jobs.
+
+Suggested fields:
+
+- id
+- user_id
+- job_id
+- saved_at
 
 ## Application Entities
 
@@ -283,26 +323,18 @@ Suggested fields:
 
 - id
 - user_id
-- job_opportunity_id
-- status
+- job_id (nullable for manual entries)
+- company
+- title
+- url
+- status (saved, preparing, applied, interview, offer, rejected, withdrawn)
 - priority
-- applied_at
-- deadline_at
 - notes
 - next_action
+- deadline_at
+- applied_at
 - created_at
 - updated_at
-
-Application statuses:
-
-- saved
-- preparing
-- ready_for_review
-- applied
-- interview
-- offer
-- rejected
-- withdrawn
 
 ### application_assets
 
@@ -312,22 +344,51 @@ Suggested fields:
 
 - id
 - application_id
-- asset_type
+- asset_type (tailored_resume, cover_letter, recruiter_message, interview_plan)
 - title
 - content
-- file_url
 - version
-- created_by
+- approval_status
+- approved_at
 - created_at
 
-Asset types:
+### approval_requests
 
-- tailored_resume
-- cover_letter
-- recruiter_message
-- interview_plan
+Tracks user approvals for sensitive external actions.
+
+Suggested fields:
+
+- id
+- user_id
+- action_type
+- action_description
+- content_preview
+- destination
+- status (pending, approved, denied)
+- approved_at
+- denied_at
+- created_at
 
 ## Learning Entities
+
+### learning_recommendations
+
+Stores learning recommendations generated from skill gaps.
+
+Suggested fields:
+
+- id
+- user_id
+- skill_name
+- item_type (course, certification, portfolio_project, github_repo, case_study)
+- title
+- provider
+- url
+- reason
+- market_demand_basis
+- estimated_time
+- status (recommended, saved, completed, dismissed)
+- created_at
 
 ### learning_plans
 
@@ -346,23 +407,6 @@ Suggested fields:
 - created_at
 - updated_at
 
-### learning_items
-
-Stores individual courses, certifications, or practice tasks.
-
-Suggested fields:
-
-- id
-- learning_plan_id
-- title
-- provider
-- url
-- item_type
-- skill_id
-- estimated_hours
-- status
-- due_date
-
 ## Market Intelligence Entities
 
 ### market_signals
@@ -372,32 +416,24 @@ Stores external market observations.
 Suggested fields:
 
 - id
-- signal_type
+- signal_type (hiring_trend, layoff_trend, salary_trend, skill_demand, economic_indicator, geopolitical_signal, industry_news)
 - title
 - summary
 - source_name
 - source_url
-- industries
-- locations
-- roles
-- confidence
+- publication_date
 - observed_at
+- industries (jsonb)
+- locations (jsonb)
+- roles (jsonb)
+- confidence
 - created_at
-
-Signal types:
-
-- hiring_trend
-- layoff_trend
-- salary_trend
-- skill_demand
-- economic_indicator
-- industry_news
 
 ## Agent and Workflow Entities
 
 ### agent_tasks
 
-Stores agent work items.
+Stores Kai work items.
 
 Suggested fields:
 
@@ -415,44 +451,40 @@ Suggested fields:
 - created_at
 - updated_at
 
-### agent_activity_log
+### agent_messages
 
-Stores auditable agent actions and explanations.
+Stores Kai conversation messages.
 
 Suggested fields:
 
 - id
 - user_id
-- agent_task_id
-- activity_type
-- message
-- reasoning
-- input_refs
-- output_refs
+- role (user, kai, system)
+- content
+- context_summary
 - created_at
 
-### user_feedback
+### events
 
-Stores user feedback on recommendations and agent outputs.
+Stores product and system events.
 
 Suggested fields:
 
 - id
-- user_id
-- target_type
-- target_id
-- rating
-- feedback_text
+- user_id (nullable for system events)
+- event_type
+- entity_type
+- entity_id (nullable)
+- payload (jsonb — small metadata only, no sensitive content)
 - created_at
 
 ## Privacy and Retention Notes
 
-CareerOS AI will handle sensitive personal, employment, and application data. Future implementation must define:
+CareerOS handles sensitive personal, career, and application data. Implementation must define:
 
-- Data retention periods.
+- Data retention periods by category.
 - User export and deletion workflows.
 - Consent records for integrations.
 - Access audit logs.
 - Encryption requirements.
-- Redaction rules for AI prompts and logs.
-
+- Redaction rules for AI prompts and logs — raw resume text, LinkedIn text, and prompt content must never appear in logs.

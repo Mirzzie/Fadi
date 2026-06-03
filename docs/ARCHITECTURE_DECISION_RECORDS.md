@@ -6,7 +6,7 @@ Architecture Decision Records document important technical decisions, the contex
 
 ## ADR Naming
 
-Store future ADRs in:
+Store ADRs in:
 
 ```text
 docs/adr/
@@ -16,8 +16,10 @@ Use this naming format:
 
 ```text
 0001-use-nextjs-app-router.md
-0002-use-supabase-for-mvp.md
-0003-model-client-abstraction.md
+0002-use-better-auth-not-supabase.md
+0003-use-drizzle-orm-not-prisma.md
+0004-pluggable-model-gateway.md
+0005-postgresql-first-architecture.md
 ```
 
 ## ADR Statuses
@@ -76,13 +78,25 @@ Negative:
 YYYY-MM-DD or "Not scheduled".
 ```
 
-## ADRs Required Before Implementation
+## ADRs Already Decided (Capture As Formal ADRs)
 
-Before coding begins, create ADRs for:
+These decisions have been made and should be captured as formal ADRs:
 
-- Next.js App Router as the web framework.
-- Supabase as MVP database, auth, and storage.
+1. **Next.js 16 App Router as the web framework**: full-stack TypeScript, server actions, React 19.
+2. **Better Auth as the MVP auth provider**: replaces Supabase Auth; first-party TypeScript auth with Drizzle adapter.
+3. **PostgreSQL as the database**: Docker locally, managed provider for production; all migrations must run against vanilla PostgreSQL.
+4. **Drizzle ORM with committed migrations**: type-safe, SQL-forward, portable; chosen over Prisma for its SQL visibility and service extraction compatibility.
+5. **Pluggable AI model gateway**: OpenAI currently wired; Claude, Gemini, and local models supported by design; no feature code imports provider SDKs directly.
+6. **Kai as the entire product**: not a chatbot widget or a supplementary assistant; the entire UI is Kai's operating surface.
+
+## ADRs Required Before Implementation Expands
+
+Create ADRs for:
+
+- Managed PostgreSQL hosting provider selection (Neon vs Supabase Postgres vs RDS).
 - Vercel as MVP hosting provider.
-- OpenAI API behind a model client abstraction.
-- MVP repository package boundaries.
-
+- Object storage provider (S3 vs Cloudflare R2 vs equivalent).
+- Job source API selection for Phase 3.
+- Voice implementation approach (Browser Web Speech API specifics for Phase 2).
+- Background job queue approach (lightweight queue vs scheduled API jobs for Phase 3 monitoring).
+- Real-time market data API selection for Phase 3.

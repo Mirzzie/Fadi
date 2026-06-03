@@ -1,313 +1,92 @@
-# Supabase Decoupling Plan
+# Supabase Decoupling — Completed
 
-## Purpose
+## Status
 
-Supabase helped CareerOS reach a working MVP foundation quickly. The new direction is to make Supabase optional rather than foundational. This plan explains how to decouple without rewriting the app prematurely or breaking current authentication and onboarding flows.
+Supabase has been fully removed from the active CareerOS application.
 
-## Decision Summary
+Supabase is no longer used for:
 
-Recommended path:
+- Authentication
+- Session handling
+- Route protection
+- Domain database access
+- Environment configuration
 
-1. Keep Supabase Auth temporarily.
-2. Stop adding new direct Supabase database access.
-3. Introduce PostgreSQL-first schema and repositories. Completed in Phase 10.
-4. Move MVP domain data access from Supabase table calls to Drizzle repositories. Completed for onboarding, dashboard reads, and Career Intelligence Report generation in Phase 11.
-5. Move domain tables away from `auth.users` and toward an application-owned `users` table.
-6. Keep Supabase as an optional production provider only if it is used as standard managed Postgres and/or temporary auth.
-7. Reevaluate auth after the MVP has real users.
-
-Do not remove Supabase immediately. The current product is too early, and the highest-risk part of replacing Supabase Auth is user/session correctness, not code volume.
-
-## What To Keep Temporarily
-
-### Keep Supabase Auth Temporarily
-
-Reasons:
-
-- Auth is already implemented and validated.
-- Email/password signup, sign-in, sign-out, callbacks, and protected routes work.
-- Replacing auth now would delay product learning.
-- The product has no enterprise auth requirements yet.
-
-Constraints:
-
-- Treat Supabase Auth as an adapter, not a domain model.
-- Do not reference Supabase user IDs directly from new domain code after the decoupling begins.
-- Add an application user mapping layer before replacing database access.
-
-### Keep Supabase As Optional Production Provider
-
-Supabase can remain a possible production database provider if used as PostgreSQL:
-
-- Standard SQL.
-- No dependency on PostgREST behavior.
-- No dependency on Supabase-only RLS functions.
-- No storage or edge-function dependency unless explicitly chosen later.
-
-Supabase should not be the architecture. It can be one deployment option.
-
-## What To Stop Doing
-
-Stop adding:
-
-- New `.from("table")` calls outside repository adapters.
-- New migrations that require `auth.users` for domain table ownership.
-- New RLS policies that require `auth.uid()` as the only authorization mechanism.
-- Browser code that depends on Supabase data APIs.
-- Business logic that handles Supabase response envelopes directly.
-
-## Current Coupling Map
+## Active Stack (Post-Migration)
 
 ```mermaid
-flowchart TD
-    AuthActions[auth/actions.ts] --> SupabaseServer[createSupabaseServerClient]
-    Callback[auth/callback/route.ts] --> SupabaseServer
-    Session[auth/session.ts] --> SupabaseServer
-    Proxy[proxy.ts] --> SupabaseProxy[lib/supabase/proxy.ts]
-
-    Onboarding[onboarding/actions.ts] --> SupabaseServer
-    Status[onboarding/status.ts] --> SupabaseServer
-    ReportData[career-report/data.ts] --> SupabaseServer
-    DashboardActions[dashboard/actions.ts] --> SupabaseServer
-
-    SupabaseServer --> SupabaseSDK[@supabase/ssr and supabase-js]
-    SupabaseSDK --> Supabase[(Supabase Auth and PostgREST)]
+flowchart LR
+  Browser[Browser] --> Web[Next.js App Router]
+  Web --> BetterAuth[Better Auth]
+  BetterAuth --> PG[(PostgreSQL)]
+  Web --> Repos[Drizzle Repositories]
+  Repos --> PG
+  BetterAuthUser[Better Auth user] --> Identity[auth_identities]
+  Identity --> AppUser[CareerOS users]
 ```
 
-## Target Coupling Map
+- **Authentication**: Better Auth with Drizzle adapter
+- **Database**: Local PostgreSQL via Docker, production PostgreSQL provider TBD
+- **ORM**: Drizzle ORM with committed migrations in `packages/database/migrations`
+- **Data access**: Repository-backed domain data access
 
-```mermaid
-flowchart TD
-    AuthActions[auth/actions.ts] --> AuthService[Auth Service]
-    Session[auth/session.ts] --> AuthService
-    OnboardingAction[onboarding/actions.ts] --> OnboardingService
-    DashboardAction[dashboard/actions.ts] --> ReportService
-    DashboardPage[dashboard/page.tsx] --> DashboardQueryService
+## What Was Removed
 
-    AuthService --> AuthAdapter[Supabase Auth Adapter]
-    OnboardingService --> Repositories[Repository Interfaces]
-    ReportService --> Repositories
-    DashboardQueryService --> Repositories
+- `@supabase/ssr`
+- `@supabase/supabase-js`
+- Supabase server/browser/proxy client helpers
+- Supabase auth callback route
+- Supabase public and service-role environment variables
+- `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` from environment templates
 
-    Repositories --> DrizzleAdapter[Drizzle PostgreSQL Adapter]
-    DrizzleAdapter --> Postgres[(PostgreSQL)]
+## App User Mapping
+
+Better Auth owns login credentials and sessions. CareerOS owns product identity.
+
+| Field | Meaning |
+| --- | --- |
+| `auth_identities.provider` | `better_auth` |
+| `auth_identities.provider_subject` | Better Auth `user.id` |
+| `auth_identities.user_id` | CareerOS app-owned `users.id` |
+| Domain table `user_id` | Always CareerOS app `users.id` |
+
+`apps/web/src/lib/auth/session.ts` is the boundary that resolves an authenticated Better Auth user into an app-owned user.
+
+## Remaining Legacy Assets
+
+The folder below is historical reference only:
+
+```text
+infrastructure/supabase/
 ```
 
-## Auth Options
+Do not use those migrations for active local development. The live schema path is:
 
-### Option A: Keep Supabase Auth Temporarily
-
-Recommendation: choose this for now.
-
-Pros:
-
-- Lowest immediate risk.
-- Preserves existing user flows.
-- Lets the team focus on database decoupling first.
-- Supabase Auth can coexist with local Postgres if mapped through `auth_identities`.
-
-Cons:
-
-- Session logic remains provider-specific.
-- Local development still needs Supabase Auth or a mock/dev auth path.
-- Future migration still required if Supabase Auth becomes limiting.
-
-### Option B: Replace With Auth.js
-
-Pros:
-
-- Popular Next.js ecosystem option.
-- Strong OAuth provider coverage.
-- Can store sessions/users in PostgreSQL.
-- Reduces Supabase dependency.
-
-Cons:
-
-- Email/password support often requires more care than OAuth-first flows.
-- Adds migration work before product validation.
-- Session model and callbacks need careful design.
-
-Best if:
-
-- CareerOS prioritizes OAuth/social login breadth.
-- The team wants a well-known framework with broad examples.
-
-### Option C: Replace With better-auth
-
-Pros:
-
-- Modern TypeScript-first auth library.
-- Good fit for first-party app-owned auth.
-- Database-backed and framework-friendly.
-- Can reduce provider lock-in cleanly.
-
-Cons:
-
-- Younger ecosystem than Auth.js.
-- Requires team confidence in its long-term maintenance.
-- Still a meaningful auth migration.
-
-Best if:
-
-- CareerOS wants first-party email/password, OAuth, organizations later, and app-owned auth tables.
-
-### Option D: Custom Auth
-
-Pros:
-
-- Full control.
-- No auth framework lock-in.
-
-Cons:
-
-- Highest security and maintenance burden.
-- Slows product development.
-- Easy to get edge cases wrong.
-
-Recommendation:
-
-Do not build custom auth for the MVP.
-
-## Recommended Auth Path
-
-| Timeframe                  | Recommendation                                                      |
-| -------------------------- | ------------------------------------------------------------------- |
-| Now                        | Keep Supabase Auth temporarily                                      |
-| During Postgres migration  | Add `users` and `auth_identities` tables                            |
-| After first 100 users      | Decide between Supabase Auth, better-auth, or Auth.js               |
-| Before enterprise features | Revisit SSO, audit logs, organization accounts, and account linking |
-
-## Proposed Identity Tables
-
-```mermaid
-erDiagram
-    users ||--o{ auth_identities : has
-    users ||--o{ profiles : owns
-
-    users {
-      uuid id
-      text email
-      timestamptz email_verified_at
-      timestamptz created_at
-      timestamptz updated_at
-    }
-
-    auth_identities {
-      uuid id
-      uuid user_id
-      text provider
-      text provider_subject
-      jsonb provider_profile
-      timestamptz created_at
-      timestamptz updated_at
-    }
+```text
+packages/database/src/schema/index.ts
+packages/database/migrations/
 ```
 
-This permits:
+## Guardrails
 
-- Supabase Auth now.
-- better-auth/Auth.js later.
-- Multiple linked identities later.
-- Stable CareerOS `users.id` across provider migrations.
+- Do not add new imports from `@supabase/*`.
+- Do not add Supabase environment variables back to app templates.
+- Do not link domain data to Better Auth `user.id` directly.
+- Do not query PostgreSQL directly from React components.
+- Keep user-owned data access behind repositories and server actions.
+- If Supabase is ever reconsidered, treat it as a PostgreSQL hosting provider only — not as an application architecture dependency.
 
-## Database Decoupling Steps
+## Verification
 
-### Step 1: Add Service and Repository Interfaces
+Use these checks after future auth or database changes:
 
-No behavior change.
-
-Initial interfaces:
-
-- `AuthSessionService`
-- `OnboardingService`
-- `CareerReportService`
-- `DashboardQueryService`
-- `ProfileRepository`
-- `CareerReportRepository`
-
-### Step 2: Wrap Existing Supabase Data Access
-
-Create Supabase-backed repository adapters first. This reduces blast radius before switching ORM.
-
-Example:
-
-```ts
-export class SupabaseCareerReportRepository implements CareerReportRepository {
-  async createForUser(userId: string, input: CreateCareerReportInput) {
-    // Existing Supabase insert lives here temporarily.
-  }
-}
+```bash
+rg -n "@supabase|createSupabase|NEXT_PUBLIC_SUPABASE|SUPABASE_" apps packages .env.example
+npm run lint
+npm run typecheck
+npm run build
+npm run db:up
+npm run db:migrate
 ```
 
-### Step 3: Add Drizzle/Postgres Adapter
-
-Once the repository contract is stable, add a Drizzle implementation.
-
-### Step 4: Move Call Sites
-
-Move these call sites in order:
-
-1. `getOnboardingStatus` - completed in Phase 11.
-2. `getDashboardProfileSummary` - completed in Phase 11.
-3. `getLatestCareerReport` - completed in Phase 11.
-4. `completeOnboardingAction` - completed in Phase 11.
-5. `generateCareerReportAction` - completed in Phase 11.
-
-Phase 11 mapping:
-
-```mermaid
-sequenceDiagram
-    participant App as Next.js App
-    participant Supa as Supabase Auth
-    participant Users as UsersRepository
-    participant Domain as Domain Repositories
-    participant PG as Local PostgreSQL
-
-    App->>Supa: Read session claims
-    Supa-->>App: sub, email
-    App->>Users: findOrCreateFromAuthIdentity(provider, sub, email)
-    Users->>PG: upsert users/auth_identities
-    App->>Domain: read/write with app users.id
-    Domain->>PG: Drizzle queries
-```
-
-### Step 5: Replace Supabase SQL Migrations
-
-Create vanilla PostgreSQL migrations:
-
-- `users`
-- `auth_identities`
-- MVP domain tables
-- indexes
-- triggers
-- optional portable RLS later
-
-### Step 6: Remove Supabase Database Client Usage
-
-After all data access goes through Drizzle repositories:
-
-- Remove Supabase DB queries.
-- Keep Supabase Auth only in the auth adapter.
-- Remove database-related Supabase environment assumptions.
-
-## Migration Risks
-
-| Risk                         | Likelihood | Impact | Mitigation                                                    |
-| ---------------------------- | ---------- | ------ | ------------------------------------------------------------- |
-| User ID mismatch             | Medium     | High   | Introduce `users` mapping before moving domain tables         |
-| Auth session regression      | Medium     | High   | Keep Supabase Auth until DB migration is stable               |
-| Data loss during schema move | Low-medium | High   | Write explicit migration scripts and backup before production |
-| Duplicate data access paths  | Medium     | Medium | Freeze new Supabase `.from()` calls                           |
-| RLS behavior changes         | Medium     | Medium | Enforce ownership in repositories first                       |
-| Slower MVP progress          | Medium     | Medium | Decouple incrementally, not as a rewrite                      |
-
-## Definition Of Done
-
-Supabase is decoupled when:
-
-- No domain module imports `@supabase/*`.
-- No server action directly calls `.from()`.
-- Migrations run against plain local PostgreSQL.
-- Domain tables reference `public.users`, not `auth.users`.
-- Supabase-specific code is limited to `auth/adapters/supabase`.
-- Production can choose Supabase Postgres, Neon, RDS, or another PostgreSQL-compatible provider without application rewrites.
+Expected result: no active app/package Supabase references.

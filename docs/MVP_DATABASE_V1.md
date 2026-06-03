@@ -6,20 +6,45 @@ This schema is the smallest database needed for the 8-12 week MVP. It intentiona
 
 ## Database Choice
 
-Use Supabase Postgres for MVP.
+PostgreSQL with Drizzle ORM.
 
-Reasons:
+Active stack:
 
-- Relational data fits users, profiles, jobs, applications, and analyses.
-- Auth and storage integrate well with the database.
-- One developer can operate it.
-- It can later support row-level security and vector extensions if needed.
+- PostgreSQL running in Docker locally.
+- Production PostgreSQL provider TBD (Neon, Supabase Postgres, RDS, or equivalent).
+- Drizzle ORM for type-safe schema access and migration management.
+- Committed migrations in `packages/database/migrations`.
+- Better Auth owns auth tables (`user`, `session`, `account`, `verification`).
+- CareerOS owns domain tables that reference app-owned `users.id`.
+
+Do not use Supabase-specific auth functions (`auth.users`, `auth.uid()`, RLS with Supabase-only context) in domain migrations. All migrations must run against vanilla PostgreSQL.
 
 ## Core Tables
 
 ### users
 
-Supabase Auth owns primary identity. Application profile table should reference auth user ID.
+CareerOS application identity. Separate from Better Auth user identity.
+
+Fields:
+
+- id (uuid, primary key)
+- email (text, not null)
+- email_verified_at (timestamptz, nullable)
+- created_at (timestamptz)
+- updated_at (timestamptz)
+
+### auth_identities
+
+Maps auth provider identity to CareerOS app identity.
+
+Fields:
+
+- id
+- user_id (references users.id)
+- provider (text: `better_auth`)
+- provider_subject (text: Better Auth user.id)
+- provider_profile (jsonb: minimal metadata only)
+- created_at
 
 ### profiles
 
@@ -35,12 +60,28 @@ Fields:
 - current_company
 - location
 - target_role
-- target_industries
-- preferred_locations
+- target_industries (jsonb)
+- preferred_locations (jsonb)
 - remote_preference
-- salary_expectation
+- salary_expectation (jsonb)
 - years_experience
 - career_goal
+- created_at
+- updated_at
+
+### career_profiles
+
+Stores richer career data from onboarding.
+
+Fields:
+
+- id
+- user_id
+- career_summary
+- experience_level
+- primary_skills (jsonb)
+- industry_focus
+- onboarding_status
 - created_at
 - updated_at
 
@@ -52,7 +93,7 @@ Fields:
 
 - id
 - user_id
-- file_path
+- file_path (object storage reference)
 - file_name
 - file_type
 - parsed_text
@@ -61,7 +102,7 @@ Fields:
 - created_at
 - updated_at
 
-### linkedin_imports
+### linkedin_profiles
 
 Stores LinkedIn profile input from paste/import.
 
@@ -69,31 +110,12 @@ Fields:
 
 - id
 - user_id
-- source_type
+- source_type (pasted_text, profile_url, manual)
 - raw_text
 - parsed_summary
 - imported_at
 
-Source types:
-
-- pasted_text
-- profile_url
-- manual
-
-### skills
-
-Stores user skills extracted or manually entered.
-
-Fields:
-
-- id
-- user_id
-- name
-- source
-- confidence
-- created_at
-
-### career_analyses
+### career_reports
 
 Stores AI career analysis outputs.
 
@@ -101,17 +123,20 @@ Fields:
 
 - id
 - user_id
-- profile_id
-- resume_id
-- summary
-- strengths
-- weaknesses
-- missing_skills
+- career_summary
+- niche_assessment_status (text: supported, challenged, redirected)
+- niche_assessment_evidence (jsonb)
+- strengths (jsonb)
+- weaknesses (jsonb)
+- missing_skills (jsonb)
 - readiness_score
 - opportunity_score
-- recommended_actions
+- career_system_prescription (jsonb)
+- recommendations (jsonb)
 - model_name
 - prompt_version
+- market_data_snapshot_date
+- status (text: generating, ready, failed)
 - created_at
 
 ### jobs
@@ -132,7 +157,19 @@ Fields:
 - salary_text
 - posted_at
 - discovered_at
-- raw_payload
+- status (text: active, closed, unknown)
+- raw_payload (jsonb)
+
+### saved_jobs
+
+Stores user-saved jobs.
+
+Fields:
+
+- id
+- user_id
+- job_id
+- saved_at
 
 ### job_recommendations
 
@@ -144,32 +181,25 @@ Fields:
 - user_id
 - job_id
 - match_score
-- matched_skills
-- missing_skills
+- matched_skills (jsonb)
+- missing_skills (jsonb)
 - explanation
-- status
+- status (text: new, viewed, saved, rejected)
 - created_at
-
-Statuses:
-
-- new
-- viewed
-- saved
-- rejected
 
 ### applications
 
-Stores manual application tracking records.
+Stores application tracking records.
 
 Fields:
 
 - id
 - user_id
-- job_id
+- job_id (nullable)
 - company
 - title
 - url
-- status
+- status (text: saved, preparing, applied, interview, offer, rejected, withdrawn)
 - priority
 - notes
 - next_action
@@ -178,109 +208,92 @@ Fields:
 - created_at
 - updated_at
 
-Statuses:
-
-- saved
-- preparing
-- applied
-- interview
-- offer
-- rejected
-- withdrawn
-
 ### learning_recommendations
 
-Stores learning recommendations generated from skill gaps.
+Stores learning recommendations from skill gaps.
 
 Fields:
 
 - id
 - user_id
 - skill_name
+- item_type (text: course, certification, portfolio_project, github_repo, case_study)
 - title
 - provider
 - url
 - reason
+- market_demand_basis
 - estimated_time
-- status
+- status (text: recommended, saved, completed, dismissed)
 - created_at
 
-Statuses:
+### agent_messages
 
-- recommended
-- saved
-- completed
-- dismissed
-
-### assistant_messages
-
-Stores assistant conversation messages.
+Stores Kai conversation messages.
 
 Fields:
 
 - id
 - user_id
-- role
+- role (text: user, kai, system)
 - content
 - context_summary
 - created_at
 
-Roles:
-
-- user
-- assistant
-- system
-
 ### events
 
-Stores simple product and system events.
+Stores product and system events.
 
 Fields:
 
 - id
-- user_id
+- user_id (nullable)
 - event_type
 - entity_type
-- entity_id
-- metadata
+- entity_id (nullable)
+- payload (jsonb — small metadata only, no sensitive content)
 - created_at
 
 ## MVP Entity Diagram
 
 ```mermaid
 erDiagram
-    profiles ||--o{ resumes : owns
-    profiles ||--o{ linkedin_imports : imports
-    profiles ||--o{ skills : has
-    profiles ||--o{ career_analyses : receives
+    users ||--|| auth_identities : maps
+    users ||--|| profiles : owns
+    users ||--o{ career_profiles : owns
+    users ||--o{ resumes : owns
+    users ||--o{ linkedin_profiles : imports
+    users ||--o{ career_reports : receives
+    users ||--o{ job_recommendations : receives
+    users ||--o{ saved_jobs : saves
+    users ||--o{ applications : tracks
     jobs ||--o{ job_recommendations : matched
-    profiles ||--o{ job_recommendations : receives
-    profiles ||--o{ applications : tracks
+    jobs ||--o{ saved_jobs : saved
     jobs ||--o{ applications : linked
-    profiles ||--o{ learning_recommendations : receives
-    profiles ||--o{ assistant_messages : has
-    profiles ||--o{ events : emits
+    users ||--o{ learning_recommendations : receives
+    users ||--o{ agent_messages : has
+    users ||--o{ events : emits
 ```
+
+## Implementation Notes
+
+- Add `user_id` indexes to all user-owned tables.
+- Store uploaded files in object storage; database stores file path only.
+- Store arrays as JSONB for MVP where schema churn is likely.
+- Normalize later if usage patterns prove stable.
+- Do not use Supabase `auth.users` or `auth.uid()` references — these are vanilla PostgreSQL migrations.
+- Status fields should use check constraints or Drizzle enum types (not plain text) before beta launch.
+- Avoid storing unnecessary raw AI prompt data or raw provider responses.
 
 ## Excluded From V1
 
 - tenants table
 - organizations
 - billing tables
-- approval requests
-- agent tasks
+- approval_requests (add in Phase 2 when external actions are available)
+- agent_tasks (add when background workers are active)
 - vector indexes
 - knowledge graph tables
-- market signals
-- generated application assets
+- market_signals (add in Phase 3 with real-time API integration)
+- generated application assets with versioning (Phase 2)
 - audit-grade external action logs
-
-## Implementation Notes
-
-- Add `user_id` indexes to all user-owned tables.
-- Store uploaded files in Supabase Storage; database stores file path only.
-- Store arrays as JSONB for MVP where schema churn is likely.
-- Normalize later if usage patterns prove stable.
-- Add row-level security before production.
-- Avoid storing unnecessary raw AI prompt data.
-

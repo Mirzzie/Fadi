@@ -1,34 +1,31 @@
 # CareerOS AI
 
-CareerOS AI is an AI-first career operating system. The MVP is intentionally scoped to help the first 100 users authenticate, ingest a profile, upload a resume, import LinkedIn context, receive career analysis, discover recommended jobs, ask an AI career assistant, receive learning recommendations, and track applications.
+CareerOS AI is an AI-first career operating system. The MVP helps users create an account, complete onboarding, generate a Career Intelligence Report, discover recommended jobs from local seed data, save jobs, and manually track applications.
 
-This repository now contains the Phase 5 MVP application foundation: a Next.js App Router web app, TypeScript configuration, Tailwind CSS, shadcn/ui primitives, Supabase client setup, environment templates, route shells, and monorepo package placeholders. It does not yet contain business logic, AI features, job integrations, or production authentication behavior.
+The current application is PostgreSQL-first and runs locally without Supabase credentials.
 
-## MVP Stack
-
-The MVP stack is defined in [docs/MVP_TECH_STACK.md](docs/MVP_TECH_STACK.md):
+## Current Stack
 
 - Next.js App Router with TypeScript
-- Tailwind CSS and a small component library
-- Supabase Postgres, Auth, and Storage
-- Vercel hosting
-- OpenAI API behind a model service abstraction
-- One compliant job source or curated job import source
+- Tailwind CSS and shadcn-style UI primitives
+- Better Auth for email/password authentication
+- PostgreSQL for local development and production-compatible persistence
+- Drizzle ORM and committed migrations
+- OpenAI SDK used server-side for Career Intelligence Reports
 
 ## Repository Structure
 
 ```text
 .
-├── .github/
-│   ├── pull_request_template.md
-│   └── ISSUE_TEMPLATE/
 ├── apps/
-│   └── web/
-├── docs/
+│   └── web/                  # Next.js application
+├── docs/                     # Product, architecture, MVP, and engineering docs
 ├── infrastructure/
-│   ├── supabase/
+│   ├── docker/               # Local PostgreSQL Docker Compose
+│   ├── supabase/             # Legacy historical migrations only
 │   └── vercel/
 ├── packages/
+│   ├── database/             # Drizzle schema, migrations, repositories, seeds
 │   ├── shared/
 │   ├── types/
 │   └── ui/
@@ -36,36 +33,23 @@ The MVP stack is defined in [docs/MVP_TECH_STACK.md](docs/MVP_TECH_STACK.md):
 └── tests/
 ```
 
-## Directory Purpose
+## Local Setup
 
-- `apps/web`: Next.js MVP application foundation.
-- `packages/ui`: future shared UI components package.
-- `packages/types`: future shared TypeScript types and contracts package.
-- `packages/shared`: future shared utilities package that must stay framework-independent.
-- `infrastructure/vercel`: future Vercel configuration and deployment notes.
-- `infrastructure/supabase`: future Supabase migrations, policies, and local setup notes.
-- `scripts`: future developer and maintenance scripts.
-- `tests`: future cross-package and end-to-end test assets.
-- `docs`: product, architecture, MVP, and engineering documentation.
-
-## Current Non-Goals
-
-- Do not implement business logic yet.
-- Do not create API integrations yet.
-- Do not implement AI features yet.
-- Do not implement production authentication flows yet.
-- Do not implement job integrations yet.
-- Do not add autonomous agent features.
-
-## Local Development
-
-Install dependencies from the repository root:
+Install dependencies:
 
 ```bash
 npm install
 ```
 
-Run the web app:
+Start local PostgreSQL and apply migrations:
+
+```bash
+npm run db:up
+npm run db:migrate
+npm run db:seed:jobs
+```
+
+Run the app:
 
 ```bash
 npm run dev
@@ -73,13 +57,37 @@ npm run dev
 
 Open `http://localhost:3000`.
 
-## Getting Started
+## Environment
 
-1. Read [docs/MVP_SCOPE_FREEZE.md](docs/MVP_SCOPE_FREEZE.md).
-2. Read [docs/MVP_IMPLEMENTATION_PLAN.md](docs/MVP_IMPLEMENTATION_PLAN.md).
-3. Read [docs/DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md).
-4. Follow [docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md) before opening a pull request.
+Copy `apps/web/.env.example` to `apps/web/.env.local` and set:
+
+```env
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+BETTER_AUTH_URL=http://localhost:3000
+BETTER_AUTH_SECRET=replace-with-a-strong-local-secret
+DATABASE_URL=postgres://careeros:careeros@localhost:5433/careeros
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-4.1-mini
+```
+
+Supabase credentials are no longer required for local authentication or MVP domain data.
+
+## Validation
+
+```bash
+npm run lint
+npm run typecheck
+npm run build
+```
+
+## Key Docs
+
+- [Authentication Architecture](docs/AUTHENTICATION_ARCHITECTURE.md)
+- [Local Development Database](docs/LOCAL_DEVELOPMENT_DATABASE.md)
+- [Supabase Decoupling Plan](docs/SUPABASE_DECOUPLING_PLAN.md)
+- [MVP Scope Freeze](docs/MVP_SCOPE_FREEZE.md)
+- [MVP Implementation Plan](docs/MVP_IMPLEMENTATION_PLAN.md)
 
 ## Engineering Rule
 
-The MVP must stay small enough for one developer to build in 8-12 weeks. Any feature outside the MVP scope must be documented as V2, V3, or Future Vision before implementation.
+Keep the MVP small enough for one developer to operate. New database access should go through repository/service modules, and user-owned domain data should remain linked to the app-owned `users.id`.

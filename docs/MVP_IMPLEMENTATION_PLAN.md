@@ -2,7 +2,7 @@
 
 ## Goal
 
-Build a realistic 8-12 week MVP that can acquire the first 100 users. The plan assumes one developer working full time.
+Build a realistic 8-12 week MVP that can acquire the first 100 users and validate Kai's core value proposition: an honest, proactive AI career operating system. The plan assumes one developer working full time.
 
 ## Timeline Summary
 
@@ -10,7 +10,7 @@ Recommended duration: 10 weeks.
 
 Minimum possible: 8 weeks if integrations are simplified.
 
-Safer duration: 12 weeks if resume parsing, LinkedIn import, or job data source access takes longer.
+Safer duration: 12 weeks if resume parsing, LinkedIn import, or job data source access takes longer than expected.
 
 ## Week-by-Week Plan
 
@@ -18,12 +18,18 @@ Safer duration: 12 weeks if resume parsing, LinkedIn import, or job data source 
 
 Deliverables:
 
-- Next.js app scaffold.
-- Supabase project.
-- Database migrations.
-- Auth setup.
+- Next.js 16 app scaffold.
+- Better Auth configured with email/password.
+- PostgreSQL running locally (Docker).
+- Drizzle schema and initial migrations.
 - Basic layout and navigation.
 - Environment management.
+
+Tech stack confirmation:
+
+- Next.js 16, React 19, TypeScript, Tailwind v4, shadcn/ui.
+- Better Auth, Drizzle ORM, PostgreSQL.
+- Pluggable model gateway stubbed with OpenAI SDK.
 
 Risk: Low-medium.
 
@@ -31,10 +37,10 @@ Risk: Low-medium.
 
 Deliverables:
 
-- Signup/login flow.
+- Sign-up / sign-in flow (Better Auth).
 - Profile form.
 - Career goals form.
-- User profile persistence.
+- User profile persistence via Drizzle repositories.
 - Basic dashboard shell.
 
 Risk: Medium.
@@ -43,35 +49,37 @@ Risk: Medium.
 
 Deliverables:
 
-- Resume upload to storage.
+- Resume upload to object storage.
 - Resume text extraction.
-- Resume summary generation.
+- Resume summary generation through model gateway.
 - LinkedIn paste/import form.
-- Parsed profile confirmation.
+- Parsed profile confirmation with user editing.
 
-Risk: High because document parsing can be messy.
+Risk: High — document parsing can be messy.
 
-### Week 4: Career Analysis
+### Week 4: Niche Discovery and Career Analysis
 
 Deliverables:
 
-- Career analysis prompt.
-- Readiness score logic.
-- Strengths, weaknesses, gaps, next actions.
+- Niche discovery conversation: Kai asks exploratory questions about goals.
+- Basic niche validation: Kai checks the stated direction against available curated market data and returns an honest assessment.
+- Career analysis prompt through model gateway.
+- Readiness score logic with component breakdown.
+- Strengths, weaknesses, gaps, and growth system prescription.
 - Career analysis result screen.
 - Store analysis history.
 
-Risk: Medium-high because analysis quality drives activation.
+Risk: Medium-high — niche validation quality and honest-mentor tone calibration requires iteration.
 
-### Week 5: Career Dashboard
+### Week 5: Career Command Center
 
 Deliverables:
 
-- Dashboard with readiness, summary, next actions.
+- Kai-first dashboard: action feed, career summary, next actions.
 - Application tracker summary.
 - Job recommendation preview.
 - Learning preview.
-- Empty and loading states.
+- Empty and loading states that still feel like Kai.
 
 Risk: Medium.
 
@@ -79,48 +87,50 @@ Risk: Medium.
 
 Deliverables:
 
-- Job source integration or curated job ingestion.
+- Job source integration or curated job ingestion (one compliant source).
 - Job search UI.
-- Match scoring.
-- Match explanation generation.
-- Save/reject actions.
+- Match scoring with skill and gap analysis.
+- Match explanation generation through model gateway.
+- Save and reject actions with preference capture.
 
-Risk: High because job source access may vary.
+Risk: High — job source API access may vary.
 
-### Week 7: Application Tracking
+### Week 7: Application Tracking and Assets
 
 Deliverables:
 
-- Application list.
-- Application detail.
+- Application list and detail.
 - Create application from saved job.
 - Manual status updates.
 - Notes and next action.
+- Resume tailoring draft (model gateway).
+- Cover letter draft (model gateway).
+- Approval gate UI for generated assets.
 
 Risk: Low-medium.
 
-### Week 8: Learning Recommendations and Assistant
+### Week 8: Learning Recommendations and Kai Assistant
 
 Deliverables:
 
-- Learning recommendation generation from skill gaps.
+- Learning recommendation generation from skill gaps (market demand prioritized).
 - Learning list and status updates.
-- AI assistant API.
-- Assistant UI.
-- Grounded assistant context builder.
+- Kai assistant API (model gateway, grounded context builder).
+- Kai assistant UI.
+- Niche challenge capability in assistant (Kai pushes back when data warrants it).
 
 Risk: Medium.
 
-### Week 9: Quality, Safety, Analytics
+### Week 9: Quality, Safety, and Analytics
 
 Deliverables:
 
-- Output validation.
+- Output validation (Zod) for all AI responses.
 - Usage and product event tracking.
-- Error handling.
-- Rate limits.
-- Privacy-safe logging.
-- Basic admin view or database queries for first-user support.
+- Error handling and safe user-facing messages.
+- Rate limits for AI operations.
+- Privacy-safe logging (no raw prompts, resume text, or user data in logs).
+- Basic admin visibility for first-user support.
 
 Risk: Medium.
 
@@ -128,9 +138,9 @@ Risk: Medium.
 
 Deliverables:
 
-- Production deployment.
-- Seed onboarding content.
-- QA across flows.
+- Production deployment (Vercel + managed PostgreSQL).
+- Production migrations run from `packages/database/migrations`.
+- QA across all Kai flows.
 - Invite first users.
 - Feedback collection.
 - Bug fixing.
@@ -139,56 +149,46 @@ Risk: Medium.
 
 ## One-Developer Build Sequence
 
-1. Scaffold Next.js and Supabase.
-2. Implement auth.
-3. Create database tables.
-4. Build onboarding.
+1. Scaffold Next.js 16 with Better Auth and Drizzle.
+2. Implement authentication.
+3. Create PostgreSQL schema and initial migrations.
+4. Build onboarding with profile ingestion.
 5. Add resume upload and parsing.
 6. Add LinkedIn paste/import.
-7. Generate career analysis.
-8. Build dashboard.
-9. Add job discovery.
-10. Add job recommendations.
-11. Add application tracker.
+7. Implement niche discovery and basic niche validation.
+8. Generate career analysis through model gateway.
+9. Build Kai command center dashboard.
+10. Add job discovery and recommendation matching.
+11. Add application tracker and asset generation.
 12. Add learning recommendations.
-13. Add AI assistant.
+13. Add Kai assistant with grounded context.
 14. Add events and usage tracking.
-15. Add deployment and QA.
+15. Add deployment, QA, and production launch.
 
-## Cost Estimate
+## Cost Estimate for First 100 Users
 
-For first 100 users:
-
-- Hosting: USD 0-50/month initially.
-- Database/storage: USD 0-50/month initially.
-- AI usage: USD 50-500/month depending on model, prompt size, and chat usage.
+- Hosting (Vercel): USD 0-50/month initially.
+- Database (managed PostgreSQL): USD 0-50/month initially.
+- AI usage (OpenAI or equivalent): USD 50-500/month depending on model and usage.
 - Job data API: USD 0-300/month depending on source.
+- Object storage: USD 0-20/month.
 - Domain and misc tools: USD 20-100/month.
 
 Expected MVP operating cost: USD 100-700/month.
 
-Development cost if built by founder/developer: time cost only.
-
-Development cost if outsourced: likely USD 15,000-60,000 depending on quality and region.
-
 ## Infrastructure Requirements
 
-Minimum:
+Minimum for production:
 
 - Vercel project.
-- Supabase project.
-- OpenAI API key.
+- Managed PostgreSQL (Neon, Supabase Postgres, RDS, or equivalent).
+- AI model API key (server-only).
+- Object storage bucket.
 - Job source API or curated job import.
 - Error monitoring.
 - Domain.
 
-Optional for beta:
-
-- Analytics tool.
-- Email provider.
-- Resume parsing service.
-
-Not required:
+Not required for Phase 1:
 
 - Kubernetes.
 - Vector database.
@@ -202,23 +202,23 @@ Not required:
 | --- | --- | --- | --- |
 | Job API access unavailable | High | High | Use curated jobs or one compliant source |
 | LinkedIn import limited | High | Medium | Support paste/import fallback |
-| Resume parsing poor | Medium | High | Let user edit profile fields |
+| Resume parsing poor | Medium | High | Let user edit all profile fields |
+| Niche validation too harsh or too vague | Medium | High | Test with real users; calibrate tone |
 | AI analysis generic | Medium | High | Use structured inputs and prompt evaluation |
-| AI cost grows | Medium | Medium | Add usage limits and logs |
-| Scope creep | High | High | Enforce exclusions in scope freeze |
-| One developer overload | Medium | High | Build CRUD and AI flows before polish |
-| Privacy mistakes | Medium | High | Minimize stored raw prompts and add RLS |
+| AI cost grows | Medium | Medium | Add usage limits and cost tracking from week one |
+| Scope creep | High | High | Enforce scope freeze |
+| One developer overload | Medium | High | Build core flows before polish |
+| Privacy mistakes | Medium | High | Minimize stored raw data; no prompt text in logs |
 
 ## Launch Criteria
 
-- End-to-end onboarding works.
-- Career analysis produces useful output.
-- At least one job source works.
-- Job recommendations include explanations.
-- Dashboard is usable.
+- End-to-end onboarding works with Kai present throughout.
+- Niche validation produces honest, evidence-grounded output.
+- Career analysis produces useful, actionable output.
+- At least one job source works with match explanations.
+- Kai command center is usable.
 - Applications can be tracked.
-- Assistant answers grounded questions.
-- User data is protected by auth and row-level security.
-- AI usage is logged.
+- Kai assistant answers grounded questions including challenging ones.
+- User data is protected by Better Auth and repository-scoped authorization.
+- AI usage is logged (metadata only, no sensitive content).
 - Feedback collection exists.
-

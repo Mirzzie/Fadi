@@ -2,20 +2,20 @@
 
 ## Purpose
 
-The Application Automation Engine helps users turn opportunities into high-quality applications. It drafts tailored resumes, cover letters, recruiter messages, interview plans, checklists, and tracking updates.
+The Application Automation Engine helps users turn opportunities into high-quality, role-specific applications. It drafts tailored resumes, cover letters, recruiter messages, interview plans, checklists, and tracking updates.
 
-It must not submit applications or send external messages without explicit user approval.
+This engine never submits applications or sends external messages without explicit user approval. Every asset is drafted for user review before any external action can occur.
 
 ## Capabilities
 
 - Create application records.
-- Tailor resume content to a target role.
-- Generate cover letters.
-- Draft recruiter or hiring manager messages.
-- Build interview preparation plans.
+- Tailor resume content to the specific requirements of a target role.
+- Generate role-specific cover letters.
+- Draft recruiter or hiring manager messages (for user approval before sending).
+- Build interview preparation plans based on the role and company.
 - Track deadlines and next actions.
 - Recommend follow-up actions.
-- Learn from outcomes and feedback.
+- Learn from outcomes and user feedback.
 
 ## Architecture
 
@@ -24,6 +24,7 @@ flowchart TD
     Job[Selected Job] --> Workspace[Application Workspace]
     Profile[User Profile] --> Generator[Asset Generator]
     Resume[Base Resume] --> Generator
+    Gateway[Model Gateway] --> Generator
     Workspace --> Generator
     Generator --> Review[User Review]
     Review --> Approval[Approval Gate]
@@ -33,67 +34,63 @@ flowchart TD
     Events --> Analytics[Outcome Analytics]
 ```
 
+## Model Gateway
+
+All asset generation goes through the model gateway. The engine never imports provider SDKs directly. The gateway supports pluggable model providers: currently OpenAI, designed to switch to Claude, Gemini, or local models.
+
 ## Application Asset Types
 
-- Tailored resume
-- Cover letter
-- Recruiter message
+- Tailored resume (role-specific)
+- Cover letter (role and company specific)
+- Recruiter or hiring manager message (requires approval before sending)
 - Interview preparation plan
-- Follow-up message
+- Follow-up message (requires approval before sending)
 - Application checklist
 
-## MVP Version
+## Phase 1 MVP Version
 
-For MVP:
-
-- Generate tailored resume drafts from a base resume and job description.
+- Generate tailored resume drafts from base resume and job description through model gateway.
 - Generate cover letter drafts.
 - Create application tracker records.
-- Add manual status updates.
-- Require approval before any external action.
+- Manual status updates.
+- Approval gate required before any external action.
 - Store generated asset versions.
+
+## Phase 2 Version
+
+- Document rendering and export (PDF, DOCX).
+- Role-specific document templates.
+- Interview question prediction.
+- Email integration with approval gate.
 
 ## Future Scale Version
 
-At scale:
-
-- Add document rendering and export.
-- Add role-specific templates.
-- Add interview question prediction.
-- Add email and calendar integrations.
-- Add browser-assisted form preparation only after safety review.
-- Add outcome learning from interviews, offers, and rejections.
+- Browser-assisted form preparation (only after full safety and consent review).
+- Outcome learning from interviews, offers, and rejections.
+- Calendar integrations.
 
 ## Implementation Recommendations
 
-- Keep generated assets versioned.
-- Show job requirements mapped to resume edits.
-- Preserve user voice and facts.
-- Never fabricate experience.
+- Keep generated assets versioned — the user should be able to see what changed.
+- Show job requirements mapped explicitly to resume edits.
+- Preserve the user's voice and facts — never fabricate experience.
+- Never generate fake credentials, achievements, or skills.
 - Use structured diff summaries for resume changes.
-- Store approval records for external submissions.
-- Build quality checks for unsupported claims and missing evidence.
-
-## Tradeoffs and Alternatives
-
-- AI-generated documents are fast but need strong fact-checking.
-- Template-based documents are consistent but less personalized.
-- Hybrid generation with structured constraints is the preferred path.
-- Full form automation is powerful but high-risk and should wait.
+- Store approval records for all external submission actions.
+- Build quality checks: flag unsupported claims and missing evidence in generated documents.
 
 ## Complexity
 
-- MVP complexity: Medium.
-- Scale complexity: High.
+- Phase 1 complexity: Medium.
+- Phase 2 complexity: Medium-high.
 - Main risks: fabricated claims, weak personalization, accidental external submission, inconsistent document quality.
 
 ## Implementation Order
 
 1. Define application and asset schemas.
 2. Build application tracker.
-3. Build resume tailoring workflow.
+3. Build resume tailoring workflow through model gateway.
 4. Build cover letter workflow.
 5. Add user review and versioning.
-6. Add approval gate for external actions.
-7. Add integrations and automation later.
-
+6. Add approval gate for all external actions.
+7. Add integrations and broader automation in later phases.

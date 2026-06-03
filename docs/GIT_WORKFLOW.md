@@ -6,24 +6,25 @@
 
 Use short-lived branches:
 
-- `docs/update-scope-freeze`
-- `feat/profile-onboarding`
+- `docs/update-kai-vision`
+- `feat/niche-validation-conversation`
 - `fix/resume-upload-validation`
 - `chore/update-tooling`
 - `test/application-tracker`
-- `infra/supabase-migrations`
+- `infra/postgres-migration`
+- `phase2/voice-interaction`
 
 ## Commit Conventions
 
 Use Conventional Commits:
 
-- `feat: add profile onboarding shell`
+- `feat: add niche validation conversation design`
 - `fix: handle failed resume parsing`
-- `docs: add MVP scope freeze`
+- `docs: update Kai persona design`
 - `chore: configure lint tooling`
 - `test: add application tracker coverage`
-- `refactor: simplify job matching service`
-- `infra: add supabase migration notes`
+- `refactor: extract career intelligence service`
+- `infra: add PostgreSQL migration notes`
 
 Allowed types:
 
@@ -40,7 +41,7 @@ Allowed types:
 
 1. Create a branch from `main`.
 2. Make focused changes.
-3. Run local checks once tooling exists.
+3. Run local checks: `npm run lint`, `npm run typecheck`, `npm run build`.
 4. Update docs when behavior or setup changes.
 5. Open a pull request using the template.
 6. Address review comments.
@@ -55,13 +56,14 @@ If a change expands the MVP scope, it must include:
 - Deferral analysis.
 - ADR if architectural.
 
+Voice interaction is reserved for Phase 2. Do not merge Phase 2 features into Phase 1 without an explicit decision.
+
 ## Release Tags
 
-Use semantic tags once the app exists:
-
-- `v0.1.0`: internal MVP baseline.
-- `v0.2.0`: private beta.
-- `v1.0.0`: public MVP launch.
+- `v0.1.0`: Phase 1 internal baseline.
+- `v0.2.0`: private alpha.
+- `v1.0.0`: Phase 1 public launch.
+- `v2.0.0`: Phase 2 (voice, resume tailoring, real-time job APIs).
 
 ## Protected Branch Rules
 
@@ -70,6 +72,4 @@ Recommended once hosted:
 - Require pull request before merge.
 - Require status checks.
 - Require conversation resolution.
-- Require signed commits if the team chooses.
 - Block force pushes to `main`.
-

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-CareerOS AI should be designed to serve global individual users first, with a future path to teams, universities, bootcamps, workforce programs, and enterprise career mobility customers.
+CareerOS is designed to serve global individual users first, with a future path to teams, universities, bootcamps, workforce programs, and enterprise career mobility customers.
 
 Multi-tenancy must protect data boundaries while allowing shared infrastructure and scalable operations.
 
@@ -10,51 +10,52 @@ Multi-tenancy must protect data boundaries while allowing shared infrastructure 
 
 Tenant types:
 
-- Consumer user tenant
-- Organization tenant
-- Education or workforce program tenant
-- Enterprise tenant
+- Consumer user tenant (Phase 1 — the only type)
+- Organization tenant (future)
+- Education or workforce program tenant (future)
+- Enterprise tenant (future)
 
-Users may belong to multiple tenants in future versions, but MVP can assume one personal account per user.
+Users may belong to multiple tenants in future versions, but Phase 1 assumes one personal account per user.
 
 ## Architecture
 
 ```mermaid
 flowchart TD
-    Client[Client] --> Auth[Identity Provider]
-    Auth --> API[API Gateway]
+    Client[Client] --> Auth[Better Auth Identity]
+    Auth --> API[Next.js API Layer]
     API --> Tenant[Tenant Resolver]
     Tenant --> Services[Domain Services]
-    Services --> DB[(Tenant-Scoped Data)]
-    Services --> Vector[(Tenant-Scoped Vector Index)]
+    Services --> DB[(Tenant-Scoped PostgreSQL)]
+    Services --> Vector[(Tenant-Scoped Vector Index — Phase 2+)]
     Services --> Events[Event Bus]
     Tenant --> Policy[Tenant Policy and Entitlements]
 ```
 
 ## Isolation Strategy
 
-MVP:
+Phase 1:
 
-- Shared database with `tenant_id` on tenant-scoped tables.
-- Strict row-level access checks in service code.
-- Tenant-aware event payloads.
-- Tenant-aware vector metadata filters.
+- Shared database with `user_id` on user-owned tables.
+- Strict row-level access checks in repository and service code.
+- No data from one user can appear in another user's context.
 
 Future:
 
+- Add `tenant_id` on tenant-scoped tables.
+- Tenant-aware event payloads.
+- Tenant-aware vector metadata filters.
 - Row-level security at database layer.
 - Regional data partitions.
 - Dedicated databases for enterprise or regulated tenants.
 - Dedicated encryption keys by tenant tier.
 
-## MVP Version
+## Phase 1 MVP Version
 
-For MVP:
-
-- Use a personal tenant for each user.
-- Add `tenant_id` to core entities from day one.
+- Personal account per user.
+- Strict user-scoped data access via repositories.
+- Add `tenant_id` to core entities early to avoid migration pain later.
 - Build entitlement checks even if all users start on a simple plan.
-- Keep organization features out of MVP UI.
+- Keep organization features out of Phase 1 UI.
 
 ## Future Scale Version
 
@@ -69,31 +70,24 @@ For millions of users:
 
 ## Implementation Recommendations
 
-- Never add user-scoped tables without tenant scope.
-- Apply tenant filters in every query path.
-- Include tenant ID in events, logs, metrics, and traces.
+- Add `tenant_id` to core schemas even in Phase 1 (it costs little now and saves a lot later).
+- Apply user and tenant filters in every query path.
+- Include user/tenant ID in events, logs, metrics, and traces.
 - Keep entitlements separate from billing records.
-- Design account deletion and tenant deletion separately.
-
-## Tradeoffs and Alternatives
-
-- Shared database is efficient but requires strict controls.
-- Database per tenant improves isolation but increases operational cost.
-- Hybrid isolation is best for consumer plus enterprise growth.
-- Building multi-tenancy late is expensive; add core tenant fields early.
+- Design account deletion and tenant deletion as separate workflows.
+- Never allow Kai's memory, recommendations, or market context for one user to leak into another's context.
 
 ## Complexity
 
-- MVP complexity: Medium.
+- Phase 1 complexity: Medium.
 - Scale complexity: High.
 - Main risks: tenant data leakage, entitlement confusion, regional compliance gaps.
 
 ## Implementation Order
 
-1. Define tenant model.
+1. Define tenant model (Phase 1: personal user account).
 2. Add `tenant_id` to core schemas.
 3. Build tenant resolver middleware.
 4. Add entitlement service.
-5. Add organization support later.
-6. Add regional and dedicated isolation later.
-
+5. Add organization support in a future phase.
+6. Add regional and dedicated isolation for enterprise.

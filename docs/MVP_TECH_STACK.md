@@ -2,87 +2,99 @@
 
 ## Stack Decision
 
-Use a pragmatic full-stack TypeScript architecture optimized for one developer, fast iteration, and low operations.
+CareerOS uses a pragmatic full-stack TypeScript architecture optimized for one developer, fast iteration, and low operational overhead.
 
-Recommended MVP stack:
+## Current Stack
 
-- Frontend and backend: Next.js App Router with TypeScript.
-- UI: Tailwind CSS and a small component library.
-- Database: Supabase Postgres.
-- Authentication: Supabase Auth with email and Google.
-- File storage: Supabase Storage.
-- Background jobs: simple scheduled API jobs or lightweight queue first.
-- AI provider: OpenAI API behind a small model service abstraction.
-- Job data: one compliant job API or curated import source.
-- Hosting: Vercel for the Next.js app.
-- Analytics: simple product events table plus lightweight analytics later.
+| Layer | Technology | Notes |
+| --- | --- | --- |
+| Web framework | Next.js 16 (App Router) | Full-stack, React Server Components, server actions |
+| UI framework | React 19 | |
+| Language | TypeScript | Strict throughout |
+| Styling | Tailwind v4, shadcn/ui | |
+| Authentication | Better Auth with Drizzle adapter | Email/password for Phase 1; OAuth future |
+| Database | PostgreSQL | Docker locally, managed provider for production (TBD) |
+| ORM | Drizzle ORM | Type-safe, SQL-forward, migration-controlled |
+| Migrations | `drizzle-kit`, committed to repo | |
+| AI provider | Pluggable model gateway — OpenAI SDK currently wired | Claude, Gemini, or local models can be swapped in |
+| Job data | One compliant job API or curated source | Phase 1 |
+| File storage | Managed object storage | Provider TBD (S3-compatible) |
+| Background jobs | Lightweight queue or scheduled API jobs | |
+| Hosting | Vercel (Next.js) | Production TBD |
+| Voice | Browser Web Speech API | Phase 2 |
+| Real-time market data | Trusted third-party APIs | Phase 3+ |
+
+## Monorepo Structure
+
+```
+apps/
+  web/         — Next.js 16 application
+packages/
+  database/    — Drizzle schema, migrations, repositories
+  shared/      — Framework-independent utilities and constants
+  types/        — Shared TypeScript contracts
+  ui/           — Reusable presentational components
+```
 
 ## Why This Stack
 
-This stack minimizes infrastructure while preserving room to scale. Next.js supports full-stack application development and server-rendered routes; official Next.js documentation describes App Router pages and layouts as React Server Components by default and supports server-side data workflows. Vercel's official documentation positions Next.js deployment as zero-configuration with preview and production environments. Supabase provides Postgres, Auth, Storage, and Edge Functions, which reduces the number of services a solo developer must integrate.
+Next.js 16 App Router provides full-stack TypeScript in one codebase, supports server-rendered routes, server actions for mutations, and React Server Components for data access. This removes the need for a separate API backend during MVP.
 
-Reference docs checked:
+Better Auth provides first-party TypeScript auth with a Drizzle adapter. It does not lock CareerOS into a specific hosting provider or auth platform. The auth layer is application-owned.
 
-- Next.js App Router docs: https://nextjs.org/docs/app
-- Next.js Server Actions docs: https://nextjs.org/docs/app/api-reference/directives/use-server
-- Vercel Next.js deployment docs: https://vercel.com/docs/concepts/next.js/overview
-- Vercel environments docs: https://vercel.com/docs/deployments/environments
-- Supabase database functions docs: https://supabase.com/docs/guides/database/functions
-- Supabase Edge Functions docs: https://supabase.com/docs/guides/functions/quickstart
-- Supabase auth headers docs: https://supabase.com/docs/guides/functions/auth-headers
-- OpenAI platform docs: https://platform.openai.com/docs
+Drizzle ORM gives type-safe SQL access with committed migration history. Schema is visible, portable PostgreSQL and can run against any PostgreSQL-compatible provider. This is the right fit for a system that may split into services later.
 
-## MVP Architecture
+The AI model gateway abstracts the specific provider. Currently wired to the OpenAI SDK, but the design allows swapping to Claude, Gemini, or a local model without changing product code. No feature should hard-code model provider assumptions.
+
+## MVP Architecture Diagram
 
 ```mermaid
 flowchart TD
-    Web[Next.js App] --> Auth[Supabase Auth]
-    Web --> API[Next.js Route Handlers and Server Actions]
-    API --> DB[(Supabase Postgres)]
-    API --> Storage[(Supabase Storage)]
-    API --> AI[OpenAI Model Service]
-    API --> Jobs[Job Source API or Curated Jobs]
+    Web[Next.js 16 App] --> BetterAuth[Better Auth]
+    Web --> API[Server Actions and Route Handlers]
+    API --> DB[(PostgreSQL via Drizzle)]
+    API --> Storage[(Object Storage)]
+    API --> Gateway[AI Model Gateway]
+    Gateway --> OpenAI[OpenAI SDK — current]
+    Gateway -. pluggable .-> Claude[Anthropic Claude]
+    Gateway -. pluggable .-> Gemini[Google Gemini]
+    Gateway -. pluggable .-> Local[Local Models]
+    API --> Jobs[Job Source API]
     API --> Events[(Events Table)]
 ```
 
-## Alternatives Considered
-
-| Option | Pros | Cons | Decision |
-| --- | --- | --- | --- |
-| Next.js + Supabase | Fast, one repo, low ops | May need refactor at scale | Choose for MVP |
-| Django + Postgres | Stable backend | Slower full-stack iteration | Defer |
-| Rails | Productive CRUD | Less aligned with AI TypeScript ecosystem | Defer |
-| Separate frontend/backend | Cleaner separation | More overhead for one developer | Defer |
-| Firebase | Fast auth/storage | Less relational fit for career data | Defer |
-| Custom Kubernetes | Scalable | Absurd for MVP | Exclude |
-
 ## AI Stack
 
-MVP should use a single assistant service, not multi-agent orchestration.
+MVP uses a single model gateway service. No multi-agent orchestration yet.
 
 Components:
 
-- `modelClient`: wraps provider API.
-- `promptTemplates`: career analysis, job match, assistant answer, learning recommendation.
-- `contextBuilder`: gathers user profile, resume summary, career analysis, jobs, and applications.
-- `aiLogs`: stores request metadata, model, token estimates, and output references.
+- `modelGateway`: pluggable interface wrapping provider SDKs; currently implements OpenAI.
+- `promptTemplates`: career analysis, niche validation, job match, assistant answer, learning recommendation.
+- `contextBuilder`: gathers user profile, resume summary, career analysis, goals, and market signals.
+- `aiLogs`: stores request metadata, model name, operation type, and output references (no sensitive prompt text).
 
-Do not build:
+Do not build in Phase 1:
 
-- Agent workflow engine.
+- Full multi-agent workflow engine.
 - Tool marketplace.
 - Multi-agent planner.
 - Browser automation.
-- Voice stack.
 
-## Infrastructure Requirements
+Do build in Phase 2:
 
-MVP minimum:
+- Voice input/output via Browser Web Speech API.
+- Background proactive monitoring workers.
 
-- Vercel project.
-- Supabase project.
-- OpenAI API key.
+## Infrastructure Requirements for MVP
+
+Minimum:
+
+- Vercel project (Next.js deployment).
+- PostgreSQL provider (Neon, Supabase Postgres, RDS, or Railway — all compliant options).
+- OpenAI API key (server-side only, never exposed to browser).
 - Job source credentials if using an API.
+- Object storage bucket (S3 or compatible).
 - Domain name.
 - Error monitoring.
 
@@ -92,23 +104,33 @@ Estimated monthly infrastructure for first 100 users:
 - Moderate AI usage: USD 100-300.
 - Higher document and assistant usage: USD 300-600.
 
-Actual AI cost depends on model choice, prompt size, and assistant usage. Add usage tracking from week one.
+Actual AI cost depends on model choice, prompt size, and usage frequency. Add cost tracking from week one.
+
+## Alternatives Considered
+
+| Option | Pros | Cons | Decision |
+| --- | --- | --- | --- |
+| Next.js + Drizzle + Better Auth | Full TypeScript, provider-independent | More initial setup than Supabase | Chosen — more portable |
+| Supabase (as platform) | Fast setup | Auth and DB lock-in, PostgREST coupling | Rejected — decoupled by design |
+| Django + Postgres | Stable backend | Slower TypeScript ecosystem iteration | Defer |
+| Rails | Productive CRUD | Less aligned with AI TypeScript ecosystem | Defer |
+| Separate frontend/backend | Cleaner separation | More overhead for one developer | Defer |
+| Firebase | Fast auth/storage | Less relational fit for career data | Defer |
 
 ## Stack Risks
 
-- Supabase row-level security must be configured correctly.
-- OpenAI usage can become expensive without limits.
-- Job API access may be constrained.
-- Vercel serverless execution limits may affect long jobs.
-- Resume parsing may require a third-party parser later.
+- OpenAI usage can become expensive without usage limits and cost tracking.
+- Job API access may be constrained or require licensing.
+- Vercel serverless execution limits may affect long AI-generation jobs.
+- Resume parsing may require a third-party parser.
+- PostgreSQL connection pooling must be configured for serverless deployment.
 
-## MVP Technical Non-Goals
+## What Is Intentionally Out of Scope for Phase 1
 
-- No vector database.
-- No knowledge graph.
-- No streaming event platform.
-- No enterprise SSO.
-- No multi-region infrastructure.
-- No Kubernetes.
-- No browser agent runtime.
-
+- Vector database (add in Phase 2 when semantic search is needed).
+- Knowledge graph (add later when taxonomy demands it).
+- Streaming event platform (add when async volumes require it).
+- Enterprise SSO.
+- Multi-region infrastructure.
+- Browser agent runtime.
+- Voice interaction (Phase 2).
