@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type CSSProperties } from "react";
 import { Activity, Check, Moon, Pencil } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -63,7 +63,10 @@ export function MomentumPanel({ momentum }: { momentum: MomentumView }) {
   }
 
   return (
-    <section className="overflow-hidden rounded-xl border bg-card">
+    <section
+      className="glow-dynamic relative overflow-hidden rounded-xl border border-dynamic bg-card transition-shadow duration-700"
+      style={{ "--accent-dynamic": BAND_META[momentum.band].color } as CSSProperties}
+    >
       <div className="grid gap-px bg-border md:grid-cols-[auto_1fr]">
         {/* ── Momentum ring ── */}
         <div className="flex flex-col items-center justify-center gap-3 bg-card p-6 md:w-64">
@@ -162,7 +165,13 @@ function MomentumRing({ score, band }: { score: number; band: MomentumView["band
 
   return (
     <div className="relative grid place-items-center">
-      <svg width={132} height={132} viewBox="0 0 132 132" className="-rotate-90">
+      {/* Band-coloured glow — intensifies as momentum builds */}
+      <div
+        className="pointer-events-none absolute size-28 rounded-full blur-2xl transition-opacity duration-700"
+        style={{ background: meta.color, opacity: 0.08 + (pct / 100) * 0.22 }}
+        aria-hidden="true"
+      />
+      <svg width={132} height={132} viewBox="0 0 132 132" className="relative -rotate-90">
         <circle cx={66} cy={66} r={r} fill="none" stroke="var(--muted)" strokeWidth={10} />
         <circle
           cx={66}

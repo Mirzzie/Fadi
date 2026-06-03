@@ -100,10 +100,20 @@ export default function Home() {
             }}
             aria-hidden="true"
           />
-          {/* Radial glow behind Kai card */}
+          {/* Aurora glows — teal core + violet crown */}
           <div
-            className="pointer-events-none absolute right-1/4 top-1/2 size-[600px] -translate-y-1/2 rounded-full opacity-[0.06] blur-3xl"
+            className="pointer-events-none absolute right-1/4 top-1/2 size-[620px] -translate-y-1/2 rounded-full opacity-[0.14] blur-3xl"
             style={{ background: "oklch(0.72 0.19 192)" }}
+            aria-hidden="true"
+          />
+          <div
+            className="pointer-events-none absolute -right-20 top-0 size-[460px] rounded-full opacity-[0.12] blur-3xl"
+            style={{ background: "oklch(0.66 0.22 285)" }}
+            aria-hidden="true"
+          />
+          <div
+            className="pointer-events-none absolute -left-24 bottom-0 size-[420px] rounded-full opacity-[0.08] blur-3xl"
+            style={{ background: "oklch(0.7 0.17 230)" }}
             aria-hidden="true"
           />
 
@@ -119,7 +129,9 @@ export default function Home() {
                 <h1 className="text-5xl font-semibold tracking-tight text-foreground sm:text-6xl">
                   Your career,
                   <br />
-                  <span className="text-primary">run by Kai.</span>
+                  <span className="bg-gradient-to-r from-primary via-[oklch(0.7_0.17_230)] to-[oklch(0.68_0.22_285)] bg-clip-text text-transparent">
+                    run by Kai.
+                  </span>
                 </h1>
                 <p className="max-w-lg text-lg leading-relaxed text-muted-foreground">
                   Kai is an AI career agent that analyzes your profile, surfaces the right
@@ -129,7 +141,10 @@ export default function Home() {
               </div>
 
               <div className="flex flex-col gap-3 sm:flex-row">
-                <Link href="/auth/sign-up" className={buttonVariants({ size: "lg" })}>
+                <Link
+                  href="/auth/sign-up"
+                  className={cn(buttonVariants({ size: "lg" }), "glow-primary")}
+                >
                   Start with Kai
                   <ChevronRight className="size-4" aria-hidden="true" />
                 </Link>
@@ -155,7 +170,7 @@ export default function Home() {
 
             {/* Right — Kai intro card */}
             <div className="lg:pl-8">
-              <div className="kai-glow rounded-2xl border border-border/60 bg-card p-6 space-y-5">
+              <div className="gradient-border glass-card glow-primary rounded-2xl p-6 space-y-5">
                 <div className="flex items-center justify-between">
                   <KaiBadge size="sm" />
                   <span className="rounded-full bg-emerald-400/15 px-2 py-0.5 text-xs font-medium text-emerald-400">
