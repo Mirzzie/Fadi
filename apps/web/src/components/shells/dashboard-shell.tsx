@@ -1,22 +1,34 @@
 import Link from "next/link";
 import {
-  Activity,
   ArrowRight,
   BriefcaseBusiness,
   GraduationCap,
-  Moon,
   Sparkles,
   Target,
   TrendingUp,
 } from "lucide-react";
 
 import { GenerateReportButton } from "@/components/dashboard/generate-report-button";
+import { MomentumPanel, type MomentumView } from "@/components/resilience/momentum-panel";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DashboardProfileSummary, StoredCareerReport } from "@/lib/career-report/schema";
 import type { RecommendedJob } from "@/lib/jobs/types";
 import type { MomentumSummary } from "@/lib/resilience/service";
+
+function toMomentumView(m: MomentumSummary): MomentumView {
+  return {
+    score: m.momentum,
+    band: m.band,
+    bandMessage: m.bandMessage,
+    isResting: m.isResting,
+    cadenceTarget: m.cadenceTarget,
+    cadencePeriod: m.cadencePeriod,
+    cadenceMessage: m.cadenceMessage,
+    qualityApplicationsThisPeriod: m.qualityApplicationsThisPeriod,
+  };
+}
 
 type DashboardShellProps = {
   userEmail?: string;
@@ -54,7 +66,7 @@ export function DashboardShell({
         </div>
       </section>
 
-      <MomentumCard momentum={momentum} />
+      <MomentumPanel momentum={toMomentumView(momentum)} />
 
       <section className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
         <Card id="career-report">
@@ -175,56 +187,6 @@ export function DashboardShell({
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function MomentumCard({ momentum }: { momentum: MomentumSummary }) {
-  const score = Math.round(momentum.momentum);
-  const cadence =
-    momentum.cadenceTarget != null
-      ? `${momentum.qualityApplicationsThisPeriod}/${momentum.cadenceTarget} quality applications this ${momentum.cadencePeriod}`
-      : `${momentum.qualityApplicationsThisPeriod} quality applications this ${momentum.cadencePeriod}`;
-
-  return (
-    <Card>
-      <CardHeader className="flex flex-row items-start gap-4 space-y-0">
-        <div className="grid size-10 place-items-center rounded-md bg-primary/10 text-primary">
-          {momentum.isResting ? (
-            <Moon className="size-5" aria-hidden="true" />
-          ) : (
-            <Activity className="size-5" aria-hidden="true" />
-          )}
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <CardTitle>Momentum</CardTitle>
-            <Badge variant="secondary" className="capitalize">
-              {momentum.isResting ? "resting" : momentum.band}
-            </Badge>
-          </div>
-          <CardDescription>{momentum.bandMessage}</CardDescription>
-        </div>
-        <div className="text-3xl font-semibold tabular-nums">{score}</div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        <div
-          className="h-2 overflow-hidden rounded-full bg-muted"
-          role="progressbar"
-          aria-valuenow={score}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label="Career momentum"
-        >
-          <div
-            className="h-full rounded-full bg-primary transition-all"
-            style={{ width: `${Math.max(2, score)}%` }}
-          />
-        </div>
-        <p className="text-sm text-muted-foreground">
-          {cadence}. {momentum.cadenceMessage}
-        </p>
-      </CardContent>
-    </Card>
   );
 }
 
