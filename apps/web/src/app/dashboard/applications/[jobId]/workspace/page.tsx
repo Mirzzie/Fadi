@@ -1,12 +1,18 @@
 import type { Metadata } from "next";
 import { redirect, notFound } from "next/navigation";
-import { createJobsRepository, createSavedJobsRepository } from "@careeros/database";
+import {
+  createApplicationsRepository,
+  createJobsRepository,
+  createSavedJobsRepository,
+} from "@careeros/database";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { ApplicationWorkspace } from "@/components/workspace/application-workspace";
+import { ApplicationOutcomePanel } from "@/components/workspace/application-outcome-panel";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
 import { getOnboardingStatus } from "@/lib/onboarding/status";
+import { REJECTION_AUTOPSY_PROMPTS } from "@/lib/resilience/framing";
 
 export const dynamic = "force-dynamic";
 
@@ -33,12 +39,21 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
 
   const db = getDatabase();
 
-  const [job, savedJob] = await Promise.all([
+  const [job, savedJob, applications] = await Promise.all([
     createJobsRepository(db).findById(jobId),
     createSavedJobsRepository(db).listForUserByJobIds(user.id, [jobId]),
+    createApplicationsRepository(db).listForUserByJobIds(user.id, [jobId]),
   ]);
 
   if (!job) notFound();
+
+  const application = applications[0]
+    ? {
+        id: applications[0].id,
+        hasApplied: Boolean(applications[0].appliedAt),
+        outcome: applications[0].outcome ?? null,
+      }
+    : null;
 
   return (
     <AppShell>
@@ -52,6 +67,17 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
           <p className="text-sm text-muted-foreground">
             Application workspace — all documents are drafts until you approve them
           </p>
+        </div>
+
+        {/* Outcome + rejection-autopsy */}
+        <div className="shrink-0">
+          <ApplicationOutcomePanel
+            jobId={job.id}
+            jobCompany={job.company}
+            jobTitle={job.title}
+            application={application}
+            autopsyPrompts={[...REJECTION_AUTOPSY_PROMPTS]}
+          />
         </div>
 
         {/* Workspace */}
