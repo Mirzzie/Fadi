@@ -86,6 +86,12 @@ export function createUserProvider(config: ProviderConfig): AIProvider | null {
   switch (config.id) {
     case "openai":
       return new OpenAIProvider(config.apiKey, model ?? "gpt-4.1-mini");
+    case "openrouter":
+      return new OpenAIProvider(config.apiKey, model ?? "meta-llama/llama-3.3-70b-instruct:free", {
+        id: "openrouter",
+        name: "OpenRouter",
+        baseURL: "https://openrouter.ai/api/v1",
+      });
     case "anthropic":
       return new AnthropicProvider(config.apiKey, model ?? "claude-sonnet-4-6");
     case "groq":

@@ -87,6 +87,22 @@ export const PROVIDER_DESCRIPTORS: ProviderDescriptor[] = [
     docsUrl: "https://platform.openai.com/api-keys",
   },
   {
+    id: "openrouter",
+    name: "OpenRouter",
+    label: "OpenRouter (many models, free tier)",
+    defaultModel: "meta-llama/llama-3.3-70b-instruct:free",
+    models: [
+      "meta-llama/llama-3.3-70b-instruct:free",
+      "google/gemini-2.0-flash-exp:free",
+      "deepseek/deepseek-chat-v3-0324:free",
+      "openai/gpt-4o-mini",
+      "anthropic/claude-3.5-sonnet",
+    ],
+    capabilities: ["chat", "streaming", "structured_output", "vision"],
+    requiresApiKey: true,
+    docsUrl: "https://openrouter.ai/keys",
+  },
+  {
     id: "anthropic",
     name: "Anthropic",
     label: "Anthropic (Claude)",

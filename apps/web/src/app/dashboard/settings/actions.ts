@@ -6,7 +6,7 @@ import { getCurrentAuthUser } from "@/lib/auth/session";
 import { createUserProvider } from "@/lib/ai/registry";
 import {
   clearUserAiSettings,
-  getUserProviderConfig,
+  getUserProviderConfigs,
   saveUserAiSettings,
 } from "@/lib/ai/user-settings";
 import { logger } from "@/lib/observability/logger";
@@ -53,7 +53,9 @@ export async function removeAiSettingsAction(): Promise<Result> {
  * Test a connection. Uses the key typed in the form if present, otherwise the
  * already-saved key. Returns an honest message either way.
  */
-export async function testAiConnectionAction(input: AiSettingsInput): Promise<Result> {
+export async function testAiConnectionAction(
+  input: AiSettingsInput & { role?: "primary" | "fallback" },
+): Promise<Result> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
 
@@ -64,10 +66,13 @@ export async function testAiConnectionAction(input: AiSettingsInput): Promise<Re
     baseURL: input.baseUrl?.trim() || undefined,
   };
 
-  // No key typed → fall back to the saved (decrypted) key.
+  // No key typed → use the SAVED key for this exact slot (primary vs fallback).
   if (!config.apiKey) {
-    const saved = await getUserProviderConfig(user.id);
-    if (saved && saved.id === input.provider) config = { ...saved, ...config, apiKey: saved.apiKey };
+    const saved = await getUserProviderConfigs(user.id);
+    const savedCfg = saved[input.role === "fallback" ? 1 : 0];
+    if (savedCfg && savedCfg.id === input.provider) {
+      config = { ...savedCfg, ...config, apiKey: savedCfg.apiKey };
+    }
   }
 
   const provider = createUserProvider(config);

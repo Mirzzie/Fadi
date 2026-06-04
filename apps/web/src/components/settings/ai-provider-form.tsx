@@ -76,7 +76,7 @@ export function AiProviderForm({ descriptors, initial }: Props) {
         <Button
           variant="outline"
           size="sm"
-          onClick={() => run(() => testAiConnectionAction({ ...primary }))}
+          onClick={() => run(() => testAiConnectionAction({ ...primary, role: "primary" }))}
           disabled={pending}
         >
           Test primary
@@ -122,6 +122,7 @@ export function AiProviderForm({ descriptors, initial }: Props) {
                     model: fallback.model,
                     baseUrl: fallback.baseUrl,
                     apiKey: fallback.apiKey,
+                    role: "fallback",
                   }),
                 )
               }
