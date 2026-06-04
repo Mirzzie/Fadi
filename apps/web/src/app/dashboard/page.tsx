@@ -8,6 +8,7 @@ import { getDashboardProfileSummary, getLatestCareerReport } from "@/lib/career-
 import { getRecommendedJobsForUser } from "@/lib/jobs/data";
 import { getOnboardingStatus } from "@/lib/onboarding/status";
 import { getMomentumSummary } from "@/lib/resilience/service";
+import { getMarketIntelligence } from "@/lib/data-sources/service";
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -35,6 +36,25 @@ export default async function DashboardPage() {
     getMomentumSummary(user.id),
   ]);
 
+  // Live market signals scored against this user's role + report findings —
+  // the real-world relevance check for their career report (cached, 15m).
+  const marketSignals = profileSummary?.targetRole
+    ? (
+        await getMarketIntelligence({
+          targetRole: profileSummary.targetRole,
+          skills: (latestReport?.strengths ?? []).map((s) => s.title),
+          skillGaps: (latestReport?.missing_skills ?? []).map((s) => s.title),
+          region: profileSummary.locationPreference,
+        })
+      ).signals.map((s) => ({
+        kind: s.kind,
+        title: s.title,
+        url: s.url ?? null,
+        relevance: s.relevance,
+        reason: s.reasons[0] ?? "relevant to your profile",
+      }))
+    : [];
+
   return (
     <AppShell>
       <DashboardShell
@@ -43,6 +63,7 @@ export default async function DashboardPage() {
         latestReport={latestReport}
         recommendedJobsPreview={recommendedJobsPreview}
         momentum={momentum}
+        marketSignals={marketSignals}
       />
     </AppShell>
   );

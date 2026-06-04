@@ -36,12 +36,21 @@ const DASH_BANNER =
   "radial-gradient(90% 130% at 0% 100%, oklch(0.48 0.16 232) 0%, transparent 55%)," +
   "linear-gradient(120deg, oklch(0.3 0.11 288), oklch(0.24 0.07 252))";
 
+type MarketSignal = {
+  kind: "news" | "skill_trend" | "labor";
+  title: string;
+  url: string | null;
+  relevance: number;
+  reason: string;
+};
+
 type DashboardShellProps = {
   userEmail?: string;
   profileSummary: DashboardProfileSummary | null;
   latestReport: StoredCareerReport | null;
   recommendedJobsPreview: RecommendedJob[];
   momentum: MomentumSummary;
+  marketSignals: MarketSignal[];
 };
 
 export function DashboardShell({
@@ -50,6 +59,7 @@ export function DashboardShell({
   latestReport,
   recommendedJobsPreview,
   momentum,
+  marketSignals,
 }: DashboardShellProps) {
   return (
     <div className="mx-auto max-w-shell space-y-6">
@@ -238,7 +248,84 @@ export function DashboardShell({
           )}
         </CardContent>
       </Card>
+
+      <MarketSignalsCard signals={marketSignals} />
     </div>
+  );
+}
+
+const SIGNAL_KIND_LABEL: Record<MarketSignal["kind"], string> = {
+  news: "Market news",
+  skill_trend: "Skill trend",
+  labor: "Labor signal",
+};
+
+function MarketSignalsCard({ signals }: { signals: MarketSignal[] }) {
+  return (
+    <Card id="market-signals">
+      <CardHeader className="flex flex-row items-start gap-4 space-y-0">
+        <div className="grid size-10 place-items-center rounded-md bg-primary/10 text-primary">
+          <TrendingUp className="size-5" aria-hidden="true" />
+        </div>
+        <div className="flex-1">
+          <CardTitle>Live market signals</CardTitle>
+          <CardDescription>
+            Real-time signals (GDELT, Hacker News, Remotive) scored against your target role and
+            skill gaps — a reality check on your report.
+          </CardDescription>
+        </div>
+      </CardHeader>
+      <CardContent>
+        {signals.length > 0 ? (
+          <ul className="space-y-2.5">
+            {signals.map((s, i) => {
+              const accent = matchAccent(s.relevance);
+              return (
+                <li
+                  key={`${s.title}-${i}`}
+                  className="flex items-start justify-between gap-3 rounded-md border p-3"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span
+                        style={accent.style}
+                        className="shrink-0 rounded-full border border-dynamic bg-dynamic-soft px-1.5 py-0.5 text-[0.65rem] font-medium uppercase tracking-wide text-dynamic"
+                      >
+                        {SIGNAL_KIND_LABEL[s.kind]}
+                      </span>
+                      {s.url ? (
+                        <a
+                          href={s.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="truncate text-sm font-medium hover:text-primary hover:underline"
+                        >
+                          {s.title}
+                        </a>
+                      ) : (
+                        <span className="truncate text-sm font-medium">{s.title}</span>
+                      )}
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{s.reason}</p>
+                  </div>
+                  <span
+                    style={accent.style}
+                    className="shrink-0 text-sm font-semibold tabular-nums text-dynamic"
+                  >
+                    {s.relevance}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+            No live signals clear the relevance threshold for your profile right now. Kai keeps
+            watching — set a target role in your profile to sharpen this.
+          </div>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

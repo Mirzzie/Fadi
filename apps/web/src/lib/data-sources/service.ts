@@ -12,16 +12,38 @@ import type { JobPosting, SignalQuery } from "./types";
  * already personalized: "the signals that matter to YOU", not a news dump.
  */
 
+// Seniority/filler words that hurt search recall (HN/GDELT match poorly on them).
+const KEYWORD_STOPWORDS = new Set([
+  "the", "and", "of", "a", "to", "with", "in", "for", "or",
+  "staff", "senior", "junior", "lead", "principal", "mid", "entry", "level",
+  "fluency", "sense", "depth", "skills", "engineer", "developer",
+]);
+
+/**
+ * Turn verbose role/skill phrases into a few searchable terms — full phrases
+ * like "Staff Frontend Engineer" or "AI / LLM fluency" return little; tokens
+ * like "frontend", "AI", "react" surface real signals.
+ */
 function queryFromProfile(profile: RelevanceProfile, limit = 15): SignalQuery {
-  // Search terms = role + a few skills/gaps; gaps first (most actionable).
-  const keywords = [
+  const phrases = [
     profile.targetRole,
-    ...profile.skillGaps.slice(0, 2),
-    ...profile.skills.slice(0, 2),
-  ].filter(Boolean);
+    ...profile.skillGaps.slice(0, 3),
+    ...profile.skills.slice(0, 3),
+  ].filter(Boolean) as string[];
+
+  const seen = new Set<string>();
+  const keywords: string[] = [];
+  for (const word of phrases.flatMap((p) => p.split(/[^a-zA-Z0-9+#]+/))) {
+    const term = word.trim();
+    const key = term.toLowerCase();
+    if (term.length >= 2 && !KEYWORD_STOPWORDS.has(key) && !seen.has(key)) {
+      seen.add(key);
+      keywords.push(term);
+    }
+  }
 
   return {
-    keywords,
+    keywords: keywords.slice(0, 5),
     regions: profile.region ? [profile.region] : undefined,
     limit,
   };
