@@ -8,24 +8,28 @@ export type NavItem = {
 };
 
 export const appNavigation: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard/jobs", label: "Jobs", icon: BriefcaseBusiness },
+  { href: "/dashboard/learning", label: "Learning", icon: GraduationCap },
+  { href: "/dashboard/kai", label: "Ask Kai", icon: MessageSquareText },
+];
+
+export type NavGroup = { label: string; items: NavItem[] };
+
+export const appNavGroups: NavGroup[] = [
   {
-    href: "/dashboard",
-    label: "Dashboard",
-    icon: LayoutDashboard,
+    label: "Overview",
+    items: [{ href: "/dashboard", label: "Dashboard", icon: LayoutDashboard }],
   },
   {
-    href: "/dashboard/jobs",
-    label: "Jobs",
-    icon: BriefcaseBusiness,
+    label: "Career",
+    items: [
+      { href: "/dashboard/jobs", label: "Jobs", icon: BriefcaseBusiness },
+      { href: "/dashboard/learning", label: "Learning", icon: GraduationCap },
+    ],
   },
   {
-    href: "/dashboard/learning",
-    label: "Learning",
-    icon: GraduationCap,
-  },
-  {
-    href: "/dashboard/kai",
-    label: "Ask Kai",
-    icon: MessageSquareText,
+    label: "Kai",
+    items: [{ href: "/dashboard/kai", label: "Ask Kai", icon: MessageSquareText }],
   },
 ];

@@ -10,9 +10,7 @@ import {
 
 import { GenerateReportButton } from "@/components/dashboard/generate-report-button";
 import { MomentumPanel, type MomentumView } from "@/components/resilience/momentum-panel";
-import { cn } from "@/lib/utils";
 import { matchAccent } from "@/lib/jobs/match-accent";
-import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DashboardProfileSummary, StoredCareerReport } from "@/lib/career-report/schema";
@@ -32,6 +30,12 @@ function toMomentumView(m: MomentumSummary): MomentumView {
   };
 }
 
+// Rich banner gradient — violet/indigo with a teal undertone, readable under white.
+const DASH_BANNER =
+  "radial-gradient(80% 130% at 100% 0%, oklch(0.5 0.2 288) 0%, transparent 55%)," +
+  "radial-gradient(90% 130% at 0% 100%, oklch(0.48 0.16 232) 0%, transparent 55%)," +
+  "linear-gradient(120deg, oklch(0.3 0.11 288), oklch(0.24 0.07 252))";
+
 type DashboardShellProps = {
   userEmail?: string;
   profileSummary: DashboardProfileSummary | null;
@@ -49,41 +53,79 @@ export function DashboardShell({
 }: DashboardShellProps) {
   return (
     <div className="mx-auto max-w-shell space-y-6">
-      <section className="relative overflow-hidden rounded-xl border bg-card p-6">
-        {/* Aurora glows */}
+      {/* Banner */}
+      <section
+        className="relative overflow-hidden rounded-2xl border border-white/10 p-6 sm:p-8"
+        style={{ backgroundImage: DASH_BANNER }}
+      >
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -right-16 -top-24 size-72 rounded-full opacity-[0.13] blur-3xl"
-          style={{ background: "oklch(0.66 0.22 285)" }}
+          className="pointer-events-none absolute -right-16 -top-20 size-72 rounded-full opacity-30 blur-3xl"
+          style={{ background: "oklch(0.66 0.22 300)" }}
         />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -left-12 top-0 size-60 rounded-full opacity-[0.1] blur-3xl"
-          style={{ background: "oklch(0.72 0.19 192)" }}
-        />
-        <div className="relative">
-          <Badge variant="secondary">Career dashboard</Badge>
-          <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-2xl space-y-3">
-              <h2 className="text-3xl font-semibold tracking-tight">
-                Your career{" "}
-                <span className="bg-gradient-to-r from-primary via-[oklch(0.7_0.17_230)] to-[oklch(0.68_0.22_285)] bg-clip-text text-transparent">
-                  command center
-                </span>
-              </h2>
-              <p className="text-muted-foreground">
-                Review your onboarding profile and generate your first AI Career Intelligence Report.
-              </p>
-              {userEmail ? (
-                <p className="text-sm text-muted-foreground">Signed in as {userEmail}</p>
-              ) : null}
-            </div>
-            <Link href="#career-report" className={cn(buttonVariants(), "glow-primary")}>
+        <div className="relative max-w-2xl">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white/90">
+            <Sparkles className="size-3" aria-hidden="true" />
+            Career command center
+          </span>
+          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+            Your career, run by Kai
+          </h2>
+          <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/70 sm:text-base">
+            Review your profile, generate your Career Intelligence Report, and act on what matters —
+            Kai keeps the rest moving.
+          </p>
+          {userEmail ? (
+            <p className="mt-2 text-xs text-white/50">Signed in as {userEmail}</p>
+          ) : null}
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Link
+              href="#career-report"
+              className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[oklch(0.64_0.25_300)] to-[oklch(0.6_0.2_262)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_30px_-8px_oklch(0.6_0.24_300_/_0.7)] transition-transform hover:-translate-y-0.5"
+            >
               Generate report
               <ArrowRight className="size-4" aria-hidden="true" />
             </Link>
+            <Link
+              href="/dashboard/jobs"
+              className="inline-flex items-center rounded-full border border-white/25 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+            >
+              Browse jobs
+            </Link>
           </div>
         </div>
+      </section>
+
+      {/* Stat row */}
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          icon={TrendingUp}
+          label="Career readiness"
+          value={latestReport?.career_readiness_score != null ? String(latestReport.career_readiness_score) : "—"}
+          sub="for your target role"
+        />
+        <StatCard
+          icon={GraduationCap}
+          label="Resume quality"
+          value={latestReport?.resume_quality_score != null ? String(latestReport.resume_quality_score) : "—"}
+          sub="clarity of evidence"
+        />
+        <StatCard
+          icon={BriefcaseBusiness}
+          label="Top job match"
+          value={
+            recommendedJobsPreview.length > 0
+              ? `${Math.max(...recommendedJobsPreview.map((j) => j.matchScore ?? 0))}%`
+              : "—"
+          }
+          sub="best current fit"
+        />
+        <StatCard
+          icon={Sparkles}
+          label="Momentum"
+          value={String(Math.round(momentum.momentum))}
+          sub={momentum.band}
+        />
       </section>
 
       <MomentumPanel momentum={toMomentumView(momentum)} />
@@ -148,21 +190,6 @@ export function DashboardShell({
             )}
           </CardContent>
         </Card>
-      </section>
-
-      <section className="grid gap-4 md:grid-cols-2">
-        <ScoreCard
-          title="Career readiness"
-          score={latestReport?.career_readiness_score}
-          description="How ready your profile appears for your target role."
-          icon={TrendingUp}
-        />
-        <ScoreCard
-          title="Resume quality"
-          score={latestReport?.resume_quality_score}
-          description="How clearly your resume communicates role-relevant evidence."
-          icon={GraduationCap}
-        />
       </section>
 
       <Card id="recommended-jobs">
@@ -294,37 +321,29 @@ function ReportList({
   );
 }
 
-function ScoreCard({
-  title,
-  score,
-  description,
+function StatCard({
   icon: Icon,
+  label,
+  value,
+  sub,
 }: {
-  title: string;
-  score?: number | null;
-  description: string;
   icon: typeof TrendingUp;
+  label: string;
+  value: string;
+  sub: string;
 }) {
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-start gap-4 space-y-0">
-        <div className="grid size-10 place-items-center rounded-md bg-primary/10 text-primary">
+    <Card className="p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-3xl font-semibold tabular-nums">{value}</div>
+          <p className="mt-1 text-sm font-medium">{label}</p>
+          <p className="text-xs capitalize text-muted-foreground">{sub}</p>
+        </div>
+        <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-primary/20 to-[oklch(0.66_0.22_285)]/15 text-primary ring-1 ring-primary/15">
           <Icon className="size-5" aria-hidden="true" />
         </div>
-        <div>
-          <CardTitle>{title}</CardTitle>
-          <CardDescription>{description}</CardDescription>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {typeof score === "number" ? (
-          <div className="text-3xl font-semibold">{score}/100</div>
-        ) : (
-          <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-            Generate a report to see this score.
-          </div>
-        )}
-      </CardContent>
+      </div>
     </Card>
   );
 }
