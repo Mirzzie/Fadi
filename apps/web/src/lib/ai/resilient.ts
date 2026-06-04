@@ -1,8 +1,10 @@
 import "server-only";
 
+import type { ZodSchema } from "zod";
+
 import { logger } from "@/lib/observability/logger";
 import { aiErrorMessage, isProviderExhausted, isRateLimited } from "./providers/errors";
-import type { AIMessage, AIProvider, ChatOptions } from "./providers/types";
+import type { AIMessage, AIProvider, ChatOptions, ProviderCapability } from "./providers/types";
 
 const MAX_RATE_LIMIT_RETRIES = 2;
 
@@ -91,4 +93,60 @@ export function createResilientChatStream(
       controller.close();
     },
   });
+}
+
+/**
+ * A single AIProvider that wraps an ordered chain and applies retry + fallback.
+ * Drop-in anywhere a provider is expected (Kai chat, application agent), so every
+ * surface gets resilience for free.
+ */
+export class ResilientProvider implements AIProvider {
+  readonly id = "resilient";
+  readonly name: string;
+  readonly model: string;
+  readonly isConfigured: boolean;
+  readonly capabilities: ProviderCapability[];
+
+  constructor(private readonly chain: AIProvider[]) {
+    const head = chain[0];
+    this.name = head?.name ?? "AI";
+    this.model = head?.model ?? "";
+    this.isConfigured = chain.some((p) => p.isConfigured);
+    this.capabilities = head?.capabilities ?? ["chat", "streaming"];
+  }
+
+  streamChat(messages: AIMessage[], options?: ChatOptions): ReadableStream<string> {
+    return createResilientChatStream(this.chain, messages, options);
+  }
+
+  async chat(messages: AIMessage[], options?: ChatOptions): Promise<string> {
+    let lastErr: unknown;
+    for (const provider of this.chain) {
+      try {
+        return await provider.chat(messages, options);
+      } catch (err) {
+        lastErr = err;
+        if (!isProviderExhausted(err) && !isRateLimited(err)) break;
+      }
+    }
+    return aiErrorMessage(lastErr);
+  }
+
+  async parseStructured<T>(
+    messages: AIMessage[],
+    schema: ZodSchema<T>,
+    schemaName: string,
+    options?: ChatOptions,
+  ): Promise<T> {
+    let lastErr: unknown;
+    for (const provider of this.chain) {
+      try {
+        return await provider.parseStructured(messages, schema, schemaName, options);
+      } catch (err) {
+        lastErr = err;
+        if (!isProviderExhausted(err) && !isRateLimited(err)) break;
+      }
+    }
+    throw lastErr ?? new Error("No AI provider available.");
+  }
 }

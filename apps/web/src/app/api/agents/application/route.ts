@@ -5,8 +5,9 @@ import { z } from "zod";
 import { auth } from "@/lib/auth/auth";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { buildKaiContext } from "@/lib/ai/context/builder";
-import { resolveProviderForUser } from "@/lib/ai/registry";
-import { getUserProviderConfig } from "@/lib/ai/user-settings";
+import { buildProviderChain } from "@/lib/ai/registry";
+import { getUserProviderConfigs } from "@/lib/ai/user-settings";
+import { ResilientProvider } from "@/lib/ai/resilient";
 import { applicationAgent } from "@/lib/agents/application.agent";
 import { logger } from "@/lib/observability/logger";
 
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const provider = resolveProviderForUser(await getUserProviderConfig(user.id));
+  const provider = new ResilientProvider(buildProviderChain(await getUserProviderConfigs(user.id)));
 
   logger.info("agent.application.started", {
     userId: user.id,
