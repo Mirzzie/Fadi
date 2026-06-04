@@ -55,11 +55,30 @@ export class OpenAIProvider implements AIProvider {
     return response.choices[0]?.message.content ?? "";
   }
 
-  streamChat(messages: AIMessage[], options?: ChatOptions): ReadableStream<string> {
-    const client = this.client;
-    const model = this.model;
+  async openChatStream(
+    messages: AIMessage[],
+    options?: ChatOptions,
+  ): Promise<AsyncIterable<string>> {
+    if (!this.client) throw new Error("AI provider is not configured.");
+    // create() throws here on auth/quota/rate-limit, before any tokens.
+    const stream = await this.client.chat.completions.create({
+      model: this.model,
+      messages,
+      temperature: options?.temperature ?? 0.5,
+      max_tokens: options?.maxTokens,
+      stream: true,
+    });
+    async function* iterate() {
+      for await (const chunk of stream) {
+        const delta = chunk.choices[0]?.delta.content ?? "";
+        if (delta) yield delta;
+      }
+    }
+    return iterate();
+  }
 
-    if (!client) {
+  streamChat(messages: AIMessage[], options?: ChatOptions): ReadableStream<string> {
+    if (!this.client) {
       return new ReadableStream<string>({
         start(controller) {
           controller.enqueue("Kai is not configured. Add an AI provider and API key in Settings.");
@@ -67,23 +86,12 @@ export class OpenAIProvider implements AIProvider {
         },
       });
     }
-
+    const open = () => this.openChatStream(messages, options);
     return new ReadableStream<string>({
       async start(controller) {
         try {
-          const stream = await client.chat.completions.create({
-            model,
-            messages,
-            temperature: options?.temperature ?? 0.5,
-            max_tokens: options?.maxTokens,
-            stream: true,
-          });
-          for await (const chunk of stream) {
-            const delta = chunk.choices[0]?.delta.content ?? "";
-            if (delta) controller.enqueue(delta);
-          }
+          for await (const chunk of await open()) controller.enqueue(chunk);
         } catch (err) {
-          // Honest failure — tell the user the real cause.
           controller.enqueue(`\n\n${aiErrorMessage(err)}`);
         } finally {
           controller.close();

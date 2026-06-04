@@ -52,12 +52,42 @@ export class AnthropicProvider implements AIProvider {
       .join("");
   }
 
-  streamChat(messages: AIMessage[], options?: ChatOptions): ReadableStream<string> {
+  async openChatStream(
+    messages: AIMessage[],
+    options?: ChatOptions,
+  ): Promise<AsyncIterable<string>> {
+    if (!this.client) throw new Error("AI provider is not configured.");
     const client = this.client;
     const model = this.model;
     const { system, turns } = toAnthropic(messages);
+    // A probing message create would be ideal, but the stream helper surfaces
+    // auth/quota errors on first iteration; we normalize that into a throw.
+    async function* iterate() {
+      const stream = client.messages.stream({
+        model,
+        system: system || undefined,
+        messages: turns,
+        max_tokens: options?.maxTokens ?? 1024,
+        temperature: options?.temperature ?? 0.5,
+      });
+      for await (const event of stream) {
+        if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+          yield event.delta.text;
+        }
+      }
+    }
+    const iterator = iterate();
+    // Pull the first chunk now so initial errors throw here (before streaming).
+    const first = await iterator.next();
+    async function* prepend() {
+      if (!first.done) yield first.value;
+      yield* iterator;
+    }
+    return prepend();
+  }
 
-    if (!client) {
+  streamChat(messages: AIMessage[], options?: ChatOptions): ReadableStream<string> {
+    if (!this.client) {
       return new ReadableStream<string>({
         start(controller) {
           controller.enqueue("Kai is not configured. Add a Claude API key in Settings.");
@@ -65,22 +95,11 @@ export class AnthropicProvider implements AIProvider {
         },
       });
     }
-
+    const open = () => this.openChatStream(messages, options);
     return new ReadableStream<string>({
       async start(controller) {
         try {
-          const stream = client.messages.stream({
-            model,
-            system: system || undefined,
-            messages: turns,
-            max_tokens: options?.maxTokens ?? 1024,
-            temperature: options?.temperature ?? 0.5,
-          });
-          for await (const event of stream) {
-            if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-              controller.enqueue(event.delta.text);
-            }
-          }
+          for await (const chunk of await open()) controller.enqueue(chunk);
         } catch (err) {
           controller.enqueue(`\n\n${aiErrorMessage(err)}`);
         } finally {

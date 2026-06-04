@@ -1,3 +1,25 @@
+function errInfo(err: unknown) {
+  const e = err as { status?: number; code?: string; message?: string } | undefined;
+  return { status: e?.status, code: e?.code, msg: e?.message ?? "" };
+}
+
+/** Temporary rate limit (requests/tokens-per-minute) — recovers with backoff. */
+export function isRateLimited(err: unknown): boolean {
+  const { status, code } = errInfo(err);
+  return status === 429 && code !== "insufficient_quota";
+}
+
+/** Hard, non-recoverable for this provider — retrying won't help; switch away. */
+export function isProviderExhausted(err: unknown): boolean {
+  const { status, code, msg } = errInfo(err);
+  return (
+    code === "insufficient_quota" ||
+    status === 401 ||
+    status === 403 ||
+    /quota|billing|invalid api key/i.test(msg)
+  );
+}
+
 /**
  * Turn a raw provider/SDK error into an honest, actionable message for the user.
  * Never a vague "something went wrong" — name the real cause so they can fix it.

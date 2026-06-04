@@ -38,6 +38,11 @@ export interface AIProvider {
 
   chat(messages: AIMessage[], options?: ChatOptions): Promise<string>;
   streamChat(messages: AIMessage[], options?: ChatOptions): ReadableStream<string>;
+  /**
+   * Open a streaming response, THROWING on the initial failure (auth/quota/rate
+   * limit) before any tokens. Lets an orchestrator retry or fall back cleanly.
+   */
+  openChatStream?(messages: AIMessage[], options?: ChatOptions): Promise<AsyncIterable<string>>;
   parseStructured<T>(
     messages: AIMessage[],
     schema: ZodSchema<T>,

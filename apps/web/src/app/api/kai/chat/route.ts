@@ -4,8 +4,9 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth/auth";
 import { getCurrentAuthUser } from "@/lib/auth/session";
-import { resolveProviderForUser } from "@/lib/ai/registry";
-import { getUserProviderConfig } from "@/lib/ai/user-settings";
+import { buildProviderChain } from "@/lib/ai/registry";
+import { getUserProviderConfigs } from "@/lib/ai/user-settings";
+import { createResilientChatStream } from "@/lib/ai/resilient";
 import { buildKaiContext } from "@/lib/ai/context/builder";
 import { buildKaiMessages } from "@/lib/ai/prompts/system";
 import { logger } from "@/lib/observability/logger";
@@ -67,19 +68,17 @@ export async function POST(req: NextRequest) {
   // Build messages
   const messages = buildKaiMessages(context, history, message);
 
-  // Get provider — the user's own (BYOK) when configured, else server default.
-  const userConfig = await getUserProviderConfig(user.id);
-  const provider = resolveProviderForUser(userConfig);
+  // Resolve the user's provider chain (primary → fallback) and stream resiliently:
+  // retry transient rate limits, switch providers when one is exhausted.
+  const chain = buildProviderChain(await getUserProviderConfigs(user.id));
 
   logger.info("kai.chat.started", {
     userId: user.id,
-    provider: provider.name,
-    model: provider.model,
-    isConfigured: provider.isConfigured,
+    providers: chain.map((p) => `${p.id}:${p.model}`).join(", "),
     historyLength: history.length,
   });
 
-  const stream = provider.streamChat(messages, { temperature: 0.6 });
+  const stream = createResilientChatStream(chain, messages, { temperature: 0.6 });
 
   // Encode as SSE text/event-stream
   const encoder = new TextEncoder();

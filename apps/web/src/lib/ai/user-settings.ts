@@ -12,15 +12,24 @@ export type SaveAiSettingsInput = {
   baseUrl?: string | null;
   /** Plaintext key from the form; empty keeps the existing key (or none for keyless). */
   apiKey?: string | null;
+  // Optional fallback provider.
+  fallbackProvider?: string | null;
+  fallbackModel?: string | null;
+  fallbackBaseUrl?: string | null;
+  fallbackApiKey?: string | null;
 };
 
-/** Safe view for the settings UI — never includes the key, only a hint. */
 export type AiSettingsView = {
   provider: string;
   model: string | null;
   baseUrl: string | null;
   hasKey: boolean;
   keyHint: string | null;
+  fallbackProvider: string | null;
+  fallbackModel: string | null;
+  fallbackBaseUrl: string | null;
+  hasFallbackKey: boolean;
+  fallbackKeyHint: string | null;
 };
 
 function repo() {
@@ -36,21 +45,41 @@ export async function getUserAiSettingsView(userId: string): Promise<AiSettingsV
     baseUrl: row.baseUrl,
     hasKey: Boolean(row.apiKeyCiphertext),
     keyHint: row.apiKeyHint,
+    fallbackProvider: row.fallbackProvider,
+    fallbackModel: row.fallbackModel,
+    fallbackBaseUrl: row.fallbackBaseUrl,
+    hasFallbackKey: Boolean(row.fallbackApiKeyCiphertext),
+    fallbackKeyHint: row.fallbackApiKeyHint,
   };
 }
 
-/** Decrypted provider config for actually calling the model. Null if unset. */
+/** Primary provider config (decrypted), or null if unset. */
 export async function getUserProviderConfig(userId: string): Promise<ProviderConfig | null> {
-  const row = await repo().getByUserId(userId);
-  if (!row) return null;
+  const configs = await getUserProviderConfigs(userId);
+  return configs[0] ?? null;
+}
 
-  const apiKey = row.apiKeyCiphertext ? (decryptSecret(row.apiKeyCiphertext) ?? "") : "";
-  return {
+/** Ordered provider chain: [primary, fallback?] — decrypted, configured only. */
+export async function getUserProviderConfigs(userId: string): Promise<ProviderConfig[]> {
+  const row = await repo().getByUserId(userId);
+  if (!row) return [];
+
+  const configs: ProviderConfig[] = [];
+  configs.push({
     id: row.provider,
-    apiKey,
+    apiKey: row.apiKeyCiphertext ? (decryptSecret(row.apiKeyCiphertext) ?? "") : "",
     model: row.model ?? undefined,
     baseURL: row.baseUrl ?? undefined,
-  };
+  });
+  if (row.fallbackProvider) {
+    configs.push({
+      id: row.fallbackProvider,
+      apiKey: row.fallbackApiKeyCiphertext ? (decryptSecret(row.fallbackApiKeyCiphertext) ?? "") : "",
+      model: row.fallbackModel ?? undefined,
+      baseURL: row.fallbackBaseUrl ?? undefined,
+    });
+  }
+  return configs;
 }
 
 export async function saveUserAiSettings(
@@ -59,22 +88,30 @@ export async function saveUserAiSettings(
 ): Promise<void> {
   const existing = await repo().getByUserId(userId);
 
-  // A blank key on an existing row means "keep the current key".
-  const trimmedKey = input.apiKey?.trim() ?? "";
-  const apiKeyCiphertext = trimmedKey
-    ? encryptSecret(trimmedKey)
-    : (existing?.apiKeyCiphertext ?? null);
-  const apiKeyHint = trimmedKey
-    ? trimmedKey.slice(-4)
-    : (existing?.apiKeyHint ?? null);
+  const primaryKey = input.apiKey?.trim() ?? "";
+  const fallbackKey = input.fallbackApiKey?.trim() ?? "";
+  const hasFallback = Boolean(input.fallbackProvider);
 
   await repo().upsert({
     userId,
     provider: input.provider,
     model: input.model?.trim() || null,
     baseUrl: input.baseUrl?.trim() || null,
-    apiKeyCiphertext,
-    apiKeyHint,
+    apiKeyCiphertext: primaryKey ? encryptSecret(primaryKey) : (existing?.apiKeyCiphertext ?? null),
+    apiKeyHint: primaryKey ? primaryKey.slice(-4) : (existing?.apiKeyHint ?? null),
+    fallbackProvider: hasFallback ? input.fallbackProvider : null,
+    fallbackModel: hasFallback ? input.fallbackModel?.trim() || null : null,
+    fallbackBaseUrl: hasFallback ? input.fallbackBaseUrl?.trim() || null : null,
+    fallbackApiKeyCiphertext: !hasFallback
+      ? null
+      : fallbackKey
+        ? encryptSecret(fallbackKey)
+        : (existing?.fallbackApiKeyCiphertext ?? null),
+    fallbackApiKeyHint: !hasFallback
+      ? null
+      : fallbackKey
+        ? fallbackKey.slice(-4)
+        : (existing?.fallbackApiKeyHint ?? null),
   });
 }
 

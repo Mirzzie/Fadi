@@ -502,6 +502,12 @@ export const userAiSettings = pgTable(
     baseUrl: text("base_url"), // for ollama / custom-compatible endpoints
     apiKeyCiphertext: text("api_key_ciphertext"), // AES-GCM payload, null for keyless (ollama)
     apiKeyHint: text("api_key_hint"), // last 4 chars, safe to display
+    // Optional fallback provider — used when the primary is rate-limited/exhausted.
+    fallbackProvider: text("fallback_provider"),
+    fallbackModel: text("fallback_model"),
+    fallbackBaseUrl: text("fallback_base_url"),
+    fallbackApiKeyCiphertext: text("fallback_api_key_ciphertext"),
+    fallbackApiKeyHint: text("fallback_api_key_hint"),
     ...timestamps,
   },
   (table) => [uniqueIndex("user_ai_settings_user_id_idx").on(table.userId)]

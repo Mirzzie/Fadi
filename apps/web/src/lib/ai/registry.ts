@@ -116,6 +116,22 @@ export function createUserProvider(config: ProviderConfig): AIProvider | null {
  * Resolve the best provider for a user — prefers their personal key if configured.
  * Falls back to server-configured default.
  */
+/**
+ * Build an ordered provider chain (primary → fallback) from the user's configs,
+ * keeping only those that are actually configured. Falls back to the server
+ * default when the user has none.
+ */
+export function buildProviderChain(configs: ProviderConfig[]): AIProvider[] {
+  const chain = configs
+    .map((c) => createUserProvider(c))
+    .filter((p): p is AIProvider => Boolean(p?.isConfigured));
+  if (chain.length === 0) {
+    const fallback = getProviderRegistry().getDefault();
+    return [fallback];
+  }
+  return chain;
+}
+
 export function resolveProviderForUser(userConfig?: ProviderConfig | null): AIProvider {
   if (userConfig) {
     const userProvider = createUserProvider(userConfig);

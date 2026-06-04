@@ -18,6 +18,10 @@ type AiSettingsInput = {
   model?: string;
   baseUrl?: string;
   apiKey?: string;
+  fallbackProvider?: string;
+  fallbackModel?: string;
+  fallbackBaseUrl?: string;
+  fallbackApiKey?: string;
 };
 
 export async function saveAiSettingsAction(input: AiSettingsInput): Promise<Result> {
