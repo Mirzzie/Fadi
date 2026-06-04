@@ -28,7 +28,12 @@ export function OnboardingShell() {
       <section className="space-y-4">
         <Badge variant="secondary">Onboarding shell</Badge>
         <div className="space-y-3">
-          <h1 className="text-3xl font-semibold tracking-tight">Build your career profile</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Build your career{" "}
+            <span className="bg-gradient-to-r from-primary via-[oklch(0.7_0.17_230)] to-[oklch(0.68_0.22_285)] bg-clip-text text-transparent">
+              profile
+            </span>
+          </h1>
           <p className="text-muted-foreground">
             Paste your career context so CareerOS AI can prepare your profile foundation. This phase
             saves data only; AI report generation comes later.
@@ -38,7 +43,7 @@ export function OnboardingShell() {
           {steps.map((step) => (
             <Card key={step.title}>
               <CardContent className="flex gap-4 p-4">
-                <div className="grid size-10 shrink-0 place-items-center rounded-md bg-primary/10 text-primary">
+                <div className="grid size-10 shrink-0 place-items-center rounded-md bg-gradient-to-br from-primary/20 to-[oklch(0.66_0.22_285)]/15 text-primary ring-1 ring-primary/15">
                   <step.icon className="size-5" aria-hidden="true" />
                 </div>
                 <div>
@@ -51,7 +56,7 @@ export function OnboardingShell() {
         </div>
       </section>
 
-      <Card>
+      <Card className="glow-primary">
         <CardHeader>
           <CardTitle>Profile foundation</CardTitle>
           <CardDescription>

@@ -214,7 +214,7 @@ export function ApplicationWorkspace({
   return (
     <div className="flex h-full gap-4">
       {/* Left: Chat */}
-      <div className="flex min-w-0 flex-1 flex-col rounded-xl border border-border/60 bg-card">
+      <div className="kai-glow-sm flex min-w-0 flex-1 flex-col rounded-xl border border-border/60 bg-card">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
           <div className="flex items-center gap-3 min-w-0">
@@ -363,7 +363,7 @@ export function ApplicationWorkspace({
         </div>
 
         {/* Approval notice */}
-        <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+        <div className="gradient-border glass-card rounded-xl p-3">
           <p className="text-xs leading-relaxed text-muted-foreground">
             <span className="font-medium text-primary">Nothing is sent automatically.</span>{" "}
             Review every document before using it. Kai prepares; you decide.

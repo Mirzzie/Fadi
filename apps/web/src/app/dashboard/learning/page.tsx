@@ -29,13 +29,23 @@ export default async function LearningPage() {
   return (
     <AppShell>
       <div className="mx-auto max-w-shell space-y-6">
-        <section className="rounded-xl border border-border/60 bg-card p-6">
-          <div className="flex items-start gap-4">
-            <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10">
-              <GraduationCap className="size-5 text-primary" aria-hidden="true" />
+        <section className="relative overflow-hidden rounded-xl border border-border/60 bg-card p-6">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -right-16 -top-20 size-64 rounded-full opacity-[0.12] blur-3xl"
+            style={{ background: "oklch(0.7 0.17 230)" }}
+          />
+          <div className="relative flex items-start gap-4">
+            <div className="glow-primary grid size-10 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-primary to-[oklch(0.66_0.22_285)]">
+              <GraduationCap className="size-5 text-primary-foreground" aria-hidden="true" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold tracking-tight">Learning Hub</h2>
+              <h2 className="text-xl font-semibold tracking-tight">
+                Learning{" "}
+                <span className="bg-gradient-to-r from-primary to-[oklch(0.7_0.17_230)] bg-clip-text text-transparent">
+                  Hub
+                </span>
+              </h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Skill gap analysis and your personalized learning path.
               </p>
@@ -43,7 +53,7 @@ export default async function LearningPage() {
           </div>
         </section>
 
-        <div className="rounded-xl border border-primary/20 bg-primary/5 p-6">
+        <div className="gradient-border glass-card rounded-xl p-6">
           <div className="flex items-start gap-4">
             <KaiBadge size="sm" showName={false} />
             <div className="space-y-2">

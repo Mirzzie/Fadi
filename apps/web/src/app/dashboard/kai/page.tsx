@@ -34,11 +34,11 @@ export default async function KaiPage() {
         {/* Kai presence */}
         <div className="flex flex-col items-center gap-5 py-8 text-center">
           <div className="relative">
-            <div className="flex size-20 items-center justify-center rounded-full bg-primary/15 ring-4 ring-primary/10">
+            <div className="glow-primary flex size-20 items-center justify-center rounded-full bg-gradient-to-br from-primary/25 to-[oklch(0.66_0.22_285)]/20 ring-4 ring-primary/10">
               <Sparkles className="size-9 text-primary" aria-hidden="true" />
             </div>
             {/* Pulse rings */}
-            <div className="absolute inset-0 animate-ping rounded-full bg-primary/5" aria-hidden="true" />
+            <div className="absolute inset-0 animate-ping rounded-full bg-primary/10" aria-hidden="true" />
           </div>
 
           <div className="space-y-1.5">
@@ -55,7 +55,7 @@ export default async function KaiPage() {
         </div>
 
         {/* Voice interface — real-time streaming coming in Phase 2 */}
-        <div className="kai-glow rounded-2xl border border-primary/25 bg-card p-6">
+        <div className="gradient-border glass-card glow-primary rounded-2xl p-6">
           <div className="mb-4 flex items-center justify-between">
             <KaiBadge size="sm" />
             <span className="text-xs text-muted-foreground">Voice interface</span>
@@ -63,7 +63,7 @@ export default async function KaiPage() {
 
           <div className="flex flex-col items-center gap-4 py-4">
             <button
-              className="flex size-16 items-center justify-center rounded-full bg-primary/10 ring-2 ring-primary/20 transition-all hover:bg-primary/20 hover:ring-primary/40 active:scale-95"
+              className="glow-primary flex size-16 items-center justify-center rounded-full bg-primary/10 ring-2 ring-primary/30 transition-all hover:bg-primary/20 hover:ring-primary/50 active:scale-95"
               aria-label="Hold to speak to Kai"
             >
               <Mic className="size-7 text-primary" aria-hidden="true" />
