@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Bell, LogOut, Menu, Search } from "lucide-react";
 
 import { signOutAction } from "@/app/auth/actions";
@@ -47,9 +48,10 @@ export function AppHeader() {
           <Bell className="size-4" aria-hidden="true" />
           <span className="absolute right-2 top-2 size-1.5 rounded-full bg-primary" aria-hidden="true" />
         </button>
-        <div
+        <Link
+          href="/dashboard/profile"
+          aria-label="Your profile"
           className="glow-primary size-9 shrink-0 rounded-full bg-gradient-to-br from-primary to-[oklch(0.62_0.22_300)] ring-2 ring-background"
-          aria-hidden="true"
         />
         <form action={signOutAction}>
           <Button type="submit" variant="ghost" size="icon" className="size-9" aria-label="Sign out">

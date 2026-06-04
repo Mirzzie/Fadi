@@ -5,6 +5,7 @@ import {
   LayoutDashboard,
   MessageSquareText,
   Settings,
+  UserRoundCog,
 } from "lucide-react";
 
 export type NavItem = {
@@ -40,6 +41,9 @@ export const appNavGroups: NavGroup[] = [
   },
   {
     label: "Account",
-    items: [{ href: "/dashboard/settings", label: "Settings", icon: Settings }],
+    items: [
+      { href: "/dashboard/profile", label: "Profile", icon: UserRoundCog },
+      { href: "/dashboard/settings", label: "Settings", icon: Settings },
+    ],
   },
 ];

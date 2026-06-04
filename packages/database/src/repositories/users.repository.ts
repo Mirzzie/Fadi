@@ -21,6 +21,11 @@ export function createUsersRepository(db: Database) {
       return user ?? null;
     },
 
+    /** Delete the domain user; FK cascades remove all their career data. */
+    async deleteById(id: string): Promise<void> {
+      await db.delete(users).where(eq(users.id, id));
+    },
+
     async findByEmail(email: string): Promise<User | null> {
       const [user] = await db
         .select()
