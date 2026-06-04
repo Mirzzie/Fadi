@@ -11,7 +11,13 @@ import Link from "next/link";
 
 import { KaiBadge } from "@/components/ui/kai-badge";
 import { buttonVariants } from "@/components/ui/button";
+import { getCurrentAuthUser } from "@/lib/auth/session";
+import { getLatestCareerReport } from "@/lib/career-report/data";
+import { getRecommendedJobsForUser } from "@/lib/jobs/data";
+import { getMomentumSummary } from "@/lib/resilience/service";
 import { cn } from "@/lib/utils";
+
+export const dynamic = "force-dynamic";
 
 const features = [
   {
@@ -63,13 +69,62 @@ const howItWorks = [
   },
 ];
 
-// Career signals shown in the hero panel — CareerOS's read on a profile.
-const signals = [
+type Signal = { label: string; value: string; bars: number[] };
+
+// Sample signals for anonymous visitors — replaced by the viewer's real numbers
+// when they're signed in (see buildSignals).
+const DEMO_SIGNALS: Signal[] = [
   { label: "Career readiness", value: "78", bars: [4, 6, 5, 8, 7, 9, 6, 8, 10, 7] },
   { label: "Resume quality", value: "84", bars: [5, 7, 6, 9, 8, 7, 10, 8, 9, 11] },
   { label: "Top job match", value: "69%", bars: [3, 5, 4, 6, 8, 5, 7, 9, 6, 8] },
-  { label: "Market demand", value: "42%", bars: [6, 4, 7, 5, 8, 6, 4, 7, 5, 6] },
+  { label: "Momentum", value: "61", bars: [6, 4, 7, 5, 8, 6, 4, 7, 5, 6] },
 ];
+
+/**
+ * Real career signals for a signed-in viewer. When a metric doesn't exist yet
+ * (e.g. no report generated) we show "—" rather than a fabricated number — the
+ * panel is marked "live", so it must never present sample data as the user's
+ * own. Anonymous visitors get the sample showcase instead.
+ */
+async function buildSignals(): Promise<{ signals: Signal[]; personalized: boolean }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { signals: DEMO_SIGNALS, personalized: false };
+
+  const [report, jobs, momentum] = await Promise.all([
+    getLatestCareerReport(user.id),
+    getRecommendedJobsForUser(user.id, 5),
+    getMomentumSummary(user.id),
+  ]);
+
+  const topMatch = jobs.reduce((max, j) => Math.max(max, j.matchScore ?? 0), 0);
+  const readiness = report?.career_readiness_score ?? null;
+  const resume = report?.resume_quality_score ?? null;
+
+  const signals: Signal[] = [
+    {
+      label: "Career readiness",
+      value: readiness != null ? String(readiness) : "—",
+      bars: DEMO_SIGNALS[0].bars,
+    },
+    {
+      label: "Resume quality",
+      value: resume != null ? String(resume) : "—",
+      bars: DEMO_SIGNALS[1].bars,
+    },
+    {
+      label: "Top job match",
+      value: topMatch > 0 ? `${topMatch}%` : "—",
+      bars: DEMO_SIGNALS[2].bars,
+    },
+    {
+      label: "Momentum",
+      value: String(Math.round(momentum.momentum)),
+      bars: DEMO_SIGNALS[3].bars,
+    },
+  ];
+
+  return { signals, personalized: true };
+}
 
 // Aurora mesh — magenta left, blue crown, amber floor, violet corner.
 const HERO_MESH =
@@ -85,7 +140,9 @@ const navLinks = [
   { label: "Kai", href: "#trust" },
 ];
 
-export default function Home() {
+export default async function Home() {
+  const { signals, personalized } = await buildSignals();
+
   return (
     <div className="min-h-screen bg-background">
       {/* ── Framed mesh hero ───────────────────────────────────────────────── */}
@@ -181,8 +238,14 @@ export default function Home() {
 
               {/* Right — career signals panel */}
               <div className="lg:pl-4">
-                <p className="mb-1 text-xs font-medium uppercase tracking-[0.18em] text-white/55">
+                <p className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-white/55">
                   Your career signals
+                  {personalized ? (
+                    <span className="inline-flex items-center gap-1 text-emerald-300/90">
+                      <span className="size-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
+                      Live
+                    </span>
+                  ) : null}
                 </p>
                 <div className="divide-y divide-white/10">
                   {signals.map((s) => (
