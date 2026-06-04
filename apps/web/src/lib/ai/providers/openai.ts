@@ -29,7 +29,13 @@ export class OpenAIProvider implements AIProvider {
   constructor(
     apiKey: string | undefined,
     model = "gpt-4.1-mini",
-    options: { baseURL?: string; id?: string; name?: string; keyless?: boolean } = {},
+    options: {
+      baseURL?: string;
+      id?: string;
+      name?: string;
+      keyless?: boolean;
+      headers?: Record<string, string>;
+    } = {},
   ) {
     this.id = options.id ?? "openai";
     this.name = options.name ?? "OpenAI";
@@ -38,7 +44,11 @@ export class OpenAIProvider implements AIProvider {
     this.isConfigured = Boolean(apiKey) || (Boolean(options.keyless) && Boolean(options.baseURL));
     this.client =
       apiKey || options.keyless
-        ? new OpenAI({ apiKey: apiKey || "ollama", baseURL: options.baseURL })
+        ? new OpenAI({
+            apiKey: apiKey || "ollama",
+            baseURL: options.baseURL,
+            defaultHeaders: options.headers,
+          })
         : null;
   }
 

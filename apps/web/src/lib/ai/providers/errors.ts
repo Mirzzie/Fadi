@@ -36,6 +36,9 @@ export function aiErrorMessage(err: unknown): string {
   if (status === 429 || code === "insufficient_quota" || /quota|billing/i.test(msg)) {
     return "Your AI provider is out of quota or rate-limited. A ChatGPT Plus subscription does NOT include API credits — add billing/credits to the API account, or switch providers in Settings.";
   }
+  if (/data policy|no endpoints|no allowed providers/i.test(msg)) {
+    return "OpenRouter is blocking free models for this account. Enable them at openrouter.ai/settings/privacy (turn on 'Free model publication / prompt training'), then try again.";
+  }
   if (status === 404 || /model/i.test(msg)) {
     return "The selected model isn't available for this key. Pick a different model in Settings → AI provider.";
   }

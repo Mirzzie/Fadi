@@ -259,6 +259,22 @@ function ProviderFields({
           />
         </div>
       ) : null}
+
+      {slot.provider === "openrouter" ? (
+        <p className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-muted-foreground">
+          To use the <span className="text-foreground">:free</span> models, enable them once at{" "}
+          <a
+            href="https://openrouter.ai/settings/privacy"
+            target="_blank"
+            rel="noreferrer"
+            className="text-primary hover:underline"
+          >
+            openrouter.ai/settings/privacy
+          </a>{" "}
+          (allow free / prompt-training models) — otherwise free models return a &ldquo;no
+          endpoints&rdquo; error.
+        </p>
+      ) : null}
     </div>
   );
 }

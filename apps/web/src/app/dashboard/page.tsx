@@ -40,18 +40,23 @@ export default async function DashboardPage() {
   // the real-world relevance check for their career report (cached, 15m).
   const marketSignals = profileSummary?.targetRole
     ? (
-        await getMarketIntelligence({
-          targetRole: profileSummary.targetRole,
-          skills: (latestReport?.strengths ?? []).map((s) => s.title),
-          skillGaps: (latestReport?.missing_skills ?? []).map((s) => s.title),
-          region: profileSummary.locationPreference,
-        })
+        await getMarketIntelligence(
+          {
+            targetRole: profileSummary.targetRole,
+            skills: (latestReport?.strengths ?? []).map((s) => s.title),
+            skillGaps: (latestReport?.missing_skills ?? []).map((s) => s.title),
+            region: profileSummary.locationPreference,
+          },
+          // Permissive "market pulse": always surface live activity, ranked —
+          // so the data pipeline is visible even before a report exists.
+          { threshold: 0, limit: 6 },
+        )
       ).signals.map((s) => ({
         kind: s.kind,
         title: s.title,
         url: s.url ?? null,
         relevance: s.relevance,
-        reason: s.reasons[0] ?? "relevant to your profile",
+        reason: s.reasons[0] ?? "recent activity in your space",
       }))
     : [];
 

@@ -91,6 +91,10 @@ export function createUserProvider(config: ProviderConfig): AIProvider | null {
         id: "openrouter",
         name: "OpenRouter",
         baseURL: "https://openrouter.ai/api/v1",
+        headers: {
+          "HTTP-Referer": serverEnv.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+          "X-Title": "CareerOS",
+        },
       });
     case "anthropic":
       return new AnthropicProvider(config.apiKey, model ?? "claude-sonnet-4-6");
