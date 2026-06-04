@@ -3,6 +3,7 @@ import { BriefcaseBusiness, MapPin, Signal, Wallet } from "lucide-react";
 import { JobActions } from "@/components/jobs/job-actions";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { matchAccent } from "@/lib/jobs/match-accent";
 import type { RecommendedJob } from "@/lib/jobs/types";
 
 type JobsShellProps = {
@@ -12,14 +13,26 @@ type JobsShellProps = {
 export function JobsShell({ jobs }: JobsShellProps) {
   return (
     <div className="mx-auto max-w-shell space-y-6">
-      <section className="rounded-lg border bg-card p-6">
-        <Badge variant="secondary">Local job discovery</Badge>
-        <div className="mt-4 max-w-3xl space-y-3">
-          <h2 className="text-3xl font-semibold tracking-tight">Recommended jobs</h2>
-          <p className="text-muted-foreground">
-            CareerOS is matching seeded local jobs against your onboarding profile. External job
-            sources and AI ranking are intentionally not enabled yet.
-          </p>
+      <section className="relative overflow-hidden rounded-xl border bg-card p-6">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-16 -top-24 size-72 rounded-full opacity-[0.12] blur-3xl"
+          style={{ background: "oklch(0.72 0.19 192)" }}
+        />
+        <div className="relative max-w-3xl">
+          <Badge variant="secondary">Local job discovery</Badge>
+          <div className="mt-4 space-y-3">
+            <h2 className="text-3xl font-semibold tracking-tight">
+              Recommended{" "}
+              <span className="bg-gradient-to-r from-primary to-[oklch(0.7_0.17_230)] bg-clip-text text-transparent">
+                jobs
+              </span>
+            </h2>
+            <p className="text-muted-foreground">
+              CareerOS is matching seeded local jobs against your onboarding profile. External job
+              sources and AI ranking are intentionally not enabled yet.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -33,7 +46,10 @@ export function JobsShell({ jobs }: JobsShellProps) {
                     <CardTitle>{job.title}</CardTitle>
                     <CardDescription>{job.company}</CardDescription>
                   </div>
-                  <div className="rounded-md border bg-primary/10 px-3 py-2 text-sm font-medium text-primary">
+                  <div
+                    style={matchAccent(job.matchScore).style}
+                    className="shrink-0 rounded-md border border-dynamic bg-dynamic-soft px-3 py-2 text-sm font-medium tabular-nums text-dynamic"
+                  >
                     {job.matchScore}% match
                   </div>
                 </div>

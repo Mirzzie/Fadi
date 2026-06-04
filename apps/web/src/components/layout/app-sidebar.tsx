@@ -15,7 +15,7 @@ export function AppSidebar() {
     <aside className="hidden w-64 shrink-0 border-r border-border/60 bg-sidebar lg:flex lg:flex-col">
       {/* Logo */}
       <div className="flex h-16 items-center gap-2.5 border-b border-border/60 px-5">
-        <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
+        <div className="glow-primary flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-[oklch(0.66_0.22_285)]">
           <Sparkles className="size-4 text-primary-foreground" aria-hidden="true" />
         </div>
         <Link href="/dashboard" className="font-semibold tracking-tight">
@@ -36,9 +36,9 @@ export function AppSidebar() {
               key={item.href}
               href={item.href}
               className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
+                "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
                 isActive
-                  ? "bg-primary/15 font-medium text-primary"
+                  ? "bg-primary/12 font-medium text-primary ring-1 ring-inset ring-primary/25 before:absolute before:left-0 before:top-1/2 before:h-5 before:w-0.5 before:-translate-y-1/2 before:rounded-full before:bg-primary before:shadow-[0_0_8px_var(--primary)]"
                   : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
               )}
             >

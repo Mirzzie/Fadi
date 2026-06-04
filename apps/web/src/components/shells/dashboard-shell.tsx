@@ -10,6 +10,8 @@ import {
 
 import { GenerateReportButton } from "@/components/dashboard/generate-report-button";
 import { MomentumPanel, type MomentumView } from "@/components/resilience/momentum-panel";
+import { cn } from "@/lib/utils";
+import { matchAccent } from "@/lib/jobs/match-accent";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,22 +49,40 @@ export function DashboardShell({
 }: DashboardShellProps) {
   return (
     <div className="mx-auto max-w-shell space-y-6">
-      <section className="rounded-lg border bg-card p-6">
-        <Badge variant="secondary">Career dashboard</Badge>
-        <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl space-y-3">
-            <h2 className="text-3xl font-semibold tracking-tight">Your career command center</h2>
-            <p className="text-muted-foreground">
-              Review your onboarding profile and generate your first AI Career Intelligence Report.
-            </p>
-            {userEmail ? (
-              <p className="text-sm text-muted-foreground">Signed in as {userEmail}</p>
-            ) : null}
+      <section className="relative overflow-hidden rounded-xl border bg-card p-6">
+        {/* Aurora glows */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-16 -top-24 size-72 rounded-full opacity-[0.13] blur-3xl"
+          style={{ background: "oklch(0.66 0.22 285)" }}
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -left-12 top-0 size-60 rounded-full opacity-[0.1] blur-3xl"
+          style={{ background: "oklch(0.72 0.19 192)" }}
+        />
+        <div className="relative">
+          <Badge variant="secondary">Career dashboard</Badge>
+          <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-2xl space-y-3">
+              <h2 className="text-3xl font-semibold tracking-tight">
+                Your career{" "}
+                <span className="bg-gradient-to-r from-primary via-[oklch(0.7_0.17_230)] to-[oklch(0.68_0.22_285)] bg-clip-text text-transparent">
+                  command center
+                </span>
+              </h2>
+              <p className="text-muted-foreground">
+                Review your onboarding profile and generate your first AI Career Intelligence Report.
+              </p>
+              {userEmail ? (
+                <p className="text-sm text-muted-foreground">Signed in as {userEmail}</p>
+              ) : null}
+            </div>
+            <Link href="#career-report" className={cn(buttonVariants(), "glow-primary")}>
+              Generate report
+              <ArrowRight className="size-4" aria-hidden="true" />
+            </Link>
           </div>
-          <Link href="#career-report" className={buttonVariants()}>
-            Generate report
-            <ArrowRight className="size-4" aria-hidden="true" />
-          </Link>
         </div>
       </section>
 
@@ -171,7 +191,12 @@ export function DashboardShell({
                       <h3 className="text-sm font-medium">{job.title}</h3>
                       <p className="text-sm text-muted-foreground">{job.company}</p>
                     </div>
-                    <Badge variant="secondary">{job.matchScore}%</Badge>
+                    <span
+                      style={matchAccent(job.matchScore).style}
+                      className="shrink-0 rounded-full border border-dynamic bg-dynamic-soft px-2 py-0.5 text-xs font-medium tabular-nums text-dynamic"
+                    >
+                      {job.matchScore}%
+                    </span>
                   </div>
                   <p className="mt-2 text-xs text-muted-foreground">
                     {[job.location, job.remoteMode, job.seniority].filter(Boolean).join(" / ")}
