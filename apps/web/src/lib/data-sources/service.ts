@@ -35,11 +35,31 @@ export interface MarketIntelligence {
   generatedAt: string;
 }
 
+// Cache personalized intelligence per profile-query so the chat path can carry
+// live signals without paying the fetch latency on every message.
+const MARKET_TTL_MS = 15 * 60 * 1000;
+const marketCache = new Map<string, { at: number; intel: MarketIntelligence }>();
+
+function marketCacheKey(profile: RelevanceProfile, opts: { threshold?: number; limit?: number }) {
+  return JSON.stringify([
+    profile.targetRole,
+    profile.region,
+    profile.skills?.slice(0, 4),
+    profile.skillGaps?.slice(0, 4),
+    opts.threshold,
+    opts.limit,
+  ]);
+}
+
 /** Personalized market intelligence for Kai's context + the dashboard brief. */
 export async function getMarketIntelligence(
   profile: RelevanceProfile,
   opts: { threshold?: number; limit?: number } = {},
 ): Promise<MarketIntelligence> {
+  const cacheKey = marketCacheKey(profile, opts);
+  const cached = marketCache.get(cacheKey);
+  if (cached && Date.now() - cached.at < MARKET_TTL_MS) return cached.intel;
+
   const sources = getConfiguredSignalSources();
   const query = queryFromProfile(profile);
 
@@ -62,11 +82,13 @@ export async function getMarketIntelligence(
     surfaced: ranked.length,
   });
 
-  return {
+  const intel: MarketIntelligence = {
     signals: ranked,
     activeSources: sources.map((s) => s.id),
     generatedAt: new Date().toISOString(),
   };
+  marketCache.set(cacheKey, { at: Date.now(), intel });
+  return intel;
 }
 
 /** Live job discovery across configured job sources, deduped by title+company. */

@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
 
   const { jobId, jobTitle, jobCompany, jobDescription, message, history } = parsed.data;
 
-  const userContext = await buildKaiContext(user.id);
+  const userContext = await buildKaiContext(user.id, { includeLiveMarket: true });
 
   if (!userContext) {
     return new Response(

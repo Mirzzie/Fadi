@@ -56,7 +56,9 @@ export async function POST(req: NextRequest) {
   const { message, history } = parsed.data;
 
   // Build context
-  const context = await buildKaiContext(user.id);
+  // Live market signals (GDELT/HN/Remotive) are cached, so Kai's answers stay
+  // grounded in real data without per-message fetch latency.
+  const context = await buildKaiContext(user.id, { includeLiveMarket: true });
 
   if (!context) {
     return new Response(
