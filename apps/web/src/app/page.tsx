@@ -14,7 +14,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getLatestCareerReport } from "@/lib/career-report/data";
 import { getRecommendedJobsForUser } from "@/lib/jobs/data";
-import { getMomentumSummary } from "@/lib/resilience/service";
+import { getMomentumSparkline, getMomentumSummary } from "@/lib/resilience/service";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -90,10 +90,11 @@ async function buildSignals(): Promise<{ signals: Signal[]; personalized: boolea
   const user = await getCurrentAuthUser();
   if (!user) return { signals: DEMO_SIGNALS, personalized: false };
 
-  const [report, jobs, momentum] = await Promise.all([
+  const [report, jobs, momentum, momentumHistory] = await Promise.all([
     getLatestCareerReport(user.id),
     getRecommendedJobsForUser(user.id, 5),
     getMomentumSummary(user.id),
+    getMomentumSparkline(user.id, 10),
   ]);
 
   const topMatch = jobs.reduce((max, j) => Math.max(max, j.matchScore ?? 0), 0);
@@ -119,7 +120,8 @@ async function buildSignals(): Promise<{ signals: Signal[]; personalized: boolea
     {
       label: "Momentum",
       value: String(Math.round(momentum.momentum)),
-      bars: DEMO_SIGNALS[3].bars,
+      // Real momentum history — forward motion per day over the last 10 days.
+      bars: momentumHistory,
     },
   ];
 
@@ -419,14 +421,15 @@ export default async function Home() {
 }
 
 function Sparkline({ bars }: { bars: number[] }) {
-  const max = Math.max(...bars);
+  const max = Math.max(...bars, 0);
   return (
     <div className="flex h-8 items-end gap-[3px]" aria-hidden="true">
       {bars.map((h, i) => (
         <span
           key={i}
           className="w-[3px] rounded-full bg-white/45"
-          style={{ height: `${(h / max) * 100}%` }}
+          // Flat baseline when there's no activity yet (max 0) — honest "no data".
+          style={{ height: max > 0 ? `${Math.max(8, (h / max) * 100)}%` : "8%" }}
         />
       ))}
     </div>

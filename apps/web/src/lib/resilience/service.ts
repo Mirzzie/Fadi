@@ -239,3 +239,24 @@ export async function startRest(userId: string, until: Date): Promise<ForwardMot
   await r.updateMomentumState(userId, { restingUntil: until });
   return recordForwardMotion(userId, "rest_day", { metadata: { until: until.toISOString() } });
 }
+
+/**
+ * A real momentum sparkline: forward-motion earned per day over the last `days`
+ * (oldest → newest). Process activity, not a vanity curve — empty days are 0.
+ */
+export async function getMomentumSparkline(userId: string, days = 10): Promise<number[]> {
+  const r = repo();
+  const events = await r.listRecentEvents(userId, 100);
+  const now = Date.now();
+  const buckets = new Array<number>(days).fill(0);
+
+  for (const event of events) {
+    const ageDays = Math.floor((now - new Date(event.createdAt).getTime()) / (24 * 60 * 60 * 1000));
+    if (ageDays >= 0 && ageDays < days) {
+      // oldest day on the left, today on the right
+      buckets[days - 1 - ageDays] += Math.max(0, event.momentumDelta);
+    }
+  }
+
+  return buckets;
+}
