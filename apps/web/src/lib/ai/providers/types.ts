@@ -44,6 +44,8 @@ export interface AIProvider {
     schemaName: string,
     options?: ChatOptions,
   ): Promise<T>;
+  /** Optional cheap call to confirm the key/model/endpoint work. */
+  validate?(): Promise<{ ok: boolean; message: string }>;
 }
 
 // ─── Provider config (for registry) ──────────────────────────────────────────

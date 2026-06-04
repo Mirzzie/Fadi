@@ -2,11 +2,16 @@ import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import type { ZodSchema } from "zod";
 
+import { aiErrorMessage } from "./errors";
 import type { AIMessage, AIProvider, ChatOptions, ProviderCapability } from "./types";
 
+/**
+ * OpenAI-compatible provider. Works for OpenAI itself and any compatible
+ * endpoint (Groq, Ollama, Google's OpenAI-compat gateway) via `baseURL`.
+ */
 export class OpenAIProvider implements AIProvider {
-  readonly id = "openai";
-  readonly name = "OpenAI";
+  readonly id: string;
+  readonly name: string;
   readonly model: string;
   readonly isConfigured: boolean;
   readonly capabilities: ProviderCapability[] = [
@@ -21,24 +26,32 @@ export class OpenAIProvider implements AIProvider {
 
   private client: OpenAI | null;
 
-  constructor(apiKey: string | undefined, model = "gpt-4.1-mini") {
+  constructor(
+    apiKey: string | undefined,
+    model = "gpt-4.1-mini",
+    options: { baseURL?: string; id?: string; name?: string; keyless?: boolean } = {},
+  ) {
+    this.id = options.id ?? "openai";
+    this.name = options.name ?? "OpenAI";
     this.model = model;
-    this.isConfigured = Boolean(apiKey);
-    this.client = apiKey ? new OpenAI({ apiKey }) : null;
+    // Keyless local endpoints (Ollama) are "configured" once a baseURL exists.
+    this.isConfigured = Boolean(apiKey) || (Boolean(options.keyless) && Boolean(options.baseURL));
+    this.client =
+      apiKey || options.keyless
+        ? new OpenAI({ apiKey: apiKey || "ollama", baseURL: options.baseURL })
+        : null;
   }
 
   async chat(messages: AIMessage[], options?: ChatOptions): Promise<string> {
     if (!this.client) {
-      return "Kai is not configured. Add OPENAI_API_KEY to your environment to enable AI features.";
+      return "Kai is not configured. Add an AI provider and API key in Settings.";
     }
-
     const response = await this.client.chat.completions.create({
       model: this.model,
       messages,
       temperature: options?.temperature ?? 0.5,
       max_tokens: options?.maxTokens,
     });
-
     return response.choices[0]?.message.content ?? "";
   }
 
@@ -49,9 +62,7 @@ export class OpenAIProvider implements AIProvider {
     if (!client) {
       return new ReadableStream<string>({
         start(controller) {
-          controller.enqueue(
-            "Kai is not configured. Add an AI provider API key to get started.",
-          );
+          controller.enqueue("Kai is not configured. Add an AI provider and API key in Settings.");
           controller.close();
         },
       });
@@ -67,17 +78,13 @@ export class OpenAIProvider implements AIProvider {
             max_tokens: options?.maxTokens,
             stream: true,
           });
-
           for await (const chunk of stream) {
             const delta = chunk.choices[0]?.delta.content ?? "";
-            if (delta) {
-              controller.enqueue(delta);
-            }
+            if (delta) controller.enqueue(delta);
           }
         } catch (err) {
-          controller.enqueue(
-            "\n\nKai encountered an error. Please try again in a moment.",
-          );
+          // Honest failure — tell the user the real cause.
+          controller.enqueue(`\n\n${aiErrorMessage(err)}`);
         } finally {
           controller.close();
         }
@@ -92,23 +99,35 @@ export class OpenAIProvider implements AIProvider {
     options?: ChatOptions,
   ): Promise<T> {
     if (!this.client) {
-      throw new Error("OpenAI provider is not configured.");
+      throw new Error("AI provider is not configured.");
     }
-
     const response = await this.client.chat.completions.parse({
       model: this.model,
       messages,
       response_format: zodResponseFormat(schema, schemaName),
       temperature: options?.temperature ?? 0.4,
-      safety_identifier: options?.userId,
     });
-
     const parsed = response.choices[0]?.message.parsed;
-
     if (!parsed) {
       throw new Error("AI provider returned an unparseable structured response.");
     }
-
     return parsed;
+  }
+
+  /** Cheap call to confirm the key/model/endpoint actually work. */
+  async validate(): Promise<{ ok: boolean; message: string }> {
+    if (!this.client) {
+      return { ok: false, message: "No API key configured for this provider." };
+    }
+    try {
+      await this.client.chat.completions.create({
+        model: this.model,
+        messages: [{ role: "user", content: "ping" }],
+        max_tokens: 1,
+      });
+      return { ok: true, message: `Connected to ${this.name} (${this.model}).` };
+    } catch (err) {
+      return { ok: false, message: aiErrorMessage(err) };
+    }
   }
 }

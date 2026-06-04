@@ -488,6 +488,25 @@ export const productEvents = pgTable(
   ]
 );
 
+// Per-user AI provider config (BYOK). The API key is stored ENCRYPTED at rest;
+// never persist plaintext. One row per user.
+export const userAiSettings = pgTable(
+  "user_ai_settings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(), // openai | anthropic | google | groq | ollama
+    model: text("model"),
+    baseUrl: text("base_url"), // for ollama / custom-compatible endpoints
+    apiKeyCiphertext: text("api_key_ciphertext"), // AES-GCM payload, null for keyless (ollama)
+    apiKeyHint: text("api_key_hint"), // last 4 chars, safe to display
+    ...timestamps,
+  },
+  (table) => [uniqueIndex("user_ai_settings_user_id_idx").on(table.userId)]
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type AuthIdentity = typeof authIdentities.$inferSelect;
@@ -506,3 +525,5 @@ export type Application = typeof applications.$inferSelect;
 export type ResilienceEvent = typeof resilienceEvents.$inferSelect;
 export type NewResilienceEvent = typeof resilienceEvents.$inferInsert;
 export type MomentumState = typeof momentumStates.$inferSelect;
+export type UserAiSettings = typeof userAiSettings.$inferSelect;
+export type NewUserAiSettings = typeof userAiSettings.$inferInsert;

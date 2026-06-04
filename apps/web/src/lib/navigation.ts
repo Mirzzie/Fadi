@@ -1,5 +1,11 @@
 import type { LucideIcon } from "lucide-react";
-import { BriefcaseBusiness, GraduationCap, LayoutDashboard, MessageSquareText } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  GraduationCap,
+  LayoutDashboard,
+  MessageSquareText,
+  Settings,
+} from "lucide-react";
 
 export type NavItem = {
   href: string;
@@ -31,5 +37,9 @@ export const appNavGroups: NavGroup[] = [
   {
     label: "Kai",
     items: [{ href: "/dashboard/kai", label: "Ask Kai", icon: MessageSquareText }],
+  },
+  {
+    label: "Account",
+    items: [{ href: "/dashboard/settings", label: "Settings", icon: Settings }],
   },
 ];

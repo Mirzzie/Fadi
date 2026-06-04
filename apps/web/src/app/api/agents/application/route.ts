@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth/auth";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { buildKaiContext } from "@/lib/ai/context/builder";
 import { resolveProviderForUser } from "@/lib/ai/registry";
+import { getUserProviderConfig } from "@/lib/ai/user-settings";
 import { applicationAgent } from "@/lib/agents/application.agent";
 import { logger } from "@/lib/observability/logger";
 
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const provider = resolveProviderForUser();
+  const provider = resolveProviderForUser(await getUserProviderConfig(user.id));
 
   logger.info("agent.application.started", {
     userId: user.id,

@@ -82,11 +82,31 @@ export function getProviderRegistry(): ProviderRegistry {
  * Used when the user has configured their own API key in settings.
  */
 export function createUserProvider(config: ProviderConfig): AIProvider | null {
+  const model = config.model;
   switch (config.id) {
     case "openai":
-      return new OpenAIProvider(config.apiKey, config.model);
+      return new OpenAIProvider(config.apiKey, model ?? "gpt-4.1-mini");
     case "anthropic":
-      return new AnthropicProvider(config.apiKey, config.model);
+      return new AnthropicProvider(config.apiKey, model ?? "claude-sonnet-4-6");
+    case "groq":
+      return new OpenAIProvider(config.apiKey, model ?? "llama-3.3-70b-versatile", {
+        id: "groq",
+        name: "Groq",
+        baseURL: "https://api.groq.com/openai/v1",
+      });
+    case "google":
+      return new OpenAIProvider(config.apiKey, model ?? "gemini-2.0-flash", {
+        id: "google",
+        name: "Google",
+        baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+      });
+    case "ollama":
+      return new OpenAIProvider(config.apiKey, model ?? "llama3.2", {
+        id: "ollama",
+        name: "Ollama",
+        baseURL: config.baseURL || "http://localhost:11434/v1",
+        keyless: true,
+      });
     default:
       return null;
   }
@@ -97,7 +117,7 @@ export function createUserProvider(config: ProviderConfig): AIProvider | null {
  * Falls back to server-configured default.
  */
 export function resolveProviderForUser(userConfig?: ProviderConfig | null): AIProvider {
-  if (userConfig?.apiKey) {
+  if (userConfig) {
     const userProvider = createUserProvider(userConfig);
     if (userProvider?.isConfigured) return userProvider;
   }

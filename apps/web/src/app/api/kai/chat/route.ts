@@ -4,7 +4,8 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth/auth";
 import { getCurrentAuthUser } from "@/lib/auth/session";
-import { getAIProvider } from "@/lib/ai/registry";
+import { resolveProviderForUser } from "@/lib/ai/registry";
+import { getUserProviderConfig } from "@/lib/ai/user-settings";
 import { buildKaiContext } from "@/lib/ai/context/builder";
 import { buildKaiMessages } from "@/lib/ai/prompts/system";
 import { logger } from "@/lib/observability/logger";
@@ -66,8 +67,9 @@ export async function POST(req: NextRequest) {
   // Build messages
   const messages = buildKaiMessages(context, history, message);
 
-  // Get provider and stream
-  const provider = getAIProvider();
+  // Get provider — the user's own (BYOK) when configured, else server default.
+  const userConfig = await getUserProviderConfig(user.id);
+  const provider = resolveProviderForUser(userConfig);
 
   logger.info("kai.chat.started", {
     userId: user.id,
