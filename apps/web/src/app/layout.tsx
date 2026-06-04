@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Inter } from "next/font/google";
 
 import { QueryProvider } from "@/components/providers/query-provider";
 
@@ -12,6 +12,12 @@ const geistSans = Geist({
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
+
+// Display face for large hero headlines (tight, bold grotesque).
+const inter = Inter({
+  variable: "--font-display",
   subsets: ["latin"],
 });
 
@@ -29,7 +35,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}>
+    <html
+      lang="en"
+      className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} dark h-full antialiased`}
+    >
       <body className="flex min-h-full flex-col">
         <QueryProvider>{children}</QueryProvider>
       </body>

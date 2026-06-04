@@ -1,7 +1,6 @@
 import {
   BookOpen,
   BriefcaseBusiness,
-  CheckCircle2,
   ChevronRight,
   ListChecks,
   Sparkles,
@@ -64,172 +63,180 @@ const howItWorks = [
   },
 ];
 
+// Career signals shown in the hero panel — CareerOS's read on a profile.
+const signals = [
+  { label: "Career readiness", value: "78", bars: [4, 6, 5, 8, 7, 9, 6, 8, 10, 7] },
+  { label: "Resume quality", value: "84", bars: [5, 7, 6, 9, 8, 7, 10, 8, 9, 11] },
+  { label: "Top job match", value: "69%", bars: [3, 5, 4, 6, 8, 5, 7, 9, 6, 8] },
+  { label: "Market demand", value: "42%", bars: [6, 4, 7, 5, 8, 6, 4, 7, 5, 6] },
+];
+
+// Aurora mesh — magenta left, blue crown, amber floor, violet corner.
+const HERO_MESH =
+  "radial-gradient(115% 130% at 0% 38%, oklch(0.52 0.24 332) 0%, transparent 44%)," +
+  "radial-gradient(120% 115% at 100% -10%, oklch(0.56 0.21 264) 0%, transparent 50%)," +
+  "radial-gradient(95% 95% at -6% 110%, oklch(0.63 0.14 56) 0%, transparent 46%)," +
+  "radial-gradient(88% 98% at 108% 112%, oklch(0.52 0.24 312) 0%, transparent 50%)," +
+  "oklch(0.14 0.04 295)";
+
+const navLinks = [
+  { label: "Features", href: "#features" },
+  { label: "How it works", href: "#how" },
+  { label: "Kai", href: "#trust" },
+];
+
 export default function Home() {
   return (
     <div className="min-h-screen bg-background">
-      {/* Nav */}
-      <header className="border-b border-border/60 bg-background/80 backdrop-blur-sm sticky top-0 z-40">
-        <div className="mx-auto flex h-16 max-w-shell items-center justify-between px-4 sm:px-6">
-          <Link href="/" className="flex items-center gap-2.5">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
-              <Sparkles className="size-4 text-primary-foreground" aria-hidden="true" />
-            </div>
-            <span className="font-semibold tracking-tight">CareerOS</span>
-          </Link>
-          <nav className="flex items-center gap-2">
-            <Link href="/auth/sign-in" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-              Sign in
-            </Link>
-            <Link href="/auth/sign-up" className={buttonVariants({ size: "sm" })}>
-              Get started
-            </Link>
-          </nav>
-        </div>
-      </header>
-
-      <main>
-        {/* Hero */}
-        <section className="relative overflow-hidden border-b border-border/60">
-          {/* Subtle background grid */}
+      {/* ── Framed mesh hero ───────────────────────────────────────────────── */}
+      <div className="p-2.5 sm:p-3.5">
+        <section
+          className="relative overflow-hidden rounded-[1.75rem] ring-1 ring-white/12"
+          style={{ backgroundImage: HERO_MESH }}
+        >
+          {/* Dotted texture, faded toward the centre-right */}
           <div
-            className="pointer-events-none absolute inset-0 opacity-[0.025]"
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 opacity-[0.14]"
             style={{
-              backgroundImage:
-                "linear-gradient(to right, oklch(0.72 0.19 192) 1px, transparent 1px), linear-gradient(to bottom, oklch(0.72 0.19 192) 1px, transparent 1px)",
-              backgroundSize: "56px 56px",
+              backgroundImage: "radial-gradient(oklch(1 0 0 / 0.7) 1px, transparent 1.4px)",
+              backgroundSize: "18px 18px",
+              maskImage: "radial-gradient(65% 75% at 72% 42%, black, transparent 75%)",
+              WebkitMaskImage: "radial-gradient(65% 75% at 72% 42%, black, transparent 75%)",
             }}
-            aria-hidden="true"
           />
-          {/* Aurora glows — teal core + violet crown */}
+          {/* Top sheen */}
           <div
-            className="pointer-events-none absolute right-1/4 top-1/2 size-[620px] -translate-y-1/2 rounded-full opacity-[0.14] blur-3xl"
-            style={{ background: "oklch(0.72 0.19 192)" }}
             aria-hidden="true"
-          />
-          <div
-            className="pointer-events-none absolute -right-20 top-0 size-[460px] rounded-full opacity-[0.12] blur-3xl"
-            style={{ background: "oklch(0.66 0.22 285)" }}
-            aria-hidden="true"
-          />
-          <div
-            className="pointer-events-none absolute -left-24 bottom-0 size-[420px] rounded-full opacity-[0.08] blur-3xl"
-            style={{ background: "oklch(0.7 0.17 230)" }}
-            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent"
           />
 
-          <div className="mx-auto grid max-w-shell gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2 lg:items-center lg:py-28">
-            {/* Left */}
-            <div className="space-y-8">
-              <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-                <span className="size-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
-                Kai is ready
+          <div className="relative">
+            {/* Nav */}
+            <nav className="flex items-center justify-between px-6 py-5 sm:px-10">
+              <Link href="/" className="flex items-center gap-2.5">
+                <div className="glow-primary flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-[oklch(0.7_0.2_330)] to-[oklch(0.6_0.2_270)]">
+                  <Sparkles className="size-4 text-white" aria-hidden="true" />
+                </div>
+                <span className="font-semibold tracking-tight text-white">CareerOS</span>
+              </Link>
+              <div className="hidden items-center gap-8 md:flex">
+                {navLinks.map((link) => (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    className="text-sm text-white/70 transition-colors hover:text-white"
+                  >
+                    {link.label}
+                  </a>
+                ))}
               </div>
-
-              <div className="space-y-4">
-                <h1 className="text-5xl font-semibold tracking-tight text-foreground sm:text-6xl">
-                  Your career,
-                  <br />
-                  <span className="bg-gradient-to-r from-primary via-[oklch(0.7_0.17_230)] to-[oklch(0.68_0.22_285)] bg-clip-text text-transparent">
-                    run by Kai.
-                  </span>
-                </h1>
-                <p className="max-w-lg text-lg leading-relaxed text-muted-foreground">
-                  Kai is an AI career agent that analyzes your profile, surfaces the right
-                  opportunities, builds your learning plan, and tracks every application. Not a job
-                  board. An operating system for your career.
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Link
-                  href="/auth/sign-up"
-                  className={cn(buttonVariants({ size: "lg" }), "glow-primary")}
-                >
-                  Start with Kai
-                  <ChevronRight className="size-4" aria-hidden="true" />
-                </Link>
+              <div className="flex items-center gap-5">
                 <Link
                   href="/auth/sign-in"
-                  className={buttonVariants({ size: "lg", variant: "outline" })}
+                  className="text-sm text-white/70 transition-colors hover:text-white"
                 >
-                  Sign in
+                  Login
+                </Link>
+                <Link
+                  href="/auth/sign-up"
+                  className="text-sm font-medium text-white/90 transition-colors hover:text-white"
+                >
+                  Register
                 </Link>
               </div>
+            </nav>
 
-              <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-muted-foreground">
-                {["No credit card required", "Free to get started", "Approval-gated automation"].map(
-                  (item) => (
-                    <div key={item} className="flex items-center gap-1.5">
-                      <CheckCircle2 className="size-3.5 text-primary" aria-hidden="true" />
-                      {item}
+            {/* Top: headline + signals panel */}
+            <div className="grid gap-10 px-6 pb-4 pt-10 sm:px-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-6 lg:pt-16">
+              {/* Left */}
+              <div className="max-w-xl">
+                <h1
+                  className="text-[2.9rem] font-extrabold leading-[0.95] tracking-tight text-white sm:text-6xl lg:text-7xl"
+                  style={{ fontFamily: "var(--font-display)" }}
+                >
+                  Take Control
+                  <br />
+                  of Your Career
+                </h1>
+                <p className="mt-6 max-w-md text-base leading-relaxed text-white/65">
+                  Stay ahead of your search with an AI agent that reads your profile, finds the roles
+                  that actually fit, and tracks every move — honestly.
+                </p>
+                <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+                  <Link
+                    href="/auth/sign-up"
+                    className="inline-flex items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-[oklch(0.64_0.25_350)] to-[oklch(0.55_0.24_300)] px-6 py-3 text-sm font-semibold text-white shadow-[0_8px_30px_-6px_oklch(0.6_0.25_330_/_0.6)] transition-transform hover:-translate-y-0.5"
+                  >
+                    Sign Up Now
+                  </Link>
+                  <Link
+                    href="#features"
+                    className="inline-flex items-center justify-center rounded-full border border-white/25 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+                  >
+                    Learn More
+                  </Link>
+                </div>
+              </div>
+
+              {/* Right — career signals panel */}
+              <div className="lg:pl-4">
+                <p className="mb-1 text-xs font-medium uppercase tracking-[0.18em] text-white/55">
+                  Your career signals
+                </p>
+                <div className="divide-y divide-white/10">
+                  {signals.map((s) => (
+                    <div
+                      key={s.label}
+                      className="flex items-center justify-between gap-4 py-5"
+                    >
+                      <span className="text-xs uppercase tracking-wide text-white/55">
+                        {s.label}
+                      </span>
+                      <div className="flex items-center gap-5">
+                        <Sparkline bars={s.bars} />
+                        <span
+                          className="min-w-[3.5rem] text-right text-3xl font-light tabular-nums text-white sm:text-4xl"
+                          style={{ fontFamily: "var(--font-display)" }}
+                        >
+                          {s.value}
+                        </span>
+                      </div>
                     </div>
-                  ),
-                )}
+                  ))}
+                </div>
               </div>
             </div>
 
-            {/* Right — Kai intro card */}
-            <div className="lg:pl-8">
-              <div className="gradient-border glass-card glow-primary rounded-2xl p-6 space-y-5">
-                <div className="flex items-center justify-between">
-                  <KaiBadge size="sm" />
-                  <span className="rounded-full bg-emerald-400/15 px-2 py-0.5 text-xs font-medium text-emerald-400">
-                    Online
-                  </span>
+            {/* Bottom: three feature columns */}
+            <div className="mt-6 grid border-t border-white/12 sm:grid-cols-3 sm:divide-x sm:divide-white/12">
+              {[
+                {
+                  title: "From Profile to Plan: A Career Read Honestly",
+                  body: "Turn your resume and goals into a clear, evidence-based readout — strengths, gaps, and the next real step.",
+                },
+                {
+                  title: "Every Application Counts: Quality Over Volume",
+                  body: "Skip the spray-and-pray. Kai helps you send fewer, sharper applications and learn from every outcome.",
+                },
+                {
+                  title: "The Hidden Market: Signals Most People Miss",
+                  body: "Live labour, skill, and economic signals — read in plain language, tied to your situation, never to alarm.",
+                },
+              ].map((col) => (
+                <div key={col.title} className="px-6 py-8 sm:px-8">
+                  <h3 className="text-lg font-semibold leading-snug text-white">{col.title}</h3>
+                  <p className="mt-3 text-sm leading-relaxed text-white/60">{col.body}</p>
                 </div>
-
-                <div className="space-y-3">
-                  <p className="text-sm leading-relaxed text-card-foreground">
-                    Hello. I&apos;m your career agent.
-                  </p>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    Share your resume and goals, and I&apos;ll analyze where you stand, what&apos;s
-                    holding you back, and what the smartest next move is. I&apos;ll surface matching
-                    jobs, build your learning plan, and keep your applications organized.
-                  </p>
-                  <p className="text-sm leading-relaxed text-muted-foreground">
-                    You stay in control. I do the heavy analysis.
-                  </p>
-                </div>
-
-                <div className="border-t border-border/60 pt-4">
-                  <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    What I can do for you
-                  </p>
-                  <ul className="space-y-2">
-                    {[
-                      "Career analysis and readiness score",
-                      "Job matching with match explanations",
-                      "Personalized learning paths",
-                      "Application tracking and preparation",
-                    ].map((capability) => (
-                      <li key={capability} className="flex items-center gap-2.5 text-sm">
-                        <Sparkles
-                          className="size-3.5 shrink-0 text-primary"
-                          aria-hidden="true"
-                        />
-                        <span className="text-card-foreground">{capability}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                <Link
-                  href="/auth/sign-up"
-                  className={cn(
-                    buttonVariants({ size: "sm" }),
-                    "w-full justify-center",
-                  )}
-                >
-                  Start your career analysis
-                </Link>
-              </div>
+              ))}
             </div>
           </div>
         </section>
+      </div>
 
+      <main>
         {/* Features */}
-        <section className="border-b border-border/60 py-20 sm:py-28">
+        <section id="features" className="border-b border-border/60 py-20 sm:py-28">
           <div className="mx-auto max-w-shell px-4 sm:px-6">
             <div className="mx-auto mb-12 max-w-xl text-center">
               <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -261,7 +268,7 @@ export default function Home() {
         </section>
 
         {/* How it works */}
-        <section className="border-b border-border/60 py-20 sm:py-28">
+        <section id="how" className="border-b border-border/60 py-20 sm:py-28">
           <div className="mx-auto max-w-shell px-4 sm:px-6">
             <div className="mx-auto mb-14 max-w-xl text-center">
               <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">How Kai works.</h2>
@@ -283,7 +290,7 @@ export default function Home() {
         </section>
 
         {/* Kai trust strip */}
-        <section className="border-b border-border/60 bg-primary/5 py-12">
+        <section id="trust" className="border-b border-border/60 bg-primary/5 py-12">
           <div className="mx-auto max-w-shell px-4 sm:px-6">
             <div className="flex flex-col items-center gap-6 text-center sm:flex-row sm:justify-between sm:text-left">
               <div className="space-y-1">
@@ -293,10 +300,7 @@ export default function Home() {
                   Kai prepares. You decide.
                 </p>
               </div>
-              <TrendingUp
-                className="size-10 shrink-0 text-primary opacity-60"
-                aria-hidden="true"
-              />
+              <TrendingUp className="size-10 shrink-0 text-primary opacity-60" aria-hidden="true" />
             </div>
           </div>
         </section>
@@ -315,7 +319,10 @@ export default function Home() {
               Intelligence Report ready in minutes.
             </p>
             <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
-              <Link href="/auth/sign-up" className={buttonVariants({ size: "lg" })}>
+              <Link
+                href="/auth/sign-up"
+                className={cn(buttonVariants({ size: "lg" }), "glow-primary")}
+              >
                 Create your account
                 <ChevronRight className="size-4" aria-hidden="true" />
               </Link>
@@ -344,6 +351,21 @@ export default function Home() {
           </p>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function Sparkline({ bars }: { bars: number[] }) {
+  const max = Math.max(...bars);
+  return (
+    <div className="flex h-8 items-end gap-[3px]" aria-hidden="true">
+      {bars.map((h, i) => (
+        <span
+          key={i}
+          className="w-[3px] rounded-full bg-white/45"
+          style={{ height: `${(h / max) * 100}%` }}
+        />
+      ))}
     </div>
   );
 }
