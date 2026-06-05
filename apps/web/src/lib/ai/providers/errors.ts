@@ -66,6 +66,12 @@ export function aiErrorMessage(
     if (provider?.id === "openai") {
       return "OpenAI is out of quota or rate-limited. Note: a ChatGPT Plus subscription does NOT include API credits — add billing/credits at platform.openai.com, or switch providers in Settings.";
     }
+    if (provider?.id === "google") {
+      return "Gemini's free quota was exceeded. Use the gemini-2.0-flash model (the most generous free tier — avoid gemini-2.5-pro, which has almost no free quota), or wait a minute and retry.";
+    }
+    if (provider?.id === "groq") {
+      return "Groq's free daily token limit was hit. Switch to a smaller model (llama-3.1-8b-instant has its own daily quota), add a fallback provider in Settings, or wait for the daily reset.";
+    }
     return `${who} is out of quota or rate-limited. Add credits/billing to that account, or switch providers in Settings.`;
   }
   if (status === 404 || /model/i.test(msg)) {

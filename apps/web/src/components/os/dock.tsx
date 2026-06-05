@@ -37,7 +37,7 @@ export function Dock() {
     <div className="pointer-events-none fixed inset-x-0 bottom-3 z-40 flex justify-center px-3">
       <nav
         aria-label="Apps"
-        className="pointer-events-auto flex items-end gap-1.5 rounded-2xl border border-border/60 bg-background/70 px-2.5 py-2 shadow-2xl backdrop-blur-xl"
+        className="pointer-events-auto flex items-end gap-1.5 rounded-2xl border border-border/60 bg-background/70 px-2.5 py-2 shadow-2xl backdrop-blur-xl duration-500 animate-in fade-in slide-in-from-bottom-4"
       >
         {DOCK_APPS.map((app) => {
           const active =

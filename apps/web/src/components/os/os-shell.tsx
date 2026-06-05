@@ -1,5 +1,7 @@
 "use client";
 
+import { usePathname } from "next/navigation";
+
 import { Dock } from "./dock";
 import { KaiLauncher } from "./kai-launcher";
 import { MenuBar } from "./menu-bar";
@@ -11,6 +13,7 @@ import { OsModeProvider, useOsMode } from "./os-mode";
  * the desktop area between them. Mode (Desk ⇄ Kai) lives in OsModeProvider.
  */
 export function OsShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   return (
     <OsModeProvider>
       <div className="relative flex min-h-screen flex-col">
@@ -24,7 +27,15 @@ export function OsShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <MenuBar />
-        <main className="flex-1 px-3 pb-24 pt-4 sm:px-6">{children}</main>
+        <main className="flex-1 px-3 pb-24 pt-4 sm:px-6">
+          {/* Keyed by route so each navigation fades + slides in. */}
+          <div
+            key={pathname}
+            className="duration-300 animate-in fade-in slide-in-from-bottom-2"
+          >
+            {children}
+          </div>
+        </main>
         <Dock />
         <DeskOnlyKaiOrb />
       </div>
