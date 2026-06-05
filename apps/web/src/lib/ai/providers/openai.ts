@@ -9,6 +9,7 @@ import type {
   ChatOptions,
   ProviderCapability,
   ToolExecutor,
+  ToolRunCallbacks,
   ToolRunResult,
   ToolSpec,
 } from "./types";
@@ -223,6 +224,7 @@ export class OpenAIProvider implements AIProvider {
     tools: ToolSpec[],
     executeTool: ToolExecutor,
     options?: ChatOptions,
+    callbacks?: ToolRunCallbacks,
   ): Promise<ToolRunResult> {
     if (!this.client) throw new Error("AI provider is not configured.");
     const client = this.client;
@@ -232,70 +234,64 @@ export class OpenAIProvider implements AIProvider {
       content: m.content,
     }));
     const toolResults: ToolRunResult["toolResults"] = [];
-    // De-dupe identical calls across the whole run — llama (esp. on Groq) tends
-    // to re-call the same tool every step, which would create duplicate cards
-    // and duplicate documents.
-    const executed = new Set<string>();
-    let toolsUsed = false;
 
-    for (let step = 0; step < 4; step++) {
-      const response = await client.chat.completions.create({
-        model: this.model,
-        messages: convo,
-        // Offer tools only until the first batch runs; after that drop them so
-        // the model MUST produce a final answer instead of looping on the tool.
-        ...(toolsUsed ? {} : { tools, tool_choice: "auto" as const }),
-        // Low temperature → far more reliable tool-call JSON (high temp makes
-        // llama models on Groq emit malformed calls → 400 "failed to call").
-        temperature: 0.2,
-      });
+    // Phase 1 — a single tool-resolution pass (non-streaming, so we can read the
+    // tool calls). Low temperature → far more reliable tool-call JSON on Groq.
+    const first = await client.chat.completions.create({
+      model: this.model,
+      messages: convo,
+      tools,
+      tool_choice: "auto",
+      temperature: 0.2,
+    });
+    const choice = first.choices[0]?.message;
+    const calls = (choice?.tool_calls ?? []).filter((c) => c.type === "function");
 
-      const choice = response.choices[0]?.message;
-      const calls = choice?.tool_calls ?? [];
-
-      if (calls.length === 0) {
-        return { text: choice?.content ?? "", toolResults };
-      }
-
-      // Record the assistant turn that requested the tools, then answer each.
-      convo.push(choice as OpenAI.Chat.Completions.ChatCompletionMessageParam);
-      for (const call of calls) {
-        if (call.type !== "function") continue;
-        let args: Record<string, unknown> = {};
-        try {
-          args = JSON.parse(call.function.arguments || "{}");
-        } catch {
-          /* leave args empty on malformed JSON */
-        }
-        const key = `${call.function.name}:${JSON.stringify(args)}`;
-        if (executed.has(key)) {
-          // Same tool + args already ran — acknowledge without re-executing.
-          convo.push({ role: "tool", tool_call_id: call.id, content: "(already provided above)" });
-          continue;
-        }
-        executed.add(key);
-        const result = await executeTool(call.function.name, args);
-        toolResults.push({
-          name: call.function.name,
-          view: result.view ?? "none",
-          data: result.data,
-        });
-        convo.push({
-          role: "tool",
-          tool_call_id: call.id,
-          content: result.summary,
-        });
-      }
-      toolsUsed = true;
+    if (calls.length === 0) {
+      // No tools needed — return the direct answer (delivered whole).
+      const text = choice?.content ?? "";
+      callbacks?.onToken?.(text);
+      return { text, toolResults };
     }
 
-    // Hit the step cap — make one final no-tools pass for a clean answer.
-    const final = await client.chat.completions.create({
+    // Execute the requested tools (de-duped: llama on Groq tends to repeat calls).
+    convo.push(choice as OpenAI.Chat.Completions.ChatCompletionMessageParam);
+    const executed = new Set<string>();
+    for (const call of calls) {
+      let args: Record<string, unknown> = {};
+      try {
+        args = JSON.parse(call.function.arguments || "{}");
+      } catch {
+        /* leave empty on malformed JSON */
+      }
+      const key = `${call.function.name}:${JSON.stringify(args)}`;
+      if (executed.has(key)) {
+        convo.push({ role: "tool", tool_call_id: call.id, content: "(already provided above)" });
+        continue;
+      }
+      executed.add(key);
+      const result = await executeTool(call.function.name, args);
+      toolResults.push({ name: call.function.name, view: result.view ?? "none", data: result.data });
+      convo.push({ role: "tool", tool_call_id: call.id, content: result.summary });
+    }
+    callbacks?.onToolResults?.(toolResults);
+
+    // Phase 2 — STREAM the final answer (no tools offered, so it must answer).
+    const stream = await client.chat.completions.create({
       model: this.model,
       messages: convo,
       temperature: options?.temperature ?? 0.5,
+      stream: true,
     });
-    return { text: final.choices[0]?.message.content ?? "", toolResults };
+    let text = "";
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content ?? "";
+      if (delta) {
+        text += delta;
+        callbacks?.onToken?.(delta);
+      }
+    }
+    return { text, toolResults };
   }
 
   /**

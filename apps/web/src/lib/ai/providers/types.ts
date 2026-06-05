@@ -48,6 +48,14 @@ export interface ToolRunResult {
   toolResults: Array<{ name: string; view: string; data: unknown }>;
 }
 
+/** Stream hooks for runWithTools so the chat can render cards + stream the answer. */
+export interface ToolRunCallbacks {
+  /** Fired once the tools have run, before the answer streams. */
+  onToolResults?(results: ToolRunResult["toolResults"]): void;
+  /** Fired per token of the final answer. */
+  onToken?(token: string): void;
+}
+
 export interface AIProvider {
   readonly id: string;
   readonly name: string;
@@ -66,6 +74,7 @@ export interface AIProvider {
     tools: ToolSpec[],
     executeTool: ToolExecutor,
     options?: ChatOptions,
+    callbacks?: ToolRunCallbacks,
   ): Promise<ToolRunResult>;
   streamChat(messages: AIMessage[], options?: ChatOptions): ReadableStream<string>;
   /**

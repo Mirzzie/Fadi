@@ -157,16 +157,24 @@ export async function POST(req: NextRequest) {
             tools,
             (name, args) => executeKaiTool(name, args, toolCtx),
             { temperature: 0.6 },
+            {
+              // Render result cards as soon as the tools run…
+              onToolResults: (results) => {
+                if (results.length > 0) {
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({ kaiTools: results })}\n\n`),
+                  );
+                }
+              },
+              // …then stream Kai's answer token by token.
+              onToken: (t) => sendText(t),
+            },
           );
-          if (result.toolResults.length > 0) {
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ kaiTools: result.toolResults })}\n\n`),
-            );
-          }
-          const finalText =
-            result.text || (result.toolResults.length > 0 ? "Here's what I found." : "");
-          sendText(finalText);
-          await saveAssistant(finalText, result.toolResults.map((t) => t.name).join(", ") || undefined);
+          // Answer already streamed via onToken; backfill a line if a tool ran
+          // but produced no narration.
+          if (!result.text.trim() && result.toolResults.length > 0) sendText("Here's what I found.");
+          const saved = result.text.trim() || (result.toolResults.length > 0 ? "Here's what I found." : "");
+          await saveAssistant(saved, result.toolResults.map((t) => t.name).join(", ") || undefined);
           logger.info("kai.chat.completed", {
             userId: user.id,
             provider: tp.id,
