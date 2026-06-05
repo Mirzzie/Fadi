@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect, notFound } from "next/navigation";
 import {
   createApplicationsRepository,
+  createDocumentsRepository,
   createJobsRepository,
   createSavedJobsRepository,
 } from "@careeros/database";
@@ -9,6 +10,7 @@ import {
 import { AppShell } from "@/components/layout/app-shell";
 import { ApplicationWorkspace } from "@/components/workspace/application-workspace";
 import { ApplicationOutcomePanel } from "@/components/workspace/application-outcome-panel";
+import { WorkspaceDocActions } from "@/components/workspace/workspace-doc-actions";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
 import { getOnboardingStatus } from "@/lib/onboarding/status";
@@ -39,10 +41,11 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
 
   const db = getDatabase();
 
-  const [job, savedJob, applications] = await Promise.all([
+  const [job, savedJob, applications, jobDocs] = await Promise.all([
     createJobsRepository(db).findById(jobId),
     createSavedJobsRepository(db).listForUserByJobIds(user.id, [jobId]),
     createApplicationsRepository(db).listForUserByJobIds(user.id, [jobId]),
+    createDocumentsRepository(db).listForJob(user.id, jobId),
   ]);
 
   if (!job) notFound();
@@ -77,6 +80,14 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
             jobTitle={job.title}
             application={application}
             autopsyPrompts={[...REJECTION_AUTOPSY_PROMPTS]}
+          />
+        </div>
+
+        {/* Real, saved, JD-tailored documents for this job */}
+        <div className="shrink-0">
+          <WorkspaceDocActions
+            jobId={job.id}
+            documents={jobDocs.map((d) => ({ id: d.id, kind: d.kind, title: d.title }))}
           />
         </div>
 
