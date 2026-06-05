@@ -7,6 +7,7 @@ import { DashboardShell } from "@/components/shells/dashboard-shell";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDashboardProfileSummary, getLatestCareerReport } from "@/lib/career-report/data";
 import { getRecommendedJobsForUser } from "@/lib/jobs/data";
+import { getSetupState } from "@/lib/guidance/setup";
 import { getOnboardingStatus } from "@/lib/onboarding/status";
 import { getMomentumSummary } from "@/lib/resilience/service";
 import { getMarketIntelligence } from "@/lib/data-sources/service";
@@ -30,11 +31,12 @@ export default async function DashboardPage() {
     redirect("/onboarding");
   }
 
-  const [profileSummary, latestReport, recommendedJobsPreview, momentum] = await Promise.all([
+  const [profileSummary, latestReport, recommendedJobsPreview, momentum, setup] = await Promise.all([
     getDashboardProfileSummary(user.id),
     getLatestCareerReport(user.id),
     getRecommendedJobsForUser(user.id, 3),
     getMomentumSummary(user.id),
+    getSetupState(user.id),
   ]);
 
   // Live market signals scored against this user's role + report findings —
@@ -68,8 +70,12 @@ export default async function DashboardPage() {
       ? `I've lined up ${jobsCount} role${jobsCount === 1 ? "" : "s"} matched to you, plus your latest market signals. Ask me anything — or tell me what you're working on.`
       : `I'm watching your target market. Ask me about your roadmap, a specific role, or your next move.`;
 
-  // Real opportunities Kai surfaces in Kai mode — top matched roles + a live signal.
+  // Real opportunities Kai surfaces in Kai mode — the guided next step (if setup
+  // isn't complete) leads, then top matched roles + a live signal.
   const opportunities = [
+    ...(setup.nextStep
+      ? [{ label: "Next step", detail: setup.nextStep.title, href: setup.nextStep.href }]
+      : []),
     ...recommendedJobsPreview.slice(0, 2).map((job) => ({
       label: "New role",
       detail: `${job.title} · ${job.company}`,
@@ -96,6 +102,7 @@ export default async function DashboardPage() {
             recommendedJobsPreview={recommendedJobsPreview}
             momentum={momentum}
             marketSignals={marketSignals}
+            setup={setup}
           />
         }
       />

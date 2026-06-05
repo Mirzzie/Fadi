@@ -10,7 +10,9 @@ import {
 } from "lucide-react";
 
 import { GenerateReportButton } from "@/components/dashboard/generate-report-button";
+import { GuidedSetup } from "@/components/os/guided-setup";
 import { MomentumPanel, type MomentumView } from "@/components/resilience/momentum-panel";
+import type { SetupState } from "@/lib/guidance/setup";
 import { matchAccent } from "@/lib/jobs/match-accent";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,6 +54,7 @@ type DashboardShellProps = {
   recommendedJobsPreview: RecommendedJob[];
   momentum: MomentumSummary;
   marketSignals: MarketSignal[];
+  setup?: SetupState | null;
 };
 
 export function DashboardShell({
@@ -61,6 +64,7 @@ export function DashboardShell({
   recommendedJobsPreview,
   momentum,
   marketSignals,
+  setup,
 }: DashboardShellProps) {
   return (
     <div className="mx-auto max-w-shell space-y-6">
@@ -106,6 +110,10 @@ export function DashboardShell({
           </div>
         </div>
       </section>
+
+      {/* Guided setup — the OS leads the user through personalize → analyze → act.
+          Hidden once everything's done so power users get a clean dashboard. */}
+      {setup && !setup.allDone ? <GuidedSetup setup={setup} /> : null}
 
       {/* Stat row */}
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
