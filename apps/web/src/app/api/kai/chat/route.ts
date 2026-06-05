@@ -87,7 +87,9 @@ export async function POST(req: NextRequest) {
   // Kai's tools (search_jobs, get_performance, …) + the first provider in the
   // chain that supports function calling. If none do, we stream plainly.
   const tools = getKaiTools().map(toToolSpec);
-  const toolProvider = chain.find((p) => typeof p.runWithTools === "function");
+  // All tool-capable providers (primary → fallback) so the agentic loop fails
+  // over when one is rate-limited/exhausted (e.g. Groq's daily token cap).
+  const toolProviders = chain.filter((p) => typeof p.runWithTools === "function");
 
   // Generation capability for tools that draft content (generate_document),
   // bound to the user's primary provider.
@@ -146,17 +148,17 @@ export async function POST(req: NextRequest) {
         }
       };
 
-      // Agentic path: let Kai call tools, then narrate + show the results.
-      if (toolProvider?.runWithTools) {
+      // Agentic path: try each tool-capable provider (primary → fallback) so Kai
+      // stays up when one is rate-limited/exhausted (e.g. Groq's daily cap).
+      for (const tp of toolProviders) {
         try {
-          const result = await toolProvider.runWithTools(
+          const result = await tp.runWithTools!(
             messages,
             tools,
             (name, args) => executeKaiTool(name, args, toolCtx),
             { temperature: 0.6 },
           );
           if (result.toolResults.length > 0) {
-            // A structured event the client renders as cards/tiles.
             controller.enqueue(
               encoder.encode(`data: ${JSON.stringify({ kaiTools: result.toolResults })}\n\n`),
             );
@@ -167,6 +169,7 @@ export async function POST(req: NextRequest) {
           await saveAssistant(finalText, result.toolResults.map((t) => t.name).join(", ") || undefined);
           logger.info("kai.chat.completed", {
             userId: user.id,
+            provider: tp.id,
             tools: result.toolResults.map((t) => t.name).join(", "),
           });
           finish();
@@ -174,13 +177,18 @@ export async function POST(req: NextRequest) {
         } catch (err) {
           logger.warn("kai.chat.tool_run_failed", {
             userId: user.id,
+            provider: tp.id,
             error: err instanceof Error ? err.message : "unknown",
           });
+          // Try the next provider in the chain.
+        }
+      }
 
-          // Deterministic safety net: provider function-calling is flaky (Groq
-          // can 400 on llama tool calls), so run the right tool ourselves rather
-          // than let the fallback model fabricate or just write prose in chat.
-
+      // Every tool provider failed (e.g. all keys rate-limited). Deterministic
+      // safety net so Kai still ACTS for the common intents rather than
+      // fabricating or just writing prose.
+      {
+        {
           // Document drafting intent → generate_document (writes into the editor).
           if (
             /\b(generate|draft|write|create|make|build|tailor)\b/i.test(message) &&

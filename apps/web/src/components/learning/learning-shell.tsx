@@ -1,10 +1,38 @@
 import Link from "next/link";
-import { BookOpen, GraduationCap, Sparkles, Target, TrendingUp } from "lucide-react";
+import { BookOpen, GraduationCap, Hammer, Map, MonitorPlay, Target } from "lucide-react";
 
 import { KaiBadge } from "@/components/ui/kai-badge";
 import { buttonVariants } from "@/components/ui/button";
 import type { StoredCareerReport } from "@/lib/career-report/schema";
+import { learningResources } from "@/lib/learning/resources";
 import { cn } from "@/lib/utils";
+
+/** Free, actionable resources for a skill — roadmap.sh, YouTube, courses, project. */
+function ResourceLinks({ skill }: { skill: string }) {
+  const r = learningResources(skill);
+  const items = [
+    { href: r.roadmap, label: "Roadmap", icon: Map },
+    { href: r.youtube, label: "Tutorials", icon: MonitorPlay },
+    { href: r.courses, label: "Free courses", icon: GraduationCap },
+    { href: r.project, label: "Build a project", icon: Hammer },
+  ];
+  return (
+    <div className="mt-3 flex flex-wrap gap-1.5">
+      {items.map((it) => (
+        <a
+          key={it.label}
+          href={it.href}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-background/40 px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+        >
+          <it.icon className="size-3.5" aria-hidden="true" />
+          {it.label}
+        </a>
+      ))}
+    </div>
+  );
+}
 
 type Props = { report: StoredCareerReport | null };
 
@@ -92,9 +120,10 @@ export function LearningShell({ report }: Props) {
                       >
                         {i + 1}
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <h4 className="font-medium">{gap.title}</h4>
                         <p className="mt-1 text-sm text-muted-foreground">{gap.detail}</p>
+                        <ResourceLinks skill={gap.title} />
                       </div>
                     </div>
                   </div>
@@ -125,6 +154,7 @@ export function LearningShell({ report }: Props) {
                     </span>
                     <h4 className="font-medium">{step.title}</h4>
                     <p className="mt-1 text-sm text-muted-foreground">{step.detail}</p>
+                    <ResourceLinks skill={step.title} />
                   </li>
                 ))}
               </ol>
@@ -132,10 +162,9 @@ export function LearningShell({ report }: Props) {
           ) : null}
 
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Sparkles className="size-3 text-primary/60" aria-hidden="true" />
-            <TrendingUp className="size-3 text-primary/60" aria-hidden="true" />
-            Progress tracking and curated course links are coming next — for now, work top-down: the
-            highest-impact gap first.
+            <BookOpen className="size-3 text-primary/60" aria-hidden="true" />
+            Each item links to a roadmap, video tutorials, free courses and a project to build —
+            work top-down: the highest-impact gap first. Ask Kai in chat to plan any of these out.
           </p>
         </>
       )}

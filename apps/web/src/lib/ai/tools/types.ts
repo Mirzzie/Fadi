@@ -8,7 +8,7 @@
  */
 
 /** How the client should visually render a tool's result inside the chat. */
-export type KaiToolView = "jobs" | "performance" | "updates" | "document" | "none";
+export type KaiToolView = "jobs" | "performance" | "updates" | "document" | "application" | "none";
 
 export interface KaiToolResult {
   /** Natural-language result for the model to speak/narrate. */

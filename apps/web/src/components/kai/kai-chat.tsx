@@ -522,6 +522,26 @@ function renderToolResult(r: KaiToolResultView) {
     );
   }
 
+  if (r.view === "application" && data) {
+    const d = data as { id?: string; company?: string; title?: string };
+    return (
+      <a
+        href="/dashboard/applications"
+        className="group flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 transition-colors hover:border-emerald-500/50"
+      >
+        <span className="grid size-9 shrink-0 place-items-center rounded-md bg-emerald-500/15 text-emerald-400">
+          <FileText className="size-5" aria-hidden="true" />
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-medium">{d.title}</span>
+          <span className="text-xs text-muted-foreground">
+            {d.company} · added to tracker — open Applications →
+          </span>
+        </span>
+      </a>
+    );
+  }
+
   if (r.view === "document" && data) {
     const d = data as { id?: string; kind?: string; title?: string };
     return (
