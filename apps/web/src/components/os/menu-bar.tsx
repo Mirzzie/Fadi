@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useWakeWord } from "@/lib/voice/use-wake-word";
 import { cn } from "@/lib/utils";
 import { summonKai, useOsMode } from "./os-mode";
+import { TrackSwitcher } from "./track-switcher";
 
 /** Top menu bar — the OS's persistent identity strip: brand, live clock, Kai
  *  status, and the Desk ⇄ Kai mode switch. */
@@ -36,6 +37,8 @@ export function MenuBar() {
           <span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_var(--color-emerald-400,#34d399)]" />
           Kai active
         </span>
+        <span className="text-muted-foreground/50">/</span>
+        <TrackSwitcher />
       </div>
 
       {/* Mode switch + clock */}

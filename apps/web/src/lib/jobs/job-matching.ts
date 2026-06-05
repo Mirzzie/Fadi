@@ -103,14 +103,36 @@ const ROLE_SYNONYMS: Record<string, string[]> = {
   sales: ["sales", "account executive", "business development"],
 };
 
-/** The set of role-family phrases that signal a relevant title for this user. */
-function roleFamilyTerms(targetRole: string | null, careerGoal: string | null): string[] {
-  const tokens = new Set([...distinctiveTokens(targetRole), ...distinctiveTokens(careerGoal)]);
+/**
+ * The set of role-family phrases that signal a relevant title for this user —
+ * DOMAIN-AGNOSTIC. It works for any field, not just tech:
+ *  - distinctive tokens from the role(s) + goal, expanded via ROLE_SYNONYMS where
+ *    a synonym set exists (IT ladders), else used as-is;
+ *  - the whole normalized role phrase ("financial analyst", "registered nurse"),
+ *    so non-tech roles match directly without needing a hand-written synonym list;
+ *  - every role in an exploration track's `roleCluster`, so a fresher casting a
+ *    wide net ("IT Support, SOC Analyst, Junior Security Eng") matches all of them.
+ */
+function roleFamilyTerms(
+  targetRole: string | null,
+  careerGoal: string | null,
+  roleCluster?: string[] | null,
+): string[] {
+  const roles = [targetRole, ...(roleCluster ?? [])].filter(Boolean) as string[];
+  const tokens = new Set<string>();
+  for (const r of roles) distinctiveTokens(r).forEach((t) => tokens.add(t));
+  distinctiveTokens(careerGoal).forEach((t) => tokens.add(t));
+
   const terms = new Set<string>();
   for (const token of tokens) {
     const synonyms = ROLE_SYNONYMS[token];
     if (synonyms) synonyms.forEach((s) => terms.add(s));
     else terms.add(token);
+  }
+  // Whole-role phrases — the domain-general path (finance, healthcare, trades…).
+  for (const r of roles) {
+    const phrase = normalize(r).replace(/[^a-z0-9+#. ]/g, " ").replace(/\s+/g, " ").trim();
+    if (phrase.length >= 4) terms.add(phrase);
   }
   return [...terms];
 }
@@ -119,9 +141,10 @@ function roleFamilyTerms(targetRole: string | null, careerGoal: string | null): 
 function roleScore(
   targetRole: string | null,
   careerGoal: string | null,
+  roleCluster: string[] | null,
   jobTitle: string,
 ): { score: number; onRole: boolean } {
-  const terms = roleFamilyTerms(targetRole, careerGoal);
+  const terms = roleFamilyTerms(targetRole, careerGoal, roleCluster);
   const title = normalize(jobTitle);
   if (terms.length === 0) return { score: 8, onRole: true }; // no profile signal → don't penalise
 
@@ -189,9 +212,11 @@ function experienceScore(experienceLevel: string | null, job: Job) {
 function keywordScore(careerProfile: CareerProfile | null, resume: Resume | null, job: Job) {
   // Distinctive-only on both sides, so generic words ("engineer", "systems")
   // don't manufacture a match between unrelated roles.
+  const clusterTokens = (careerProfile?.roleCluster ?? []).flatMap((r) => distinctiveTokens(r));
   const profileKeywords = new Set([
     ...distinctiveTokens(careerProfile?.targetRole),
     ...distinctiveTokens(careerProfile?.careerGoal),
+    ...clusterTokens,
     ...distinctiveTokens(resume?.parsedText ?? resume?.rawText),
   ]);
   const jobKeywords = new Set([
@@ -227,6 +252,7 @@ export function scoreJobForUser({
   const role = roleScore(
     careerProfile?.targetRole ?? null,
     careerProfile?.careerGoal ?? null,
+    careerProfile?.roleCluster ?? null,
     job.title,
   );
   // Low floor: an unrelated role should score low, not inherit a generous base.

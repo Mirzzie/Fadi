@@ -14,6 +14,8 @@ export interface RelevanceProfile {
   skillGaps: string[];
   region?: string | null;
   sectors?: string[];
+  /** The track's field/industry (e.g. "Finance"). Drives domain-aware source selection. */
+  domain?: string | null;
 }
 
 export interface ScoredSignal extends MarketSignal {

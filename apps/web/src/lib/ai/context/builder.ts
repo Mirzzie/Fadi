@@ -36,7 +36,7 @@ export async function buildKaiContext(
 
   const [careerProfile, profile, resume, linkedIn, report, savedJobsList, momentum] =
     await Promise.all([
-      createCareerProfilesRepository(db).getLatestForUser(userId),
+      createCareerProfilesRepository(db).getActiveForUser(userId),
       createProfilesRepository(db).getByUserId(userId),
       createResumesRepository(db).getLatestForUser(userId),
       createLinkedInProfilesRepository(db).getLatestForUser(userId),

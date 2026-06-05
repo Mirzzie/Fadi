@@ -60,7 +60,7 @@ export async function generateCareerDocument(
   const db = getDatabase();
   const [profile, careerProfile, resume, linkedin] = await Promise.all([
     createProfilesRepository(db).getByUserId(userId),
-    createCareerProfilesRepository(db).getLatestForUser(userId),
+    createCareerProfilesRepository(db).getActiveForUser(userId),
     createResumesRepository(db).getLatestForUser(userId),
     createLinkedInProfilesRepository(db).getLatestForUser(userId),
   ]);

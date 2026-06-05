@@ -132,12 +132,30 @@ export async function getMarketIntelligence(
 }
 
 /** Live job discovery across configured job sources, deduped by title+company. */
+// Sources whose catalog is overwhelmingly tech/startup roles. For a non-tech
+// user (finance, healthcare, trades…) these are mostly noise, so we drop them
+// and lean on the cross-sector aggregators (Reed/Jooble/Adzuna).
+const TECH_FOCUSED_SOURCES = new Set(["remotive", "arbeitnow", "hackernews"]);
+
+function isLikelyTechDomain(domain?: string | null): boolean {
+  if (!domain) return true; // unknown domain → keep every source (back-compat)
+  return /tech|\bit\b|information technology|software|develop|engineer|data|cyber|security|cloud|devops|\bweb\b|\bai\b|\bml\b|computer|programming|sre|network/.test(
+    domain.toLowerCase(),
+  );
+}
+
 export async function discoverJobs(
   profile: RelevanceProfile,
   limit = 20,
   location?: LocationFilter,
 ): Promise<JobPosting[]> {
-  const sources = getConfiguredJobSources();
+  let sources = getConfiguredJobSources();
+  // Domain-aware: a finance user shouldn't be fed a tech-only board. Only filter
+  // when at least one general source survives — never leave the user with zero.
+  if (!isLikelyTechDomain(profile.domain)) {
+    const general = sources.filter((s) => !TECH_FOCUSED_SOURCES.has(s.id));
+    if (general.length > 0) sources = general;
+  }
   const query = queryFromProfile(profile, limit, location);
 
   const settled = await Promise.allSettled(sources.map((s) => s.fetchJobs(query)));

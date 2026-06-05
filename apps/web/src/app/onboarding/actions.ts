@@ -74,6 +74,8 @@ export async function completeOnboardingAction(
       location: parsed.locationPreference,
       experienceLevel: parsed.experienceLevel,
       careerGoal: parsed.careerGoals,
+      // The first track a user creates is their active one.
+      makeActive: true,
     });
 
     const linkedInText = parsed.linkedInProfile?.trim();

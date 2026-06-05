@@ -73,7 +73,7 @@ export async function saveJobAction(jobId: string): Promise<JobActionResult> {
 
     const [job, careerProfile, resume] = await Promise.all([
       jobsRepository.findById(parsedJobId.data),
-      careerProfilesRepository.getLatestForUser(user.id),
+      careerProfilesRepository.getActiveForUser(user.id),
       resumesRepository.getLatestForUser(user.id),
     ]);
 

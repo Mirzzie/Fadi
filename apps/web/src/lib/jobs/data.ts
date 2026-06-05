@@ -30,7 +30,7 @@ export async function getRecommendedJobsForUser(
   const applicationsRepository = createApplicationsRepository(db);
 
   const [careerProfile, resume] = await Promise.all([
-    careerProfilesRepository.getLatestForUser(userId),
+    careerProfilesRepository.getActiveForUser(userId),
     resumesRepository.getLatestForUser(userId),
   ]);
 
@@ -44,6 +44,7 @@ export async function getRecommendedJobsForUser(
         skills: [],
         skillGaps: [],
         region: careerProfile.location,
+        domain: careerProfile.domain,
       },
       { country: filters?.country, city: filters?.city },
     );

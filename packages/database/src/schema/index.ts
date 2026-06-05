@@ -166,6 +166,19 @@ export const careerProfiles = pgTable(
     careerGoal: text("career_goal").notNull(),
     importedFrom: text("imported_from").notNull().default("manual"),
     analysisStatus: text("analysis_status").notNull().default("not_started"),
+    // A career_profile row IS a "career track" — a switchable direction the user
+    // is pursuing. A user can run several in parallel (career change, exploration,
+    // a trial, a part-time/gig hustle). Exactly one is active at a time.
+    /** User-facing track name, e.g. "Break into Cybersecurity". Null → fall back to targetRole. */
+    label: text("label"),
+    /** Industry/domain the track lives in, e.g. "Finance", "Information Technology". Drives domain-aware sources + role families (not tech-only). */
+    domain: text("domain"),
+    /** Why this track exists: career | exploration | trial | part_time. */
+    intent: text("intent").notNull().default("career"),
+    /** For exploration tracks: several target roles to cast a wide net (fresher "any entry role"). */
+    roleCluster: jsonb("role_cluster").$type<string[]>(),
+    /** The one track currently driving jobs/report/documents/Kai for this user. */
+    isActive: boolean("is_active").notNull().default(false),
     ...timestamps,
   },
   (table) => [
@@ -173,6 +186,7 @@ export const careerProfiles = pgTable(
     index("career_profiles_profile_id_idx").on(table.profileId),
     index("career_profiles_analysis_status_idx").on(table.analysisStatus),
     index("career_profiles_user_created_at_idx").on(table.userId, table.createdAt),
+    index("career_profiles_user_active_idx").on(table.userId, table.isActive),
   ]
 );
 

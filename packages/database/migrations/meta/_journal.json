@@ -57,6 +57,13 @@
       "when": 1780648781488,
       "tag": "0007_fuzzy_tiger_shark",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1780674869765,
+      "tag": "0008_tearful_eternals",
+      "breakpoints": true
     }
   ]
 }

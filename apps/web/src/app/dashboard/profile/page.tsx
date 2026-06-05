@@ -27,7 +27,7 @@ export default async function ProfilePage() {
   const db = getDatabase();
   const [profile, careerProfile, linkedIn, resume] = await Promise.all([
     createProfilesRepository(db).getByUserId(user.id),
-    createCareerProfilesRepository(db).getLatestForUser(user.id),
+    createCareerProfilesRepository(db).getActiveForUser(user.id),
     createLinkedInProfilesRepository(db).getLatestForUser(user.id),
     createResumesRepository(db).getLatestForUser(user.id),
   ]);

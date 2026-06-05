@@ -48,7 +48,7 @@ export async function getCareerReportContext(userId: string): Promise<CareerRepo
   const resumesRepository = createResumesRepository(db);
   const linkedInProfilesRepository = createLinkedInProfilesRepository(db);
 
-  const careerProfile = await careerProfilesRepository.getLatestForUser(userId);
+  const careerProfile = await careerProfilesRepository.getActiveForUser(userId);
 
   if (!careerProfile) {
     return null;
