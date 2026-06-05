@@ -60,7 +60,43 @@ export function getProviderRegistry(): ProviderRegistry {
 
   _registry = new ProviderRegistry();
 
-  const defaultProvider = serverEnv.AI_PROVIDER ?? "openai";
+  // Pick the server-default provider: honour AI_PROVIDER if set, otherwise the
+  // first provider that actually has a key (Groq first — fast + free). This is
+  // what a brand-new user with no BYOK key of their own falls back to, so it
+  // must point at a LIVE key, not a placeholder.
+  const defaultProvider =
+    serverEnv.AI_PROVIDER ??
+    (serverEnv.GROQ_API_KEY
+      ? "groq"
+      : serverEnv.GOOGLE_API_KEY
+        ? "google"
+        : serverEnv.ANTHROPIC_API_KEY
+          ? "anthropic"
+          : "openai");
+
+  // Groq (fast, free tier) — registered first so it can serve as the default.
+  if (serverEnv.GROQ_API_KEY) {
+    _registry.register(
+      new OpenAIProvider(serverEnv.GROQ_API_KEY, serverEnv.GROQ_MODEL ?? "llama-3.3-70b-versatile", {
+        id: "groq",
+        name: "Groq",
+        baseURL: "https://api.groq.com/openai/v1",
+      }),
+      defaultProvider === "groq",
+    );
+  }
+
+  // Google (Gemini, free tier).
+  if (serverEnv.GOOGLE_API_KEY) {
+    _registry.register(
+      new OpenAIProvider(serverEnv.GOOGLE_API_KEY, serverEnv.GOOGLE_MODEL ?? "gemini-2.0-flash", {
+        id: "google",
+        name: "Google",
+        baseURL: "https://generativelanguage.googleapis.com/v1beta/openai/",
+      }),
+      defaultProvider === "google",
+    );
+  }
 
   // OpenAI
   _registry.register(

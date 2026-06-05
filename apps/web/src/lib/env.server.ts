@@ -8,12 +8,17 @@ const serverEnvSchema = z.object({
   BETTER_AUTH_SECRET: z.string().optional(),
   BETTER_AUTH_URL: z.string().url().optional(),
   BETTER_AUTH_TRUSTED_ORIGINS: z.string().optional(),
-  // Pluggable AI provider — "openai" | "anthropic", defaults to openai
-  AI_PROVIDER: z.enum(["openai", "anthropic"]).optional(),
+  // Pluggable AI server-default provider. If unset, it auto-picks the first
+  // configured key in order: Groq → Google → Anthropic → OpenAI.
+  AI_PROVIDER: z.enum(["openai", "anthropic", "groq", "google"]).optional(),
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_MODEL: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_MODEL: z.string().optional(),
+  GROQ_API_KEY: z.string().optional(),
+  GROQ_MODEL: z.string().optional(),
+  GOOGLE_API_KEY: z.string().optional(),
+  GOOGLE_MODEL: z.string().optional(),
   // External data sources (see docs/DATA_SOURCES_AND_REALTIME_INTELLIGENCE.md).
   // GDELT, Hacker News and Remotive are keyless and always active.
   JOB_SOURCE_API_KEY: z.string().optional(),
@@ -40,6 +45,10 @@ export const serverEnv = {
     OPENAI_MODEL: process.env.OPENAI_MODEL,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL,
+    GROQ_API_KEY: process.env.GROQ_API_KEY,
+    GROQ_MODEL: process.env.GROQ_MODEL,
+    GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
+    GOOGLE_MODEL: process.env.GOOGLE_MODEL,
     JOB_SOURCE_API_KEY: process.env.JOB_SOURCE_API_KEY,
     NEWS_API_KEY: process.env.NEWS_API_KEY,
     ADZUNA_APP_ID: process.env.ADZUNA_APP_ID,
