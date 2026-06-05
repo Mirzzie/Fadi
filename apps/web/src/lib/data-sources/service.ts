@@ -1,9 +1,16 @@
 import "server-only";
 
 import { logger } from "@/lib/observability/logger";
+import { parseLocation } from "@/lib/jobs/locations";
 import { getConfiguredJobSources, getConfiguredSignalSources } from "./registry";
 import { rankSignals, type RelevanceProfile, type ScoredSignal } from "./relevance";
 import type { JobPosting, SignalQuery } from "./types";
+
+/** Explicit location filter from the UI switcher; overrides the profile's region. */
+export interface LocationFilter {
+  country?: string; // ISO-3166 alpha-2, lowercase
+  city?: string;
+}
 
 /**
  * Market-intelligence service — the seam between raw external sources and the
@@ -24,7 +31,11 @@ const KEYWORD_STOPWORDS = new Set([
  * like "Staff Frontend Engineer" or "AI / LLM fluency" return little; tokens
  * like "frontend", "AI", "react" surface real signals.
  */
-function queryFromProfile(profile: RelevanceProfile, limit = 15): SignalQuery {
+function queryFromProfile(
+  profile: RelevanceProfile,
+  limit = 15,
+  location?: LocationFilter,
+): SignalQuery {
   const phrases = [
     profile.targetRole,
     ...profile.skillGaps.slice(0, 3),
@@ -42,9 +53,16 @@ function queryFromProfile(profile: RelevanceProfile, limit = 15): SignalQuery {
     }
   }
 
+  // Explicit UI filter wins; otherwise derive country/city from the profile region.
+  const parsed = parseLocation(profile.region);
+  const country = location?.country ?? parsed.country;
+  const city = location?.city ?? parsed.city;
+
   return {
     keywords: keywords.slice(0, 5),
     regions: profile.region ? [profile.region] : undefined,
+    country,
+    city,
     limit,
   };
 }
@@ -114,12 +132,35 @@ export async function getMarketIntelligence(
 }
 
 /** Live job discovery across configured job sources, deduped by title+company. */
-export async function discoverJobs(profile: RelevanceProfile, limit = 20): Promise<JobPosting[]> {
+export async function discoverJobs(
+  profile: RelevanceProfile,
+  limit = 20,
+  location?: LocationFilter,
+): Promise<JobPosting[]> {
   const sources = getConfiguredJobSources();
-  const query = queryFromProfile(profile, limit);
+  const query = queryFromProfile(profile, limit, location);
 
   const settled = await Promise.allSettled(sources.map((s) => s.fetchJobs(query)));
-  const jobs = settled.flatMap((r) => (r.status === "fulfilled" ? r.value : []));
+  const perSource = settled.map((r) => (r.status === "fulfilled" ? r.value : []));
+
+  // Round-robin across sources so EVERY source contributes to the limited set —
+  // otherwise the first source (Remotive) fills the whole limit and location-
+  // specific sources (Reed/Jooble for Ireland) get sliced off and never stored.
+  const jobs: JobPosting[] = [];
+  const maxLen = perSource.reduce((m, a) => Math.max(m, a.length), 0);
+  for (let i = 0; i < maxLen; i++) {
+    for (const arr of perSource) {
+      if (arr[i]) jobs.push(arr[i]);
+    }
+  }
+
+  logger.info("data_sources.discover_jobs", {
+    configured: sources.map((s) => s.id).join(",") || "none",
+    query: `${query.keywords.join("+")}|country=${query.country ?? ""}|city=${query.city ?? ""}`,
+    perSource: settled
+      .map((r, i) => `${sources[i]?.id}:${r.status === "fulfilled" ? r.value.length : "ERR"}`)
+      .join(","),
+  });
 
   const seen = new Set<string>();
   return jobs

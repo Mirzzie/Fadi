@@ -83,6 +83,33 @@ export function ProfileForm({
           />
         </Field>
 
+        <Field label="LinkedIn profile URL">
+          <input
+            value={form.linkedInUrl}
+            onChange={(e) => set("linkedInUrl", e.target.value)}
+            placeholder="https://www.linkedin.com/in/your-handle/"
+            className={inputCls}
+          />
+        </Field>
+        <Field label="LinkedIn context (paste your About / experience)">
+          <textarea
+            value={form.linkedInText}
+            onChange={(e) => set("linkedInText", e.target.value)}
+            rows={4}
+            placeholder="Paste your LinkedIn summary and experience so Kai can reason from it."
+            className={cn(inputCls, "h-auto py-2")}
+          />
+        </Field>
+        <Field label="Resume text">
+          <textarea
+            value={form.resumeText}
+            onChange={(e) => set("resumeText", e.target.value)}
+            rows={8}
+            placeholder="Paste your full resume text here."
+            className={cn(inputCls, "h-auto py-2 font-mono text-xs")}
+          />
+        </Field>
+
         {status ? (
           <div
             className={cn(

@@ -44,12 +44,18 @@ export interface JobPosting {
   description?: string;
   tags: string[];
   postedAt?: string; // ISO
+  /** Human-readable salary, when the source provides it (e.g. Adzuna "70k–95k"). */
+  salaryText?: string;
 }
 
 export interface SignalQuery {
   /** Role + skills + sectors to search for (already derived from the user profile). */
   keywords: string[];
   regions?: string[];
+  /** ISO-3166 alpha-2 country code (lowercase), e.g. "gb", "us" — for sources that scope by country. */
+  country?: string;
+  /** City / area within the country, e.g. "Dublin" — maps to Adzuna's `where`. */
+  city?: string;
   limit?: number;
 }
 

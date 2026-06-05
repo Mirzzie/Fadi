@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { DashboardHomeSwitch } from "@/components/os/dashboard-home-switch";
 import { DashboardShell } from "@/components/shells/dashboard-shell";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDashboardProfileSummary, getLatestCareerReport } from "@/lib/career-report/data";
@@ -60,15 +61,43 @@ export default async function DashboardPage() {
       }))
     : [];
 
+  const firstName = profileSummary?.fullName?.trim().split(/\s+/)[0] || "there";
+  const jobsCount = recommendedJobsPreview.length;
+  const subline =
+    jobsCount > 0
+      ? `I've lined up ${jobsCount} role${jobsCount === 1 ? "" : "s"} matched to you, plus your latest market signals. Ask me anything — or tell me what you're working on.`
+      : `I'm watching your target market. Ask me about your roadmap, a specific role, or your next move.`;
+
+  // Real opportunities Kai surfaces in Kai mode — top matched roles + a live signal.
+  const opportunities = [
+    ...recommendedJobsPreview.slice(0, 2).map((job) => ({
+      label: "New role",
+      detail: `${job.title} · ${job.company}`,
+      href: "/dashboard/jobs",
+    })),
+    ...marketSignals.slice(0, 1).map((signal) => ({
+      label: "Market signal",
+      detail: signal.title,
+      href: "/dashboard",
+    })),
+  ].slice(0, 3);
+
   return (
     <AppShell>
-      <DashboardShell
-        userEmail={user.email}
-        profileSummary={profileSummary}
-        latestReport={latestReport}
-        recommendedJobsPreview={recommendedJobsPreview}
-        momentum={momentum}
-        marketSignals={marketSignals}
+      <DashboardHomeSwitch
+        greeting={`Hey ${firstName}.`}
+        subline={subline}
+        opportunities={opportunities}
+        desk={
+          <DashboardShell
+            userEmail={user.email}
+            profileSummary={profileSummary}
+            latestReport={latestReport}
+            recommendedJobsPreview={recommendedJobsPreview}
+            momentum={momentum}
+            marketSignals={marketSignals}
+          />
+        }
       />
     </AppShell>
   );

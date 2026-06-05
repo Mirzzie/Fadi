@@ -2,7 +2,9 @@
 
 import {
   createCareerProfilesRepository,
+  createLinkedInProfilesRepository,
   createProfilesRepository,
+  createResumesRepository,
   createUsersRepository,
 } from "@careeros/database";
 import { revalidatePath } from "next/cache";
@@ -20,6 +22,9 @@ export type UpdateProfileInput = {
   location: string;
   experienceLevel: string;
   careerGoal: string;
+  linkedInUrl: string;
+  linkedInText: string;
+  resumeText: string;
 };
 
 export async function updateProfileAction(input: UpdateProfileInput): Promise<Result> {
@@ -42,6 +47,23 @@ export async function updateProfileAction(input: UpdateProfileInput): Promise<Re
       experienceLevel: input.experienceLevel.trim() || null,
       careerGoal: input.careerGoal.trim(),
     });
+
+    // LinkedIn URL + context and resume text are the richest AI inputs — keep
+    // them editable here too. Only touch them when the user provided something,
+    // so saving the basic fields never wipes an existing import.
+    const linkedInUrl = input.linkedInUrl.trim();
+    const linkedInText = input.linkedInText.trim();
+    if (linkedInUrl || linkedInText) {
+      await createLinkedInProfilesRepository(db).upsertLatestForUser(user.id, {
+        profileUrl: linkedInUrl || null,
+        rawText: linkedInText || null,
+      });
+    }
+
+    const resumeText = input.resumeText.trim();
+    if (resumeText) {
+      await createResumesRepository(db).upsertLatestForUser(user.id, resumeText);
+    }
 
     revalidatePath("/dashboard/profile");
     revalidatePath("/dashboard");

@@ -347,6 +347,8 @@ export const applications = pgTable(
     company: text("company").notNull(),
     title: text("title").notNull(),
     url: text("url"),
+    // Pasted job description — the context Kai tailors documents against.
+    jobDescription: text("job_description"),
     status: text("status").notNull().default("saved"),
     priority: text("priority").notNull().default("medium"),
     notes: text("notes"),
@@ -513,6 +515,39 @@ export const userAiSettings = pgTable(
   (table) => [uniqueIndex("user_ai_settings_user_id_idx").on(table.userId)]
 );
 
+// Career documents Kai helps create — resumes, cover letters, emails, value
+// propositions. Optionally tied to a specific job/application. Rich-text body
+// stored as `content`; exported to PDF/DOCX on demand. Saved, versionable,
+// downloadable — the backbone of the document workspace.
+export const documents = pgTable(
+  "documents",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    jobId: uuid("job_id").references(() => jobs.id, { onDelete: "set null" }),
+    applicationId: uuid("application_id").references(() => applications.id, {
+      onDelete: "set null",
+    }),
+    kind: text("kind").notNull(), // resume | cover_letter | email | value_proposition | note
+    title: text("title").notNull(),
+    content: text("content").notNull().default(""),
+    format: text("format").notNull().default("richtext"), // richtext | markdown | plain
+    template: text("template"), // selected resume/letter template id
+    // Pasted job context for paste-a-JD workspaces (company, role, raw JD).
+    jobContext: jsonb("job_context").$type<Record<string, unknown>>().notNull().default({}),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    ...timestamps,
+  },
+  (table) => [
+    index("documents_user_id_idx").on(table.userId),
+    index("documents_job_id_idx").on(table.jobId),
+    index("documents_kind_idx").on(table.kind),
+    index("documents_user_updated_at_idx").on(table.userId, table.updatedAt),
+  ]
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type AuthIdentity = typeof authIdentities.$inferSelect;
@@ -533,3 +568,6 @@ export type NewResilienceEvent = typeof resilienceEvents.$inferInsert;
 export type MomentumState = typeof momentumStates.$inferSelect;
 export type UserAiSettings = typeof userAiSettings.$inferSelect;
 export type NewUserAiSettings = typeof userAiSettings.$inferInsert;
+export type AgentMessage = typeof agentMessages.$inferSelect;
+export type Document = typeof documents.$inferSelect;
+export type NewDocument = typeof documents.$inferInsert;

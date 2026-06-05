@@ -101,7 +101,7 @@ export class AnthropicProvider implements AIProvider {
         try {
           for await (const chunk of await open()) controller.enqueue(chunk);
         } catch (err) {
-          controller.enqueue(`\n\n${aiErrorMessage(err)}`);
+          controller.enqueue(`\n\n${aiErrorMessage(err, { id: "anthropic", name: "Anthropic" })}`);
         } finally {
           controller.close();
         }
@@ -144,7 +144,7 @@ export class AnthropicProvider implements AIProvider {
       });
       return { ok: true, message: `Connected to Claude (${this.model}).` };
     } catch (err) {
-      return { ok: false, message: aiErrorMessage(err) };
+      return { ok: false, message: aiErrorMessage(err, { id: this.id, name: this.name }) };
     }
   }
 }

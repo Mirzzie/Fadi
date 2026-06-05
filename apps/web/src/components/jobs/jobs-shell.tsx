@@ -1,16 +1,30 @@
 import { BriefcaseBusiness, MapPin, Signal, Wallet } from "lucide-react";
 
 import { JobActions } from "@/components/jobs/job-actions";
+import { JobLocationFilter } from "@/components/jobs/job-location-filter";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import type { EmploymentType, VisaFilter, WorkMode } from "@/lib/jobs/filters";
 import { matchAccent } from "@/lib/jobs/match-accent";
 import type { RecommendedJob } from "@/lib/jobs/types";
 
 type JobsShellProps = {
   jobs: RecommendedJob[];
+  selectedCountry: string | null;
+  selectedCity: string | null;
+  selectedModes: WorkMode[];
+  selectedTypes: EmploymentType[];
+  selectedVisa: VisaFilter;
 };
 
-export function JobsShell({ jobs }: JobsShellProps) {
+export function JobsShell({
+  jobs,
+  selectedCountry,
+  selectedCity,
+  selectedModes,
+  selectedTypes,
+  selectedVisa,
+}: JobsShellProps) {
   return (
     <div className="mx-auto max-w-shell space-y-6">
       <section className="relative overflow-hidden rounded-xl border bg-card p-6">
@@ -19,20 +33,29 @@ export function JobsShell({ jobs }: JobsShellProps) {
           className="pointer-events-none absolute -right-16 -top-24 size-72 rounded-full opacity-[0.12] blur-3xl"
           style={{ background: "oklch(0.72 0.19 192)" }}
         />
-        <div className="relative max-w-3xl">
-          <Badge variant="secondary">Local job discovery</Badge>
-          <div className="mt-4 space-y-3">
-            <h2 className="text-3xl font-semibold tracking-tight">
-              Recommended{" "}
-              <span className="bg-gradient-to-r from-primary to-[oklch(0.7_0.17_230)] bg-clip-text text-transparent">
-                jobs
-              </span>
-            </h2>
-            <p className="text-muted-foreground">
-              CareerOS is matching seeded local jobs against your onboarding profile. External job
-              sources and AI ranking are intentionally not enabled yet.
-            </p>
+        <div className="relative space-y-5">
+          <div className="max-w-3xl">
+            <Badge variant="secondary">Live job discovery</Badge>
+            <div className="mt-4 space-y-3">
+              <h2 className="text-3xl font-semibold tracking-tight">
+                Recommended{" "}
+                <span className="bg-gradient-to-r from-primary to-[oklch(0.7_0.17_230)] bg-clip-text text-transparent">
+                  jobs
+                </span>
+              </h2>
+              <p className="text-muted-foreground">
+                Live postings from Remotive, Arbeitnow, Adzuna, Reed and Jooble — matched against
+                your profile. Switch country and city to search anywhere.
+              </p>
+            </div>
           </div>
+          <JobLocationFilter
+            selectedCountry={selectedCountry}
+            selectedCity={selectedCity}
+            selectedModes={selectedModes}
+            selectedTypes={selectedTypes}
+            selectedVisa={selectedVisa}
+          />
         </div>
       </section>
 
@@ -81,9 +104,11 @@ export function JobsShell({ jobs }: JobsShellProps) {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>No local jobs found</CardTitle>
+            <CardTitle>No live jobs for this search</CardTitle>
             <CardDescription>
-              Run `npm run db:seed:jobs` to insert example MVP jobs into local Postgres.
+              {selectedCity || selectedCountry
+                ? "No postings matched this location yet. Try a different city or country, or broaden to “Any country”."
+                : "No postings came back from the live sources yet. Add a country/city above, or check back shortly as sources refresh."}
             </CardDescription>
           </CardHeader>
         </Card>

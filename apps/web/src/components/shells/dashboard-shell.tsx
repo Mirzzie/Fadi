@@ -3,6 +3,7 @@ import {
   ArrowRight,
   BriefcaseBusiness,
   GraduationCap,
+  Pencil,
   Sparkles,
   Target,
   TrendingUp,
@@ -152,6 +153,13 @@ export function DashboardShell({
                 The data CareerOS AI will use for your first report.
               </CardDescription>
             </div>
+            <Link
+              href="/dashboard/profile"
+              className={`${buttonVariants({ variant: "outline", size: "sm" })} ml-auto shrink-0`}
+            >
+              <Pencil className="size-3.5" aria-hidden="true" />
+              Edit
+            </Link>
           </CardHeader>
           <CardContent>
             {profileSummary ? (

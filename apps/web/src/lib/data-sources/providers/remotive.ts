@@ -5,6 +5,7 @@
  * https://remotive.com/api/remote-jobs
  */
 
+import { htmlToText } from "../sanitize";
 import type { DataSourceCapability, JobPosting, SignalQuery, JobSource } from "../types";
 
 const REMOTIVE_API = "https://remotive.com/api/remote-jobs";
@@ -50,7 +51,7 @@ export class RemotiveSource implements JobSource {
           location: j.candidate_required_location,
           remote: true,
           url: j.url,
-          description: j.description,
+          description: htmlToText(j.description),
           tags: j.tags ?? [],
           postedAt: j.publication_date,
         }));

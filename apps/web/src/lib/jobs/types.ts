@@ -20,6 +20,8 @@ export type RecommendedJob = {
   matchScore: number;
   matchReason: string;
   matchedKeywords: string[];
+  /** Whether the job is the right KIND of role for the user (drives relevance filtering). */
+  onRole: boolean;
   isSaved: boolean;
   applicationStatus: ApplicationStatus | null;
 };

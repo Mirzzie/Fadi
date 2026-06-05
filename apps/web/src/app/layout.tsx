@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
+import Script from "next/script";
 
 import { QueryProvider } from "@/components/providers/query-provider";
 
 import "./globals.css";
+
+// Set the theme before paint so there's no flash. `beforeInteractive` runs this
+// early without React rendering a raw <script> (which React 19 flags as an error).
+const THEME_INIT = `try{var t=localStorage.getItem('theme');if(t==='light')document.documentElement.classList.remove('dark');else document.documentElement.classList.add('dark');}catch(e){}`;
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -40,15 +45,10 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} dark h-full antialiased`}
     >
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html:
-              "try{var t=localStorage.getItem('theme');if(t==='light')document.documentElement.classList.remove('dark');else document.documentElement.classList.add('dark');}catch(e){}",
-          }}
-        />
-      </head>
       <body className="flex min-h-full flex-col">
+        <Script id="theme-init" strategy="beforeInteractive">
+          {THEME_INIT}
+        </Script>
         <QueryProvider>{children}</QueryProvider>
       </body>
     </html>

@@ -43,5 +43,30 @@ export function createResumesRepository(db: Database) {
 
       return resume;
     },
+
+    /** Update the user's latest resume text in place, or create one if none exists. */
+    async upsertLatestForUser(userId: string, rawText: string): Promise<Resume> {
+      const [existing] = await db
+        .select()
+        .from(resumes)
+        .where(eq(resumes.userId, userId))
+        .orderBy(desc(resumes.createdAt))
+        .limit(1);
+
+      if (existing) {
+        const [updated] = await db
+          .update(resumes)
+          .set({ rawText, parsedText: rawText, updatedAt: new Date() })
+          .where(eq(resumes.id, existing.id))
+          .returning();
+        return updated;
+      }
+
+      const [created] = await db
+        .insert(resumes)
+        .values({ userId, rawText, parsedText: rawText, parseStatus: "manual_text" })
+        .returning();
+      return created;
+    },
   };
 }

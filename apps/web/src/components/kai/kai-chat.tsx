@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  AudioLines,
+  FileText,
   Loader2,
   Mic,
   MicOff,
@@ -13,15 +15,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { KaiBadge } from "@/components/ui/kai-badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useSpeechInput } from "@/lib/voice/use-speech-input";
+import { useGroqVoice } from "@/lib/voice/use-groq-voice";
 import { useSpeechOutput } from "@/lib/voice/use-speech-output";
 import { cn } from "@/lib/utils";
+
+export type KaiToolResultView = { name: string; view: string; data: unknown };
 
 type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  toolResults?: KaiToolResultView[];
 };
 
 const INITIAL_MESSAGE: Message = {
@@ -32,34 +37,95 @@ const INITIAL_MESSAGE: Message = {
   timestamp: new Date(),
 };
 
-export function KaiChat() {
+export function KaiChat({ autoListenNonce }: { autoListenNonce?: number } = {}) {
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
+  const [conversationMode, setConversationMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Refs so the speech callback (a stable closure) always sees current values.
+  const conversationRef = useRef(false);
+  conversationRef.current = conversationMode;
+  const sendRef = useRef<(t: string) => void>(() => {});
 
   const { speak, stop: stopSpeaking, state: speechOutputState } = useSpeechOutput({ rate: 1.0 });
 
-  const { state: speechInputState, start: startListening, stop: stopListening, interimTranscript } =
-    useSpeechInput({
-      onTranscript: (transcript, isFinal) => {
-        if (isFinal) {
-          setInput((prev) => (prev ? `${prev} ${transcript}` : transcript));
-        }
-      },
-      onError: (err) => setError(err),
-    });
+  // Voice input via server-side Whisper (Groq) — records the mic, auto-stops on
+  // silence, transcribes. Browser-agnostic (no Google Web Speech dependency).
+  const {
+    state: voiceState,
+    start: startListening,
+    stop: stopListening,
+  } = useGroqVoice({
+    onTranscript: (text) => {
+      // Hands-free: a finished utterance is sent; otherwise it fills the box.
+      if (conversationRef.current) sendRef.current(text);
+      else setInput((prev) => (prev ? `${prev} ${text}` : text));
+    },
+    onError: (err) => setError(err),
+  });
 
-  const isListening = speechInputState === "listening";
+  const isListening = voiceState === "recording";
+  const isTranscribing = voiceState === "transcribing";
   const isSpeaking = speechOutputState === "speaking";
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
+
+  // Load persisted conversation on mount → chats survive reloads and Desk/Kai
+  // modes stay in sync (both read the same history).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/kai/history");
+        if (!res.ok) return;
+        const data = (await res.json()) as { messages: Array<{ id: string; role: string; content: string }> };
+        if (cancelled || data.messages.length === 0) return;
+        setMessages(
+          data.messages.map((m) => ({
+            id: m.id,
+            role: m.role === "assistant" ? "assistant" : "user",
+            content: m.content,
+            timestamp: new Date(),
+          })),
+        );
+      } catch {
+        /* keep the default greeting on failure */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Summoned by "Hey Kai": start listening for the user's question immediately.
+  useEffect(() => {
+    if (autoListenNonce && autoListenNonce > 0) {
+      startListening();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoListenNonce]);
+
+  // Conversation loop: whenever Kai is idle in hands-free mode (not thinking,
+  // speaking, or already listening), resume listening for the next turn. Back
+  // off when the last attempt errored (e.g. flaky speech network) so we don't
+  // spin in a tight retry storm.
+  useEffect(() => {
+    if (!conversationMode || isStreaming || isSpeaking || isListening || isTranscribing) return;
+    const t = setTimeout(
+      () => {
+        if (conversationRef.current) startListening();
+      },
+      error ? 4000 : 600,
+    );
+    return () => clearTimeout(t);
+  }, [conversationMode, isStreaming, isSpeaking, isListening, isTranscribing, error, startListening]);
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -118,13 +184,21 @@ export function KaiChat() {
             if (data === "[DONE]") break;
 
             try {
-              const delta = JSON.parse(data) as string;
-              fullResponse += delta;
-              setMessages((prev) =>
-                prev.map((m) =>
-                  m.id === assistantId ? { ...m, content: fullResponse } : m,
-                ),
-              );
+              const parsed = JSON.parse(data);
+              if (parsed && typeof parsed === "object" && "kaiTools" in parsed) {
+                // Structured tool results → render as cards/tiles.
+                const toolResults = (parsed as { kaiTools: KaiToolResultView[] }).kaiTools;
+                setMessages((prev) =>
+                  prev.map((m) => (m.id === assistantId ? { ...m, toolResults } : m)),
+                );
+              } else if (typeof parsed === "string") {
+                fullResponse += parsed;
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === assistantId ? { ...m, content: fullResponse } : m,
+                  ),
+                );
+              }
             } catch {
               // Skip malformed SSE lines
             }
@@ -157,6 +231,11 @@ export function KaiChat() {
     [isStreaming, messages, voiceEnabled, speak],
   );
 
+  // Keep the speech callback's reference to sendMessage current.
+  useEffect(() => {
+    sendRef.current = sendMessage;
+  }, [sendMessage]);
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -180,6 +259,29 @@ export function KaiChat() {
     }
   }
 
+  function toggleConversation() {
+    if (conversationMode) {
+      setConversationMode(false);
+      setVoiceEnabled(false);
+      stopListening();
+      stopSpeaking();
+    } else {
+      setConversationMode(true);
+      setVoiceEnabled(true); // Kai speaks its replies in conversation mode
+      setError(null);
+      startListening();
+    }
+  }
+
+  // Kai's live state — drives the animated persona orb.
+  const kaiState: "speaking" | "thinking" | "listening" | "idle" = isSpeaking
+    ? "speaking"
+    : isStreaming || isTranscribing
+      ? "thinking"
+      : isListening
+        ? "listening"
+        : "idle";
+
   return (
     <div className="flex h-full flex-col">
       {/* Messages */}
@@ -187,13 +289,13 @@ export function KaiChat() {
         {messages.map((message) => (
           <MessageBubble key={message.id} message={message} isStreaming={isStreaming && message.id === messages[messages.length - 1]?.id && message.role === "assistant"} />
         ))}
-        {isListening && interimTranscript ? (
-          <div className="flex items-start gap-3">
+        {isListening || isTranscribing ? (
+          <div className="flex items-center gap-3">
             <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10">
-              <Mic className="size-3.5 text-primary animate-pulse" aria-hidden="true" />
+              <Mic className="size-3.5 animate-pulse text-primary" aria-hidden="true" />
             </div>
             <div className="rounded-xl bg-muted/40 px-3 py-2 text-sm italic text-muted-foreground">
-              {interimTranscript}
+              {isTranscribing ? "Transcribing…" : "Listening — speak now"}
             </div>
           </div>
         ) : null}
@@ -204,6 +306,30 @@ export function KaiChat() {
       {error ? (
         <div className="mx-4 mb-2 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           {error}
+        </div>
+      ) : null}
+
+      {/* Live conversation persona */}
+      {conversationMode ? (
+        <div className="mx-4 mb-2 flex items-center gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3">
+          <KaiOrb state={kaiState} />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium">
+              {kaiState === "speaking"
+                ? "Kai is speaking…"
+                : kaiState === "thinking"
+                  ? "Kai is thinking…"
+                  : kaiState === "listening"
+                    ? "Listening — go ahead"
+                    : "Say something…"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Hands-free — talk naturally, Kai replies out loud.
+            </p>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={toggleConversation}>
+            End
+          </Button>
         </div>
       ) : null}
 
@@ -229,13 +355,27 @@ export function KaiChat() {
             <Button
               type="button"
               size="icon"
+              variant={conversationMode ? "default" : "outline"}
+              className={cn("size-9 shrink-0", conversationMode && "animate-pulse")}
+              onClick={toggleConversation}
+              title={conversationMode ? "End live conversation" : "Start live hands-free conversation"}
+              aria-label="Toggle live conversation"
+            >
+              <AudioLines className="size-4" aria-hidden="true" />
+            </Button>
+            <Button
+              type="button"
+              size="icon"
               variant={isListening ? "default" : "outline"}
               className={cn("size-9 shrink-0", isListening && "animate-pulse")}
               onClick={toggleVoiceInput}
-              title={isListening ? "Stop listening" : "Speak to Kai"}
+              disabled={isTranscribing}
+              title={isListening ? "Stop & transcribe" : isTranscribing ? "Transcribing…" : "Speak to Kai"}
               aria-label={isListening ? "Stop voice input" : "Start voice input"}
             >
-              {isListening ? (
+              {isTranscribing ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : isListening ? (
                 <MicOff className="size-4" aria-hidden="true" />
               ) : (
                 <Mic className="size-4" aria-hidden="true" />
@@ -288,6 +428,7 @@ function MessageBubble({
   isStreaming: boolean;
 }) {
   const isKai = message.role === "assistant";
+  const hasTools = (message.toolResults?.length ?? 0) > 0;
 
   return (
     <div className={cn("flex items-start gap-3", !isKai && "flex-row-reverse")}>
@@ -298,23 +439,155 @@ function MessageBubble({
           You
         </div>
       )}
-      <div
+      <div className={cn("flex flex-col gap-2", hasTools ? "w-full max-w-[94%]" : "max-w-[80%]")}>
+        <div
+          className={cn(
+            "rounded-xl px-3.5 py-2.5 text-sm leading-relaxed",
+            isKai ? "bg-card border border-border/60" : "bg-primary/15 text-foreground",
+          )}
+        >
+          {message.content ? (
+            <p className="whitespace-pre-wrap">{message.content}</p>
+          ) : isStreaming ? (
+            <span className="flex items-center gap-1.5 text-muted-foreground">
+              <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+              Kai is thinking...
+            </span>
+          ) : null}
+        </div>
+        {hasTools ? <KaiToolResults results={message.toolResults!} /> : null}
+      </div>
+    </div>
+  );
+}
+
+/** Visual render of what Kai's tools returned — job cards, performance tiles. */
+function KaiToolResults({ results }: { results: KaiToolResultView[] }) {
+  return (
+    <div className="space-y-3">
+      {results.map((r, i) => (
+        <div key={`${r.name}-${i}`}>{renderToolResult(r)}</div>
+      ))}
+    </div>
+  );
+}
+
+type JobCard = {
+  id?: string;
+  title?: string;
+  company?: string;
+  location?: string;
+  salaryText?: string;
+  matchScore?: number;
+  url?: string;
+};
+
+function renderToolResult(r: KaiToolResultView) {
+  const data = r.data as Record<string, unknown> | undefined;
+
+  if ((r.view === "jobs" || r.view === "updates") && data) {
+    const jobs = (data.jobs as JobCard[]) ?? [];
+    if (jobs.length === 0) {
+      return (
+        <p className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          No live roles matched that search.
+        </p>
+      );
+    }
+    return (
+      <div className="grid gap-2 sm:grid-cols-2">
+        {jobs.map((j, i) => (
+          <a
+            key={j.id ?? `${j.title}-${i}`}
+            href={j.url ?? "/dashboard/jobs"}
+            target={j.url ? "_blank" : undefined}
+            rel={j.url ? "noreferrer" : undefined}
+            className="group rounded-lg border border-border/60 bg-card/60 p-3 transition-colors hover:border-primary/40"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <p className="text-sm font-medium leading-tight">{j.title}</p>
+              {typeof j.matchScore === "number" ? (
+                <span className="shrink-0 rounded-md bg-primary/10 px-1.5 py-0.5 text-[0.7rem] font-medium text-primary">
+                  {j.matchScore}%
+                </span>
+              ) : null}
+            </div>
+            <p className="mt-0.5 text-xs text-muted-foreground">{j.company}</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {[j.location, j.salaryText].filter(Boolean).join(" · ")}
+            </p>
+          </a>
+        ))}
+      </div>
+    );
+  }
+
+  if (r.view === "document" && data) {
+    const d = data as { id?: string; kind?: string; title?: string };
+    return (
+      <a
+        href={`/dashboard/documents/${d.id ?? ""}`}
+        className="group flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3 transition-colors hover:border-primary/50"
+      >
+        <span className="grid size-9 shrink-0 place-items-center rounded-md bg-primary/15 text-primary">
+          <FileText className="size-5" aria-hidden="true" />
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-medium">{d.title ?? "Document"}</span>
+          <span className="text-xs text-primary group-hover:underline">Open in editor →</span>
+        </span>
+      </a>
+    );
+  }
+
+  if (r.view === "performance" && data) {
+    const tiles: Array<[string, string]> = [
+      ["Momentum", String(data.momentum ?? "—")],
+      ["Peak", String(data.peakMomentum ?? "—")],
+      ["Band", String(data.band ?? "—")],
+      ["Quality apps", String(data.qualityApplicationsThisPeriod ?? "—")],
+    ];
+    return (
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {tiles.map(([label, value]) => (
+          <div key={label} className="rounded-lg border border-border/60 bg-card/60 p-2.5 text-center">
+            <p className="text-lg font-semibold tabular-nums">{value}</p>
+            <p className="text-[0.7rem] uppercase tracking-wide text-muted-foreground">{label}</p>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return null;
+}
+
+/** Animated Kai persona — reacts to whether Kai is listening, thinking, or speaking. */
+function KaiOrb({ state }: { state: "speaking" | "thinking" | "listening" | "idle" }) {
+  return (
+    <div className="relative grid size-10 shrink-0 place-items-center">
+      {state === "listening" ? (
+        <span className="absolute size-10 animate-ping rounded-full bg-emerald-400/40" />
+      ) : null}
+      {state === "speaking" ? (
+        <>
+          <span className="absolute size-10 animate-ping rounded-full bg-primary/40 [animation-duration:1s]" />
+          <span className="absolute size-9 animate-ping rounded-full bg-primary/30 [animation-duration:1.5s]" />
+        </>
+      ) : null}
+      <span
         className={cn(
-          "max-w-[80%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed",
-          isKai
-            ? "bg-card border border-border/60"
-            : "bg-primary/15 text-foreground",
+          "relative grid size-7 place-items-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.66_0.22_285)] shadow",
+          state === "idle" && "animate-pulse",
+          state === "listening" && "ring-2 ring-emerald-400/50",
         )}
       >
-        {message.content ? (
-          <p className="whitespace-pre-wrap">{message.content}</p>
-        ) : isStreaming ? (
-          <span className="flex items-center gap-1.5 text-muted-foreground">
-            <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-            Kai is thinking...
-          </span>
-        ) : null}
-      </div>
+        {state === "thinking" ? (
+          <Loader2 className="size-3.5 animate-spin text-primary-foreground" aria-hidden="true" />
+        ) : (
+          <span className="size-2.5 rounded-full bg-primary-foreground/90" />
+        )}
+      </span>
     </div>
   );
 }

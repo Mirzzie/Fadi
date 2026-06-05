@@ -7,7 +7,12 @@ import { ProfileForm } from "@/components/profile/profile-form";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
 import { getOnboardingStatus } from "@/lib/onboarding/status";
-import { createCareerProfilesRepository, createProfilesRepository } from "@careeros/database";
+import {
+  createCareerProfilesRepository,
+  createLinkedInProfilesRepository,
+  createProfilesRepository,
+  createResumesRepository,
+} from "@careeros/database";
 
 export const metadata: Metadata = { title: "Profile" };
 export const dynamic = "force-dynamic";
@@ -20,9 +25,11 @@ export default async function ProfilePage() {
   if (onboardingStatus !== "completed") redirect("/onboarding");
 
   const db = getDatabase();
-  const [profile, careerProfile] = await Promise.all([
+  const [profile, careerProfile, linkedIn, resume] = await Promise.all([
     createProfilesRepository(db).getByUserId(user.id),
     createCareerProfilesRepository(db).getLatestForUser(user.id),
+    createLinkedInProfilesRepository(db).getLatestForUser(user.id),
+    createResumesRepository(db).getLatestForUser(user.id),
   ]);
 
   return (
@@ -60,6 +67,9 @@ export default async function ProfilePage() {
             location: careerProfile?.location ?? "",
             experienceLevel: careerProfile?.experienceLevel ?? "",
             careerGoal: careerProfile?.careerGoal ?? "",
+            linkedInUrl: linkedIn?.profileUrl ?? "",
+            linkedInText: linkedIn?.rawText ?? "",
+            resumeText: resume?.parsedText ?? resume?.rawText ?? "",
           }}
         />
       </div>

@@ -35,6 +35,20 @@ export function createJobsRepository(db: Database) {
       return job ?? null;
     },
 
+    /**
+     * Archive every job from a given source (e.g. retire the local MVP seed
+     * once real live postings are flowing). Archived rows drop out of
+     * `listActive` but stay referencable by saved/applied records.
+     */
+    async deactivateBySource(source: string): Promise<number> {
+      const updated = await db
+        .update(jobs)
+        .set({ status: "archived", updatedAt: new Date() })
+        .where(eq(jobs.source, source))
+        .returning({ id: jobs.id });
+      return updated.length;
+    },
+
     async upsertSeedJob(input: SeedJobInput): Promise<Job> {
       const [job] = await db
         .insert(jobs)

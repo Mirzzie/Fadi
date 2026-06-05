@@ -29,6 +29,25 @@ export interface ChatOptions {
 
 // ─── Provider interface ───────────────────────────────────────────────────────
 
+/** A function-tool the model can call (OpenAI/Groq/Gemini tool format). */
+export interface ToolSpec {
+  type: "function";
+  function: { name: string; description: string; parameters: Record<string, unknown> };
+}
+
+/** Executes a tool the model asked for; returns narration + visual payload. */
+export type ToolExecutor = (
+  name: string,
+  args: Record<string, unknown>,
+) => Promise<{ summary: string; data?: unknown; view?: string }>;
+
+export interface ToolRunResult {
+  /** Kai's final natural-language answer after any tools ran. */
+  text: string;
+  /** Structured results for visual rendering, in call order. */
+  toolResults: Array<{ name: string; view: string; data: unknown }>;
+}
+
 export interface AIProvider {
   readonly id: string;
   readonly name: string;
@@ -37,6 +56,17 @@ export interface AIProvider {
   readonly capabilities: ProviderCapability[];
 
   chat(messages: AIMessage[], options?: ChatOptions): Promise<string>;
+  /**
+   * Run a tool-calling conversation: the model may call tools (executed via
+   * `executeTool`), then produces a final answer. Optional — providers that
+   * don't support function calling omit it and the caller falls back to chat.
+   */
+  runWithTools?(
+    messages: AIMessage[],
+    tools: ToolSpec[],
+    executeTool: ToolExecutor,
+    options?: ChatOptions,
+  ): Promise<ToolRunResult>;
   streamChat(messages: AIMessage[], options?: ChatOptions): ReadableStream<string>;
   /**
    * Open a streaming response, THROWING on the initial failure (auth/quota/rate
@@ -51,6 +81,8 @@ export interface AIProvider {
   ): Promise<T>;
   /** Optional cheap call to confirm the key/model/endpoint work. */
   validate?(): Promise<{ ok: boolean; message: string }>;
+  /** Transcribe an audio clip to text (Whisper). Only STT-capable providers. */
+  transcribe?(file: File): Promise<string>;
 }
 
 // ─── Provider config (for registry) ──────────────────────────────────────────
@@ -115,9 +147,9 @@ export const PROVIDER_DESCRIPTORS: ProviderDescriptor[] = [
   {
     id: "google",
     name: "Google",
-    label: "Google (Gemini)",
+    label: "Google (Gemini · free tier)",
     defaultModel: "gemini-2.0-flash",
-    models: ["gemini-2.5-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite"],
+    models: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite"],
     capabilities: ["chat", "streaming", "structured_output", "vision"],
     requiresApiKey: true,
     docsUrl: "https://aistudio.google.com/app/apikey",
@@ -125,10 +157,10 @@ export const PROVIDER_DESCRIPTORS: ProviderDescriptor[] = [
   {
     id: "groq",
     name: "Groq",
-    label: "Groq (fast inference)",
+    label: "Groq (fast · free tier)",
     defaultModel: "llama-3.3-70b-versatile",
-    models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768"],
-    capabilities: ["chat", "streaming", "stt"],
+    models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"],
+    capabilities: ["chat", "streaming", "structured_output", "stt"],
     requiresApiKey: true,
     docsUrl: "https://console.groq.com/keys",
   },

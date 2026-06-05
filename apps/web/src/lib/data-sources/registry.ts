@@ -1,7 +1,13 @@
 import "server-only";
 
+import { serverEnv } from "@/lib/env.server";
+
+import { AdzunaSource } from "./providers/adzuna";
+import { ArbeitnowSource } from "./providers/arbeitnow";
 import { GdeltSource } from "./providers/gdelt";
 import { HackerNewsSource } from "./providers/hackernews";
+import { JoobleSource } from "./providers/jooble";
+import { ReedSource } from "./providers/reed";
 import { RemotiveSource } from "./providers/remotive";
 import {
   isJobSource,
@@ -27,8 +33,11 @@ function buildSources(): DataSourceBase[] {
     new GdeltSource(), // geopolitical / economic news_signal
     new HackerNewsSource(), // AI / skill_trend
     new RemotiveSource(), // live job_listings
-    // ── Phase B/C providers register here as they're implemented:
-    //   new AdzunaSource(serverEnv.ADZUNA_APP_ID, serverEnv.ADZUNA_APP_KEY),
+    new ArbeitnowSource(), // live job_listings (EU / ATS)
+    // ── Phase B: keyed sources — self-report unavailable until their env key is set ──
+    new AdzunaSource(serverEnv.ADZUNA_APP_ID, serverEnv.ADZUNA_APP_KEY), // jobs + salary, ~19 countries (NOT Ireland)
+    new ReedSource(serverEnv.REED_API_KEY), // jobs + salary, UK + Ireland
+    new JoobleSource(serverEnv.JOOBLE_API_KEY), // global aggregator, covers Ireland
     //   new BlsSource(serverEnv.BLS_API_KEY), new OnetSource(...), etc.
   ];
 }

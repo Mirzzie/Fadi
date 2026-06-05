@@ -21,6 +21,8 @@ const serverEnvSchema = z.object({
   // Phase B/C — providers self-report unavailable until their key is set.
   ADZUNA_APP_ID: z.string().optional(),
   ADZUNA_APP_KEY: z.string().optional(),
+  REED_API_KEY: z.string().optional(), // reed.co.uk — UK + Ireland, salary
+  JOOBLE_API_KEY: z.string().optional(), // jooble.org — global aggregator, covers IE
   JSEARCH_RAPIDAPI_KEY: z.string().optional(),
   BLS_API_KEY: z.string().optional(),
   ONET_API_KEY: z.string().optional(),
@@ -42,6 +44,8 @@ export const serverEnv = {
     NEWS_API_KEY: process.env.NEWS_API_KEY,
     ADZUNA_APP_ID: process.env.ADZUNA_APP_ID,
     ADZUNA_APP_KEY: process.env.ADZUNA_APP_KEY,
+    REED_API_KEY: process.env.REED_API_KEY,
+    JOOBLE_API_KEY: process.env.JOOBLE_API_KEY,
     JSEARCH_RAPIDAPI_KEY: process.env.JSEARCH_RAPIDAPI_KEY,
     BLS_API_KEY: process.env.BLS_API_KEY,
     ONET_API_KEY: process.env.ONET_API_KEY,

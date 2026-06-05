@@ -1,17 +1,7 @@
-import { AppHeader } from "@/components/layout/app-header";
-import { AppSidebar } from "@/components/layout/app-sidebar";
-import { SidebarProvider } from "@/components/layout/sidebar-context";
+import { OsShell } from "@/components/os/os-shell";
 
+/** Every authenticated screen renders inside the Career OS chrome (menu bar,
+ *  dock, wallpaper, persistent Kai). */
 export function AppShell({ children }: { children: React.ReactNode }) {
-  return (
-    <SidebarProvider>
-      <div className="flex min-h-screen bg-muted/40">
-        <AppSidebar />
-        <div className="flex min-w-0 flex-1 flex-col">
-          <AppHeader />
-          <main className="flex-1 p-4 sm:p-6">{children}</main>
-        </div>
-      </div>
-    </SidebarProvider>
-  );
+  return <OsShell>{children}</OsShell>;
 }

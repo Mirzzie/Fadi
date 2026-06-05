@@ -3,6 +3,24 @@ function errInfo(err: unknown) {
   return { status: e?.status, code: e?.code, msg: e?.message ?? "" };
 }
 
+/**
+ * True when a provider rejected strict structured-output / json_schema mode (so
+ * we should retry with a tolerant JSON approach) — vs a real auth/quota/network
+ * error, which must bubble up. Many free/local/OpenRouter models can't do
+ * `response_format: json_schema`; they answer with a 400/422 bad-request.
+ */
+export function isStructuredOutputUnsupported(err: unknown): boolean {
+  const { status, code, msg } = errInfo(err);
+  // Never treat auth/quota/rate-limit as "unsupported" — those must surface.
+  if (status === 401 || status === 403 || status === 429 || code === "insufficient_quota") {
+    return false;
+  }
+  if (status === 400 || status === 404 || status === 422) return true;
+  return /response_format|json[_\s]?schema|json mode|structured output|not supported|unsupported|invalid schema/i.test(
+    msg,
+  );
+}
+
 /** Temporary rate limit (requests/tokens-per-minute) — recovers with backoff. */
 export function isRateLimited(err: unknown): boolean {
   const { status, code } = errInfo(err);
@@ -24,29 +42,40 @@ export function isProviderExhausted(err: unknown): boolean {
  * Turn a raw provider/SDK error into an honest, actionable message for the user.
  * Never a vague "something went wrong" — name the real cause so they can fix it.
  */
-export function aiErrorMessage(err: unknown): string {
+export function aiErrorMessage(
+  err: unknown,
+  provider?: { id?: string; name?: string },
+): string {
   const e = err as { status?: number; code?: string; message?: string } | undefined;
   const status = e?.status;
   const code = e?.code;
   const msg = e?.message ?? "";
+  const who = provider?.name ?? "Your AI provider";
 
   if (status === 401 || code === "invalid_api_key" || /api key/i.test(msg)) {
-    return "Your AI provider rejected the API key (invalid or revoked). Update it in Settings → AI provider.";
+    return `${who} rejected the API key (invalid or revoked). Update it in Settings → AI provider.`;
+  }
+  // OpenRouter free models fail with a "no endpoints" / data-policy error that
+  // can ride in on a 429 — catch it before the generic quota branch so the user
+  // gets the real fix (the privacy toggle), not a billing message.
+  if (/data policy|no endpoints|no allowed providers/i.test(msg)) {
+    return "OpenRouter is blocking free (:free) models for this account. Enable them at openrouter.ai/settings/privacy (turn on 'Free model publication / prompt training'), then try again.";
   }
   if (status === 429 || code === "insufficient_quota" || /quota|billing/i.test(msg)) {
-    return "Your AI provider is out of quota or rate-limited. A ChatGPT Plus subscription does NOT include API credits — add billing/credits to the API account, or switch providers in Settings.";
-  }
-  if (/data policy|no endpoints|no allowed providers/i.test(msg)) {
-    return "OpenRouter is blocking free models for this account. Enable them at openrouter.ai/settings/privacy (turn on 'Free model publication / prompt training'), then try again.";
+    // Only OpenAI users hit the ChatGPT-Plus-≠-API-credits confusion.
+    if (provider?.id === "openai") {
+      return "OpenAI is out of quota or rate-limited. Note: a ChatGPT Plus subscription does NOT include API credits — add billing/credits at platform.openai.com, or switch providers in Settings.";
+    }
+    return `${who} is out of quota or rate-limited. Add credits/billing to that account, or switch providers in Settings.`;
   }
   if (status === 404 || /model/i.test(msg)) {
-    return "The selected model isn't available for this key. Pick a different model in Settings → AI provider.";
+    return `The selected model isn't available for this key on ${who}. Pick a different model in Settings → AI provider.`;
   }
   if (status === 403) {
-    return "Your AI provider denied access (permissions or region). Check the account or try another provider.";
+    return `${who} denied access (permissions or region). Check the account or try another provider.`;
   }
   if (/fetch failed|ECONNREFUSED|ENOTFOUND|timeout/i.test(msg)) {
-    return "Couldn't reach the AI provider. If you're using a local model (Ollama), make sure it's running.";
+    return `Couldn't reach ${who}. If you're using a local model (Ollama), make sure it's running.`;
   }
-  return "Kai couldn't reach the AI provider. Please try again in a moment.";
+  return `Kai couldn't reach ${who}. Please try again in a moment.`;
 }

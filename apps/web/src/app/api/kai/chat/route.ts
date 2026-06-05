@@ -9,6 +9,10 @@ import { getUserProviderConfigs } from "@/lib/ai/user-settings";
 import { createResilientChatStream } from "@/lib/ai/resilient";
 import { buildKaiContext } from "@/lib/ai/context/builder";
 import { buildKaiMessages } from "@/lib/ai/prompts/system";
+import { executeKaiTool, getKaiTools } from "@/lib/ai/tools/registry";
+import { toToolSpec, type KaiToolContext } from "@/lib/ai/tools/types";
+import { createAgentMessagesRepository } from "@careeros/database";
+import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
 
 const chatRequestSchema = z.object({
@@ -80,42 +84,185 @@ export async function POST(req: NextRequest) {
     historyLength: history.length,
   });
 
-  const stream = createResilientChatStream(chain, messages, { temperature: 0.6 });
+  // Kai's tools (search_jobs, get_performance, …) + the first provider in the
+  // chain that supports function calling. If none do, we stream plainly.
+  const tools = getKaiTools().map(toToolSpec);
+  const toolProvider = chain.find((p) => typeof p.runWithTools === "function");
 
-  // Encode as SSE text/event-stream
+  // Generation capability for tools that draft content (generate_document),
+  // bound to the user's primary provider.
+  const genProvider = chain[0];
+  const toolCtx: KaiToolContext = {
+    userId: user.id,
+    generate: genProvider
+      ? {
+          structured: (system, userMsg, schema, name) =>
+            genProvider.parseStructured(
+              [
+                { role: "system", content: system },
+                { role: "user", content: userMsg },
+              ],
+              schema,
+              name,
+              { temperature: 0.4 },
+            ),
+          text: (system, userMsg) =>
+            genProvider.chat(
+              [
+                { role: "system", content: system },
+                { role: "user", content: userMsg },
+              ],
+              { temperature: 0.6 },
+            ),
+        }
+      : undefined,
+  };
+
   const encoder = new TextEncoder();
 
   const sseStream = new ReadableStream({
     async start(controller) {
-      const reader = stream.getReader();
+      const sendText = (t: string) =>
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(t)}\n\n`));
+      const finish = () => {
+        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        controller.close();
+      };
 
+      // Persist the conversation so it survives reloads and is shared between
+      // Desk and Kai modes (both load the same history). Best-effort.
+      const agentRepo = createAgentMessagesRepository(getDatabase());
+      agentRepo.createForUser(user.id, { role: "user", content: message }).catch(() => {});
+      const saveAssistant = async (text: string, toolNames?: string) => {
+        if (!text.trim()) return;
+        try {
+          await agentRepo.createForUser(user.id, {
+            role: "assistant",
+            content: text,
+            metadata: toolNames ? { tools: toolNames } : {},
+          });
+        } catch {
+          /* best-effort */
+        }
+      };
+
+      // Agentic path: let Kai call tools, then narrate + show the results.
+      if (toolProvider?.runWithTools) {
+        try {
+          const result = await toolProvider.runWithTools(
+            messages,
+            tools,
+            (name, args) => executeKaiTool(name, args, toolCtx),
+            { temperature: 0.6 },
+          );
+          if (result.toolResults.length > 0) {
+            // A structured event the client renders as cards/tiles.
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ kaiTools: result.toolResults })}\n\n`),
+            );
+          }
+          const finalText =
+            result.text || (result.toolResults.length > 0 ? "Here's what I found." : "");
+          sendText(finalText);
+          await saveAssistant(finalText, result.toolResults.map((t) => t.name).join(", ") || undefined);
+          logger.info("kai.chat.completed", {
+            userId: user.id,
+            tools: result.toolResults.map((t) => t.name).join(", "),
+          });
+          finish();
+          return;
+        } catch (err) {
+          logger.warn("kai.chat.tool_run_failed", {
+            userId: user.id,
+            error: err instanceof Error ? err.message : "unknown",
+          });
+
+          // Deterministic safety net: provider function-calling is flaky (Groq
+          // can 400 on llama tool calls), so run the right tool ourselves rather
+          // than let the fallback model fabricate or just write prose in chat.
+
+          // Document drafting intent → generate_document (writes into the editor).
+          if (
+            /\b(generate|draft|write|create|make|build|tailor)\b/i.test(message) &&
+            /\b(resume|cv|cover[\s-]?letter|cold email|value prop(osition)?|vpd)\b/i.test(message)
+          ) {
+            try {
+              const kind = /cover[\s-]?letter/i.test(message)
+                ? "cover_letter"
+                : /\bemail\b/i.test(message)
+                  ? "email"
+                  : /value prop|vpd/i.test(message)
+                    ? "value_proposition"
+                    : "resume";
+              const r = await executeKaiTool("generate_document", { kind }, toolCtx);
+              if (r.data) {
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({ kaiTools: [{ name: "generate_document", view: r.view ?? "document", data: r.data }] })}\n\n`,
+                  ),
+                );
+              }
+              sendText(r.summary);
+              await saveAssistant(r.summary, "generate_document");
+              logger.info("kai.chat.completed", { userId: user.id, tools: "generate_document(fallback)" });
+              finish();
+              return;
+            } catch (toolErr) {
+              logger.warn("kai.chat.fallback_tool_failed", {
+                userId: user.id,
+                error: toolErr instanceof Error ? toolErr.message : "unknown",
+              });
+            }
+          }
+
+          // Job-search intent → real live cards (never fabricated listings).
+          if (/\b(jobs?|roles?|positions?|openings?|listings?|vacanc|hiring)\b/i.test(message)) {
+            try {
+              const r = await executeKaiTool("search_jobs", { location: message }, toolCtx);
+              if (r.data) {
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({ kaiTools: [{ name: "search_jobs", view: r.view ?? "jobs", data: r.data }] })}\n\n`,
+                  ),
+                );
+              }
+              sendText(r.summary);
+              await saveAssistant(r.summary, "search_jobs");
+              logger.info("kai.chat.completed", { userId: user.id, tools: "search_jobs(fallback)" });
+              finish();
+              return;
+            } catch (toolErr) {
+              logger.warn("kai.chat.fallback_tool_failed", {
+                userId: user.id,
+                error: toolErr instanceof Error ? toolErr.message : "unknown",
+              });
+            }
+          }
+          // Otherwise fall through to a plain stream (anti-fabrication is enforced
+          // by Kai's system prompt) so Kai still answers conversationally.
+        }
+      }
+
+      // Fallback: plain resilient stream (no tools).
+      const reader = createResilientChatStream(chain, messages, { temperature: 0.6 }).getReader();
+      let streamed = "";
       try {
         while (true) {
           const { done, value } = await reader.read();
-
-          if (done) {
-            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-            break;
-          }
-
-          // Escape the value for SSE
-          const escaped = JSON.stringify(value);
-          controller.enqueue(encoder.encode(`data: ${escaped}\n\n`));
+          if (done) break;
+          streamed += value;
+          sendText(value);
         }
       } catch (err) {
         logger.error("kai.chat.stream_error", {
           userId: user.id,
           error: err instanceof Error ? err.message : "unknown",
         });
-        controller.enqueue(
-          encoder.encode(
-            `data: ${JSON.stringify("\n\nSomething went wrong. Please try again.")}\n\n`,
-          ),
-        );
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+        sendText("\n\nSomething went wrong. Please try again.");
       } finally {
-        controller.close();
+        await saveAssistant(streamed);
         reader.releaseLock();
+        finish();
       }
     },
   });

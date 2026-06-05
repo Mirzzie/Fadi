@@ -7,12 +7,20 @@ import {
 } from "@careeros/database";
 
 import { getDatabase } from "@/lib/database/client";
+import { ensureFreshLiveJobs } from "@/lib/jobs/sync";
 import { scoreJobForUser } from "@/lib/jobs/job-matching";
+import { passesFilters, type JobFilters } from "@/lib/jobs/filters";
+import { getCountry } from "@/lib/jobs/locations";
 import type { ApplicationStatus, RecommendedJob } from "@/lib/jobs/types";
+
+// Below this match score a role is noise for this user — hide it rather than
+// pad the list. Saved/applied roles are always kept regardless.
+const MIN_RELEVANCE = 30;
 
 export async function getRecommendedJobsForUser(
   userId: string,
-  limit?: number
+  limit?: number,
+  filters?: JobFilters
 ): Promise<RecommendedJob[]> {
   const db = getDatabase();
   const jobsRepository = createJobsRepository(db);
@@ -21,11 +29,27 @@ export async function getRecommendedJobsForUser(
   const savedJobsRepository = createSavedJobsRepository(db);
   const applicationsRepository = createApplicationsRepository(db);
 
-  const [jobs, careerProfile, resume] = await Promise.all([
-    jobsRepository.listActive(),
+  const [careerProfile, resume] = await Promise.all([
     careerProfilesRepository.getLatestForUser(userId),
     resumesRepository.getLatestForUser(userId),
   ]);
+
+  // Pull fresh live postings (Remotive, Arbeitnow, …) into the jobs table,
+  // personalized to the user's target role, before we read+score. TTL-guarded,
+  // best-effort: if every source is down we just score whatever is stored.
+  if (careerProfile?.targetRole) {
+    await ensureFreshLiveJobs(
+      {
+        targetRole: careerProfile.targetRole,
+        skills: [],
+        skillGaps: [],
+        region: careerProfile.location,
+      },
+      { country: filters?.country, city: filters?.city },
+    );
+  }
+
+  const jobs = await jobsRepository.listActive();
   const jobIds = jobs.map((job) => job.id);
   const [savedJobs, applications] = await Promise.all([
     savedJobsRepository.listForUserByJobIds(userId, jobIds),
@@ -36,9 +60,16 @@ export async function getRecommendedJobsForUser(
     applications.map((application) => [application.jobId, application])
   );
 
+  // When the user actively searched a location, score against THAT location
+  // rather than only their profile's home region.
+  const locationOverride =
+    filters?.city || filters?.country
+      ? [filters?.city, getCountry(filters?.country)?.name].filter(Boolean).join(", ")
+      : null;
+
   const recommendedJobs = jobs
     .map((job) => {
-      const match = scoreJobForUser({ careerProfile, resume, job });
+      const match = scoreJobForUser({ careerProfile, resume, job, locationOverride });
       const savedJob = savedByJobId.get(job.id);
       const application = applicationByJobId.get(job.id);
 
@@ -56,11 +87,31 @@ export async function getRecommendedJobsForUser(
         matchScore: savedJob?.matchScore ?? match.matchScore,
         matchReason: savedJob?.matchSummary ?? match.matchReason,
         matchedKeywords: savedJob?.matchedSkills ?? match.matchedKeywords,
+        onRole: match.onRole,
         isSaved: Boolean(savedJob),
         applicationStatus: (application?.status as ApplicationStatus | undefined) ?? null,
       };
     })
     .sort((a, b) => b.matchScore - a.matchScore);
 
-  return typeof limit === "number" ? recommendedJobs.slice(0, limit) : recommendedJobs;
+  // Hard filters first — the user chose a location / type / mode / visa, so these
+  // are strict (a Dublin search shows ONLY Dublin roles, never remote-worldwide).
+  const hardFiltered = filters
+    ? recommendedJobs.filter((j) => passesFilters(j, filters))
+    : recommendedJobs;
+
+  // Relevance gating — NEVER pad with off-role jobs. We'd rather show fewer (or
+  // an honest empty state) than surface "Risk Assurance Manager" for an
+  // IT-support seeker. Saved/applied roles are always kept.
+  const tracked = (j: (typeof recommendedJobs)[number]) => j.isSaved || Boolean(j.applicationStatus);
+  const overBar = (j: (typeof recommendedJobs)[number]) => j.matchScore >= MIN_RELEVANCE;
+
+  // 1) Strong: on-role AND above the bar.
+  const strong = hardFiltered.filter((j) => (j.onRole && overBar(j)) || tracked(j));
+  // 2) Fallback: on-role at any score — the right KIND of role, just weaker —
+  //    but still never off-role.
+  const onRoleAny = hardFiltered.filter((j) => j.onRole || tracked(j));
+  const shown = strong.length > 0 ? strong : onRoleAny.slice(0, 10);
+
+  return typeof limit === "number" ? shown.slice(0, limit) : shown;
 }

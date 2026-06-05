@@ -82,7 +82,7 @@ export function createResilientChatStream(
             exhausted: isProviderExhausted(err),
           });
           if (isLast) {
-            controller.enqueue(`\n\n${aiErrorMessage(err)}`);
+            controller.enqueue(`\n\n${aiErrorMessage(err, { id: provider.id, name: provider.name })}`);
             controller.close();
             return;
           }
@@ -121,7 +121,9 @@ export class ResilientProvider implements AIProvider {
 
   async chat(messages: AIMessage[], options?: ChatOptions): Promise<string> {
     let lastErr: unknown;
+    let lastProvider: AIProvider | undefined;
     for (const provider of this.chain) {
+      lastProvider = provider;
       try {
         return await provider.chat(messages, options);
       } catch (err) {
@@ -129,7 +131,7 @@ export class ResilientProvider implements AIProvider {
         if (!isProviderExhausted(err) && !isRateLimited(err)) break;
       }
     }
-    return aiErrorMessage(lastErr);
+    return aiErrorMessage(lastErr, lastProvider && { id: lastProvider.id, name: lastProvider.name });
   }
 
   async parseStructured<T>(

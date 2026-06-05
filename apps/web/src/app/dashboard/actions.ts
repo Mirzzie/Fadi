@@ -7,7 +7,9 @@ import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getCareerReportContext } from "@/lib/career-report/data";
 import { careerIntelligenceReportSchema } from "@/lib/career-report/schema";
 import { getDatabase } from "@/lib/database/client";
-import { getAIProvider } from "@/lib/ai/registry";
+import { buildProviderChain } from "@/lib/ai/registry";
+import { ResilientProvider } from "@/lib/ai/resilient";
+import { getUserProviderConfigs } from "@/lib/ai/user-settings";
 import { logger } from "@/lib/observability/logger";
 import { consumeRateLimit, refundRateLimit } from "@/lib/security/rate-limit";
 
@@ -134,7 +136,12 @@ export async function generateCareerReportAction(
     };
   }
 
-  const provider = getAIProvider();
+  // Resolve the SAME per-user provider chain Kai chat uses, so a key set in
+  // Settings → AI provider drives the report too. buildProviderChain falls back
+  // to the server default when the user hasn't configured their own; wrapping it
+  // in ResilientProvider gives the report primary→fallback resilience for free.
+  const providerChain = buildProviderChain(await getUserProviderConfigs(user.id));
+  const provider = new ResilientProvider(providerChain);
 
   if (!provider.isConfigured) {
     logger.error("career_report.generate.provider_not_configured", {

@@ -119,6 +119,24 @@ export function useSpeechInput({
     };
 
     recognition.onerror = (event: WebSpeechRecognitionError) => {
+      // "aborted" / "no-speech" are normal lifecycle events (e.g. the mic was
+      // handed off or the user paused) — not real errors. Don't alarm the user.
+      if (event.error === "aborted" || event.error === "no-speech") {
+        setState("idle");
+        return;
+      }
+      // "network" / "audio-capture" are recoverable: the browser couldn't reach
+      // its speech service or the mic blipped. Go idle so the hands-free loop can
+      // retry; surface a calm, actionable note instead of a red "error".
+      if (event.error === "network" || event.error === "audio-capture") {
+        setState("idle");
+        onError?.(
+          event.error === "network"
+            ? "Voice couldn't reach the speech service (browser speech needs a connection). You can keep typing, or try the mic again."
+            : "Couldn't access the microphone. Check it's connected and permitted, then try again.",
+        );
+        return;
+      }
       setState("error");
       const message =
         event.error === "not-allowed"
