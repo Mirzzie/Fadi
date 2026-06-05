@@ -4,6 +4,7 @@ import { getRecommendedJobsForUser } from "@/lib/jobs/data";
 import { parseLocation, getCountry } from "@/lib/jobs/locations";
 import { getMomentumSummary } from "@/lib/resilience/service";
 import { generateDocument } from "./generate-document";
+import { getLaborMarket } from "./labor-market";
 import { trackApplication } from "./track-application";
 import type { KaiTool, KaiToolContext, KaiToolResult } from "./types";
 
@@ -126,6 +127,7 @@ const TOOLS: KaiTool[] = [
   getCareerUpdates,
   generateDocument,
   trackApplication,
+  getLaborMarket,
 ];
 
 export function getKaiTools(): KaiTool[] {

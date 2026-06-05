@@ -7,6 +7,7 @@ import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getCareerReportContext } from "@/lib/career-report/data";
 import { careerIntelligenceReportSchema } from "@/lib/career-report/schema";
 import { getDatabase } from "@/lib/database/client";
+import { getLaborMarketSnapshot } from "@/lib/labor-market/bls";
 import { buildProviderChain } from "@/lib/ai/registry";
 import { ResilientProvider } from "@/lib/ai/resilient";
 import { getUserProviderConfigs } from "@/lib/ai/user-settings";
@@ -217,6 +218,10 @@ export async function generateCareerReportAction(
     };
   }
 
+  // Ground the report's market reasoning in real BLS labor data (honest macro
+  // context — never to alarm). Keyless + cached; degrades to empty if unavailable.
+  const labor = await getLaborMarketSnapshot();
+
   const userContext = `
 User profile:
 - Name: ${context.fullName ?? "Not provided"}
@@ -224,6 +229,7 @@ User profile:
 - Location preference: ${context.locationPreference ?? "Not provided"}
 - Experience level: ${context.experienceLevel ?? "Not provided"}
 - Career goals: ${truncate(context.careerGoals, 1600)}
+${labor.summary ? `\nCurrent labor market (real BLS data — use for honest context, not alarm):\n${labor.summary}` : ""}
 
 LinkedIn context:
 ${truncate(context.linkedInProfileText, 5000)}
@@ -274,9 +280,18 @@ ${truncate(context.resumeText, 9000)}
           detail: report.targetRoleFit.explanation,
         },
       ],
-      marketDemand: {
-        note: "Real-time market intelligence is not implemented in the MVP.",
-      },
+      marketDemand: labor.summary
+        ? {
+            note: labor.summary,
+            source: "U.S. Bureau of Labor Statistics",
+            asOf: labor.asOf,
+            unemploymentRate: labor.unemploymentRate,
+            jobOpeningsMillions: labor.jobOpeningsMillions,
+            quitsRate: labor.quitsRate,
+          }
+        : {
+            note: "Live labor-market data is temporarily unavailable — check back shortly.",
+          },
       recommendedLearningPath: report.learningRecommendations,
       resumeQualityScore: report.resumeQualityScore,
       careerReadinessScore: report.careerReadinessScore,

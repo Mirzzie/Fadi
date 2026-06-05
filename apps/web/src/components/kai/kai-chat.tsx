@@ -560,6 +560,38 @@ function renderToolResult(r: KaiToolResultView) {
     );
   }
 
+  if (r.view === "labor" && data) {
+    const d = data as {
+      unemploymentRate?: number | null;
+      unemploymentTrend?: string | null;
+      jobOpeningsMillions?: number | null;
+      openingsTrend?: string | null;
+      quitsRate?: number | null;
+      asOf?: string | null;
+    };
+    const arrow = (t?: string | null) => (t === "up" ? "▲" : t === "down" ? "▼" : t === "flat" ? "▬" : "");
+    const tiles: Array<[string, string, string?]> = [
+      ["Unemployment", d.unemploymentRate != null ? `${d.unemploymentRate}%` : "—", arrow(d.unemploymentTrend)],
+      ["Job openings", d.jobOpeningsMillions != null ? `${d.jobOpeningsMillions.toFixed(1)}M` : "—", arrow(d.openingsTrend)],
+      ["Quits rate", d.quitsRate != null ? `${d.quitsRate}%` : "—"],
+    ];
+    return (
+      <div>
+        <div className="grid grid-cols-3 gap-2">
+          {tiles.map(([label, value, trend]) => (
+            <div key={label} className="rounded-lg border border-border/60 bg-card/60 p-2.5 text-center">
+              <p className="text-lg font-semibold tabular-nums">
+                {value} {trend ? <span className="text-xs text-muted-foreground">{trend}</span> : null}
+              </p>
+              <p className="text-[0.7rem] uppercase tracking-wide text-muted-foreground">{label}</p>
+            </div>
+          ))}
+        </div>
+        {d.asOf ? <p className="mt-1.5 text-[0.7rem] text-muted-foreground">US · BLS · {d.asOf}</p> : null}
+      </div>
+    );
+  }
+
   if (r.view === "performance" && data) {
     const tiles: Array<[string, string]> = [
       ["Momentum", String(data.momentum ?? "—")],
