@@ -2,6 +2,7 @@
 
 import {
   BriefcaseBusiness,
+  Compass,
   FileText,
   GraduationCap,
   KanbanSquare,
@@ -21,6 +22,7 @@ type DockApp = { href: string; label: string; icon: LucideIcon };
 const DOCK_APPS: DockApp[] = [
   { href: "/dashboard", label: "Home", icon: LayoutDashboard },
   { href: "/dashboard/jobs", label: "Jobs", icon: BriefcaseBusiness },
+  { href: "/dashboard/niche-finder", label: "Niche Finder", icon: Compass },
   { href: "/dashboard/applications", label: "Applications", icon: KanbanSquare },
   { href: "/dashboard/documents", label: "Documents", icon: FileText },
   { href: "/dashboard/learning", label: "Learning", icon: GraduationCap },
