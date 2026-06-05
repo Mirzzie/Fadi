@@ -1,0 +1,155 @@
+"use server";
+
+import { z } from "zod";
+
+import { completeOnboardingAction } from "@/app/onboarding/actions";
+import { buildProviderChain } from "@/lib/ai/registry";
+import { ResilientProvider } from "@/lib/ai/resilient";
+import { getUserProviderConfigs } from "@/lib/ai/user-settings";
+import { getCurrentAuthUser } from "@/lib/auth/session";
+import { isProviderExhausted, isRateLimited } from "@/lib/ai/providers/errors";
+import { experienceLevelOptions, type OnboardingFormValues } from "@/lib/onboarding/validation";
+import { logger } from "@/lib/observability/logger";
+
+/**
+ * The Kai-led welcome as a REAL AI conversation. Each turn the model both replies
+ * to the user AND tracks the structured fields it has gathered so far + whether
+ * it's done — so onboarding feels like talking to Kai, not filling a form, while
+ * staying reliable enough to actually create the profile + first track.
+ *
+ * Degrades honestly: a brand-new user has no AI key, so this falls back to the
+ * server default; if that's unavailable the action returns { error: "provider" }
+ * and the UI drops to the scripted welcome (no AI needed).
+ */
+
+export type OnboardingChatMessage = { role: "user" | "assistant"; content: string };
+
+const collectedSchema = z.object({
+  fullName: z.string().nullable(),
+  targetRole: z.string().nullable(),
+  locationPreference: z.string().nullable(),
+  experienceLevel: z.string().nullable(),
+  careerGoals: z.string().nullable(),
+  resumeText: z.string().nullable(),
+  linkedInProfile: z.string().nullable(),
+});
+export type CollectedFields = z.infer<typeof collectedSchema>;
+
+const turnSchema = z.object({
+  reply: z.string(),
+  collected: collectedSchema,
+  complete: z.boolean(),
+});
+
+export type OnboardingChatResult =
+  | {
+      ok: true;
+      reply: string;
+      collected: CollectedFields;
+      done: boolean;
+      redirectTo?: string;
+    }
+  | { ok: false; error: "provider" | "auth"; message: string };
+
+const SYSTEM = `You are Kai, CareerOS's career operating system, welcoming a brand-new user on their first login. Run a warm, BRIEF conversation to set up their first career track.
+
+Collect — conversationally, ONE topic at a time, reacting to each answer before moving on:
+- fullName — what to call them
+- targetRole — the role or field they're aiming for (this becomes their first track; help them narrow it if they're unsure)
+- locationPreference — a city, country, or "remote"
+- experienceLevel — map to exactly one of: entry, mid, senior, lead, executive, career_switcher
+- careerGoals — what they actually want from this move (money, stability, growth, a fresh start)
+- resumeText — a summary of their experience, skills, and education (a paragraph is fine)
+- linkedInProfile — a LinkedIn URL or a couple of lines about their background
+
+Style: warm, sharp, concise (1-3 sentences). Never dump a list of questions. This serves ANY field — finance, healthcare, trades, tech — not just tech.
+
+Every turn, output: reply (your next message), collected (EVERYTHING gathered so far across the whole conversation — keep a field null until you truly have it), and complete (true ONLY when every field above has a real value). NEVER invent, assume, or guess a field — only fill it from what the user actually told you. When complete, make reply a short warm closing line telling them you're setting up their Career OS now.`;
+
+function normalizeExperience(value: string | null): OnboardingFormValues["experienceLevel"] {
+  const s = (value ?? "").toLowerCase();
+  if (/switch|career.?chang|transition|pivot|new to/.test(s)) return "career_switcher";
+  if (/exec|c-?level|cxo|chief|director|vp|head of/.test(s)) return "executive";
+  if (/lead|principal|staff|manage/.test(s)) return "lead";
+  if (/senior|\bsr\b/.test(s)) return "senior";
+  if (/entry|junior|\bjr\b|grad|student|intern|fresh|no experience/.test(s)) return "entry";
+  if (experienceLevelOptions.includes(s as OnboardingFormValues["experienceLevel"])) {
+    return s as OnboardingFormValues["experienceLevel"];
+  }
+  return "mid";
+}
+
+export async function onboardingChatAction(
+  history: OnboardingChatMessage[],
+): Promise<OnboardingChatResult> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, error: "auth", message: "Sign in to continue." };
+
+  const provider = new ResilientProvider(buildProviderChain(await getUserProviderConfigs(user.id)));
+  if (!provider.isConfigured) {
+    return { ok: false, error: "provider", message: "No AI provider available." };
+  }
+
+  const messages = [
+    { role: "system" as const, content: SYSTEM },
+    ...history
+      .filter((m) => m.role === "user" || m.role === "assistant")
+      .slice(-24)
+      .map((m) => ({ role: m.role, content: m.content.slice(0, 4000) })),
+  ];
+
+  let turn: z.infer<typeof turnSchema>;
+  try {
+    turn = await provider.parseStructured(messages, turnSchema, "onboarding_turn", {
+      temperature: 0.6,
+      userId: user.id,
+    });
+  } catch (err) {
+    // A dead/quota'd provider here means the new user has no working AI — let the
+    // UI fall back to the scripted welcome rather than trapping them.
+    logger.warn("onboarding.chat.provider_failed", {
+      userId: user.id,
+      exhausted: isProviderExhausted(err) || isRateLimited(err),
+      error: err instanceof Error ? err.message : "unknown",
+    });
+    return { ok: false, error: "provider", message: "Kai's AI is unavailable right now." };
+  }
+
+  // Guard against weak models that declare "complete" too early and fabricate
+  // fields — you genuinely can't gather all seven in a couple of turns.
+  const userTurns = history.filter((m) => m.role === "user").length;
+  if (!turn.complete || userTurns < 4) {
+    return { ok: true, reply: turn.reply, collected: turn.collected, done: false };
+  }
+
+  // Model says it has everything — validate + persist via the real onboarding path.
+  const values: OnboardingFormValues = {
+    fullName: turn.collected.fullName ?? "",
+    targetRole: turn.collected.targetRole ?? "",
+    locationPreference: turn.collected.locationPreference ?? "",
+    experienceLevel: normalizeExperience(turn.collected.experienceLevel),
+    careerGoals: turn.collected.careerGoals ?? "",
+    resumeText: turn.collected.resumeText ?? "",
+    linkedInProfile: turn.collected.linkedInProfile ?? "",
+  };
+
+  const saved = await completeOnboardingAction(values);
+  if (!saved.ok) {
+    // The model jumped the gun (e.g. CV too thin) — keep talking, ask for the gap.
+    return {
+      ok: true,
+      reply: `Almost there — ${saved.message ?? "I need a little more detail."}`,
+      collected: turn.collected,
+      done: false,
+    };
+  }
+
+  logger.info("onboarding.chat.completed", { userId: user.id });
+  return {
+    ok: true,
+    reply: turn.reply,
+    collected: turn.collected,
+    done: true,
+    redirectTo: saved.redirectTo ?? "/dashboard",
+  };
+}
