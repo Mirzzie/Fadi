@@ -1,72 +1,13 @@
-import { Upload, UserRoundCheck, WandSparkles } from "lucide-react";
+import { OnboardingExperience } from "@/components/onboarding/onboarding-experience";
 
-import { OnboardingForm } from "@/components/onboarding/onboarding-form";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-
-const steps = [
-  {
-    title: "CV upload",
-    description: "Capture experience, skills, education, and achievements.",
-    icon: Upload,
-  },
-  {
-    title: "Profile context",
-    description: "Add LinkedIn text or confirm details manually.",
-    icon: UserRoundCheck,
-  },
-  {
-    title: "Career report",
-    description: "Generate the first Career Intelligence Report.",
-    icon: WandSparkles,
-  },
-];
-
+/**
+ * Onboarding shell — the OS "first boot". Kai welcomes the user and guides them
+ * through setting up their first track conversationally (with a form fallback).
+ */
 export function OnboardingShell() {
   return (
-    <div className="mx-auto grid max-w-shell gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-      <section className="space-y-4">
-        <Badge variant="secondary">Onboarding shell</Badge>
-        <div className="space-y-3">
-          <h1 className="text-3xl font-semibold tracking-tight">
-            Build your career{" "}
-            <span className="bg-gradient-to-r from-primary via-[oklch(0.7_0.17_230)] to-[oklch(0.68_0.22_285)] bg-clip-text text-transparent">
-              profile
-            </span>
-          </h1>
-          <p className="text-muted-foreground">
-            Paste your career context so CareerOS AI can prepare your profile foundation. This phase
-            saves data only; AI report generation comes later.
-          </p>
-        </div>
-        <div className="grid gap-3">
-          {steps.map((step) => (
-            <Card key={step.title}>
-              <CardContent className="flex gap-4 p-4">
-                <div className="grid size-10 shrink-0 place-items-center rounded-md bg-gradient-to-br from-primary/20 to-[oklch(0.66_0.22_285)]/15 text-primary ring-1 ring-primary/15">
-                  <step.icon className="size-5" aria-hidden="true" />
-                </div>
-                <div>
-                  <h2 className="font-medium">{step.title}</h2>
-                  <p className="text-sm text-muted-foreground">{step.description}</p>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
-
-      <Card className="glow-primary">
-        <CardHeader>
-          <CardTitle>Profile foundation</CardTitle>
-          <CardDescription>
-            Complete these steps to unlock your protected dashboard.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <OnboardingForm />
-        </CardContent>
-      </Card>
+    <div className="mx-auto w-full max-w-2xl">
+      <OnboardingExperience />
     </div>
   );
 }
