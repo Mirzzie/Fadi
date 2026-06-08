@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, lt } from "drizzle-orm";
 
 import type { Database } from "../client";
 import { jobs, type Job } from "../schema";
@@ -45,6 +45,29 @@ export function createJobsRepository(db: Database) {
         .update(jobs)
         .set({ status: "archived", updatedAt: new Date() })
         .where(eq(jobs.source, source))
+        .returning({ id: jobs.id });
+      return updated.length;
+    },
+
+    /**
+     * Age out stale live postings. `updatedAt` is bumped every time a posting
+     * reappears in a sync (see `upsertSeedJob`), so a row whose `updatedAt` is
+     * older than `staleBefore` hasn't been re-seen on the boards in a while —
+     * strong signal it's been pulled. We mark those `expired` so they drop out
+     * of `listActive` and never waste a user's time. Optionally scope to a
+     * single source (e.g. only age out a specific board's rows).
+     */
+    async archiveStaleLiveJobs(staleBefore: Date, source?: string): Promise<number> {
+      const conditions = [
+        eq(jobs.status, "active"),
+        lt(jobs.updatedAt, staleBefore),
+      ];
+      if (source) conditions.push(eq(jobs.source, source));
+
+      const updated = await db
+        .update(jobs)
+        .set({ status: "expired", updatedAt: new Date() })
+        .where(and(...conditions))
         .returning({ id: jobs.id });
       return updated.length;
     },

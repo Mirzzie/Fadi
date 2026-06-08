@@ -4,12 +4,15 @@ import {
   createApplicationsRepository,
   createDocumentsRepository,
   createJobsRepository,
+  createProfilesRepository,
   createSavedJobsRepository,
 } from "@careeros/database";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { ApplicationWorkspace } from "@/components/workspace/application-workspace";
 import { ApplicationOutcomePanel } from "@/components/workspace/application-outcome-panel";
+import { AutoPrepRunner } from "@/components/workspace/auto-prep-runner";
+import { JobLivenessBanner } from "@/components/workspace/job-liveness-banner";
 import { WorkspaceDocActions } from "@/components/workspace/workspace-doc-actions";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
@@ -41,11 +44,12 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
 
   const db = getDatabase();
 
-  const [job, savedJob, applications, jobDocs] = await Promise.all([
+  const [job, savedJob, applications, jobDocs, profile] = await Promise.all([
     createJobsRepository(db).findById(jobId),
     createSavedJobsRepository(db).listForUserByJobIds(user.id, [jobId]),
     createApplicationsRepository(db).listForUserByJobIds(user.id, [jobId]),
     createDocumentsRepository(db).listForJob(user.id, jobId),
+    createProfilesRepository(db).getByUserId(user.id),
   ]);
 
   if (!job) notFound();
@@ -71,6 +75,18 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
             Application workspace — all documents are drafts until you approve them
           </p>
         </div>
+
+        {/* Freshness guard — warn (don't block) if the posting looks closed */}
+        <div className="shrink-0">
+          <JobLivenessBanner jobId={job.id} jobUrl={job.url} />
+        </div>
+
+        {/* Auto-prep — if the user opted in, Kai drafts the packet on open */}
+        {profile?.autoPrepEnabled ? (
+          <div className="shrink-0">
+            <AutoPrepRunner jobId={job.id} enabled hasDocs={jobDocs.length > 0} />
+          </div>
+        ) : null}
 
         {/* Outcome + rejection-autopsy */}
         <div className="shrink-0">

@@ -59,5 +59,16 @@ export function createProfilesRepository(db: Database) {
 
       return profile ?? null;
     },
+
+    /** Toggle Kai's auto-prep (auto-draft the full doc packet when engaging a job). */
+    async setAutoPrep(userId: string, enabled: boolean): Promise<Profile | null> {
+      const [profile] = await db
+        .update(profiles)
+        .set({ autoPrepEnabled: enabled, updatedAt: new Date() })
+        .where(eq(profiles.userId, userId))
+        .returning();
+
+      return profile ?? null;
+    },
   };
 }

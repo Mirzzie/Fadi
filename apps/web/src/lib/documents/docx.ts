@@ -57,6 +57,26 @@ const DOCX_TEMPLATES: Record<ResumeTemplate, DocxStyle> = {
     bodyFont: "Calibri",
     border: true,
   },
+  // ATS: single column, left-aligned, near-black, standard Arial — safest parse.
+  ats: {
+    nameAlign: AlignmentType.LEFT,
+    nameSize: 34,
+    headerAlign: AlignmentType.LEFT,
+    sectionColor: "111111",
+    sectionSize: 19,
+    bodyFont: "Arial",
+    border: true,
+  },
+  // Executive: centered serif (Georgia), restrained — refined but still parse-safe.
+  executive: {
+    nameAlign: AlignmentType.CENTER,
+    nameSize: 34,
+    headerAlign: AlignmentType.CENTER,
+    sectionColor: "222222",
+    sectionSize: 19,
+    bodyFont: "Georgia",
+    border: true,
+  },
 };
 
 function sectionHeading(text: string, s: DocxStyle): Paragraph {

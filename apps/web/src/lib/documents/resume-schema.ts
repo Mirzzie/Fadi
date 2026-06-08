@@ -60,3 +60,40 @@ export function toResumeData(
     order: [...DEFAULT_SECTION_ORDER],
   };
 }
+
+/**
+ * Schema for PARSING an existing resume (from an uploaded PDF/DOCX/DOC) into our
+ * structure. Unlike generation, this also captures the candidate's real contact
+ * details from the document itself, and must be verbatim — never invented.
+ */
+export const resumeImportSchema = z.object({
+  personal: z.object({
+    name: z.string(),
+    headline: z.string(),
+    email: z.string(),
+    phone: z.string(),
+    location: z.string(),
+    links: z.string(),
+  }),
+  summary: z.string(),
+  experiences: resumeGenerationSchema.shape.experiences,
+  education: resumeGenerationSchema.shape.education,
+  skills: resumeGenerationSchema.shape.skills,
+  projects: resumeGenerationSchema.shape.projects,
+});
+
+export type ResumeImport = z.infer<typeof resumeImportSchema>;
+
+/** Build ResumeData from a parsed-import payload (contact details come from the doc). */
+export function importedToResumeData(parsed: ResumeImport): ResumeData {
+  return toResumeData(
+    {
+      summary: parsed.summary,
+      experiences: parsed.experiences,
+      education: parsed.education,
+      skills: parsed.skills,
+      projects: parsed.projects,
+    },
+    parsed.personal,
+  );
+}

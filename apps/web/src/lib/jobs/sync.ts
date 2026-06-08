@@ -23,6 +23,12 @@ const SOURCE_SEED = "local_mvp_seed";
 // last sync for a profile is older than this. Subsequent page loads read the
 // already-persisted rows instantly.
 const SYNC_TTL_MS = 30 * 60 * 1000;
+
+// A live posting that hasn't reappeared in any sync for this long has almost
+// certainly been pulled from the boards — age it out so it stops surfacing as
+// "active" (a ghost job that wastes the user's time). Boards typically expire
+// postings within ~30 days; we're a bit more aggressive.
+const JOB_FRESHNESS_MS = 14 * 24 * 60 * 60 * 1000;
 const lastSyncByKey = new Map<string, number>();
 
 function syncKey(profile: RelevanceProfile, location?: LocationFilter): string {
@@ -92,11 +98,18 @@ export async function ensureFreshLiveJobs(
     // Real postings are now live — retire the fabricated MVP seed for good.
     const archived = await jobsRepository.deactivateBySource(SOURCE_SEED);
 
+    // Age out postings that haven't been re-seen in a while — they've likely
+    // closed on the source, and a stale "active" job wastes the user's time.
+    const expired = await jobsRepository.archiveStaleLiveJobs(
+      new Date(Date.now() - JOB_FRESHNESS_MS),
+    );
+
     logger.info("jobs.sync.completed", {
       targetRole: profile.targetRole,
       discovered: postings.length,
       upserted,
       seedArchived: archived,
+      staleExpired: expired,
     });
 
     return upserted;

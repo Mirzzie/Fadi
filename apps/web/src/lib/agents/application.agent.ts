@@ -1,5 +1,6 @@
 import type { AIProvider } from "@/lib/ai/providers/types";
 import { formatKaiContextAsPrompt } from "@/lib/ai/context/builder";
+import { HUMANIZE_CORE, HUMANIZE_PROSE, HUMANIZE_RESUME } from "@/lib/documents/humanize";
 
 import type {
   AgentArtifact,
@@ -196,7 +197,18 @@ You can generate and iterate on:
 - Be direct: if the user is underqualified for this role, say so constructively and help them anyway
 
 ## Tools
-When the user asks to generate a document, call the appropriate tool and then produce the full document content in your response. The user reviews and approves before anything leaves CareerOS.`;
+When the user asks to generate a document, call the appropriate tool and then produce the full document content in your response. The user reviews and approves before anything leaves CareerOS.
+
+---
+
+## How everything you write must read
+${HUMANIZE_CORE}
+
+For any prose document (cover letter, cold email, value proposition, outreach):
+${HUMANIZE_PROSE}
+
+For a CV/résumé:
+${HUMANIZE_RESUME}`;
   }
 
   async *stream(

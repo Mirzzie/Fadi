@@ -2,9 +2,10 @@
 
 import { ArrowLeft, ChevronDown, ChevronUp, Check, Download, Loader2, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { AiTellCheck } from "@/components/documents/ai-tell-check";
 import { ResumePreview } from "@/components/documents/resume-preview";
 import { updateDocumentAction } from "@/app/dashboard/documents/actions";
 import {
@@ -85,11 +86,28 @@ export function ResumeEditor({
     patch({ order });
   }
 
+  // Scan the prose-heavy fields (summary, bullets, project descriptions) for AI
+  // clichés — skills are just keyword lists, so they're not worth flagging.
+  const proseText = useMemo(
+    () =>
+      [
+        data.summary,
+        ...data.experiences.map((e) => e.bullets),
+        ...data.projects.map((p) => p.description),
+      ]
+        .filter(Boolean)
+        .join("\n"),
+    [data.summary, data.experiences, data.projects],
+  );
+
   function exportPdf() {
     window.open(`/dashboard/documents/${id}/print`, "_blank");
   }
   function exportDocx() {
     window.open(`/api/documents/${id}/docx`, "_blank");
+  }
+  function exportJson() {
+    window.open(`/api/documents/${id}/json`, "_blank");
   }
 
   function addSectionItem(key: ResumeSectionKey) {
@@ -219,11 +237,18 @@ export function ResumeEditor({
             <Download className="size-4" aria-hidden="true" />
             PDF
           </Button>
+          <Button variant="outline" size="sm" onClick={exportJson} title="Export as JSON Resume (open standard)">
+            <Download className="size-4" aria-hidden="true" />
+            JSON
+          </Button>
           <Button size="sm" onClick={save}>
             Save
           </Button>
         </div>
       </div>
+
+      {/* Honest reads-human check across the resume's prose */}
+      <AiTellCheck text={proseText} />
 
       <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-2">
         {/* Live preview */}

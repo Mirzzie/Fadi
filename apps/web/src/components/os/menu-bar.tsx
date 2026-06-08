@@ -7,6 +7,7 @@ import { useWakeWord } from "@/lib/voice/use-wake-word";
 import { cn } from "@/lib/utils";
 import { summonKai, useOsMode } from "./os-mode";
 import { TrackSwitcher } from "./track-switcher";
+import { UserMenu } from "./user-menu";
 
 /** Top menu bar — the OS's persistent identity strip: brand, live clock, Kai
  *  status, and the Desk ⇄ Kai mode switch. */
@@ -75,6 +76,7 @@ export function MenuBar() {
           </ModeButton>
         </div>
         <span className="tabular-nums text-muted-foreground">{clock}</span>
+        <UserMenu />
       </div>
     </header>
   );

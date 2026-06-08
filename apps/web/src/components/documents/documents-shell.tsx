@@ -7,10 +7,11 @@ import {
   Plus,
   Sparkles,
   Trash2,
+  Upload,
   type LucideIcon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,6 +20,7 @@ import { cn } from "@/lib/utils";
 import {
   createDocumentAction,
   deleteDocumentAction,
+  importResumeFileAction,
 } from "@/app/dashboard/documents/actions";
 import type { DocumentKind } from "@careeros/database";
 
@@ -43,6 +45,21 @@ export function DocumentsShell({ documents }: { documents: DocView[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  function onImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-importing the same file
+    if (!file) return;
+    setError(null);
+    const form = new FormData();
+    form.append("file", file);
+    startTransition(async () => {
+      const res = await importResumeFileAction(form);
+      if (res.ok && res.id) router.push(`/dashboard/documents/${res.id}`);
+      else setError(res.message);
+    });
+  }
 
   function create(kind: DocumentKind) {
     setError(null);
@@ -91,6 +108,23 @@ export function DocumentsShell({ documents }: { documents: DocView[] }) {
                 {k.label}
               </Button>
             ))}
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pending}
+              onClick={() => fileInput.current?.click()}
+              title="Import a CV from PDF, DOCX, DOC, TXT, or JSON Resume"
+            >
+              <Upload className="size-4" aria-hidden="true" />
+              Import CV
+            </Button>
+            <input
+              ref={fileInput}
+              type="file"
+              accept=".pdf,.docx,.doc,.txt,.json,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,text/plain,application/json"
+              className="hidden"
+              onChange={onImportFile}
+            />
           </div>
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
         </div>

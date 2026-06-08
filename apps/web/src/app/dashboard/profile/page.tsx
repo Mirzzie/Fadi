@@ -3,6 +3,8 @@ import { redirect } from "next/navigation";
 import { UserRoundCog } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { ActiveSessions } from "@/components/profile/active-sessions";
+import { ChangePasswordForm } from "@/components/profile/change-password-form";
 import { ProfileForm } from "@/components/profile/profile-form";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
@@ -72,6 +74,15 @@ export default async function ProfilePage() {
             resumeText: resume?.parsedText ?? resume?.rawText ?? "",
           }}
         />
+
+        {/* Security */}
+        <div className="space-y-2 pt-2">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Security
+          </h2>
+        </div>
+        <ChangePasswordForm />
+        <ActiveSessions />
       </div>
     </AppShell>
   );

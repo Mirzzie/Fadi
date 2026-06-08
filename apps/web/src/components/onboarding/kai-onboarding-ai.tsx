@@ -1,7 +1,6 @@
 "use client";
 
 import { Loader2, SendHorizonal } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 
 import {
@@ -40,7 +39,6 @@ export function KaiOnboardingAI({
   onUseForm?: () => void;
   onProviderUnavailable?: () => void;
 }) {
-  const router = useRouter();
   const [messages, setMessages] = useState<OnboardingChatMessage[]>([
     { role: "assistant", content: GREETING },
   ]);
@@ -78,8 +76,12 @@ export function KaiOnboardingAI({
       setMessages((m) => [...m, { role: "assistant", content: res.reply }]);
       if (res.done) {
         setFinishing(true);
-        router.push(res.redirectTo ?? "/dashboard");
-        router.refresh();
+        // Hard navigation for the one-time onboarding → OS handoff. A
+        // router.push + router.refresh here raced (refresh cancelled the push)
+        // and stranded users on "Setting things up…" even though the profile
+        // was saved. A full load guarantees the OS shell renders with a fresh
+        // session + profile.
+        window.location.assign(res.redirectTo ?? "/dashboard");
       }
     });
   }

@@ -144,6 +144,10 @@ export const profiles = pgTable(
     email: text("email").notNull(),
     onboardingCompleted: boolean("onboarding_completed").notNull().default(false),
     onboardingCompletedAt: timestamp("onboarding_completed_at", { withTimezone: true }),
+    // When on, Kai auto-prepares the full document packet (CV, cover letter,
+    // cold email, value proposition) the moment a user engages a job, instead
+    // of waiting to be asked. Opt-in — defaults off so we never surprise users.
+    autoPrepEnabled: boolean("auto_prep_enabled").notNull().default(false),
     ...timestamps,
   },
   (table) => [

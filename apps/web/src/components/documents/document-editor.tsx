@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { AiTellCheck } from "@/components/documents/ai-tell-check";
 import { updateDocumentAction } from "@/app/dashboard/documents/actions";
 
 const KIND_LABELS: Record<string, string> = {
@@ -127,6 +128,9 @@ export function DocumentEditor({
           className="min-h-0 flex-1 resize-none bg-transparent px-5 py-4 font-mono text-sm leading-relaxed outline-none"
         />
       </div>
+
+      {/* Honest reads-human check */}
+      <AiTellCheck text={content} />
     </div>
   );
 }

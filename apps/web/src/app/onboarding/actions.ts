@@ -10,7 +10,10 @@ import {
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
-import { onboardingFormSchema, type OnboardingFormValues } from "@/lib/onboarding/validation";
+import {
+  onboardingEssentialsSchema,
+  type OnboardingFormValues,
+} from "@/lib/onboarding/validation";
 
 export type OnboardingActionResult = {
   ok: boolean;
@@ -19,7 +22,7 @@ export type OnboardingActionResult = {
 };
 
 function firstValidationMessage(values: unknown) {
-  const parsed = onboardingFormSchema.safeParse(values);
+  const parsed = onboardingEssentialsSchema.safeParse(values);
 
   if (parsed.success) {
     return null;
@@ -42,7 +45,7 @@ export async function completeOnboardingAction(
     };
   }
 
-  const parsed = onboardingFormSchema.parse(values);
+  const parsed = onboardingEssentialsSchema.parse(values);
 
   try {
     const user = await getCurrentAuthUser();
@@ -89,15 +92,21 @@ export async function completeOnboardingAction(
       });
     }
 
-    await resumesRepository.createForUser(user.id, {
-      profileId: profile.id,
-      filePath: `text-paste/${user.id}/${Date.now()}`,
-      fileName: "pasted-resume.txt",
-      fileMimeType: "text/plain",
-      rawText: parsed.resumeText,
-      parsedText: parsed.resumeText,
-      parseStatus: "parsed",
-    });
+    // Only persist a resume when the user actually gave us substantive text —
+    // the conversational welcome often completes without one, and the OS
+    // guidance layer prompts for a CV afterward. Avoid creating empty rows.
+    const resumeText = parsed.resumeText?.trim();
+    if (resumeText && resumeText.length >= 20) {
+      await resumesRepository.createForUser(user.id, {
+        profileId: profile.id,
+        filePath: `text-paste/${user.id}/${Date.now()}`,
+        fileName: "pasted-resume.txt",
+        fileMimeType: "text/plain",
+        rawText: resumeText,
+        parsedText: resumeText,
+        parseStatus: "parsed",
+      });
+    }
 
     await profilesRepository.markOnboardingCompleted(user.id);
     logger.info("onboarding.complete.succeeded", {

@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 
+import { createProfilesRepository } from "@careeros/database";
+
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { createUserProvider } from "@/lib/ai/registry";
 import {
@@ -9,6 +11,7 @@ import {
   getUserProviderConfigs,
   saveUserAiSettings,
 } from "@/lib/ai/user-settings";
+import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
 
 type Result = { ok: boolean; message: string };
@@ -38,6 +41,29 @@ export async function saveAiSettingsAction(input: AiSettingsInput): Promise<Resu
       error: error instanceof Error ? error.message : "unknown",
     });
     return { ok: false, message: "Couldn't save your settings. Please try again." };
+  }
+}
+
+/** Toggle Kai's auto-prep — auto-draft the full doc packet when engaging a job. */
+export async function setAutoPrepAction(enabled: boolean): Promise<Result> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  try {
+    await createProfilesRepository(getDatabase()).setAutoPrep(user.id, enabled);
+    revalidatePath("/dashboard/settings");
+    return {
+      ok: true,
+      message: enabled
+        ? "Auto-prep on — Kai will draft your packet when you open a role."
+        : "Auto-prep off — you'll draft documents manually.",
+    };
+  } catch (error) {
+    logger.error("settings.set_auto_prep_failed", {
+      userId: user.id,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return { ok: false, message: "Couldn't update auto-prep. Please try again." };
   }
 }
 

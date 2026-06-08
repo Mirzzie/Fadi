@@ -33,6 +33,21 @@ const TEMPLATES: Record<ResumeTemplate, TemplateStyle> = {
     name: "text-lg font-bold tracking-tight",
     sectionHeader: "mb-0.5 border-b border-zinc-300 pb-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-600",
   },
+  // Maximally ATS-safe: single column, left-aligned, black text, no accent
+  // colour, plain rules — the layout parsers read most reliably.
+  ats: {
+    root: "space-y-3.5",
+    header: "text-left",
+    name: "text-2xl font-bold tracking-tight text-zinc-900",
+    sectionHeader: "mb-1 border-b border-zinc-400 pb-0.5 text-[11px] font-bold uppercase tracking-[0.12em] text-zinc-900",
+  },
+  // Refined serif, centered — still single column and ATS-safe.
+  executive: {
+    root: "space-y-4 font-serif",
+    header: "text-center border-b-2 border-zinc-800 pb-2",
+    name: "text-2xl font-bold tracking-wide text-zinc-900",
+    sectionHeader: "mb-1.5 text-[12px] font-bold uppercase tracking-[0.15em] text-zinc-800",
+  },
 };
 
 /** Pure render of a resume — shared by the editor's live preview and the

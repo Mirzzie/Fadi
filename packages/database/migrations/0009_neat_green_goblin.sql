@@ -1,0 +1,1 @@
+ALTER TABLE "profiles" ADD COLUMN "auto_prep_enabled" boolean DEFAULT false NOT NULL;

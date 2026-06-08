@@ -11,6 +11,12 @@ import {
 } from "@careeros/database";
 
 import { getDatabase } from "@/lib/database/client";
+import {
+  HUMANIZE_CORE,
+  HUMANIZE_PROSE,
+  HUMANIZE_RESUME,
+  stripAiTells,
+} from "@/lib/documents/humanize";
 import { serializeResume, type ResumeData } from "@/lib/documents/resume";
 import { resumeGenerationSchema, toResumeData } from "@/lib/documents/resume-schema";
 import type { DocKind } from "@/lib/jobs/application-types";
@@ -29,14 +35,6 @@ const KIND_LABEL: Record<string, string> = {
   email: "cold outreach email",
   value_proposition: "value proposition",
 };
-
-/** Shared "write like a real person, not an AI" rules — injected into every draft. */
-const HUMANIZE_GUIDE = `Write like a real, thoughtful person — not an AI. Non-negotiable:
-- NO AI clichés or buzzwords: never use "leverage", "spearheaded", "passionate", "results-driven", "dynamic", "seasoned", "proven track record", "synergy", "deep dive", "fast-paced", "I am excited to", "wealth of experience", "honed".
-- Vary sentence length and openings — don't start every line the same way or with "-ing" verbs. Mix short and longer sentences so it reads naturally.
-- Be concrete: real tools, numbers and outcomes from the candidate's actual experience. Cut vague filler.
-- Plain, confident, human voice. Active verbs. No em-dash overuse, no semicolon stacking, no emoji, no exclamation marks.
-- Mirror the job description's real terminology ONLY where the candidate genuinely has that experience. Never claim a skill they don't have.`;
 
 export type GeneratedDoc = { id: string; kind: string; title: string };
 
@@ -97,7 +95,9 @@ export async function generateCareerDocument(
 - Show impact with the real numbers/tools already in their resume.
 CRITICAL: use ONLY real experience, education, skills and projects from the provided material. Never invent employers, dates, degrees, or achievements. If a section is thin, keep it short rather than fabricating.
 
-${HUMANIZE_GUIDE}`;
+${HUMANIZE_CORE}
+
+${HUMANIZE_RESUME}`;
     const gen = await generate.structured(system, candidateContext, resumeGenerationSchema, "resume");
     const personal: ResumeData["personal"] = {
       name: profile?.fullName ?? "",
@@ -120,8 +120,14 @@ ${HUMANIZE_GUIDE}`;
   const label = KIND_LABEL[opts.kind] ?? "document";
   const system = `You are Kai, an expert career writer. Write a concise, specific, honest ${label} for the target role${jobDescription ? ", tailored to the provided job description" : ""}. Ground every claim in the candidate's REAL experience — never invent. Return plain text ready to use.
 
-${HUMANIZE_GUIDE}`;
-  const text = await generate.text(system, candidateContext);
+${HUMANIZE_CORE}
+
+${HUMANIZE_PROSE}`;
+  // Draft, then run the deterministic AI-tell safety net (strips any banned
+  // clichés the model leaked past the prompt) before saving.
+  const draft = await generate.text(system, candidateContext);
+  const text = await stripAiTells(draft, (s, u) => generate.text(s, u));
+
   const doc = await docsRepo.createForUser(userId, {
     ...link,
     kind: opts.kind,

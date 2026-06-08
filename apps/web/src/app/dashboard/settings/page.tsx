@@ -2,10 +2,14 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Cpu } from "lucide-react";
 
+import { createProfilesRepository } from "@careeros/database";
+
 import { AppShell } from "@/components/layout/app-shell";
 import { AiProviderForm } from "@/components/settings/ai-provider-form";
+import { AutoPrepToggle } from "@/components/settings/auto-prep-toggle";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getUserAiSettingsView } from "@/lib/ai/user-settings";
+import { getDatabase } from "@/lib/database/client";
 import { PROVIDER_DESCRIPTORS } from "@/lib/ai/providers/types";
 
 export const metadata: Metadata = { title: "Settings" };
@@ -16,6 +20,7 @@ export default async function SettingsPage() {
   if (!user) redirect("/auth/sign-in");
 
   const settings = await getUserAiSettingsView(user.id);
+  const profile = await createProfilesRepository(getDatabase()).getByUserId(user.id);
 
   return (
     <AppShell>
@@ -46,6 +51,8 @@ export default async function SettingsPage() {
         </section>
 
         <AiProviderForm descriptors={PROVIDER_DESCRIPTORS} initial={settings} />
+
+        <AutoPrepToggle initial={profile?.autoPrepEnabled ?? false} />
       </div>
     </AppShell>
   );

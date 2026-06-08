@@ -22,3 +22,27 @@ export const onboardingFormSchema = z.object({
 });
 
 export type OnboardingFormValues = z.infer<typeof onboardingFormSchema>;
+
+/**
+ * Lenient server-side completion schema. Onboarding only needs the five
+ * essentials to bootstrap a career track; resume + LinkedIn are optional
+ * enrichments the OS collects afterward (see the OS guidance layer). The
+ * Kai-led conversation can't reliably extract a pasted CV/LinkedIn, and the
+ * strict form schema blocking on them stranded new users on "Setting things
+ * up…". The manual form still enforces `onboardingFormSchema` client-side, so
+ * this only loosens the conversational path.
+ */
+export const onboardingEssentialsSchema = z.object({
+  fullName: z.string().trim().min(2, "I just need a name to call you."),
+  targetRole: z.string().trim().min(2, "Tell me the role or field you're aiming for."),
+  locationPreference: z
+    .string()
+    .trim()
+    .min(2, "A city, country, or 'remote' is enough."),
+  experienceLevel: z.enum(experienceLevelOptions, {
+    message: "Roughly how much experience do you have?",
+  }),
+  careerGoals: z.string().trim().min(2, "What do you want from this move?"),
+  linkedInProfile: z.string().trim().optional().default(""),
+  resumeText: z.string().trim().optional().default(""),
+});
