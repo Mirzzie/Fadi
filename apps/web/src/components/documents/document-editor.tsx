@@ -7,8 +7,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AiTellCheck } from "@/components/documents/ai-tell-check";
 import { DocAdvisor } from "@/components/documents/doc-advisor";
+import { DocTemplatePicker } from "@/components/documents/doc-template-picker";
 import { updateDocumentAction } from "@/app/dashboard/documents/actions";
 import type { DocKind } from "@/lib/jobs/application-types";
+import type { DocTemplate } from "@/lib/documents/doc-templates";
 
 const KIND_LABELS: Record<string, string> = {
   resume: "Resume",
@@ -70,6 +72,10 @@ export function DocumentEditor({
   function exportDocx() {
     window.open(`/api/documents/${id}/docx`, "_blank");
   }
+  function applyTemplate(t: DocTemplate) {
+    if (content.trim() && !window.confirm("Replace the current content with this template?")) return;
+    onChange({ content: t.content });
+  }
 
   return (
     <div className="mx-auto flex h-[calc(100vh-7rem)] max-w-3xl flex-col gap-3">
@@ -101,6 +107,7 @@ export function DocumentEditor({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          <DocTemplatePicker kind={kind as DocKind} onPick={applyTemplate} />
           <Button variant="outline" size="sm" onClick={exportDocx}>
             <Download className="size-4" aria-hidden="true" />
             DOCX
