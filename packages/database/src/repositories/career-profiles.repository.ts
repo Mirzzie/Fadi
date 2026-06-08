@@ -167,5 +167,13 @@ export function createCareerProfilesRepository(db: Database) {
 
       return updated;
     },
+
+    /** Store the Kai-generated role synonyms for a specific track. */
+    async setRoleSynonyms(id: string, roleSynonyms: string[]): Promise<void> {
+      await db
+        .update(careerProfiles)
+        .set({ roleSynonyms, updatedAt: new Date() })
+        .where(eq(careerProfiles.id, id));
+    },
   };
 }

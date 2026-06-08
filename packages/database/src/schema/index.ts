@@ -181,6 +181,12 @@ export const careerProfiles = pgTable(
     intent: text("intent").notNull().default("career"),
     /** For exploration tracks: several target roles to cast a wide net (fresher "any entry role"). */
     roleCluster: jsonb("role_cluster").$type<string[]>(),
+    /**
+     * Kai-generated equivalent job-title phrases for THIS track's role(s), used
+     * to match title variants — domain-agnostic (works for nursing, finance,
+     * trades, tech alike), replacing the old hardcoded IT-only synonym map.
+     */
+    roleSynonyms: jsonb("role_synonyms").$type<string[]>(),
     /** The one track currently driving jobs/report/documents/Kai for this user. */
     isActive: boolean("is_active").notNull().default(false),
     ...timestamps,

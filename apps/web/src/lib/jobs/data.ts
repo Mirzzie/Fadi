@@ -7,8 +7,10 @@ import {
 } from "@careeros/database";
 
 import { getDatabase } from "@/lib/database/client";
+import { getUserDocGenerate } from "@/lib/ai/user-generate";
 import { ensureFreshLiveJobs } from "@/lib/jobs/sync";
 import { scoreJobForUser } from "@/lib/jobs/job-matching";
+import { expandRoleSynonyms } from "@/lib/jobs/role-synonyms";
 import { passesFilters, type JobFilters } from "@/lib/jobs/filters";
 import { getCountry } from "@/lib/jobs/locations";
 import type { ApplicationStatus, RecommendedJob } from "@/lib/jobs/types";
@@ -33,6 +35,30 @@ export async function getRecommendedJobsForUser(
     careerProfilesRepository.getActiveForUser(userId),
     resumesRepository.getLatestForUser(userId),
   ]);
+
+  // First time we score this track, have Kai generate domain-agnostic role
+  // synonyms (nurse → "staff nurse", "rn"; finance → "fp&a analyst") and store
+  // them, so title-variant matching is as good for any field as it is for tech.
+  // Best-effort + one-time (cached on the track); no AI provider → skip and fall
+  // back to the token/phrase path (still unbiased).
+  if (
+    careerProfile?.targetRole &&
+    (!careerProfile.roleSynonyms || careerProfile.roleSynonyms.length === 0)
+  ) {
+    try {
+      const generate = await getUserDocGenerate(userId);
+      if (generate) {
+        const roles = [careerProfile.targetRole, ...(careerProfile.roleCluster ?? [])];
+        const synonyms = await expandRoleSynonyms(roles, generate);
+        if (synonyms.length > 0) {
+          await careerProfilesRepository.setRoleSynonyms(careerProfile.id, synonyms);
+          careerProfile.roleSynonyms = synonyms; // use them for this request too
+        }
+      }
+    } catch {
+      // best-effort — matching falls back to tokens + whole-role phrases
+    }
+  }
 
   // Pull fresh live postings (Remotive, Arbeitnow, …) into the jobs table,
   // personalized to the user's target role, before we read+score. TTL-guarded,

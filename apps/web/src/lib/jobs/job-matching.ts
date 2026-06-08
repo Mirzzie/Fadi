@@ -70,70 +70,46 @@ function distinctiveTokens(value: string | null | undefined) {
   return tokenize(value).filter((token) => !genericRoleWords.has(token));
 }
 
-// Role-family synonyms: a distinctive token → the phrases that mean the same
-// KIND of role in a job title. Lets "IT Support" match "Service Desk", "Help
-// Desk", "Technician" — and, crucially, lets us tell an on-role job from an
-// off-role one (an IT-support seeker shouldn't see "Materials Engineer").
-const ROLE_SYNONYMS: Record<string, string[]> = {
-  support: [
-    "support", "helpdesk", "help desk", "service desk", "technician", "desktop", "deskside",
-    "field service", "end user", "endpoint", "it support", "technical support", "service delivery",
-    "1st line", "2nd line", "first line", "second line", "it technician",
-  ],
-  helpdesk: ["helpdesk", "help desk", "service desk", "support", "technician", "1st line", "2nd line"],
-  operations: [
-    "operations", "ops", "sysadmin", "system administrator", "systems administrator",
-    "infrastructure", "devops", "systems engineer", "infrastructure engineer", "platform engineer",
-  ],
-  ops: ["operations", "ops", "devops", "sysadmin", "infrastructure"],
-  security: [
-    "security", "soc", "cyber", "infosec", "information security", "security analyst",
-    "security operations", "incident response", "threat", "siem",
-  ],
-  soc: ["soc", "security operations", "security analyst", "cyber", "incident", "threat", "siem"],
-  network: ["network", "networking", "noc", "network engineer", "network administrator"],
-  developer: ["developer", "software engineer", "programmer", "software"],
-  software: ["software", "developer", "engineer", "programmer"],
-  data: ["data", "analytics", "data analyst", "data engineer"],
-  cloud: ["cloud", "aws", "azure", "gcp", "infrastructure"],
-  devops: ["devops", "sre", "platform", "infrastructure", "operations"],
-  product: ["product manager", "product owner", "product"],
-  design: ["design", "designer", "ux", "ui"],
-  marketing: ["marketing", "growth", "seo", "content"],
-  sales: ["sales", "account executive", "business development"],
-};
-
 /**
  * The set of role-family phrases that signal a relevant title for this user —
- * DOMAIN-AGNOSTIC. It works for any field, not just tech:
- *  - distinctive tokens from the role(s) + goal, expanded via ROLE_SYNONYMS where
- *    a synonym set exists (IT ladders), else used as-is;
+ * genuinely DOMAIN-AGNOSTIC, with no field privileged over another:
+ *  - distinctive tokens from the role(s) + goal, used as-is;
  *  - the whole normalized role phrase ("financial analyst", "registered nurse"),
- *    so non-tech roles match directly without needing a hand-written synonym list;
- *  - every role in an exploration track's `roleCluster`, so a fresher casting a
- *    wide net ("IT Support, SOC Analyst, Junior Security Eng") matches all of them.
+ *    so any role matches directly;
+ *  - every role in an exploration track's `roleCluster` (the user's own related
+ *    titles, in any field);
+ *  - `roleSynonyms` — equivalent title phrases Kai generated for THIS track's
+ *    field (e.g. nurse → "staff nurse", "rn"; finance → "fp&a analyst"). This
+ *    replaces the old hardcoded IT-only map, so a nurse or accountant gets the
+ *    same quality of title-variant matching an IT seeker does. When no synonyms
+ *    have been generated yet (e.g. no AI provider), every field falls back to
+ *    the token + phrase path equally — still no bias.
  */
 function roleFamilyTerms(
   targetRole: string | null,
   careerGoal: string | null,
   roleCluster?: string[] | null,
+  roleSynonyms?: string[] | null,
 ): string[] {
   const roles = [targetRole, ...(roleCluster ?? [])].filter(Boolean) as string[];
-  const tokens = new Set<string>();
-  for (const r of roles) distinctiveTokens(r).forEach((t) => tokens.add(t));
-  distinctiveTokens(careerGoal).forEach((t) => tokens.add(t));
-
   const terms = new Set<string>();
-  for (const token of tokens) {
-    const synonyms = ROLE_SYNONYMS[token];
-    if (synonyms) synonyms.forEach((s) => terms.add(s));
-    else terms.add(token);
-  }
+
+  // Distinctive tokens from the user's role(s) + goal — any field.
+  for (const r of roles) distinctiveTokens(r).forEach((t) => terms.add(t));
+  distinctiveTokens(careerGoal).forEach((t) => terms.add(t));
+
   // Whole-role phrases — the domain-general path (finance, healthcare, trades…).
   for (const r of roles) {
     const phrase = normalize(r).replace(/[^a-z0-9+#. ]/g, " ").replace(/\s+/g, " ").trim();
     if (phrase.length >= 4) terms.add(phrase);
   }
+
+  // Kai-generated equivalents for this track's field (domain-agnostic).
+  for (const s of roleSynonyms ?? []) {
+    const phrase = normalize(s).trim();
+    if (phrase.length >= 2) terms.add(phrase);
+  }
+
   return [...terms];
 }
 
@@ -142,9 +118,10 @@ function roleScore(
   targetRole: string | null,
   careerGoal: string | null,
   roleCluster: string[] | null,
+  roleSynonyms: string[] | null,
   jobTitle: string,
 ): { score: number; onRole: boolean } {
-  const terms = roleFamilyTerms(targetRole, careerGoal, roleCluster);
+  const terms = roleFamilyTerms(targetRole, careerGoal, roleCluster, roleSynonyms);
   const title = normalize(jobTitle);
   if (terms.length === 0) return { score: 8, onRole: true }; // no profile signal → don't penalise
 
@@ -253,6 +230,7 @@ export function scoreJobForUser({
     careerProfile?.targetRole ?? null,
     careerProfile?.careerGoal ?? null,
     careerProfile?.roleCluster ?? null,
+    careerProfile?.roleSynonyms ?? null,
     job.title,
   );
   // Low floor: an unrelated role should score low, not inherit a generous base.
