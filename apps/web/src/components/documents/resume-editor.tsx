@@ -1,14 +1,19 @@
 "use client";
 
-import { ArrowLeft, ChevronDown, ChevronUp, Check, Download, Loader2, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, BookmarkPlus, ChevronDown, ChevronUp, Check, Download, Loader2, Plus, Trash2, X } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { AiTellCheck } from "@/components/documents/ai-tell-check";
 import { ResumeAdvisor } from "@/components/documents/resume-advisor";
 import { ResumePreview } from "@/components/documents/resume-preview";
-import { updateDocumentAction } from "@/app/dashboard/documents/actions";
+import {
+  deleteResumeTemplateAction,
+  saveResumeTemplateAction,
+  updateDocumentAction,
+} from "@/app/dashboard/documents/actions";
 import {
   newId,
   parseResume,
@@ -44,13 +49,16 @@ export function ResumeEditor({
   initialContent,
   initialTemplate,
   experienceLevel,
+  customTemplates = [],
 }: {
   id: string;
   initialTitle: string;
   initialContent: string;
   initialTemplate?: string | null;
   experienceLevel?: string | null;
+  customTemplates?: { id: string; name: string; config: Record<string, unknown> }[];
 }) {
+  const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
   const [data, setData] = useState<ResumeData>(() => parseResume(initialContent));
   const [template, setTemplate] = useState<ResumeTemplate>(
@@ -91,6 +99,46 @@ export function ResumeEditor({
     if (i < 0 || j < 0 || j >= order.length) return;
     [order[i], order[j]] = [order[j], order[i]];
     patch({ order });
+  }
+
+  // ── Custom (user-saved) templates: apply / save / delete ──
+  const [templateName, setTemplateName] = useState<string | null>(null); // non-null = naming
+  const [tplBusy, setTplBusy] = useState(false);
+
+  function applyCustomTemplate(config: Record<string, unknown>) {
+    dirty.current = true;
+    setStatus("idle");
+    if (typeof config.baseTemplate === "string") setTemplate(config.baseTemplate as ResumeTemplate);
+    setData((d) => ({
+      ...d,
+      font: (config.font as ResumeFontId | undefined) ?? undefined,
+      fontSize: (config.fontSize as ResumeFontSizeId | undefined) ?? undefined,
+      order: Array.isArray(config.order) ? (config.order as ResumeSectionKey[]) : d.order,
+    }));
+  }
+
+  async function saveCurrentAsTemplate() {
+    const name = (templateName ?? "").trim();
+    if (!name) return;
+    setTplBusy(true);
+    const res = await saveResumeTemplateAction(name, {
+      baseTemplate: template,
+      font: data.font,
+      fontSize: data.fontSize,
+      order: data.order,
+    });
+    setTplBusy(false);
+    if (res.ok) {
+      setTemplateName(null);
+      router.refresh(); // reload the saved-templates list
+    }
+  }
+
+  async function removeTemplate(tid: string) {
+    setTplBusy(true);
+    await deleteResumeTemplateAction(tid);
+    setTplBusy(false);
+    router.refresh();
   }
 
   // Scan the prose-heavy fields (summary, bullets, project descriptions) for AI
@@ -264,6 +312,15 @@ export function ResumeEditor({
               </option>
             ))}
           </select>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setTemplateName((n) => (n === null ? "" : null))}
+            title="Save the current template + font + size + section order as a reusable template"
+          >
+            <BookmarkPlus className="size-4" aria-hidden="true" />
+            Save style
+          </Button>
           <Button variant="outline" size="sm" onClick={exportDocx}>
             <Download className="size-4" aria-hidden="true" />
             DOCX
@@ -281,6 +338,60 @@ export function ResumeEditor({
           </Button>
         </div>
       </div>
+
+      {/* Save-as-template: name input when saving, plus apply/delete for saved styles */}
+      {templateName !== null ? (
+        <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+          <input
+            autoFocus
+            value={templateName}
+            onChange={(e) => setTemplateName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") saveCurrentAsTemplate();
+              if (e.key === "Escape") setTemplateName(null);
+            }}
+            placeholder="Name this template (e.g. My clean serif)"
+            className="h-8 flex-1 rounded-md border border-border bg-background px-2.5 text-sm outline-none focus:border-primary/40"
+          />
+          <Button size="sm" disabled={tplBusy || !templateName.trim()} onClick={saveCurrentAsTemplate}>
+            {tplBusy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
+            Save template
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setTemplateName(null)}>
+            Cancel
+          </Button>
+        </div>
+      ) : null}
+
+      {customTemplates.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs">
+          <span className="mr-1 text-muted-foreground">My templates:</span>
+          {customTemplates.map((t) => (
+            <span
+              key={t.id}
+              className="inline-flex items-center gap-1 rounded-full border border-border/70 bg-card py-0.5 pl-2.5 pr-1"
+            >
+              <button
+                type="button"
+                onClick={() => applyCustomTemplate(t.config)}
+                className="font-medium hover:text-primary"
+                title="Apply this saved style"
+              >
+                {t.name}
+              </button>
+              <button
+                type="button"
+                onClick={() => removeTemplate(t.id)}
+                disabled={tplBusy}
+                aria-label={`Delete ${t.name}`}
+                className="grid size-4 place-items-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+              >
+                <X className="size-3" aria-hidden="true" />
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
 
       {/* Recruiter-backed formatting guidance (font/size/length) */}
       <ResumeAdvisor experienceLevel={experienceLevel} />

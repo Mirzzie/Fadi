@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
-import { createDocumentsRepository, type DocumentKind } from "@careeros/database";
+import {
+  createDocumentsRepository,
+  createResumeTemplatesRepository,
+  type DocumentKind,
+} from "@careeros/database";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getUserDocGenerate } from "@/lib/ai/user-generate";
 import { getDatabase } from "@/lib/database/client";
@@ -186,6 +190,42 @@ export async function updateDocumentAction(input: {
     });
     return { ok: false, message: "Couldn't save the document." };
   }
+}
+
+/** Save the current resume's styling (template + font + size + section order) as a reusable template. */
+export async function saveResumeTemplateAction(
+  name: string,
+  config: Record<string, unknown>,
+): Promise<Result> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  const trimmed = name.trim();
+  if (trimmed.length < 1) return { ok: false, message: "Give the template a name." };
+  if (trimmed.length > 60) return { ok: false, message: "Template name is too long." };
+
+  try {
+    const row = await createResumeTemplatesRepository(getDatabase()).createForUser(user.id, {
+      name: trimmed,
+      config,
+    });
+    revalidatePath("/dashboard/documents/[id]", "page");
+    return { ok: true, message: "Template saved.", id: row.id };
+  } catch (error) {
+    logger.error("documents.save_template_failed", {
+      userId: user.id,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return { ok: false, message: "Couldn't save the template." };
+  }
+}
+
+export async function deleteResumeTemplateAction(id: string): Promise<Result> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  const removed = await createResumeTemplatesRepository(getDatabase()).deleteForUser(user.id, id);
+  revalidatePath("/dashboard/documents/[id]", "page");
+  return removed ? { ok: true, message: "Template removed." } : { ok: false, message: "Not found." };
 }
 
 export async function deleteDocumentAction(id: string): Promise<Result> {

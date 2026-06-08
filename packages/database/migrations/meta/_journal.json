@@ -71,6 +71,13 @@
       "when": 1780855071710,
       "tag": "0009_neat_green_goblin",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1780946957898,
+      "tag": "0010_naive_kang",
+      "breakpoints": true
     }
   ]
 }

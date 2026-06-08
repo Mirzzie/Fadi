@@ -6,7 +6,11 @@ import { DocumentEditor } from "@/components/documents/document-editor";
 import { ResumeEditor } from "@/components/documents/resume-editor";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
-import { createCareerProfilesRepository, createDocumentsRepository } from "@careeros/database";
+import {
+  createCareerProfilesRepository,
+  createDocumentsRepository,
+  createResumeTemplatesRepository,
+} from "@careeros/database";
 
 export const metadata: Metadata = { title: "Edit document" };
 export const dynamic = "force-dynamic";
@@ -24,9 +28,14 @@ export default async function DocumentEditorPage({
   const doc = await createDocumentsRepository(db).getForUser(user.id, id);
   if (!doc) notFound();
 
-  // For resumes, the recruiter advisor tailors its length tip to real experience.
-  const careerProfile =
-    doc.kind === "resume" ? await createCareerProfilesRepository(db).getActiveForUser(user.id) : null;
+  // For resumes: tailor the advisor to real experience + load the user's saved templates.
+  const [careerProfile, savedTemplates] =
+    doc.kind === "resume"
+      ? await Promise.all([
+          createCareerProfilesRepository(db).getActiveForUser(user.id),
+          createResumeTemplatesRepository(db).listForUser(user.id),
+        ])
+      : [null, []];
 
   return (
     <AppShell>
@@ -37,6 +46,11 @@ export default async function DocumentEditorPage({
           initialContent={doc.content}
           initialTemplate={doc.template}
           experienceLevel={careerProfile?.experienceLevel ?? null}
+          customTemplates={savedTemplates.map((t) => ({
+            id: t.id,
+            name: t.name,
+            config: t.config,
+          }))}
         />
       ) : (
         <DocumentEditor

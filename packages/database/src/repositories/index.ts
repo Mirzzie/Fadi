@@ -7,6 +7,7 @@ export * from "./jobs.repository";
 export * from "./linkedin-profiles.repository";
 export * from "./profiles.repository";
 export * from "./resilience.repository";
+export * from "./resume-templates.repository";
 export * from "./resumes.repository";
 export * from "./saved-jobs.repository";
 export * from "./user-ai-settings.repository";

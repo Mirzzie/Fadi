@@ -566,6 +566,22 @@ export const documents = pgTable(
   ]
 );
 
+// User-saved resume style presets (base template + font + size + section order),
+// reusable across their resumes — "save my styling as a template".
+export const resumeTemplates = pgTable(
+  "resume_templates",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    config: jsonb("config").$type<Record<string, unknown>>().notNull().default({}),
+    ...timestamps,
+  },
+  (table) => [index("resume_templates_user_id_idx").on(table.userId)]
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type AuthIdentity = typeof authIdentities.$inferSelect;
@@ -589,3 +605,4 @@ export type NewUserAiSettings = typeof userAiSettings.$inferInsert;
 export type AgentMessage = typeof agentMessages.$inferSelect;
 export type Document = typeof documents.$inferSelect;
 export type NewDocument = typeof documents.$inferInsert;
+export type ResumeTemplateRow = typeof resumeTemplates.$inferSelect;
