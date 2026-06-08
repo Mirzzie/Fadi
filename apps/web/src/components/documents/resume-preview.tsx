@@ -1,6 +1,8 @@
 import { cn } from "@/lib/utils";
 import {
   DEFAULT_SECTION_ORDER,
+  resolveResumeFont,
+  resolveResumeFontSize,
   type ResumeData,
   type ResumeSectionKey,
   type ResumeTemplate,
@@ -64,6 +66,14 @@ export function ResumePreview({
     .filter(Boolean)
     .join("  ·  ");
   const order = data.order?.length ? data.order : DEFAULT_SECTION_ORDER;
+
+  // Optional font/size overrides — when unset, the template's defaults apply.
+  const fontDef = resolveResumeFont(data.font);
+  const sizeDef = resolveResumeFontSize(data.fontSize);
+  const rootStyle: React.CSSProperties = {
+    ...(fontDef ? { fontFamily: fontDef.cssStack } : {}),
+    ...(sizeDef ? { fontSize: `${sizeDef.previewPx}px` } : {}),
+  };
 
   function Section({ title, children }: { title: string; children: React.ReactNode }) {
     return (
@@ -149,7 +159,7 @@ export function ResumePreview({
   }
 
   return (
-    <div className={t.root}>
+    <div className={t.root} style={rootStyle}>
       <header className={t.header}>
         <h1 className={t.name}>{data.personal.name || "Your Name"}</h1>
         {data.personal.headline ? <p className="text-sm text-zinc-600">{data.personal.headline}</p> : null}

@@ -6,16 +6,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { AiTellCheck } from "@/components/documents/ai-tell-check";
+import { ResumeAdvisor } from "@/components/documents/resume-advisor";
 import { ResumePreview } from "@/components/documents/resume-preview";
 import { updateDocumentAction } from "@/app/dashboard/documents/actions";
 import {
   newId,
   parseResume,
+  RESUME_FONTS,
+  RESUME_FONT_SIZES,
   RESUME_TEMPLATES,
   serializeResume,
   type ResumeData,
   type ResumeEducation,
   type ResumeExperience,
+  type ResumeFontId,
+  type ResumeFontSizeId,
   type ResumeProject,
   type ResumeSectionKey,
   type ResumeTemplate,
@@ -38,11 +43,13 @@ export function ResumeEditor({
   initialTitle,
   initialContent,
   initialTemplate,
+  experienceLevel,
 }: {
   id: string;
   initialTitle: string;
   initialContent: string;
   initialTemplate?: string | null;
+  experienceLevel?: string | null;
 }) {
   const [title, setTitle] = useState(initialTitle);
   const [data, setData] = useState<ResumeData>(() => parseResume(initialContent));
@@ -229,6 +236,34 @@ export function ResumeEditor({
               </option>
             ))}
           </select>
+          <select
+            value={data.font ?? ""}
+            onChange={(e) => patch({ font: (e.target.value || undefined) as ResumeFontId | undefined })}
+            aria-label="Resume font"
+            title="Font (ATS-safe options)"
+            className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-primary/40"
+          >
+            <option value="">Font: default</option>
+            {RESUME_FONTS.map((f) => (
+              <option key={f.id} value={f.id}>
+                {f.label}
+              </option>
+            ))}
+          </select>
+          <select
+            value={data.fontSize ?? ""}
+            onChange={(e) => patch({ fontSize: (e.target.value || undefined) as ResumeFontSizeId | undefined })}
+            aria-label="Resume text size"
+            title="Body text size"
+            className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-primary/40"
+          >
+            <option value="">Size: default</option>
+            {RESUME_FONT_SIZES.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.label}
+              </option>
+            ))}
+          </select>
           <Button variant="outline" size="sm" onClick={exportDocx}>
             <Download className="size-4" aria-hidden="true" />
             DOCX
@@ -246,6 +281,9 @@ export function ResumeEditor({
           </Button>
         </div>
       </div>
+
+      {/* Recruiter-backed formatting guidance (font/size/length) */}
+      <ResumeAdvisor experienceLevel={experienceLevel} />
 
       {/* Honest reads-human check across the resume's prose */}
       <AiTellCheck text={proseText} />

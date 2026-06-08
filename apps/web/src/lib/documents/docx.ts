@@ -13,6 +13,8 @@ import {
 import {
   DEFAULT_SECTION_ORDER,
   parseResume,
+  resolveResumeFont,
+  resolveResumeFontSize,
   type ResumeData,
   type ResumeSectionKey,
   type ResumeTemplate,
@@ -173,16 +175,25 @@ export async function documentToDocx(doc: {
 }): Promise<Buffer> {
   const style = DOCX_TEMPLATES[(doc.template as ResumeTemplate) || "classic"] ?? DOCX_TEMPLATES.classic;
 
-  const children =
-    doc.kind === "resume"
-      ? resumeParagraphs(parseResume(doc.content), style)
-      : [
-          new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ text: doc.title, bold: true })] }),
-          ...doc.content.split("\n").map((line) => new Paragraph({ text: line })),
-        ];
+  let bodyFont = style.bodyFont;
+  let bodySize = 21; // half-points (~10.5pt) default
+  let children;
+
+  if (doc.kind === "resume") {
+    const data = parseResume(doc.content);
+    // User font/size overrides win over the template defaults.
+    bodyFont = resolveResumeFont(data.font)?.docxName ?? style.bodyFont;
+    bodySize = resolveResumeFontSize(data.fontSize)?.docxHalfPt ?? 21;
+    children = resumeParagraphs(data, style);
+  } else {
+    children = [
+      new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ text: doc.title, bold: true })] }),
+      ...doc.content.split("\n").map((line) => new Paragraph({ text: line })),
+    ];
+  }
 
   const document = new Document({
-    styles: { default: { document: { run: { font: style.bodyFont, size: 21 } } } },
+    styles: { default: { document: { run: { font: bodyFont, size: bodySize } } } },
     sections: [{ children }],
   });
   return Packer.toBuffer(document);
