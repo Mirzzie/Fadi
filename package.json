@@ -10,6 +10,7 @@
   "scripts": {
     "dev": "npm --workspace @careeros/web run dev",
     "build": "npm --workspace @careeros/web run build",
+    "test": "npm --workspace @careeros/web run test",
     "db:down": "docker compose -f infrastructure/docker/docker-compose.yml down",
     "db:generate": "npm --workspace @careeros/database run db:generate",
     "db:migrate": "npm --workspace @careeros/database run db:migrate",
