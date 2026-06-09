@@ -119,14 +119,26 @@ export async function onboardingChatAction(
     return { ok: false, error: "provider", message: "Kai's AI is unavailable right now." };
   }
 
-  // Guard against weak models that declare "complete" too early and fabricate
-  // fields — you genuinely can't gather all seven in a couple of turns.
+  // Don't depend on the model flipping `complete` — some models never do, which
+  // used to strand users in the chat. Once the FIVE essentials are actually
+  // gathered, we finish regardless: the model can declare complete, OR we
+  // force-complete after enough turns. The userTurns floor still guards against
+  // weak models that fabricate everything in the first reply.
+  const c = turn.collected;
+  const essentialsReady = Boolean(
+    c.fullName?.trim() &&
+      c.targetRole?.trim() &&
+      c.locationPreference?.trim() &&
+      c.experienceLevel?.trim() &&
+      c.careerGoals?.trim(),
+  );
   const userTurns = history.filter((m) => m.role === "user").length;
-  if (!turn.complete || userTurns < 4) {
+  const shouldComplete = essentialsReady && (turn.complete || userTurns >= 6);
+  if (userTurns < 4 || !shouldComplete) {
     return { ok: true, reply: turn.reply, collected: turn.collected, done: false };
   }
 
-  // Model says it has everything — validate + persist via the real onboarding path.
+  // Validate + persist via the real onboarding path.
   const values: OnboardingFormValues = {
     fullName: turn.collected.fullName ?? "",
     targetRole: turn.collected.targetRole ?? "",
@@ -148,10 +160,16 @@ export async function onboardingChatAction(
     };
   }
 
-  logger.info("onboarding.chat.completed", { userId: user.id });
+  logger.info("onboarding.chat.completed", { userId: user.id, forced: !turn.complete });
+  // If we force-completed, the model's reply is probably still a question —
+  // replace it with a proper closing line so the handoff reads right.
+  const firstName = (values.fullName.split(/\s+/)[0] ?? "").trim();
+  const closing = turn.complete
+    ? turn.reply
+    : `That's everything I need${firstName ? `, ${firstName}` : ""} — setting up your Career OS now.`;
   return {
     ok: true,
-    reply: turn.reply,
+    reply: closing,
     collected: turn.collected,
     done: true,
     redirectTo: saved.redirectTo ?? "/dashboard",
