@@ -40,7 +40,6 @@ export const COUNTRIES: Country[] = [
 ];
 
 const BY_CODE = new Map(COUNTRIES.map((c) => [c.code, c]));
-const BY_NAME = new Map(COUNTRIES.map((c) => [c.name.toLowerCase(), c]));
 
 // Common cities → their country, so a freeform profile location like "Dublin"
 // or "Dublin, Ireland" still resolves a country for the source layer.

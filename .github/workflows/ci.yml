@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Typecheck + lint gate. These need no database or secrets, so they run
+# reliably on every push/PR. (A full `next build` and Playwright smokes need
+# env + a Postgres service — add behind secrets when ready.)
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Typecheck (database + web)
+        run: npm run typecheck
+      - name: Lint
+        run: npm run lint
