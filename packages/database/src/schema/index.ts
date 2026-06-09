@@ -148,6 +148,10 @@ export const profiles = pgTable(
     // cold email, value proposition) the moment a user engages a job, instead
     // of waiting to be asked. Opt-in — defaults off so we never surprise users.
     autoPrepEnabled: boolean("auto_prep_enabled").notNull().default(false),
+    // BYO-token Notion sync: the user's Notion internal-integration secret
+    // (AES-GCM encrypted) + the target database id they shared with it.
+    notionTokenCiphertext: text("notion_token_ciphertext"),
+    notionDatabaseId: text("notion_database_id"),
     ...timestamps,
   },
   (table) => [

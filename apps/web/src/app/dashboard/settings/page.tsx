@@ -7,6 +7,7 @@ import { createProfilesRepository } from "@careeros/database";
 import { AppShell } from "@/components/layout/app-shell";
 import { AiProviderForm } from "@/components/settings/ai-provider-form";
 import { AutoPrepToggle } from "@/components/settings/auto-prep-toggle";
+import { NotionIntegration } from "@/components/settings/notion-integration";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getUserAiSettingsView } from "@/lib/ai/user-settings";
 import { getDatabase } from "@/lib/database/client";
@@ -53,6 +54,8 @@ export default async function SettingsPage() {
         <AiProviderForm descriptors={PROVIDER_DESCRIPTORS} initial={settings} />
 
         <AutoPrepToggle initial={profile?.autoPrepEnabled ?? false} />
+
+        <NotionIntegration connected={Boolean(profile?.notionDatabaseId)} />
       </div>
     </AppShell>
   );

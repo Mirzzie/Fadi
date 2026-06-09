@@ -70,5 +70,23 @@ export function createProfilesRepository(db: Database) {
 
       return profile ?? null;
     },
+
+    /** Store (or clear) the user's BYO Notion integration credentials. */
+    async setNotionIntegration(
+      userId: string,
+      input: { tokenCiphertext: string | null; databaseId: string | null },
+    ): Promise<Profile | null> {
+      const [profile] = await db
+        .update(profiles)
+        .set({
+          notionTokenCiphertext: input.tokenCiphertext,
+          notionDatabaseId: input.databaseId,
+          updatedAt: new Date(),
+        })
+        .where(eq(profiles.userId, userId))
+        .returning();
+
+      return profile ?? null;
+    },
   };
 }
