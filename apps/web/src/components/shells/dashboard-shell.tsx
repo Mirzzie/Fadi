@@ -286,8 +286,8 @@ function MarketSignalsCard({ signals }: { signals: MarketSignal[] }) {
         <div className="flex-1">
           <CardTitle>Live market signals</CardTitle>
           <CardDescription>
-            Real-time signals (GDELT, Hacker News, Remotive) scored against your target role and
-            skill gaps — a reality check on your report.
+            Signals from live sources (GDELT, Hacker News, Remotive), refreshed regularly and scored
+            against your target role and skill gaps — a reality check on your report.
           </CardDescription>
         </div>
       </CardHeader>
