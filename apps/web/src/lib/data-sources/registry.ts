@@ -3,10 +3,12 @@ import "server-only";
 import { serverEnv } from "@/lib/env.server";
 
 import { AdzunaSource } from "./providers/adzuna";
+import { ApifyLinkedInSource } from "./providers/apify-linkedin";
 import { ArbeitnowSource } from "./providers/arbeitnow";
 import { GdeltSource } from "./providers/gdelt";
 import { HackerNewsSource } from "./providers/hackernews";
 import { JoobleSource } from "./providers/jooble";
+import { JSearchSource } from "./providers/jsearch";
 import { ReedSource } from "./providers/reed";
 import { RemotiveSource } from "./providers/remotive";
 import {
@@ -38,6 +40,9 @@ function buildSources(): DataSourceBase[] {
     new AdzunaSource(serverEnv.ADZUNA_APP_ID, serverEnv.ADZUNA_APP_KEY), // jobs + salary, ~19 countries (NOT Ireland)
     new ReedSource(serverEnv.REED_API_KEY), // jobs + salary, UK + Ireland
     new JoobleSource(serverEnv.JOOBLE_API_KEY), // global aggregator, covers Ireland
+    new JSearchSource(serverEnv.JSEARCH_RAPIDAPI_KEY), // Google for Jobs (LinkedIn/Indeed/etc.), compliant
+    // ── Opt-in scraping: OFF unless APIFY_TOKEN set; operator owns the ToS call ──
+    new ApifyLinkedInSource(serverEnv.APIFY_TOKEN, serverEnv.APIFY_LINKEDIN_ACTOR),
     //   new BlsSource(serverEnv.BLS_API_KEY), new OnetSource(...), etc.
   ];
 }

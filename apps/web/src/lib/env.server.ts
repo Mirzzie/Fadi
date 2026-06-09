@@ -29,6 +29,10 @@ const serverEnvSchema = z.object({
   REED_API_KEY: z.string().optional(), // reed.co.uk — UK + Ireland, salary
   JOOBLE_API_KEY: z.string().optional(), // jooble.org — global aggregator, covers IE
   JSEARCH_RAPIDAPI_KEY: z.string().optional(),
+  // Apify — OPT-IN job scraping (e.g. Curious Coder's LinkedIn Jobs actor).
+  // Off unless a token is set; the operator owns the ToS/legal decision.
+  APIFY_TOKEN: z.string().optional(),
+  APIFY_LINKEDIN_ACTOR: z.string().optional(), // default: curious_coder~linkedin-jobs-scraper
   BLS_API_KEY: z.string().optional(),
   ONET_API_KEY: z.string().optional(),
   FRED_API_KEY: z.string().optional(),
@@ -56,6 +60,8 @@ export const serverEnv = {
     REED_API_KEY: process.env.REED_API_KEY,
     JOOBLE_API_KEY: process.env.JOOBLE_API_KEY,
     JSEARCH_RAPIDAPI_KEY: process.env.JSEARCH_RAPIDAPI_KEY,
+    APIFY_TOKEN: process.env.APIFY_TOKEN,
+    APIFY_LINKEDIN_ACTOR: process.env.APIFY_LINKEDIN_ACTOR,
     BLS_API_KEY: process.env.BLS_API_KEY,
     ONET_API_KEY: process.env.ONET_API_KEY,
     FRED_API_KEY: process.env.FRED_API_KEY,
