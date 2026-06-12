@@ -15,6 +15,7 @@ export type KaiToolView =
   | "document"
   | "application"
   | "labor"
+  | "world_shifts"
   | "none";
 
 export interface KaiToolResult {

@@ -2,6 +2,7 @@ import "server-only";
 
 import type { AIProvider } from "@/lib/ai/providers/types";
 import { discoverJobs } from "@/lib/data-sources/service";
+import { formatShiftsForPrompt, relevantShiftsFor } from "@/lib/intelligence/world-shifts";
 import { getLaborMarketSnapshot } from "@/lib/labor-market/bls";
 import { parseLocation } from "@/lib/jobs/locations";
 import { logger } from "@/lib/observability/logger";
@@ -150,6 +151,14 @@ ${evidenceBlock}
 
 ## Macro labor backdrop (US national, BLS — context only, not niche-specific)
 ${bls.summary || "Not available."}
+
+## Structural global forces (curated + sourced — weigh each niche against these, as positioning not prophecy)
+${formatShiftsForPrompt(
+  relevantShiftsFor(
+    candidates.map((c) => c.anchorRole).join(" "),
+    candidates.map((c) => c.domain).join(" "),
+  ),
+)}
 
 Return: an honest overview of where they stand; one analysis per niche above (SAME names, ordered best-fit first); a real recommendation of which to pursue and why; and a reality check naming what to avoid. For each niche set successProbability honestly (low is fine) and base demand on the live postings count — if a niche returned 0 postings, treat demand as unproven and say so.`,
       },

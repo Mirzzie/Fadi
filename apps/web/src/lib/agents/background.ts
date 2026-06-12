@@ -141,7 +141,9 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
       .slice(0, MAX_SIGNAL_FINDINGS);
     for (const signal of signals) {
       findings.push({
-        kind: "market_signal",
+        // News-class signals are the world-shift channel (geopolitics, macro,
+        // industry moves); the rest are routine market activity.
+        kind: signal.kind === "news" ? "world_shift" : "market_signal",
         title: signal.title,
         detail: signal.reasons[0] ?? "Relevant activity in your target market.",
         href: signal.url ?? "/dashboard",
