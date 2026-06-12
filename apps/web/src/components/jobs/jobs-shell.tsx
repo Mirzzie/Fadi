@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, MapPin, Signal, Wallet } from "lucide-react";
+import { BriefcaseBusiness, CalendarClock, MapPin, Signal, Wallet } from "lucide-react";
 
 import { JobActions } from "@/components/jobs/job-actions";
 import { JobLocationFilter } from "@/components/jobs/job-location-filter";
@@ -44,8 +44,9 @@ export function JobsShell({
                 </span>
               </h2>
               <p className="text-muted-foreground">
-                Live postings from Remotive, Arbeitnow, Adzuna, Reed and Jooble — matched against
-                your profile. Switch country and city to search anywhere.
+                Live postings from the connected job sources — Google for Jobs, Adzuna, Reed,
+                Jooble, Remotive and more — matched against your profile. Switch country and city
+                to search anywhere.
               </p>
             </div>
           </div>
@@ -117,11 +118,26 @@ export function JobsShell({
   );
 }
 
+/** Honest posting age — the user is about to invest real time in this role,
+ *  so they get to see how old (or undated) the posting is before they do. */
+function postedAgo(postedAt: Date | null): string {
+  if (!postedAt) return "Posting date not listed";
+  const days = Math.floor((Date.now() - new Date(postedAt).getTime()) / 86_400_000);
+  if (days <= 0) return "Posted today";
+  if (days === 1) return "Posted yesterday";
+  if (days < 30) return `Posted ${days} days ago`;
+  return "Posted over a month ago — may be stale";
+}
+
 function JobMeta({ job }: { job: RecommendedJob }) {
   const items = [
     {
       label: job.location ?? "Location not listed",
       icon: MapPin,
+    },
+    {
+      label: postedAgo(job.postedAt),
+      icon: CalendarClock,
     },
     {
       label: [job.remoteMode, job.employmentType, job.seniority].filter(Boolean).join(" / "),

@@ -17,6 +17,8 @@ export type RecommendedJob = {
   salaryText: string | null;
   description: string | null;
   url: string | null;
+  /** When the source says it was posted — null when the source didn't disclose it. */
+  postedAt: Date | null;
   matchScore: number;
   matchReason: string;
   matchedKeywords: string[];

@@ -1,5 +1,16 @@
 import "server-only";
 
+/**
+ * Career trajectory diagnostics. IDEOLOGY CONSTRAINT (read before wiring this
+ * into any UI): the composite cptScore blends OUTCOME metrics (response rate,
+ * interview conversion) the user does not control. That makes it a valid
+ * internal diagnostic for bottleneck detection, but it must NEVER be surfaced
+ * as a user-facing score, grade, or trend — only the bottleneck, weeklyFocus,
+ * and estimates (which are framed as forecasts, not judgments) belong on
+ * screen. The user-facing momentum score lives in lib/resilience and is
+ * process-only by design.
+ */
+
 // ─── Market benchmarks (from 2025-2026 research) ──────────────────────────────
 
 const BENCHMARKS = {
@@ -40,6 +51,10 @@ export interface TrajectoryInput {
   targetRole: string;
   targetSeniority: string | null;
   marketDemand: "growing" | "stable" | "declining" | "unknown";
+
+  /** Prior composite score, if one was computed before. A trend is a change
+   *  over time — without this, no trend is claimed. */
+  previousCptScore?: number | null;
 }
 
 export interface TrajectoryResult {
@@ -177,15 +192,22 @@ export function computeCareerTrajectory(input: TrajectoryInput): TrajectoryResul
   // ── Weekly focus ──
   const weeklyFocus = deriveWeeklyFocus(bottleneck, input, estimates);
 
-  return {
-    cptScore: Math.max(0, Math.min(100, cptScore)),
-    trend: hasEnoughData
-      ? cptScore > 60
+  // A trend is a CHANGE over time, never a relabelled level — calling a static
+  // low score "falling" would be both false and demoralizing.
+  const boundedScore = Math.max(0, Math.min(100, cptScore));
+  const prev = input.previousCptScore;
+  const trend: TrajectoryResult["trend"] =
+    !hasEnoughData || prev == null
+      ? "insufficient_data"
+      : boundedScore - prev > 3
         ? "rising"
-        : cptScore > 40
-          ? "flat"
-          : "falling"
-      : "insufficient_data",
+        : boundedScore - prev < -3
+          ? "falling"
+          : "flat";
+
+  return {
+    cptScore: boundedScore,
+    trend,
 
     metrics: {
       responseRateIndex: rrIndex,
@@ -307,31 +329,26 @@ function computeEstimates(
   };
 }
 
+/**
+ * Honest framing: we cannot observe other applicants, so no invented
+ * "top X% of applicants" percentile. The assessment compares the user's
+ * process against published market BENCHMARKS and says so; percentile stays
+ * null until a real comparative data source exists.
+ */
 function assessCompetitivePosition(
   input: TrajectoryInput,
   cptScore: number,
 ): TrajectoryResult["competitivePosition"] {
-  const percentile =
-    cptScore >= 85
-      ? 85
-      : cptScore >= 70
-        ? 65
-        : cptScore >= 55
-          ? 45
-          : cptScore >= 40
-            ? 30
-            : 15;
-
   const assessment =
-    percentile >= 80
-      ? `Your profile is competitive for ${input.targetRole} roles. You are likely in the top 20% of applicants for well-matched roles.`
-      : percentile >= 60
-        ? `Your profile is above average for ${input.targetRole} roles, but there are specific gaps holding you back from top-tier consideration.`
-        : percentile >= 40
-          ? `Your profile is around the median for ${input.targetRole} applications. Improving your application quality and skill evidence will move you into the stronger candidate range.`
-          : `Your profile needs significant development before it can compete effectively for ${input.targetRole} roles. Kai has identified the specific gaps.`;
+    cptScore >= 80
+      ? `Measured against market benchmarks, your search process is in strong shape for ${input.targetRole} roles — keep the same quality bar.`
+      : cptScore >= 60
+        ? `Measured against market benchmarks, your process is above average for ${input.targetRole} roles, with specific, fixable gaps — see the bottleneck below.`
+        : cptScore >= 40
+          ? `Measured against market benchmarks, your process is around typical for ${input.targetRole} applications. The bottleneck below is the highest-leverage thing to improve.`
+          : `Measured against market benchmarks, the foundations for ${input.targetRole} roles need building before volume will pay off. The gaps are specific and closable — start with the bottleneck below.`;
 
-  return { percentile, assessment };
+  return { percentile: null, assessment };
 }
 
 function deriveWeeklyFocus(

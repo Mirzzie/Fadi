@@ -111,6 +111,7 @@ export async function getRecommendedJobsForUser(
         salaryText: job.salaryText,
         description: job.description,
         url: job.url,
+        postedAt: job.postedAt ?? null,
         matchScore: savedJob?.matchScore ?? match.matchScore,
         matchReason: savedJob?.matchSummary ?? match.matchReason,
         matchedKeywords: savedJob?.matchedSkills ?? match.matchedKeywords,
