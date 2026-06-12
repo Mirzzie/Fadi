@@ -13,6 +13,13 @@ const serverEnvSchema = z.object({
   EMAIL_FROM: z.string().optional(), // e.g. "CareerOS <noreply@yourdomain.com>"
   // Shared secret for the background-agency cron route (/api/agent/run).
   CRON_SECRET: z.string().optional(),
+  // Social sign-in (Better Auth) — a provider's buttons appear only when both
+  // its values are set. Note: Indeed has no consumer OAuth program, so the
+  // supported set is Google + LinkedIn.
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  LINKEDIN_CLIENT_ID: z.string().optional(),
+  LINKEDIN_CLIENT_SECRET: z.string().optional(),
   // Pluggable AI server-default provider. If unset, it auto-picks the first
   // configured key in order: Groq → Google → Anthropic → OpenAI.
   AI_PROVIDER: z.enum(["openai", "anthropic", "groq", "google"]).optional(),
@@ -52,6 +59,10 @@ export const serverEnv = {
     RESEND_API_KEY: process.env.RESEND_API_KEY,
     EMAIL_FROM: process.env.EMAIL_FROM,
     CRON_SECRET: process.env.CRON_SECRET,
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+    LINKEDIN_CLIENT_ID: process.env.LINKEDIN_CLIENT_ID,
+    LINKEDIN_CLIENT_SECRET: process.env.LINKEDIN_CLIENT_SECRET,
     AI_PROVIDER: process.env.AI_PROVIDER,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     OPENAI_MODEL: process.env.OPENAI_MODEL,

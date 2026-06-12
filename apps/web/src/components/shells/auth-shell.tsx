@@ -3,11 +3,14 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { AuthForm } from "@/components/auth/auth-form";
+import { SocialButtons } from "@/components/auth/social-buttons";
 import { KaiBadge } from "@/components/ui/kai-badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import type { SocialProvider } from "@/lib/auth/social";
 
 type AuthShellProps = {
   mode: "sign-in" | "sign-up";
+  socialProviders?: SocialProvider[];
 };
 
 const signUpKaiPoints = [
@@ -24,7 +27,7 @@ const signInKaiPoints = [
   "See what's changed in your target market",
 ];
 
-export function AuthShell({ mode }: AuthShellProps) {
+export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
   const isSignUp = mode === "sign-up";
   const kaiPoints = isSignUp ? signUpKaiPoints : signInKaiPoints;
 
@@ -118,6 +121,7 @@ export function AuthShell({ mode }: AuthShellProps) {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
+              <SocialButtons providers={socialProviders} />
               <Suspense
                 fallback={
                   <div className="rounded-lg border border-border/60 p-3 text-sm text-muted-foreground">

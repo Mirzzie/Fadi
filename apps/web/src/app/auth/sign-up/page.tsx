@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { AuthShell } from "@/components/shells/auth-shell";
 import { getCurrentAuthUser } from "@/lib/auth/session";
+import { getEnabledSocialProviders } from "@/lib/auth/social";
 
 export const metadata: Metadata = {
   title: "Sign up",
@@ -17,5 +18,5 @@ export default async function SignUpPage() {
     redirect("/dashboard");
   }
 
-  return <AuthShell mode="sign-up" />;
+  return <AuthShell mode="sign-up" socialProviders={getEnabledSocialProviders()} />;
 }

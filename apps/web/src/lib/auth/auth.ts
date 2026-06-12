@@ -39,6 +39,26 @@ export const auth = betterAuth({
       verification,
     },
   }),
+  // Social sign-in — each provider activates only when its env pair is set, so
+  // local dev without keys keeps working. (Indeed offers no consumer OAuth.)
+  socialProviders: {
+    ...(serverEnv.GOOGLE_CLIENT_ID && serverEnv.GOOGLE_CLIENT_SECRET
+      ? {
+          google: {
+            clientId: serverEnv.GOOGLE_CLIENT_ID,
+            clientSecret: serverEnv.GOOGLE_CLIENT_SECRET,
+          },
+        }
+      : {}),
+    ...(serverEnv.LINKEDIN_CLIENT_ID && serverEnv.LINKEDIN_CLIENT_SECRET
+      ? {
+          linkedin: {
+            clientId: serverEnv.LINKEDIN_CLIENT_ID,
+            clientSecret: serverEnv.LINKEDIN_CLIENT_SECRET,
+          },
+        }
+      : {}),
+  },
   emailAndPassword: {
     enabled: true,
     // Without a configured sender this logs the link (dev) / an error (prod)
