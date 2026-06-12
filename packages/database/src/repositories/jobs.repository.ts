@@ -1,4 +1,4 @@
-import { and, asc, eq, lt } from "drizzle-orm";
+import { and, asc, eq, inArray, lt } from "drizzle-orm";
 
 import type { Database } from "../client";
 import { jobs, type Job } from "../schema";
@@ -33,6 +33,12 @@ export function createJobsRepository(db: Database) {
     async findById(id: string): Promise<Job | null> {
       const [job] = await db.select().from(jobs).where(eq(jobs.id, id)).limit(1);
       return job ?? null;
+    },
+
+    /** Any status — lets callers check whether saved/applied jobs went stale. */
+    async listByIds(ids: string[]): Promise<Job[]> {
+      if (ids.length === 0) return [];
+      return db.select().from(jobs).where(inArray(jobs.id, ids));
     },
 
     /**

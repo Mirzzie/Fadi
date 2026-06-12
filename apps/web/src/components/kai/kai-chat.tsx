@@ -37,11 +37,31 @@ const INITIAL_MESSAGE: Message = {
   timestamp: new Date(),
 };
 
+/** Speech-friendly form of a chat message: markdown markers read terribly aloud. */
+function toSpeakable(markdown: string): string {
+  return markdown
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/^[-*]\s+/gm, "")
+    .replace(/^#+\s+/gm, "")
+    .replace(/\n{2,}/g, ". ")
+    .replace(/\n/g, " ");
+}
+
+const VOICE_PREF_KEY = "kai-voice-enabled";
+
 export function KaiChat({ autoListenNonce }: { autoListenNonce?: number } = {}) {
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
+  // Voice preference survives sessions — it's what lets Kai greet you ALOUD
+  // with the background digest when you come back.
   const [voiceEnabled, setVoiceEnabled] = useState(false);
+  useEffect(() => {
+    setVoiceEnabled(localStorage.getItem(VOICE_PREF_KEY) === "1");
+  }, []);
+  useEffect(() => {
+    localStorage.setItem(VOICE_PREF_KEY, voiceEnabled ? "1" : "0");
+  }, [voiceEnabled]);
   const [conversationMode, setConversationMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -85,7 +105,15 @@ export function KaiChat({ autoListenNonce }: { autoListenNonce?: number } = {}) 
       try {
         const res = await fetch("/api/kai/history");
         if (!res.ok) return;
-        const data = (await res.json()) as { messages: Array<{ id: string; role: string; content: string }> };
+        const data = (await res.json()) as {
+          messages: Array<{
+            id: string;
+            role: string;
+            content: string;
+            isDigest?: boolean;
+            createdAt?: string;
+          }>;
+        };
         if (cancelled || data.messages.length === 0) return;
         setMessages(
           data.messages.map((m) => ({
@@ -95,6 +123,15 @@ export function KaiChat({ autoListenNonce }: { autoListenNonce?: number } = {}) 
             timestamp: new Date(),
           })),
         );
+
+        // Kai speaks a background digest that just landed — only the newest
+        // message, only when fresh, and only if the user keeps voice on.
+        const last = data.messages[data.messages.length - 1];
+        const isFresh =
+          last.createdAt && Date.now() - new Date(last.createdAt).getTime() < 10 * 60 * 1000;
+        if (last.isDigest && isFresh && localStorage.getItem(VOICE_PREF_KEY) === "1") {
+          speak(toSpeakable(last.content));
+        }
       } catch {
         /* keep the default greeting on failure */
       }
@@ -102,6 +139,8 @@ export function KaiChat({ autoListenNonce }: { autoListenNonce?: number } = {}) 
     return () => {
       cancelled = true;
     };
+    // Mount-only: history loads once; `speak` is intentionally not a dep.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Summoned by "Hey Kai": start listening for the user's question immediately.

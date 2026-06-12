@@ -592,6 +592,52 @@ export const resumeTemplates = pgTable(
   (table) => [index("resume_templates_user_id_idx").on(table.userId)]
 );
 
+// Kai's background agency. One agent_runs row per pass Kai makes over a user's
+// market while they're away; agent_findings are the auditable evidence behind
+// the "since you were away" digest — Kai may only claim what a finding records.
+export const agentRuns = pgTable(
+  "agent_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: text("status").notNull().default("running"), // running | ok | error
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    findingsCount: integer("findings_count").notNull().default(0),
+    error: text("error"),
+  },
+  (table) => [
+    index("agent_runs_user_id_idx").on(table.userId),
+    index("agent_runs_started_at_idx").on(table.startedAt),
+  ]
+);
+
+export const agentFindings = pgTable(
+  "agent_findings",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => agentRuns.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(), // new_role | expired_saved_role | market_signal | world_shift
+    title: text("title").notNull(),
+    detail: text("detail"),
+    href: text("href"),
+    data: jsonb("data").$type<Record<string, unknown>>().notNull().default({}),
+    seenAt: timestamp("seen_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("agent_findings_user_seen_idx").on(table.userId, table.seenAt),
+    index("agent_findings_run_id_idx").on(table.runId),
+  ]
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type AuthIdentity = typeof authIdentities.$inferSelect;
@@ -616,3 +662,6 @@ export type AgentMessage = typeof agentMessages.$inferSelect;
 export type Document = typeof documents.$inferSelect;
 export type NewDocument = typeof documents.$inferInsert;
 export type ResumeTemplateRow = typeof resumeTemplates.$inferSelect;
+export type AgentRun = typeof agentRuns.$inferSelect;
+export type AgentFinding = typeof agentFindings.$inferSelect;
+export type NewAgentFinding = typeof agentFindings.$inferInsert;

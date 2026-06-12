@@ -19,6 +19,8 @@ export type RecommendedJob = {
   url: string | null;
   /** When the source says it was posted — null when the source didn't disclose it. */
   postedAt: Date | null;
+  /** When OUR system first ingested it — drives "new since your last visit". */
+  firstSeenAt: Date;
   matchScore: number;
   matchReason: string;
   matchedKeywords: string[];

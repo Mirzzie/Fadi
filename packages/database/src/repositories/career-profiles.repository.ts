@@ -22,6 +22,15 @@ export type CreateCareerProfileInput = {
 
 export function createCareerProfilesRepository(db: Database) {
   return {
+    /** Distinct users who have at least one track — the background agency's worklist. */
+    async listUserIdsWithTracks(limit = 200): Promise<string[]> {
+      const rows = await db
+        .selectDistinct({ userId: careerProfiles.userId })
+        .from(careerProfiles)
+        .limit(limit);
+      return rows.map((r) => r.userId);
+    },
+
     async getLatestForUser(userId: string): Promise<CareerProfile | null> {
       const [careerProfile] = await db
         .select()

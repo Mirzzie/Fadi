@@ -55,6 +55,17 @@ export interface KaiUserContext {
   };
 
   /**
+   * What the background agency actually found in recent runs — the ONLY
+   * background work Kai may claim. Empty array = no background claims allowed.
+   */
+  backgroundFindings: Array<{
+    kind: string;
+    title: string;
+    detail: string | null;
+    foundAt: string; // ISO
+  }>;
+
+  /**
    * The user's resilience/momentum state. Kai uses this to calibrate TONE and
    * pacing, never to shame: score the process (quality applications, autopsies,
    * referrals), protect rest, and frame setbacks with locus-of-control.

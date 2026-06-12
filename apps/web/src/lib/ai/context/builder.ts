@@ -1,4 +1,5 @@
 import {
+  createAgentRunsRepository,
   createCareerProfilesRepository,
   createCareerReportsRepository,
   createLinkedInProfilesRepository,
@@ -34,7 +35,7 @@ export async function buildKaiContext(
 ): Promise<KaiUserContext | null> {
   const db = getDatabase();
 
-  const [careerProfile, profile, resume, linkedIn, report, savedJobsList, momentum] =
+  const [careerProfile, profile, resume, linkedIn, report, savedJobsList, momentum, findings] =
     await Promise.all([
       createCareerProfilesRepository(db).getActiveForUser(userId),
       createProfilesRepository(db).getByUserId(userId),
@@ -43,6 +44,7 @@ export async function buildKaiContext(
       createCareerReportsRepository(db).getLatestReadyForUser(userId),
       createSavedJobsRepository(db).listForUser(userId),
       getMomentumSummary(userId),
+      createAgentRunsRepository(db).listRecentForUser(userId, 8),
     ]);
 
   if (!careerProfile) return null;
@@ -132,6 +134,13 @@ export async function buildKaiContext(
     },
 
     marketContext,
+
+    backgroundFindings: findings.map((f) => ({
+      kind: f.kind,
+      title: f.title,
+      detail: f.detail,
+      foundAt: new Date(f.createdAt).toISOString(),
+    })),
 
     momentum: {
       available: true,
@@ -242,6 +251,23 @@ export function formatKaiContextAsPrompt(ctx: KaiUserContext): string {
     ctx.marketContext.signals.forEach((s) => {
       lines.push(`  - [${s.kind}] ${s.title}${s.url ? ` (${s.url})` : ""} — ${s.reason}`);
     });
+  }
+
+  lines.push("");
+  lines.push("## Background Agency Findings");
+  if (ctx.backgroundFindings.length > 0) {
+    lines.push(
+      "Your background runs found these (the ONLY background work you may claim — cite them by what they are):",
+    );
+    ctx.backgroundFindings.forEach((f) => {
+      lines.push(
+        `  - [${f.kind}] ${f.title}${f.detail ? ` — ${f.detail}` : ""} (found ${new Date(f.foundAt).toLocaleDateString()})`,
+      );
+    });
+  } else {
+    lines.push(
+      "No background findings on the ledger yet. Do NOT claim you did work between sessions; offer to check live now instead.",
+    );
   }
 
   lines.push("");

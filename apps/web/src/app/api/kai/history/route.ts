@@ -18,6 +18,14 @@ export async function GET() {
   const rows = await repo.listRecentForUser(user.id, 50);
 
   return Response.json({
-    messages: rows.map((r) => ({ id: r.id, role: r.role, content: r.content })),
+    messages: rows.map((r) => ({
+      id: r.id,
+      role: r.role,
+      content: r.content,
+      // Lets the client announce (speak) a digest that landed while the user
+      // was away — only acted on when it's the newest message and still fresh.
+      isDigest: Boolean((r.metadata as Record<string, unknown> | null)?.digest),
+      createdAt: r.createdAt,
+    })),
   });
 }
