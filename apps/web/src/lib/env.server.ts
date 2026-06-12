@@ -8,6 +8,9 @@ const serverEnvSchema = z.object({
   BETTER_AUTH_SECRET: z.string().optional(),
   BETTER_AUTH_URL: z.string().url().optional(),
   BETTER_AUTH_TRUSTED_ORIGINS: z.string().optional(),
+  // Transactional email (password reset / verification). Both required to send.
+  RESEND_API_KEY: z.string().optional(),
+  EMAIL_FROM: z.string().optional(), // e.g. "CareerOS <noreply@yourdomain.com>"
   // Pluggable AI server-default provider. If unset, it auto-picks the first
   // configured key in order: Groq → Google → Anthropic → OpenAI.
   AI_PROVIDER: z.enum(["openai", "anthropic", "groq", "google"]).optional(),
@@ -44,6 +47,8 @@ export const serverEnv = {
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
     BETTER_AUTH_TRUSTED_ORIGINS: process.env.BETTER_AUTH_TRUSTED_ORIGINS,
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    EMAIL_FROM: process.env.EMAIL_FROM,
     AI_PROVIDER: process.env.AI_PROVIDER,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     OPENAI_MODEL: process.env.OPENAI_MODEL,

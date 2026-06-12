@@ -4,6 +4,7 @@ import { betterAuth } from "better-auth";
 import { nextCookies } from "better-auth/next-js";
 
 import { getDatabase } from "@/lib/database/client";
+import { isEmailConfigured, resetPasswordEmail, sendEmail, verifyEmailEmail } from "@/lib/email/send";
 import { serverEnv } from "@/lib/env.server";
 
 const appUrl = serverEnv.BETTER_AUTH_URL ?? serverEnv.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
@@ -40,6 +41,21 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
+    // Without a configured sender this logs the link (dev) / an error (prod)
+    // instead of silently dropping it — see lib/email/send.ts.
+    sendResetPassword: async ({ user: resetUser, url }) => {
+      await sendEmail({ to: resetUser.email, ...resetPasswordEmail(url) });
+    },
+    resetPasswordTokenExpiresIn: 60 * 60, // 1 hour, matches the email copy
+  },
+  emailVerification: {
+    sendVerificationEmail: async ({ user: verifyUser, url }) => {
+      await sendEmail({ to: verifyUser.email, ...verifyEmailEmail(url) });
+    },
+    // Only auto-send on sign-up when a real sender exists; verification stays
+    // optional (requireEmailVerification off) so nobody gets locked out.
+    sendOnSignUp: isEmailConfigured(),
+    autoSignInAfterVerification: true,
   },
   user: {
     deleteUser: {

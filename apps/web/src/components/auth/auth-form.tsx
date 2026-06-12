@@ -2,6 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
@@ -54,6 +55,13 @@ export function AuthForm({ mode }: AuthFormProps) {
       return {
         ok: false,
         message: "The authentication callback failed. Please sign in again.",
+      };
+    }
+
+    if (mode === "sign-in" && searchParams.get("reset") === "success") {
+      return {
+        ok: true,
+        message: "Password updated. Sign in with your new password.",
       };
     }
 
@@ -140,7 +148,17 @@ export function AuthForm({ mode }: AuthFormProps) {
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
+        <div className="flex items-center justify-between">
+          <Label htmlFor="password">Password</Label>
+          {!isSignUp ? (
+            <Link
+              href="/auth/forgot-password"
+              className="text-xs font-medium text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
+            >
+              Forgot password?
+            </Link>
+          ) : null}
+        </div>
         <Input
           id="password"
           type="password"
