@@ -1,6 +1,7 @@
 import { BriefcaseBusiness, CalendarClock, MapPin, Signal, Wallet } from "lucide-react";
 
 import { JobActions } from "@/components/jobs/job-actions";
+import { JobDescription } from "@/components/jobs/job-description";
 import { JobLocationFilter } from "@/components/jobs/job-location-filter";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -80,7 +81,7 @@ export function JobsShell({
                 <JobMeta job={job} />
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">{job.description}</p>
+                <JobDescription text={job.description} />
                 <div className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
                   {job.matchReason}
                 </div>

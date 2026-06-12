@@ -18,8 +18,10 @@ const ENTITIES: Record<string, string> = {
   "&hellip;": "…",
 };
 
-/** Convert an HTML fragment to compact, readable plain text. */
-export function htmlToText(html: string | undefined | null, maxLength = 1200): string {
+/** Convert an HTML fragment to compact, readable plain text. The cap is
+ *  generous (was 1200) so job descriptions survive intact for the structured
+ *  section view — truncated JDs were losing requirements mid-sentence. */
+export function htmlToText(html: string | undefined | null, maxLength = 6000): string {
   if (!html) return "";
 
   let text = html
