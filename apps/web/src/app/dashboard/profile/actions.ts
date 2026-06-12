@@ -12,9 +12,56 @@ import { revalidatePath } from "next/cache";
 import { signOutAction } from "@/app/auth/actions";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
+import { detectDocType, extractDocumentText } from "@/lib/documents/extract-text";
 import { logger } from "@/lib/observability/logger";
 
 type Result = { ok: boolean; message: string };
+
+const MAX_CV_FILE_BYTES = 8 * 1024 * 1024; // 8MB — generous for any real CV
+
+export type ExtractCvResult = { ok: boolean; message: string; text?: string };
+
+/**
+ * Extract plain text from an uploaded CV (PDF/DOCX/DOC/TXT). The text is
+ * returned to the form — NOT saved directly — so the user reviews exactly what
+ * was parsed before it becomes the evidence Kai reasons from.
+ */
+export async function extractCvTextAction(formData: FormData): Promise<ExtractCvResult> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, message: "Choose a file first." };
+  }
+  if (file.size > MAX_CV_FILE_BYTES) {
+    return { ok: false, message: "That file is over 8MB — export a lighter copy and retry." };
+  }
+
+  const type = detectDocType(file.name, file.type);
+  if (!type || type === "json") {
+    return { ok: false, message: "Unsupported file type. Upload a PDF, DOCX, DOC or TXT file." };
+  }
+
+  try {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const text = (await extractDocumentText(buffer, file.name, file.type)).trim();
+    if (!text) {
+      return {
+        ok: false,
+        message:
+          "Couldn't read any text from that file — if it's a scanned/image PDF, export a text-based copy instead.",
+      };
+    }
+    return { ok: true, message: `Parsed ${file.name} — review the text below, then save.`, text };
+  } catch (err) {
+    logger.error("profile.cv_extract_failed", {
+      userId: user.id,
+      error: err instanceof Error ? err.message : "unknown",
+    });
+    return { ok: false, message: "Couldn't parse that file. Try a different export of your CV." };
+  }
+}
 
 export type UpdateProfileInput = {
   fullName: string;

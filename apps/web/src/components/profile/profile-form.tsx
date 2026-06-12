@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { CheckCircle2, Loader2, Trash2, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { CvUpload } from "@/components/profile/cv-upload";
 import { cn } from "@/lib/utils";
 import {
   deleteAccountDataAction,
@@ -100,12 +101,13 @@ export function ProfileForm({
             className={cn(inputCls, "h-auto py-2")}
           />
         </Field>
-        <Field label="Resume text">
+        <Field label="Resume / CV">
+          <CvUpload onExtracted={(text) => set("resumeText", text)} />
           <textarea
             value={form.resumeText}
             onChange={(e) => set("resumeText", e.target.value)}
             rows={8}
-            placeholder="Paste your full resume text here."
+            placeholder="Upload your CV above, or paste the text here."
             className={cn(inputCls, "h-auto py-2 font-mono text-xs")}
           />
         </Field>

@@ -7,6 +7,7 @@ import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 
 import { completeOnboardingAction, type OnboardingActionResult } from "@/app/onboarding/actions";
+import { CvUpload } from "@/components/profile/cv-upload";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +29,7 @@ const steps = [
   {
     title: "Profile evidence",
     aiCopy:
-      "Now add the career evidence I can read in this MVP. Paste LinkedIn context and resume text; no file upload yet.",
+      "Now add the career evidence I can read. Upload your CV (PDF, DOCX or TXT) or paste it — plus any LinkedIn context.",
   },
   {
     title: "Career goals",
@@ -184,10 +185,15 @@ export function OnboardingForm() {
           </FieldError>
 
           <FieldError message={form.formState.errors.resumeText?.message}>
-            <Label htmlFor="resume-text">Resume text</Label>
+            <Label htmlFor="resume-text">Resume / CV</Label>
+            <CvUpload
+              onExtracted={(text) =>
+                form.setValue("resumeText", text, { shouldValidate: true, shouldDirty: true })
+              }
+            />
             <Textarea
               id="resume-text"
-              placeholder="Paste your resume text here. File upload arrives in a later phase."
+              placeholder="Upload your CV above (PDF, DOCX, TXT), or paste the text here."
               rows={9}
               {...form.register("resumeText")}
             />
