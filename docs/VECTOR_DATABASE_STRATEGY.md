@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The vector database stores embeddings for semantic retrieval across resumes, jobs, learning resources, market signals, application assets, and memory summaries. It supports Kai's ability to retrieve relevant career context at inference time, including evidence for niche validation and market intelligence.
+The vector database stores embeddings for semantic retrieval across resumes, jobs, learning resources, market signals, application assets, and memory summaries. It supports Scout's ability to retrieve relevant career context at inference time, including evidence for niche validation and market intelligence.
 
 It should support high-quality retrieval while enforcing user isolation and lifecycle management.
 

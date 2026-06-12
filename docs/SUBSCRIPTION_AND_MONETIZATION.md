@@ -6,7 +6,7 @@ CareerOS can monetize through subscriptions, premium automation, advanced intell
 
 ## Packaging Principles
 
-- Free users receive meaningful career value — Kai's core identity must come through.
+- Free users receive meaningful career value — Scout's core identity must come through.
 - Paid tiers unlock deeper analysis, more automation, and higher usage limits.
 - Sensitive career advice must not be degraded into manipulative upsells.
 - Pricing reflects AI gateway cost, integration cost, and value delivered.
@@ -16,7 +16,7 @@ CareerOS can monetize through subscriptions, premium automation, advanced intell
 
 ### Free
 
-- Basic profile setup and onboarding with Kai
+- Basic profile setup and onboarding with Scout
 - Initial career analysis and niche validation (directional)
 - Limited opportunity matches
 - Limited AI-generated drafts
@@ -58,7 +58,7 @@ flowchart TD
     Webhooks --> BillingSvc[Billing Service]
     BillingSvc --> Entitlements[Entitlement Service]
     Entitlements --> API[Next.js API Layer]
-    Entitlements --> Agent[Kai Agent Orchestration]
+    Entitlements --> Agent[Scout Agent Orchestration]
     Usage[Usage Events — Model Gateway + Features] --> Metering[Usage Metering]
     Metering --> Entitlements
 ```
@@ -87,7 +87,7 @@ At scale:
 - Store billing webhook events idempotently.
 - Design plan limits around costly operations (AI model gateway calls, background monitoring frequency).
 - Add transparent usage messaging so users understand what they are consuming.
-- Never gate Kai's honest-mentor behavior behind a paywall — the core assessment quality must be present on free.
+- Never gate Scout's honest-mentor behavior behind a paywall — the core assessment quality must be present on free.
 
 ## Complexity
 

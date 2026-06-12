@@ -4,7 +4,7 @@
 
 CareerOS is building toward the Phase 1 MVP. Contributions should support the frozen MVP scope unless an architecture decision record approves otherwise.
 
-The product has a clear identity: Kai is the entire CareerOS system — not a chatbot widget on a dashboard. Contributions should reinforce this identity, not dilute it.
+The product has a clear identity: Scout is the entire CareerOS system — not a chatbot widget on a dashboard. Contributions should reinforce this identity, not dilute it.
 
 ## Before You Start
 
@@ -43,7 +43,7 @@ Reviewers should check:
 - Correctness.
 - Simplicity.
 - Security and privacy impact.
-- Kai identity — does this reinforce or dilute Kai's honest-mentor character?
+- Scout identity — does this reinforce or dilute Scout's honest-mentor character?
 - Test coverage.
 - Naming consistency.
 - Whether an ADR is needed.
@@ -64,11 +64,11 @@ Create an ADR for decisions that affect:
 
 Use the template in `docs/ARCHITECTURE_DECISION_RECORDS.md`.
 
-## Kai Identity Guardrails
+## Scout Identity Guardrails
 
 Contributions must not:
 
-- Redesign any screen to treat Kai as a supplementary feature or chatbot widget.
+- Redesign any screen to treat Scout as a supplementary feature or chatbot widget.
 - Add voice interaction in Phase 1 code (reserved for Phase 2).
 - Hard-code model provider assumptions into feature code.
 - Add Supabase imports or environment variables back into the active codebase.

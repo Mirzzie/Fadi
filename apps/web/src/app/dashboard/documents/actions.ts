@@ -55,7 +55,7 @@ export async function createDocumentAction(input: {
 
 /**
  * Import a JSON Resume (jsonresume.org) file → a new editable resume document.
- * Lets users bring resume data from any JSON-Resume-compatible tool into Kai.
+ * Lets users bring resume data from any JSON-Resume-compatible tool into Scout.
  */
 export async function importJsonResumeAction(jsonText: string, title?: string): Promise<Result> {
   const user = await getCurrentAuthUser();

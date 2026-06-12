@@ -23,7 +23,7 @@ This register tracks Phase 1 technical debt. Severity reflects launch risk, not 
 | TD-013 | AI | No report generation idempotency or in-progress status | Medium | Create draft/generating report row before model call, then update status | Medium |
 | TD-014 | Security | No distributed rate limiting for auth and mutation endpoints | High | Add rate limits for auth-adjacent actions and mutation endpoints | Medium |
 | TD-015 | Dependencies | `npm audit` reports moderate advisories | Medium | Track compatible upstream updates; avoid force downgrade | Low-medium |
-| TD-016 | Product | Niche validation conversation design not yet implemented | High | Required for Phase 1 alpha — Kai's honest-mentor identity depends on this | Medium |
+| TD-016 | Product | Niche validation conversation design not yet implemented | High | Required for Phase 1 alpha — Scout's honest-mentor identity depends on this | Medium |
 | TD-017 | AI | Model gateway is wired but not fully abstracted from server actions | Medium | Move all model gateway calls behind a typed model service interface | Medium |
 
 ## Cleanup Order

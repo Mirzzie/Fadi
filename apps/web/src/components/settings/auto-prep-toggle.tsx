@@ -7,8 +7,8 @@ import { setAutoPrepAction } from "@/app/dashboard/settings/actions";
 import { cn } from "@/lib/utils";
 
 /**
- * Opt-in switch for Kai auto-prep. When on, opening a role's workspace makes
- * Kai immediately draft the full packet (CV, cover letter, cold email, value
+ * Opt-in switch for Scout auto-prep. When on, opening a role's workspace makes
+ * Scout immediately draft the full packet (CV, cover letter, cold email, value
  * proposition). Off = the user drafts manually. Honest by default: off.
  */
 export function AutoPrepToggle({ initial }: { initial: boolean }) {
@@ -37,12 +37,12 @@ export function AutoPrepToggle({ initial }: { initial: boolean }) {
         </div>
         <div className="flex-1">
           <div className="flex items-center justify-between gap-4">
-            <h2 className="text-xl font-semibold tracking-tight">Kai auto-prep</h2>
+            <h2 className="text-xl font-semibold tracking-tight">Scout auto-prep</h2>
             <button
               type="button"
               role="switch"
               aria-checked={on}
-              aria-label="Toggle Kai auto-prep"
+              aria-label="Toggle Scout auto-prep"
               disabled={pending}
               onClick={toggle}
               className={cn(
@@ -59,7 +59,7 @@ export function AutoPrepToggle({ initial }: { initial: boolean }) {
             </button>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            When you open a role, Kai immediately drafts your full packet — tailored CV, cover
+            When you open a role, Scout immediately drafts your full packet — tailored CV, cover
             letter, cold email, and value proposition — grounded in your real experience. Leave it
             off to draft each document yourself, when you want.
           </p>

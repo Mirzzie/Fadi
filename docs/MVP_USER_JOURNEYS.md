@@ -4,7 +4,7 @@
 
 The MVP serves individual professionals looking for career clarity, honest guidance, and practical next steps. The first 100 users can include job seekers, career switchers, graduates, early-career professionals, and experienced professionals considering a move.
 
-Kai behaves differently for each stage. A fresh graduate gets guidance on building a first professional identity. A mid-career switcher gets a niche validation and bridge-building plan. An experienced professional gets strategic positioning intelligence. The underlying system is the same; the output is personalised.
+Scout behaves differently for each stage. A fresh graduate gets guidance on building a first professional identity. A mid-career switcher gets a niche validation and bridge-building plan. An experienced professional gets strategic positioning intelligence. The underlying system is the same; the output is personalised.
 
 ## Journey 1: New User Activation
 
@@ -21,10 +21,10 @@ flowchart TD
     Resume --> LinkedIn[Import or Paste LinkedIn]
     LinkedIn --> Profile[Confirm Profile Fields]
     Profile --> Goals[Set Career Goals]
-    Goals --> Niche[Niche Discovery with Kai]
-    Niche --> Validate[Kai Niche Validation]
+    Goals --> Niche[Niche Discovery with Scout]
+    Niche --> Validate[Scout Niche Validation]
     Validate --> Analyze[Generate Career Analysis]
-    Analyze --> Dashboard[Kai Command Center]
+    Analyze --> Dashboard[Scout Command Center]
 ```
 
 ### Phase 1 Requirements
@@ -33,36 +33,36 @@ flowchart TD
 - User can upload PDF or DOCX resume.
 - User can paste LinkedIn profile text or URL metadata.
 - User can edit target role, location, salary expectation, skills, and industries.
-- Kai conducts a niche discovery conversation and returns an honest assessment.
+- Scout conducts a niche discovery conversation and returns an honest assessment.
 - User receives analysis with strengths, gaps, niche assessment, readiness score, and a prescribed next system.
 
 ### Success Metric
 
 Career analysis with honest niche assessment generated within 15 minutes of sign-up.
 
-## Journey 2: Kai Command Center Review
+## Journey 2: Scout Command Center Review
 
 ### Goal
 
-Help the user understand their career status and Kai's recommended next actions.
+Help the user understand their career status and Scout's recommended next actions.
 
 ### Flow
 
 ```mermaid
 flowchart TD
-    Dashboard[Kai Command Center] --> Summary[Career Summary and Niche Validation]
+    Dashboard[Scout Command Center] --> Summary[Career Summary and Niche Validation]
     Dashboard --> Gaps[Skill and Evidence Gaps]
     Dashboard --> Jobs[Recommended Jobs]
     Dashboard --> Learning[Learning Recommendations]
     Dashboard --> Apps[Application Tracker]
-    Dashboard --> Assistant[Kai Assistant]
+    Dashboard --> Assistant[Scout Assistant]
 ```
 
 ### Phase 1 Requirements
 
 - Command center shows the user's current target role and niche assessment.
 - Command center shows readiness score with evidence breakdown.
-- Kai surfaces three to five recommended next actions with reasoning.
+- Scout surfaces three to five recommended next actions with reasoning.
 - Top job recommendations visible.
 - Application tracker summary visible.
 
@@ -74,7 +74,7 @@ User understands what to do next without asking support.
 
 ### Goal
 
-Show users jobs that feel meaningfully matched to their profile, with Kai's reasoning.
+Show users jobs that feel meaningfully matched to their profile, with Scout's reasoning.
 
 ### Flow
 
@@ -82,7 +82,7 @@ Show users jobs that feel meaningfully matched to their profile, with Kai's reas
 flowchart TD
     Profile[Profile and Goals] --> Search[Job Discovery]
     Search --> Match[Match Scoring]
-    Match --> Explain[Kai Explanation]
+    Match --> Explain[Scout Explanation]
     Explain --> User[User Reviews]
     User --> Save[Save Job]
     User --> Reject[Reject Job]
@@ -92,8 +92,8 @@ flowchart TD
 ### Phase 1 Requirements
 
 - User can search jobs by role and location.
-- Kai displays recommended jobs with match score.
-- Each recommendation includes matched skills, missing skills, and Kai's explanation.
+- Scout displays recommended jobs with match score.
+- Each recommendation includes matched skills, missing skills, and Scout's explanation.
 - User can save or reject a job.
 - User can convert a saved job into an application tracker item.
 
@@ -101,7 +101,7 @@ flowchart TD
 
 User saves at least one recommended job.
 
-## Journey 4: Kai Career Assistant
+## Journey 4: Scout Career Assistant
 
 ### Goal
 
@@ -111,24 +111,24 @@ Let the user ask grounded career questions — including hard ones — and recei
 
 ```mermaid
 flowchart TD
-    User[User Question] --> Assistant[Kai Agent]
+    User[User Question] --> Assistant[Scout Agent]
     Assistant --> Context[Profile, Analysis, Niche Validation, Jobs, Applications]
     Context --> Response[Grounded Honest Answer]
-    Response --> Challenge[Kai Challenges If Data Warrants]
+    Response --> Challenge[Scout Challenges If Data Warrants]
     Challenge --> Action[Specific Next Action Suggested]
 ```
 
 ### Phase 1 Requirements
 
-- Kai answers career, resume, job targeting, learning, niche, and application tracking questions.
-- Kai uses stored profile and career analysis context.
-- Kai challenges user's direction when the available data supports doing so.
-- Kai does not claim to submit applications or perform external actions.
-- Kai suggests specific next actions inside CareerOS.
+- Scout answers career, resume, job targeting, learning, niche, and application tracking questions.
+- Scout uses stored profile and career analysis context.
+- Scout challenges user's direction when the available data supports doing so.
+- Scout does not claim to submit applications or perform external actions.
+- Scout suggests specific next actions inside CareerOS.
 
 ### Success Metric
 
-User asks at least one Kai question after analysis. Bonus: user engages with a contrarian or challenging Kai response.
+User asks at least one Scout question after analysis. Bonus: user engages with a contrarian or challenging Scout response.
 
 ## Journey 5: Learning Recommendation
 
@@ -160,7 +160,7 @@ User saves or engages with at least one learning recommendation.
 
 ### Goal
 
-Give users a simple place to manage applications with Kai's context.
+Give users a simple place to manage applications with Scout's context.
 
 ### Flow
 

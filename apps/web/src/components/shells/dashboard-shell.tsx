@@ -84,11 +84,11 @@ export function DashboardShell({
             Career command center
           </span>
           <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-            Your career, run by Kai
+            Your career, run by Scout
           </h2>
           <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/70 sm:text-base">
             Review your profile, generate your Career Intelligence Report, and act on what matters —
-            Kai keeps the rest moving.
+            Scout keeps the rest moving.
           </p>
           {userEmail ? (
             <p className="mt-2 text-xs text-white/50">Signed in as {userEmail}</p>
@@ -336,7 +336,7 @@ function MarketSignalsCard({ signals }: { signals: MarketSignal[] }) {
           </ul>
         ) : (
           <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-            No live signals clear the relevance threshold for your profile right now. Kai keeps
+            No live signals clear the relevance threshold for your profile right now. Scout keeps
             watching — set a target role in your profile to sharpen this.
           </div>
         )}

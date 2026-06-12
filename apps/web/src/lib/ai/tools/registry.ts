@@ -7,15 +7,15 @@ import { generateDocument } from "./generate-document";
 import { getLaborMarket } from "./labor-market";
 import { getWorldShifts } from "./world-shifts";
 import { trackApplication } from "./track-application";
-import type { KaiTool, KaiToolContext, KaiToolResult } from "./types";
+import type { ScoutTool, ScoutToolContext, ScoutToolResult } from "./types";
 
 /**
- * Kai's tool registry. Each tool wraps a real CareerOS service so Kai can act on
+ * Scout's tool registry. Each tool wraps a real CareerOS service so Scout can act on
  * live data and return something the chat can both speak and show. Add tools (and
- * external-source plugins) here — Kai picks them up automatically.
+ * external-source plugins) here — Scout picks them up automatically.
  */
 
-const searchJobs: KaiTool = {
+const searchJobs: ScoutTool = {
   name: "search_jobs",
   description:
     "Search live job postings for the user, optionally scoped to a country/city and keywords. Use when the user asks to see, list, or find jobs — anywhere in the world, any employment type.",
@@ -30,7 +30,7 @@ const searchJobs: KaiTool = {
       limit: { type: "number", description: "How many roles to return (default 6, max 12)." },
     },
   },
-  async execute(args, ctx): Promise<KaiToolResult> {
+  async execute(args, ctx): Promise<ScoutToolResult> {
     const parsed = parseLocation(typeof args.location === "string" ? args.location : undefined);
     const limit = Math.min(Math.max(Number(args.limit) || 6, 1), 12);
 
@@ -72,12 +72,12 @@ const searchJobs: KaiTool = {
   },
 };
 
-const getPerformance: KaiTool = {
+const getPerformance: ScoutTool = {
   name: "get_performance",
   description:
     "Get the user's career momentum and performance: momentum score, band, resting state, cadence adherence, and quality applications this period. Use for 'how am I doing', 'my performance', 'my progress'.",
   parameters: { type: "object", properties: {} },
-  async execute(_args, ctx): Promise<KaiToolResult> {
+  async execute(_args, ctx): Promise<ScoutToolResult> {
     const m = await getMomentumSummary(ctx.userId);
     return {
       summary: `Momentum ${m.momentum} (peak ${m.peakMomentum}), band "${m.band}". ${m.bandMessage} Cadence: ${m.cadenceMessage} ${m.qualityApplicationsThisPeriod} quality application(s) this period.${m.isResting ? " Currently resting — that's allowed." : ""}`,
@@ -96,12 +96,12 @@ const getPerformance: KaiTool = {
   },
 };
 
-const getCareerUpdates: KaiTool = {
+const getCareerUpdates: ScoutTool = {
   name: "get_career_updates",
   description:
     "Get what's new for the user: freshly matched roles. Use for 'what's new', 'any updates', 'what did you find'.",
   parameters: { type: "object", properties: {} },
-  async execute(_args, ctx): Promise<KaiToolResult> {
+  async execute(_args, ctx): Promise<ScoutToolResult> {
     const jobs = await getRecommendedJobsForUser(ctx.userId, 5);
     const top = jobs.slice(0, 5).map((j) => ({
       id: j.id,
@@ -122,7 +122,7 @@ const getCareerUpdates: KaiTool = {
   },
 };
 
-const TOOLS: KaiTool[] = [
+const TOOLS: ScoutTool[] = [
   searchJobs,
   getPerformance,
   getCareerUpdates,
@@ -132,20 +132,20 @@ const TOOLS: KaiTool[] = [
   getWorldShifts,
 ];
 
-export function getKaiTools(): KaiTool[] {
+export function getScoutTools(): ScoutTool[] {
   return TOOLS;
 }
 
-export function getKaiTool(name: string): KaiTool | undefined {
+export function getScoutTool(name: string): ScoutTool | undefined {
   return TOOLS.find((t) => t.name === name);
 }
 
-export async function executeKaiTool(
+export async function executeScoutTool(
   name: string,
   args: Record<string, unknown>,
-  ctx: KaiToolContext,
-): Promise<KaiToolResult> {
-  const tool = getKaiTool(name);
+  ctx: ScoutToolContext,
+): Promise<ScoutToolResult> {
+  const tool = getScoutTool(name);
   if (!tool) {
     return { summary: `Unknown tool "${name}".`, view: "none" };
   }

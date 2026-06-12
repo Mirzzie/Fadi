@@ -37,7 +37,7 @@ export class AnthropicProvider implements AIProvider {
   }
 
   async chat(messages: AIMessage[], options?: ChatOptions): Promise<string> {
-    if (!this.client) return "Kai is not configured. Add a Claude API key in Settings.";
+    if (!this.client) return "Scout is not configured. Add a Claude API key in Settings.";
     const { system, turns } = toAnthropic(messages);
     const res = await this.client.messages.create({
       model: this.model,
@@ -90,7 +90,7 @@ export class AnthropicProvider implements AIProvider {
     if (!this.client) {
       return new ReadableStream<string>({
         start(controller) {
-          controller.enqueue("Kai is not configured. Add a Claude API key in Settings.");
+          controller.enqueue("Scout is not configured. Add a Claude API key in Settings.");
           controller.close();
         },
       });

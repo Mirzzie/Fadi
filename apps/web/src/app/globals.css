@@ -157,10 +157,10 @@
 }
 
 @layer utilities {
-  .kai-glow {
+  .scout-glow {
     box-shadow: 0 0 0 1px oklch(0.72 0.19 192 / 25%), 0 0 24px oklch(0.72 0.19 192 / 12%);
   }
-  .kai-glow-sm {
+  .scout-glow-sm {
     box-shadow: 0 0 0 1px oklch(0.72 0.19 192 / 20%), 0 0 12px oklch(0.72 0.19 192 / 10%);
   }
 

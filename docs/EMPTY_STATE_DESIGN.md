@@ -2,30 +2,30 @@
 
 ## Purpose
 
-Empty states should reduce anxiety, explain why a section is empty, and guide the user toward one useful action. They should not feel like errors or dead ends. All empty states come from Kai — there is no part of CareerOS that exists outside Kai.
+Empty states should reduce anxiety, explain why a section is empty, and guide the user toward one useful action. They should not feel like errors or dead ends. All empty states come from Scout — there is no part of CareerOS that exists outside Scout.
 
 ## Empty State Principles
 
-- Kai says what is missing.
-- Kai explains why it matters.
+- Scout says what is missing.
+- Scout explains why it matters.
 - Offer one primary action.
-- Keep Kai's tone calm and specific.
+- Keep Scout's tone calm and specific.
 - Avoid blame.
-- Never use a generic loading spinner without Kai narrating what is happening.
+- Never use a generic loading spinner without Scout narrating what is happening.
 
-## Kai Command Center Empty State
+## Scout Command Center Empty State
 
 When onboarding is incomplete:
 
 ```text
-[Kai Command Center]
+[Scout Command Center]
 Your command center will be ready after your first Career Intelligence Report.
 
-[Kai speaks]
+[Scout speaks]
 [Continue onboarding button]
 ```
 
-Kai says:
+Scout says:
 
 > I need your CV, profile details, and career goal before I can build a useful command center. Complete onboarding and I will prepare your first analysis — including an honest assessment of your direction.
 
@@ -45,7 +45,7 @@ No CV uploaded yet.
 [Continue manually]
 ```
 
-Kai says:
+Scout says:
 
 > A CV helps me understand your experience quickly. If you do not have one ready, you can continue manually and add it later.
 
@@ -69,7 +69,7 @@ No LinkedIn profile added.
 [Skip for now]
 ```
 
-Kai says:
+Scout says:
 
 > LinkedIn context helps me compare your public profile with your CV. You can skip this now, but the analysis may be less precise.
 
@@ -88,7 +88,7 @@ Not yet assessed.
 [Start niche discovery]
 ```
 
-Kai says:
+Scout says:
 
 > I have not yet assessed your career direction against market data. This is an important step — it tells you whether the path you are planning is supported by current hiring reality.
 
@@ -107,7 +107,7 @@ No report generated yet.
 [Generate report]
 ```
 
-Kai says:
+Scout says:
 
 > Once your profile is ready, I can generate your first Career Intelligence Report — with strengths, gaps, an honest niche assessment, learning recommendations, and readiness scores.
 
@@ -127,7 +127,7 @@ No recommendations yet.
 [Update target role]
 ```
 
-Kai says:
+Scout says:
 
 > I do not have enough job data yet to surface strong matches. Search for a target role or update your goals so I can refine the recommendations.
 
@@ -151,7 +151,7 @@ No applications tracked yet.
 [Add application manually]
 ```
 
-Kai says:
+Scout says:
 
 > When you save a role or apply somewhere, track it here so I can help you stay organised and follow up.
 
@@ -174,7 +174,7 @@ No learning path yet.
 [Generate from skill gaps]
 ```
 
-Kai says:
+Scout says:
 
 > I can recommend learning actions after I understand your target role and skill gaps. I prioritise recommendations by what the market currently values most for your direction.
 
@@ -182,18 +182,18 @@ Primary action:
 
 - Generate from skill gaps
 
-## Kai Assistant Empty State
+## Scout Assistant Empty State
 
 Before the first message:
 
 ```text
-[Kai]
+[Scout]
 Ask about your report, your direction, your skills, or what to do next.
 
 [Starter prompts]
 ```
 
-Kai says:
+Scout says:
 
 > Ask me about your career report, your niche assessment, your strongest opportunities, or the fastest way to improve your readiness score. I will give you a straight answer.
 

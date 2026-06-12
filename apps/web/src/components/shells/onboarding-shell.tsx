@@ -1,7 +1,7 @@
 import { OnboardingExperience } from "@/components/onboarding/onboarding-experience";
 
 /**
- * Onboarding shell — the OS "first boot". Kai welcomes the user and guides them
+ * Onboarding shell — the OS "first boot". Scout welcomes the user and guides them
  * through setting up their first track conversationally (with a form fallback).
  */
 export function OnboardingShell() {

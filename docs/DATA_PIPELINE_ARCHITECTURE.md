@@ -4,7 +4,7 @@
 
 The Data Pipeline Architecture moves data from product events, third-party integrations, job sources, market intelligence sources, AI outputs, and user feedback into operational stores, analytics stores, search indexes, vector indexes, and recommendation features.
 
-Real-time data pipelines are what make Kai's market intelligence and proactive job discovery credible. Data pipelines are the infrastructure backbone of the honest-mentor promise.
+Real-time data pipelines are what make Scout's market intelligence and proactive job discovery credible. Data pipelines are the infrastructure backbone of the honest-mentor promise.
 
 ## Pipeline Types
 
@@ -77,7 +77,7 @@ Market data freshness requirements:
 - Market signals: freshness tags required; signals older than 90 days flagged as potentially outdated.
 - Salary data: freshness within the source's stated update cycle.
 
-Kai never presents stale data as current without explicitly flagging it.
+Scout never presents stale data as current without explicitly flagging it.
 
 ## Implementation Recommendations
 

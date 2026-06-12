@@ -43,7 +43,7 @@ export async function checkJobLivenessAction(jobId: string): Promise<PostingLive
 /**
  * Generate a REAL, saved document tailored to this job (using its live job
  * description), linked to the job + an application so it shows up in Documents
- * and the tracker. Opens in the form editor. Same core as the Kai tool.
+ * and the tracker. Opens in the form editor. Same core as the Scout tool.
  */
 export async function generateJobDocumentAction(jobId: string, kind: DocKind): Promise<Result> {
   const user = await getCurrentAuthUser();
@@ -92,11 +92,11 @@ export async function generateJobDocumentAction(jobId: string, kind: DocKind): P
       userId: user.id,
       error: error instanceof Error ? error.message : "unknown",
     });
-    return { ok: false, message: "Kai couldn't draft that. Check your AI provider and try again." };
+    return { ok: false, message: "Scout couldn't draft that. Check your AI provider and try again." };
   }
 }
 
-// The full packet Kai prepares when auto-prep is on (the four DocKinds).
+// The full packet Scout prepares when auto-prep is on (the four DocKinds).
 const AUTO_PREP_KINDS: DocKind[] = ["resume", "cover_letter", "email", "value_proposition"];
 
 type AutoPrepResult = { ok: boolean; message: string; created: number };
@@ -177,11 +177,11 @@ export async function autoPrepJobAction(jobId: string): Promise<AutoPrepResult> 
     logger.info("workspace.auto_prep.completed", { userId: user.id, jobId, created, requested: todo.length });
 
     if (created === 0) {
-      return { ok: false, message: "Kai couldn't draft the packet. Check your AI provider.", created: 0 };
+      return { ok: false, message: "Scout couldn't draft the packet. Check your AI provider.", created: 0 };
     }
     return {
       ok: true,
-      message: `Kai prepared ${created} document${created === 1 ? "" : "s"} for this role.`,
+      message: `Scout prepared ${created} document${created === 1 ? "" : "s"} for this role.`,
       created,
     };
   } catch (error) {

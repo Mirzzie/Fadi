@@ -63,7 +63,7 @@ export function ApplicationsBoard({
             </span>
           </h2>
           <p className="text-sm text-muted-foreground">
-            Every role you&apos;re chasing, by stage. Open one to let Kai draft a tailored resume,
+            Every role you&apos;re chasing, by stage. Open one to let Scout draft a tailored resume,
             cover letter or cold email for it.
           </p>
         </div>
@@ -148,7 +148,7 @@ function AddDialog({ onClose, onDone }: { onClose: () => void; onDone: () => voi
     <Overlay onClose={onClose}>
       <h3 className="mb-1 font-semibold">Paste a job</h3>
       <p className="mb-3 text-xs text-muted-foreground">
-        Drop in a job from anywhere — Kai tailors your documents to its exact description.
+        Drop in a job from anywhere — Scout tailors your documents to its exact description.
       </p>
       <div className="space-y-2">
         <input className={input} placeholder="Role / job title" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -268,7 +268,7 @@ function DetailDialog({ app, docs, onClose }: { app: AppView; docs: DocView[]; o
               Save
             </button>
           ) : (
-            <span className="text-[0.7rem] text-muted-foreground">Kai tailors documents to this</span>
+            <span className="text-[0.7rem] text-muted-foreground">Scout tailors documents to this</span>
           )}
         </div>
         <textarea
@@ -277,16 +277,16 @@ function DetailDialog({ app, docs, onClose }: { app: AppView; docs: DocView[]; o
             setJd(e.target.value);
             setJdSaved(false);
           }}
-          placeholder="Paste the job description so Kai tailors to it…"
+          placeholder="Paste the job description so Scout tailors to it…"
           className="min-h-24 w-full resize-none rounded-md border border-border bg-background px-3 py-2 text-xs outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15"
         />
       </div>
 
-      {/* Kai document actions */}
+      {/* Scout document actions */}
       <div className="mb-4">
         <p className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
           <Sparkles className="size-3.5 text-primary" aria-hidden="true" />
-          {jd.trim() ? "Let Kai draft — tailored to this JD" : "Let Kai draft for this role"}
+          {jd.trim() ? "Let Scout draft — tailored to this JD" : "Let Scout draft for this role"}
         </p>
         <div className="grid grid-cols-2 gap-2">
           {DOC_ACTIONS.map((d) => (

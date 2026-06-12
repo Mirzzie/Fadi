@@ -86,7 +86,7 @@ export function createResilientChatStream(
             controller.close();
             return;
           }
-          // Transparent switch — the user sees Kai stay up via the fallback.
+          // Transparent switch — the user sees Scout stay up via the fallback.
           controller.enqueue("\n\n_(Primary AI provider unavailable — switching to your fallback…)_\n\n");
         }
       }
@@ -97,7 +97,7 @@ export function createResilientChatStream(
 
 /**
  * A single AIProvider that wraps an ordered chain and applies retry + fallback.
- * Drop-in anywhere a provider is expected (Kai chat, application agent), so every
+ * Drop-in anywhere a provider is expected (Scout chat, application agent), so every
  * surface gets resilience for free.
  */
 export class ResilientProvider implements AIProvider {

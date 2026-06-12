@@ -26,7 +26,7 @@ const DOCK_APPS: DockApp[] = [
   { href: "/dashboard/applications", label: "Applications", icon: KanbanSquare },
   { href: "/dashboard/documents", label: "Documents", icon: FileText },
   { href: "/dashboard/learning", label: "Learning", icon: GraduationCap },
-  { href: "/dashboard/kai", label: "Kai", icon: Sparkles },
+  { href: "/dashboard/scout", label: "Scout", icon: Sparkles },
   { href: "/dashboard/profile", label: "Profile", icon: UserRoundCog },
   { href: "/dashboard/settings", label: "Settings", icon: Settings },
 ];

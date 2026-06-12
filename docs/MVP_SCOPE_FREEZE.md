@@ -2,9 +2,9 @@
 
 ## Decision
 
-CareerOS MVP is an 8-12 week, one-developer product focused on acquiring the first 100 users. The MVP expresses Kai's full identity as an honest career mentor and career operating system, but scopes the features to what is buildable by one developer in that window.
+CareerOS MVP is an 8-12 week, one-developer product focused on acquiring the first 100 users. The MVP expresses Scout's full identity as an honest career mentor and career operating system, but scopes the features to what is buildable by one developer in that window.
 
-The MVP is NOT a toy version of CareerOS. It IS the minimum set of features that let Kai's real personality come through: honest niche guidance, evidence-based analysis, proactive job matching, and a prescribed career system.
+The MVP is NOT a toy version of CareerOS. It IS the minimum set of features that let Scout's real personality come through: honest niche guidance, evidence-based analysis, proactive job matching, and a prescribed career system.
 
 ## MVP Outcome
 
@@ -14,12 +14,12 @@ A user can:
 2. Upload a resume or enter profile data manually.
 3. Import or paste LinkedIn profile data.
 4. Complete a guided career profile.
-5. Have Kai validate and (where warranted) challenge their stated career direction using available market data.
+5. Have Scout validate and (where warranted) challenge their stated career direction using available market data.
 6. Receive an honest, evidence-grounded AI career analysis.
-7. See a career command center driven by Kai.
+7. See a career command center driven by Scout.
 8. Discover relevant jobs matched to their profile.
 9. Receive job recommendations with match explanations.
-10. Ask Kai grounded career questions, including challenging ones.
+10. Ask Scout grounded career questions, including challenging ones.
 11. Receive learning recommendations prioritized by market demand.
 12. Track applications manually.
 
@@ -35,8 +35,8 @@ This is enough to validate whether users trust an honest, proactive AI career op
 - Career analysis with honest gap assessment
 - Job discovery and matching
 - Job recommendations with explanations
-- Career command center (Kai as the operating surface)
-- Career assistant (Kai answers grounded career questions)
+- Career command center (Scout as the operating surface)
+- Career assistant (Scout answers grounded career questions)
 - Learning recommendations (market-demand prioritized)
 - Application tracking
 
@@ -47,7 +47,7 @@ This is enough to validate whether users trust an honest, proactive AI career op
 - Full multi-agent orchestration
 - Full knowledge graph
 - Advanced automation
-- Voice interaction — Phase 2 (core to Kai's identity but not Phase 1)
+- Voice interaction — Phase 2 (core to Scout's identity but not Phase 1)
 - Recruiter simulation
 - Salary negotiation
 - Multi-tenant enterprise features
@@ -76,8 +76,8 @@ Note on Real-Time Market Data: Phase 1 MVP uses available directional data (cura
 | Job discovery | One compliant API or curated source | More sources | Real-time monitoring | 24x7 global discovery |
 | Job recommendations | Rule-based match + explanation | Feedback-tuned ranking | ML ranking | Personalized opportunity agent |
 | Voice interaction | Not included | Browser Web Speech API | Full voice command | Ambient career assistant |
-| Dashboard | Kai command center | Timeline and milestones | Motivation engine | Full career operating system |
-| Kai assistant | Single agent, limited tools | More tools and context | Proactive task creation | Autonomous career operator |
+| Dashboard | Scout command center | Timeline and milestones | Motivation engine | Full career operating system |
+| Scout assistant | Single agent, limited tools | More tools and context | Proactive task creation | Autonomous career operator |
 | Learning | Skill gap to resource list | Learning plans + proof-of-work | Progress tracking | Adaptive career learning coach |
 | Application tracking | Manual tracker | Generated resume/cover letter | Follow-up automation | Supervised application automation |
 | Market intelligence | Directional signals | Real-time APIs | Geo-political context | Predictive signals |
@@ -91,17 +91,17 @@ Note on Real-Time Market Data: Phase 1 MVP uses available directional data (cura
 | Resume upload | Fast career context ingestion | Reduces onboarding friction | Medium | No |
 | LinkedIn import | Users expect profile reuse | Improves analysis quality | Medium-high | Partially |
 | Manual profile fields | Handles missing data and corrections | Improves analysis quality | Low-medium | No |
-| Niche validation | Core of Kai's honest mentor identity | Trust and differentiation | Medium | No |
-| Career analysis | First Kai value moment | Core activation | Medium | No |
+| Niche validation | Core of Scout's honest mentor identity | Trust and differentiation | Medium | No |
+| Career analysis | First Scout value moment | Core activation | Medium | No |
 | Job discovery | Converts insight into opportunity | Core user value | Medium-high | No |
 | Job recommendations | Makes jobs feel personally relevant | Differentiates from job boards | Medium | No |
-| Dashboard (Kai command center) | Kai's primary operating surface | Drives repeat use | Medium | No |
-| Kai career assistant | Expresses Kai's full identity | Brand and UX differentiator | Medium | No |
+| Dashboard (Scout command center) | Scout's primary operating surface | Drives repeat use | Medium | No |
+| Scout career assistant | Expresses Scout's full identity | Brand and UX differentiator | Medium | No |
 | Learning recommendations | Helps users close gaps | Retention and long-term value | Low-medium | No |
 | Application tracking | Keeps users returning | Practical utility | Low-medium | No |
 | Resume tailoring | Strong value but not blocking | Future premium path | Medium | Yes, Phase 2 |
 | Cover letters | Application support | Monetizable | Medium | Yes, Phase 2 |
-| Voice interaction | Core to Kai's identity | Natural interaction + accessibility | High | Yes, Phase 2 |
+| Voice interaction | Core to Scout's identity | Natural interaction + accessibility | High | Yes, Phase 2 |
 | Real-time market APIs | Grounds market intelligence | Trust and depth | Medium | Yes, Phase 3 |
 | Browser agents | Enables automation | Powerful but high-risk | Very high | Yes, future |
 | Multi-agent orchestration | Long-term autonomy | Scale of intelligence | Very high | Yes, future |
@@ -115,12 +115,12 @@ Note on Real-Time Market Data: Phase 1 MVP uses available directional data (cura
 - 100 signed-up users.
 - 70% complete profile onboarding.
 - 60% receive a career analysis.
-- 50% engage with Kai's niche validation (agree, challenge, or revise direction).
+- 50% engage with Scout's niche validation (agree, challenge, or revise direction).
 - 40% save or view at least 3 job recommendations.
 - 30% create at least 1 application tracker item.
 - 30% return within 7 days.
 - Average career analysis usefulness rating of 4/5 or better.
-- At least one user says something like "Kai told me something I needed to hear but didn't expect."
+- At least one user says something like "Scout told me something I needed to hear but didn't expect."
 
 ## MVP Risk Level
 

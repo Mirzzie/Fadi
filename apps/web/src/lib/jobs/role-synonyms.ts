@@ -6,7 +6,7 @@ import type { DocGenerate } from "@/lib/documents/generate";
 
 /**
  * Domain-agnostic role-synonym expansion. Given a user's target role(s) — in
- * ANY field (nursing, finance, trades, tech, design…) — Kai returns the
+ * ANY field (nursing, finance, trades, tech, design…) — Scout returns the
  * equivalent job-title phrases hiring teams actually use, so matching catches
  * title variants ("Registered Nurse" ↔ "Staff Nurse" ↔ "RN") for everyone, not
  * just the IT roles a hardcoded map happened to cover.

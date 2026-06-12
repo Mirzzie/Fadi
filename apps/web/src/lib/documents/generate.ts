@@ -41,7 +41,7 @@ export type GeneratedDoc = { id: string; kind: string; title: string };
 /**
  * Draft a tailored career document grounded in the user's REAL profile/resume,
  * save it (optionally linked to a job/application), and return a pointer. Shared
- * by Kai's generate_document tool and the per-job workspace buttons.
+ * by Scout's generate_document tool and the per-job workspace buttons.
  */
 export async function generateCareerDocument(
   userId: string,
@@ -89,7 +89,7 @@ export async function generateCareerDocument(
   const jobContext = { jobTitle: role, company };
 
   if (opts.kind === "resume") {
-    const system = `You are Kai, an expert resume writer. Start from the candidate's BASE resume below and produce a version tailored to the target role${jobDescription ? " and its job description" : ""}.
+    const system = `You are Scout, an expert resume writer. Start from the candidate's BASE resume below and produce a version tailored to the target role${jobDescription ? " and its job description" : ""}.
 - Keep their real roles, companies, dates, education and projects exactly.
 - Rewrite the summary and bullets to align with what the job actually asks for: surface the most relevant real experience first, and weave in the job's real keywords/terminology WHERE the candidate genuinely has that experience.
 - Show impact with the real numbers/tools already in their resume.
@@ -118,7 +118,7 @@ ${HUMANIZE_RESUME}`;
   }
 
   const label = KIND_LABEL[opts.kind] ?? "document";
-  const system = `You are Kai, an expert career writer. Write a concise, specific, honest ${label} for the target role${jobDescription ? ", tailored to the provided job description" : ""}. Ground every claim in the candidate's REAL experience — never invent. Return plain text ready to use.
+  const system = `You are Scout, an expert career writer. Write a concise, specific, honest ${label} for the target role${jobDescription ? ", tailored to the provided job description" : ""}. Ground every claim in the candidate's REAL experience — never invent. Return plain text ready to use.
 
 ${HUMANIZE_CORE}
 

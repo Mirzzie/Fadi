@@ -2,11 +2,11 @@
 
 ## Purpose
 
-The first wow moment is the point where the user feels Kai genuinely understood their career context — and was honest with them about it, including the parts that required some courage to say. The wow moment is not just accuracy; it is the experience of receiving real advice rather than generic encouragement.
+The first wow moment is the point where the user feels Scout genuinely understood their career context — and was honest with them about it, including the parts that required some courage to say. The wow moment is not just accuracy; it is the experience of receiving real advice rather than generic encouragement.
 
 ## Wow Moment Definition
 
-The first wow moment happens at the top of the Career Intelligence Report, when Kai delivers one specific, evidence-grounded insight that connects:
+The first wow moment happens at the top of the Career Intelligence Report, when Scout delivers one specific, evidence-grounded insight that connects:
 
 - What the user has done.
 - What the user wants.
@@ -47,8 +47,8 @@ The fastest next move is [specific, concrete action].
 The wow moment appears:
 
 1. At the top of the report reveal screen.
-2. As the first Kai action feed item in the Kai Command Center after report completion.
-3. As Kai's first contextual prompt in the assistant.
+2. As the first Scout action feed item in the Scout Command Center after report completion.
+3. As Scout's first contextual prompt in the assistant.
 
 ## Report Reveal Wireframe
 
@@ -56,7 +56,7 @@ The wow moment appears:
 ------------------------------------------------
 [Career Intelligence Report]
 
-[Kai Insight Card]
+[Scout Insight Card]
 "I see you as..."
 [Niche assessment: supported / challenged]
 [Evidence: market data source attribution]
@@ -71,7 +71,7 @@ Specific next action
 ------------------------------------------------
 ```
 
-## Kai Copy Variants
+## Scout Copy Variants
 
 ### Strong Fit and Validated Direction
 
@@ -111,8 +111,8 @@ Before showing the wow moment, confirm:
 - User reads the report insight (scroll depth).
 - User clicks "Why I think this" or expands evidence.
 - User rates the report useful.
-- User engages with a contrarian or challenging Kai assessment (does not immediately dismiss it).
-- User asks Kai a follow-up question.
+- User engages with a contrarian or challenging Scout assessment (does not immediately dismiss it).
+- User asks Scout a follow-up question.
 - User clicks the first recommended next action.
 - User returns to the command center within 7 days.
 
@@ -132,6 +132,6 @@ Why it fails: It overpromises and breaks trust when reality disagrees.
 
 Suppressed concern moment:
 
-- Kai detects that the user's direction has significant market headwinds but says nothing about it to avoid discomforting the user.
+- Scout detects that the user's direction has significant market headwinds but says nothing about it to avoid discomforting the user.
 
-Why it fails: This is the antithesis of Kai's honest-mentor identity. Users who receive comfortable validation and later discover the reality did not match will not return.
+Why it fails: This is the antithesis of Scout's honest-mentor identity. Users who receive comfortable validation and later discover the reality did not match will not return.

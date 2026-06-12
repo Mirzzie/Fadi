@@ -230,7 +230,7 @@ Suggested fields:
 
 ### ai_memories
 
-Stores persistent Kai memory.
+Stores persistent Scout memory.
 
 Suggested fields:
 
@@ -433,7 +433,7 @@ Suggested fields:
 
 ### agent_tasks
 
-Stores Kai work items.
+Stores Scout work items.
 
 Suggested fields:
 
@@ -453,13 +453,13 @@ Suggested fields:
 
 ### agent_messages
 
-Stores Kai conversation messages.
+Stores Scout conversation messages.
 
 Suggested fields:
 
 - id
 - user_id
-- role (user, kai, system)
+- role (user, scout, system)
 - content
 - context_summary
 - created_at

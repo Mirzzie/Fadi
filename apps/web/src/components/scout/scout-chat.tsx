@@ -12,28 +12,28 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { KaiBadge } from "@/components/ui/kai-badge";
+import { ScoutBadge } from "@/components/ui/scout-badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useGroqVoice } from "@/lib/voice/use-groq-voice";
 import { useSpeechOutput } from "@/lib/voice/use-speech-output";
 import { cn } from "@/lib/utils";
 
-export type KaiToolResultView = { name: string; view: string; data: unknown };
+export type ScoutToolResultView = { name: string; view: string; data: unknown };
 
 type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
-  toolResults?: KaiToolResultView[];
+  toolResults?: ScoutToolResultView[];
 };
 
 const INITIAL_MESSAGE: Message = {
   id: "init",
   role: "assistant",
   content:
-    "Hello. I'm Kai, your career agent.\n\nI have your profile and career analysis loaded. Ask me anything — your skill gaps, whether a role is worth pursuing, how to improve your resume for a specific job, what's happening in your target market, or what your next move should be.\n\nI'll be direct. If something doesn't add up, I'll tell you.",
+    "Hello. I'm Scout, your career agent.\n\nI have your profile and career analysis loaded. Ask me anything — your skill gaps, whether a role is worth pursuing, how to improve your resume for a specific job, what's happening in your target market, or what your next move should be.\n\nI'll be direct. If something doesn't add up, I'll tell you.",
   timestamp: new Date(),
 };
 
@@ -47,17 +47,20 @@ function toSpeakable(markdown: string): string {
     .replace(/\n/g, " ");
 }
 
-const VOICE_PREF_KEY = "kai-voice-enabled";
+const VOICE_PREF_KEY = "scout-voice-enabled";
 
-export function KaiChat({ autoListenNonce }: { autoListenNonce?: number } = {}) {
+export function ScoutChat({ autoListenNonce }: { autoListenNonce?: number } = {}) {
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  // Voice preference survives sessions — it's what lets Kai greet you ALOUD
+  // Voice preference survives sessions — it's what lets Scout greet you ALOUD
   // with the background digest when you come back.
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   useEffect(() => {
-    setVoiceEnabled(localStorage.getItem(VOICE_PREF_KEY) === "1");
+    // Migrate the pre-rename pref key so nobody silently loses their voice setting.
+    setVoiceEnabled(
+      (localStorage.getItem(VOICE_PREF_KEY) ?? localStorage.getItem("kai-voice-enabled")) === "1",
+    );
   }, []);
   useEffect(() => {
     localStorage.setItem(VOICE_PREF_KEY, voiceEnabled ? "1" : "0");
@@ -97,13 +100,13 @@ export function KaiChat({ autoListenNonce }: { autoListenNonce?: number } = {}) 
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Load persisted conversation on mount → chats survive reloads and Desk/Kai
+  // Load persisted conversation on mount → chats survive reloads and Desk/Scout
   // modes stay in sync (both read the same history).
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/kai/history");
+        const res = await fetch("/api/scout/history");
         if (!res.ok) return;
         const data = (await res.json()) as {
           messages: Array<{
@@ -124,7 +127,7 @@ export function KaiChat({ autoListenNonce }: { autoListenNonce?: number } = {}) 
           })),
         );
 
-        // Kai speaks a background digest that just landed — only the newest
+        // Scout speaks a background digest that just landed — only the newest
         // message, only when fresh, and only if the user keeps voice on.
         const last = data.messages[data.messages.length - 1];
         const isFresh =
@@ -143,7 +146,7 @@ export function KaiChat({ autoListenNonce }: { autoListenNonce?: number } = {}) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Summoned by "Hey Kai": start listening for the user's question immediately.
+  // Summoned by "Hey Scout": start listening for the user's question immediately.
   useEffect(() => {
     if (autoListenNonce && autoListenNonce > 0) {
       startListening();
@@ -151,7 +154,7 @@ export function KaiChat({ autoListenNonce }: { autoListenNonce?: number } = {}) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoListenNonce]);
 
-  // Conversation loop: whenever Kai is idle in hands-free mode (not thinking,
+  // Conversation loop: whenever Scout is idle in hands-free mode (not thinking,
   // speaking, or already listening), resume listening for the next turn. Back
   // off when the last attempt errored (e.g. flaky speech network) so we don't
   // spin in a tight retry storm.
@@ -195,7 +198,7 @@ export function KaiChat({ autoListenNonce }: { autoListenNonce?: number } = {}) 
       abortRef.current = new AbortController();
 
       try {
-        const res = await fetch("/api/kai/chat", {
+        const res = await fetch("/api/scout/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: text.trim(), history }),
@@ -203,7 +206,7 @@ export function KaiChat({ autoListenNonce }: { autoListenNonce?: number } = {}) 
         });
 
         if (!res.ok || !res.body) {
-          throw new Error(`Kai returned ${res.status}`);
+          throw new Error(`Scout returned ${res.status}`);
         }
 
         const reader = res.body.getReader();
@@ -224,9 +227,9 @@ export function KaiChat({ autoListenNonce }: { autoListenNonce?: number } = {}) 
 
             try {
               const parsed = JSON.parse(data);
-              if (parsed && typeof parsed === "object" && "kaiTools" in parsed) {
+              if (parsed && typeof parsed === "object" && "scoutTools" in parsed) {
                 // Structured tool results → render as cards/tiles.
-                const toolResults = (parsed as { kaiTools: KaiToolResultView[] }).kaiTools;
+                const toolResults = (parsed as { scoutTools: ScoutToolResultView[] }).scoutTools;
                 setMessages((prev) =>
                   prev.map((m) => (m.id === assistantId ? { ...m, toolResults } : m)),
                 );
@@ -261,7 +264,7 @@ export function KaiChat({ autoListenNonce }: { autoListenNonce?: number } = {}) 
               : m,
           ),
         );
-        setError("Failed to reach Kai. Try again in a moment.");
+        setError("Failed to reach Scout. Try again in a moment.");
       } finally {
         setIsStreaming(false);
         abortRef.current = null;
@@ -306,14 +309,14 @@ export function KaiChat({ autoListenNonce }: { autoListenNonce?: number } = {}) 
       stopSpeaking();
     } else {
       setConversationMode(true);
-      setVoiceEnabled(true); // Kai speaks its replies in conversation mode
+      setVoiceEnabled(true); // Scout speaks its replies in conversation mode
       setError(null);
       startListening();
     }
   }
 
-  // Kai's live state — drives the animated persona orb.
-  const kaiState: "speaking" | "thinking" | "listening" | "idle" = isSpeaking
+  // Scout's live state — drives the animated persona orb.
+  const scoutState: "speaking" | "thinking" | "listening" | "idle" = isSpeaking
     ? "speaking"
     : isStreaming || isTranscribing
       ? "thinking"
@@ -351,19 +354,19 @@ export function KaiChat({ autoListenNonce }: { autoListenNonce?: number } = {}) 
       {/* Live conversation persona */}
       {conversationMode ? (
         <div className="mx-4 mb-2 flex items-center gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3">
-          <KaiOrb state={kaiState} />
+          <ScoutOrb state={scoutState} />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium">
-              {kaiState === "speaking"
-                ? "Kai is speaking…"
-                : kaiState === "thinking"
-                  ? "Kai is thinking…"
-                  : kaiState === "listening"
+              {scoutState === "speaking"
+                ? "Scout is speaking…"
+                : scoutState === "thinking"
+                  ? "Scout is thinking…"
+                  : scoutState === "listening"
                     ? "Listening — go ahead"
                     : "Say something…"}
             </p>
             <p className="text-xs text-muted-foreground">
-              Hands-free — talk naturally, Kai replies out loud.
+              Hands-free — talk naturally, Scout replies out loud.
             </p>
           </div>
           <Button type="button" variant="outline" size="sm" onClick={toggleConversation}>
@@ -383,12 +386,12 @@ export function KaiChat({ autoListenNonce }: { autoListenNonce?: number } = {}) 
             placeholder={
               isListening
                 ? "Listening... speak now"
-                : "Ask Kai anything about your career..."
+                : "Ask Scout anything about your career..."
             }
             rows={2}
             disabled={isStreaming}
             className="flex-1 resize-none text-sm"
-            aria-label="Message to Kai"
+            aria-label="Message to Scout"
           />
           <div className="flex flex-col gap-1.5">
             <Button
@@ -409,7 +412,7 @@ export function KaiChat({ autoListenNonce }: { autoListenNonce?: number } = {}) 
               className={cn("size-9 shrink-0", isListening && "animate-pulse")}
               onClick={toggleVoiceInput}
               disabled={isTranscribing}
-              title={isListening ? "Stop & transcribe" : isTranscribing ? "Transcribing…" : "Speak to Kai"}
+              title={isListening ? "Stop & transcribe" : isTranscribing ? "Transcribing…" : "Speak to Scout"}
               aria-label={isListening ? "Stop voice input" : "Start voice input"}
             >
               {isTranscribing ? (
@@ -426,7 +429,7 @@ export function KaiChat({ autoListenNonce }: { autoListenNonce?: number } = {}) 
               variant={voiceEnabled ? "default" : "outline"}
               className="size-9 shrink-0"
               onClick={toggleVoiceOutput}
-              title={voiceEnabled ? "Mute Kai voice" : "Enable Kai voice"}
+              title={voiceEnabled ? "Mute Scout voice" : "Enable Scout voice"}
               aria-label={voiceEnabled ? "Disable voice output" : "Enable voice output"}
             >
               {voiceEnabled || isSpeaking ? (
@@ -452,7 +455,7 @@ export function KaiChat({ autoListenNonce }: { autoListenNonce?: number } = {}) 
           </Button>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          Press Enter to send, Shift+Enter for a new line. Kai uses your career profile and analysis for context.
+          Press Enter to send, Shift+Enter for a new line. Scout uses your career profile and analysis for context.
         </p>
       </div>
     </div>
@@ -466,13 +469,13 @@ function MessageBubble({
   message: Message;
   isStreaming: boolean;
 }) {
-  const isKai = message.role === "assistant";
+  const isScout = message.role === "assistant";
   const hasTools = (message.toolResults?.length ?? 0) > 0;
 
   return (
-    <div className={cn("flex items-start gap-3", !isKai && "flex-row-reverse")}>
-      {isKai ? (
-        <KaiBadge size="xs" showName={false} className="shrink-0 pt-0.5" />
+    <div className={cn("flex items-start gap-3", !isScout && "flex-row-reverse")}>
+      {isScout ? (
+        <ScoutBadge size="xs" showName={false} className="shrink-0 pt-0.5" />
       ) : (
         <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-medium text-secondary-foreground">
           You
@@ -482,7 +485,7 @@ function MessageBubble({
         <div
           className={cn(
             "rounded-xl px-3.5 py-2.5 text-sm leading-relaxed",
-            isKai ? "bg-card border border-border/60" : "bg-primary/15 text-foreground",
+            isScout ? "bg-card border border-border/60" : "bg-primary/15 text-foreground",
           )}
         >
           {message.content ? (
@@ -490,18 +493,18 @@ function MessageBubble({
           ) : isStreaming ? (
             <span className="flex items-center gap-1.5 text-muted-foreground">
               <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-              Kai is thinking...
+              Scout is thinking...
             </span>
           ) : null}
         </div>
-        {hasTools ? <KaiToolResults results={message.toolResults!} /> : null}
+        {hasTools ? <ScoutToolResults results={message.toolResults!} /> : null}
       </div>
     </div>
   );
 }
 
-/** Visual render of what Kai's tools returned — job cards, performance tiles. */
-function KaiToolResults({ results }: { results: KaiToolResultView[] }) {
+/** Visual render of what Scout's tools returned — job cards, performance tiles. */
+function ScoutToolResults({ results }: { results: ScoutToolResultView[] }) {
   return (
     <div className="space-y-3">
       {results.map((r, i) => (
@@ -521,7 +524,7 @@ type JobCard = {
   url?: string;
 };
 
-function renderToolResult(r: KaiToolResultView) {
+function renderToolResult(r: ScoutToolResultView) {
   const data = r.data as Record<string, unknown> | undefined;
 
   if ((r.view === "jobs" || r.view === "updates") && data) {
@@ -653,8 +656,8 @@ function renderToolResult(r: KaiToolResultView) {
   return null;
 }
 
-/** Animated Kai persona — reacts to whether Kai is listening, thinking, or speaking. */
-function KaiOrb({ state }: { state: "speaking" | "thinking" | "listening" | "idle" }) {
+/** Animated Scout persona — reacts to whether Scout is listening, thinking, or speaking. */
+function ScoutOrb({ state }: { state: "speaking" | "thinking" | "listening" | "idle" }) {
   return (
     <div className="relative grid size-10 shrink-0 place-items-center">
       {state === "listening" ? (

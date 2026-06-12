@@ -24,7 +24,7 @@ This guide explains how developers should work in the CareerOS repository. The r
 - Do not build future-vision architecture inside MVP code.
 - Keep AI usage observable, bounded, and reviewable.
 - Protect user career data as sensitive personal data.
-- Kai is the product — design features from the user's perspective of interacting with Kai, not a generic dashboard.
+- Scout is the product — design features from the user's perspective of interacting with Scout, not a generic dashboard.
 
 ## Current Stack
 

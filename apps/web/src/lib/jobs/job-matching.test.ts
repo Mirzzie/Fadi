@@ -20,7 +20,7 @@ const run = (p: CareerProfile, title: string) =>
   scoreJobForUser({ careerProfile: p, resume: null, job: job(title) });
 
 describe("scoreJobForUser — domain-agnostic role matching", () => {
-  it("matches title variants for a non-tech role via Kai synonyms", () => {
+  it("matches title variants for a non-tech role via Scout synonyms", () => {
     const nurse = profile("Registered Nurse", ["registered nurse", "staff nurse", "rn", "charge nurse"]);
     expect(run(nurse, "Staff Nurse").onRole).toBe(true);
     expect(run(nurse, "RN - ICU Night Shift").onRole).toBe(true);

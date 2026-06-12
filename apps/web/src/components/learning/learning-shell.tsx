@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { BookOpen, GraduationCap, Hammer, Map, MonitorPlay, Target } from "lucide-react";
 
-import { KaiBadge } from "@/components/ui/kai-badge";
+import { ScoutBadge } from "@/components/ui/scout-badge";
 import { buttonVariants } from "@/components/ui/button";
 import type { StoredCareerReport } from "@/lib/career-report/schema";
 import { learningResources } from "@/lib/learning/resources";
@@ -83,9 +83,9 @@ export function LearningShell({ report }: Props) {
       {!hasContent ? (
         <div className="gradient-border glass-card rounded-xl p-6">
           <div className="flex items-start gap-4">
-            <KaiBadge size="sm" showName={false} />
+            <ScoutBadge size="sm" showName={false} />
             <div className="space-y-3">
-              <p className="text-sm font-medium text-primary">Kai</p>
+              <p className="text-sm font-medium text-primary">Scout</p>
               <p className="text-sm leading-relaxed text-card-foreground">
                 Generate your Career Intelligence Report from the dashboard and I&apos;ll turn your
                 skill gaps into a prioritized learning plan tied to your target role.
@@ -164,7 +164,7 @@ export function LearningShell({ report }: Props) {
           <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
             <BookOpen className="size-3 text-primary/60" aria-hidden="true" />
             Each item links to a roadmap, video tutorials, free courses and a project to build —
-            work top-down: the highest-impact gap first. Ask Kai in chat to plan any of these out.
+            work top-down: the highest-impact gap first. Ask Scout in chat to plan any of these out.
           </p>
         </>
       )}

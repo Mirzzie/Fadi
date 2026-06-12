@@ -44,7 +44,7 @@ export default async function DashboardPage() {
       getAgencyDigest(user.id),
     ]);
 
-  // Deliver the background-agency digest into Kai's chat (once per finding),
+  // Deliver the background-agency digest into Scout's chat (once per finding),
   // and kick off the next agency pass after the response is sent — this keeps
   // the agency real even on deployments with no cron scheduler.
   if (digest) {
@@ -79,14 +79,14 @@ export default async function DashboardPage() {
   const firstName = profileSummary?.fullName?.trim().split(/\s+/)[0] || "there";
   const jobsCount = recommendedJobsPreview.length;
   // The digest leads when the background agency found something — that's the
-  // real "Kai has been working" moment, grounded in the findings ledger.
+  // real "Scout has been working" moment, grounded in the findings ledger.
   const subline = digest
     ? digestSubline(digest)
     : jobsCount > 0
       ? `I've lined up ${jobsCount} role${jobsCount === 1 ? "" : "s"} matched to you, plus your latest market signals. Ask me anything — or tell me what you're working on.`
       : `I'm watching your target market. Ask me about your roadmap, a specific role, or your next move.`;
 
-  // Real opportunities Kai surfaces in Kai mode — fresh agency findings lead,
+  // Real opportunities Scout surfaces in Scout mode — fresh agency findings lead,
   // then the guided next step, then top matched roles + a live signal.
   const opportunities = [
     ...(digest?.findings ?? []).slice(0, 2).map((finding) => ({

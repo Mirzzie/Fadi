@@ -3,14 +3,14 @@
 import { usePathname } from "next/navigation";
 
 import { Dock } from "./dock";
-import { KaiLauncher } from "./kai-launcher";
+import { ScoutLauncher } from "./scout-launcher";
 import { MenuBar } from "./menu-bar";
 import { OsModeProvider, useOsMode } from "./os-mode";
 
 /**
  * The OS chrome that wraps every authenticated screen: a top menu bar, a bottom
- * dock, a desktop "wallpaper", and the always-present Kai orb. Pages render in
- * the desktop area between them. Mode (Desk ⇄ Kai) lives in OsModeProvider.
+ * dock, a desktop "wallpaper", and the always-present Scout orb. Pages render in
+ * the desktop area between them. Mode (Desk ⇄ Scout) lives in OsModeProvider.
  */
 export function OsShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -37,14 +37,14 @@ export function OsShell({ children }: { children: React.ReactNode }) {
           </div>
         </main>
         <Dock />
-        <DeskOnlyKaiOrb />
+        <DeskOnlyScoutOrb />
       </div>
     </OsModeProvider>
   );
 }
 
-/** The corner Kai orb belongs to Desk mode; Kai mode already centres Kai. */
-function DeskOnlyKaiOrb() {
+/** The corner Scout orb belongs to Desk mode; Scout mode already centres Scout. */
+function DeskOnlyScoutOrb() {
   const { mode } = useOsMode();
-  return mode === "desk" ? <KaiLauncher /> : null;
+  return mode === "desk" ? <ScoutLauncher /> : null;
 }

@@ -2,7 +2,7 @@
 
 ## Goal
 
-Build a realistic 8-12 week MVP that can acquire the first 100 users and validate Kai's core value proposition: an honest, proactive AI career operating system. The plan assumes one developer working full time.
+Build a realistic 8-12 week MVP that can acquire the first 100 users and validate Scout's core value proposition: an honest, proactive AI career operating system. The plan assumes one developer working full time.
 
 ## Timeline Summary
 
@@ -61,8 +61,8 @@ Risk: High — document parsing can be messy.
 
 Deliverables:
 
-- Niche discovery conversation: Kai asks exploratory questions about goals.
-- Basic niche validation: Kai checks the stated direction against available curated market data and returns an honest assessment.
+- Niche discovery conversation: Scout asks exploratory questions about goals.
+- Basic niche validation: Scout checks the stated direction against available curated market data and returns an honest assessment.
 - Career analysis prompt through model gateway.
 - Readiness score logic with component breakdown.
 - Strengths, weaknesses, gaps, and growth system prescription.
@@ -75,11 +75,11 @@ Risk: Medium-high — niche validation quality and honest-mentor tone calibratio
 
 Deliverables:
 
-- Kai-first dashboard: action feed, career summary, next actions.
+- Scout-first dashboard: action feed, career summary, next actions.
 - Application tracker summary.
 - Job recommendation preview.
 - Learning preview.
-- Empty and loading states that still feel like Kai.
+- Empty and loading states that still feel like Scout.
 
 Risk: Medium.
 
@@ -109,15 +109,15 @@ Deliverables:
 
 Risk: Low-medium.
 
-### Week 8: Learning Recommendations and Kai Assistant
+### Week 8: Learning Recommendations and Scout Assistant
 
 Deliverables:
 
 - Learning recommendation generation from skill gaps (market demand prioritized).
 - Learning list and status updates.
-- Kai assistant API (model gateway, grounded context builder).
-- Kai assistant UI.
-- Niche challenge capability in assistant (Kai pushes back when data warrants it).
+- Scout assistant API (model gateway, grounded context builder).
+- Scout assistant UI.
+- Niche challenge capability in assistant (Scout pushes back when data warrants it).
 
 Risk: Medium.
 
@@ -140,7 +140,7 @@ Deliverables:
 
 - Production deployment (Vercel + managed PostgreSQL).
 - Production migrations run from `packages/database/migrations`.
-- QA across all Kai flows.
+- QA across all Scout flows.
 - Invite first users.
 - Feedback collection.
 - Bug fixing.
@@ -157,11 +157,11 @@ Risk: Medium.
 6. Add LinkedIn paste/import.
 7. Implement niche discovery and basic niche validation.
 8. Generate career analysis through model gateway.
-9. Build Kai command center dashboard.
+9. Build Scout command center dashboard.
 10. Add job discovery and recommendation matching.
 11. Add application tracker and asset generation.
 12. Add learning recommendations.
-13. Add Kai assistant with grounded context.
+13. Add Scout assistant with grounded context.
 14. Add events and usage tracking.
 15. Add deployment, QA, and production launch.
 
@@ -212,13 +212,13 @@ Not required for Phase 1:
 
 ## Launch Criteria
 
-- End-to-end onboarding works with Kai present throughout.
+- End-to-end onboarding works with Scout present throughout.
 - Niche validation produces honest, evidence-grounded output.
 - Career analysis produces useful, actionable output.
 - At least one job source works with match explanations.
-- Kai command center is usable.
+- Scout command center is usable.
 - Applications can be tracked.
-- Kai assistant answers grounded questions including challenging ones.
+- Scout assistant answers grounded questions including challenging ones.
 - User data is protected by Better Auth and repository-scoped authorization.
 - AI usage is logged (metadata only, no sensitive content).
 - Feedback collection exists.

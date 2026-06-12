@@ -55,7 +55,7 @@ export default async function ProfilePage() {
                 </span>
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                This is what Kai reasons from. Keep it current — accurate inputs mean sharper advice.
+                This is what Scout reasons from. Keep it current — accurate inputs mean sharper advice.
               </p>
             </div>
           </div>

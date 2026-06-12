@@ -3,14 +3,14 @@
 import { ArrowLeft } from "lucide-react";
 import { useState } from "react";
 
-import { KaiOnboarding } from "@/components/onboarding/kai-onboarding";
-import { KaiOnboardingAI } from "@/components/onboarding/kai-onboarding-ai";
+import { ScoutOnboarding } from "@/components/onboarding/scout-onboarding";
+import { ScoutOnboardingAI } from "@/components/onboarding/scout-onboarding-ai";
 import { OnboardingForm } from "@/components/onboarding/onboarding-form";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 /**
- * Onboarding entry point. Default = Kai as a REAL AI conversation. If the user
- * has no working AI provider, it auto-drops to the scripted Kai welcome (still a
+ * Onboarding entry point. Default = Scout as a REAL AI conversation. If the user
+ * has no working AI provider, it auto-drops to the scripted Scout welcome (still a
  * conversation, no AI needed). A one-click "Prefer a form?" escape hatch to the
  * classic form is always available, so nobody is ever stuck.
  */
@@ -28,7 +28,7 @@ export function OnboardingExperience() {
           className="flex items-center gap-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
         >
           <ArrowLeft className="size-3.5" aria-hidden="true" />
-          Back to setup with Kai
+          Back to setup with Scout
         </button>
         <Card className="glow-primary">
           <CardHeader>
@@ -44,11 +44,11 @@ export function OnboardingExperience() {
   }
 
   if (mode === "scripted") {
-    return <KaiOnboarding onUseForm={() => setMode("form")} />;
+    return <ScoutOnboarding onUseForm={() => setMode("form")} />;
   }
 
   return (
-    <KaiOnboardingAI
+    <ScoutOnboardingAI
       onUseForm={() => setMode("form")}
       onProviderUnavailable={() => setMode("scripted")}
     />

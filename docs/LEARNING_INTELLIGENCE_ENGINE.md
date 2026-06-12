@@ -45,7 +45,7 @@ flowchart TD
     Gateway[Model Gateway] --> Plan
     Plan --> Tracker[Progress Tracker]
     Tracker --> Readiness[Career Readiness Update]
-    Readiness --> Recommendations[Kai Next Actions]
+    Readiness --> Recommendations[Scout Next Actions]
 ```
 
 ## Proof-of-Work Priority
@@ -56,7 +56,7 @@ For many career roles, demonstrable evidence matters more than certificates. The
 - **High portfolio value**: roles where demonstrated output matters more than certificates (engineering, design, product, data, content).
 - **Mixed value**: roles where both credentials and portfolio projects are expected.
 
-Kai surfaces the right mix for the user's specific target role.
+Scout surfaces the right mix for the user's specific target role.
 
 ## Model Gateway
 
@@ -74,7 +74,7 @@ All plan generation and project scaffolding narratives go through the model gate
 
 ## Phase 5 Version
 
-- Portfolio project and GitHub repo scaffolding (Kai generates a starting structure for the user).
+- Portfolio project and GitHub repo scaffolding (Scout generates a starting structure for the user).
 - Case study templates based on the user's industry and target role.
 - Personalized sequencing based on the user's time and constraints.
 - Learning provider integrations.

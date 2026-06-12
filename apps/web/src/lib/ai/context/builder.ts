@@ -12,9 +12,9 @@ import { getDatabase } from "@/lib/database/client";
 import { getMarketIntelligence } from "@/lib/data-sources/service";
 import { getMomentumSummary } from "@/lib/resilience/service";
 
-import type { KaiUserContext } from "./types";
+import type { ScoutUserContext } from "./types";
 
-export interface BuildKaiContextOptions {
+export interface BuildScoutContextOptions {
   /**
    * Fetch live market signals from external sources. Adds network latency, so
    * it's OFF by default (the per-message chat path stays fast). The dashboard
@@ -29,10 +29,10 @@ function truncate(text: string | null | undefined, max: number): string | null {
   return text.length > max ? `${text.slice(0, max)}\n[truncated for context]` : text;
 }
 
-export async function buildKaiContext(
+export async function buildScoutContext(
   userId: string,
-  options: BuildKaiContextOptions = {},
-): Promise<KaiUserContext | null> {
+  options: BuildScoutContextOptions = {},
+): Promise<ScoutUserContext | null> {
   const db = getDatabase();
 
   const [careerProfile, profile, resume, linkedIn, report, savedJobsList, momentum, findings] =
@@ -51,7 +51,7 @@ export async function buildKaiContext(
 
   // Live, personalized market intelligence — opt-in (see options doc above).
   const skillGaps = (report?.missingSkills as Array<{ title: string; detail: string }>) ?? [];
-  let marketContext: KaiUserContext["marketContext"] = {
+  let marketContext: ScoutUserContext["marketContext"] = {
     available: false,
     note: "Live market intelligence is available but not loaded for this turn (kept off to keep chat fast). The dashboard market brief shows the full picture.",
     signals: [],
@@ -156,7 +156,7 @@ export async function buildKaiContext(
   };
 }
 
-export function formatKaiContextAsPrompt(ctx: KaiUserContext): string {
+export function formatScoutContextAsPrompt(ctx: ScoutUserContext): string {
   const lines: string[] = [];
 
   lines.push("# User Career Context");

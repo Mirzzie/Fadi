@@ -6,7 +6,7 @@
 
 Use short-lived branches:
 
-- `docs/update-kai-vision`
+- `docs/update-scout-vision`
 - `feat/niche-validation-conversation`
 - `fix/resume-upload-validation`
 - `chore/update-tooling`
@@ -20,7 +20,7 @@ Use Conventional Commits:
 
 - `feat: add niche validation conversation design`
 - `fix: handle failed resume parsing`
-- `docs: update Kai persona design`
+- `docs: update Scout persona design`
 - `chore: configure lint tooling`
 - `test: add application tracker coverage`
 - `refactor: extract career intelligence service`

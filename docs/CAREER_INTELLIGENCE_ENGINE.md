@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The Career Intelligence Engine is the core analytical brain of Kai. It analyzes the user's professional profile, validates their career direction against real market data, and converts that analysis into structured insight: strengths, evidence gaps, niche viability, career paths, opportunity readiness, market readiness, a prescribed career system, and recommended next actions.
+The Career Intelligence Engine is the core analytical brain of Scout. It analyzes the user's professional profile, validates their career direction against real market data, and converts that analysis into structured insight: strengths, evidence gaps, niche viability, career paths, opportunity readiness, market readiness, a prescribed career system, and recommended next actions.
 
 This engine powers onboarding analysis, profile updates, job matching, learning plans, motivation, and long-term career strategy.
 
@@ -44,7 +44,7 @@ This engine powers onboarding analysis, profile updates, job matching, learning 
 flowchart TD
     Profile[Profile Data] --> Normalize[Profile Normalization]
     Resume[Resume Data] --> Normalize
-    Goals[Career Goals] --> Analyze[Kai Career Analysis]
+    Goals[Career Goals] --> Analyze[Scout Career Analysis]
     Normalize --> SkillMap[Skill Mapping]
     SkillMap --> RoleFit[Target Role Fit]
     MarketData[Real-Time Market Signals] --> Readiness[Market Readiness]
@@ -61,14 +61,14 @@ flowchart TD
 
 ## Niche Validation
 
-The niche validation component is critical to Kai's honest-mentor identity. When a user states a career direction, the engine:
+The niche validation component is critical to Scout's honest-mentor identity. When a user states a career direction, the engine:
 
 1. Retrieves available market signal data for that role, seniority level, and geography.
 2. Checks for known market saturation, contraction, geo-political headwinds, or hype patterns.
 3. Compares the user's actual profile signal against what is needed for the stated direction.
 4. Returns an assessment: supported, needs context, or challenged — each with evidence.
 
-The engine must surface concerns when the data shows them. Suppressing a concern to produce a more comfortable result violates the honest-no-fake principle and destroys Kai's credibility.
+The engine must surface concerns when the data shows them. Suppressing a concern to produce a more comfortable result violates the honest-no-fake principle and destroys Scout's credibility.
 
 ## Model Gateway
 

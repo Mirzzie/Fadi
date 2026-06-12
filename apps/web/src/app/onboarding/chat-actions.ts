@@ -12,9 +12,9 @@ import { experienceLevelOptions, type OnboardingFormValues } from "@/lib/onboard
 import { logger } from "@/lib/observability/logger";
 
 /**
- * The Kai-led welcome as a REAL AI conversation. Each turn the model both replies
+ * The Scout-led welcome as a REAL AI conversation. Each turn the model both replies
  * to the user AND tracks the structured fields it has gathered so far + whether
- * it's done — so onboarding feels like talking to Kai, not filling a form, while
+ * it's done — so onboarding feels like talking to Scout, not filling a form, while
  * staying reliable enough to actually create the profile + first track.
  *
  * Degrades honestly: a brand-new user has no AI key, so this falls back to the
@@ -51,7 +51,7 @@ export type OnboardingChatResult =
     }
   | { ok: false; error: "provider" | "auth"; message: string };
 
-const SYSTEM = `You are Kai, CareerOS's career operating system, welcoming a brand-new user on their first login. Run a warm, BRIEF conversation to set up their first career track.
+const SYSTEM = `You are Scout, CareerOS's career operating system, welcoming a brand-new user on their first login. Run a warm, BRIEF conversation to set up their first career track.
 
 Collect — conversationally, ONE topic at a time, reacting to each answer before moving on.
 
@@ -116,7 +116,7 @@ export async function onboardingChatAction(
       exhausted: isProviderExhausted(err) || isRateLimited(err),
       error: err instanceof Error ? err.message : "unknown",
     });
-    return { ok: false, error: "provider", message: "Kai's AI is unavailable right now." };
+    return { ok: false, error: "provider", message: "Scout's AI is unavailable right now." };
   }
 
   // Don't depend on the model flipping `complete` — some models never do, which

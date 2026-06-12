@@ -91,7 +91,7 @@ export function DocumentsShell({ documents }: { documents: DocView[] }) {
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
               Resumes, cover letters, emails and value propositions — saved, editable, and tied to
-              the roles you&apos;re chasing. Kai can draft any of these for you.
+              the roles you&apos;re chasing. Scout can draft any of these for you.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -133,7 +133,7 @@ export function DocumentsShell({ documents }: { documents: DocView[] }) {
       {documents.length === 0 ? (
         <Card>
           <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            No documents yet. Create one above, or ask Kai to draft a resume for a specific role.
+            No documents yet. Create one above, or ask Scout to draft a resume for a specific role.
           </CardContent>
         </Card>
       ) : (

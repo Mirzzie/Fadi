@@ -2,27 +2,27 @@
 
 import { Sparkles, X } from "lucide-react";
 
-import { KaiChat } from "@/components/kai/kai-chat";
+import { ScoutChat } from "@/components/scout/scout-chat";
 import { cn } from "@/lib/utils";
 import { useOsMode } from "./os-mode";
 
 /**
- * The always-present Kai orb (Desk mode). Floats above the dock; clicking it —
- * or saying "Hey Kai" — slides Kai out from the right so the user can talk to
+ * The always-present Scout orb (Desk mode). Floats above the dock; clicking it —
+ * or saying "Hey Scout" — slides Scout out from the right so the user can talk to
  * their agent from any app. Open-state lives in OsMode context so the wake word
- * can summon it. In Kai mode the orb is hidden (Kai is already the centrepiece).
+ * can summon it. In Scout mode the orb is hidden (Scout is already the centrepiece).
  */
-export function KaiLauncher() {
-  const { kaiOpen, openKai, closeKai, kaiVoiceNonce } = useOsMode();
-  const open = kaiOpen;
+export function ScoutLauncher() {
+  const { scoutOpen, openScout, closeScout, scoutVoiceNonce } = useOsMode();
+  const open = scoutOpen;
 
   return (
     <>
       {/* Orb */}
       <button
         type="button"
-        onClick={openKai}
-        aria-label="Open Kai"
+        onClick={openScout}
+        aria-label="Open Scout"
         className={cn(
           "group fixed bottom-20 right-5 z-40 grid size-14 place-items-center rounded-full",
           "bg-gradient-to-br from-primary to-[oklch(0.66_0.22_285)] shadow-xl",
@@ -38,8 +38,8 @@ export function KaiLauncher() {
       {open ? (
         <div className="fixed inset-0 z-50">
           <button
-            aria-label="Close Kai"
-            onClick={closeKai}
+            aria-label="Close Scout"
+            onClick={closeScout}
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
           />
           <div className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-border/60 bg-card shadow-2xl">
@@ -48,10 +48,10 @@ export function KaiLauncher() {
                 <div className="grid size-6 place-items-center rounded-md bg-gradient-to-br from-primary to-[oklch(0.66_0.22_285)]">
                   <Sparkles className="size-3.5 text-primary-foreground" aria-hidden="true" />
                 </div>
-                <span className="text-sm font-semibold">Kai</span>
+                <span className="text-sm font-semibold">Scout</span>
               </div>
               <button
-                onClick={closeKai}
+                onClick={closeScout}
                 aria-label="Close"
                 className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
               >
@@ -59,7 +59,7 @@ export function KaiLauncher() {
               </button>
             </div>
             <div className="min-h-0 flex-1">
-              <KaiChat autoListenNonce={kaiVoiceNonce} />
+              <ScoutChat autoListenNonce={scoutVoiceNonce} />
             </div>
           </div>
         </div>

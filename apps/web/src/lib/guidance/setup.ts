@@ -20,7 +20,7 @@ import { getDatabase } from "@/lib/database/client";
 export type SetupStep = {
   id: string;
   title: string;
-  /** Kai-voiced one-liner on why this matters / what to do. */
+  /** Scout-voiced one-liner on why this matters / what to do. */
   description: string;
   href: string;
   cta: string;

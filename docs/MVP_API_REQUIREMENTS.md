@@ -29,7 +29,7 @@ Authenticated routes:
 - Recommendations
 - Applications
 - Learning recommendations
-- Kai assistant
+- Scout assistant
 
 ## Endpoint Requirements
 
@@ -76,9 +76,9 @@ Authenticated routes:
 - `GET /api/learning`: list recommendations.
 - `PATCH /api/learning/:id`: update status.
 
-### Kai Assistant
+### Scout Assistant
 
-- `POST /api/assistant/message`: send message and receive grounded Kai response through model gateway.
+- `POST /api/assistant/message`: send message and receive grounded Scout response through model gateway.
 - `GET /api/assistant/messages`: list recent messages.
 
 ### Events
@@ -96,7 +96,7 @@ flowchart TD
     Analysis --> Jobs[Job Recommendation API]
     Analysis --> Learning[Learning API]
     Jobs --> Applications[Application API]
-    Profile --> Assistant[Kai Assistant API]
+    Profile --> Assistant[Scout Assistant API]
     Analysis --> Assistant
 ```
 

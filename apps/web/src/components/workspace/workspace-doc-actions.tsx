@@ -39,7 +39,7 @@ export function WorkspaceDocActions({ jobId, documents }: { jobId: string; docum
     <div className="rounded-xl border border-border/60 bg-card p-4">
       <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
         <Sparkles className="size-3.5 text-primary" aria-hidden="true" />
-        Have Kai draft — tailored to this job&apos;s description, saved to Documents
+        Have Scout draft — tailored to this job&apos;s description, saved to Documents
       </p>
       <div className="grid grid-cols-2 gap-2">
         {ACTIONS.map((a) => (

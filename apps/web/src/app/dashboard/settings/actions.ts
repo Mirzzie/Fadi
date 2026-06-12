@@ -46,7 +46,7 @@ export async function saveAiSettingsAction(input: AiSettingsInput): Promise<Resu
   }
 }
 
-/** Toggle Kai's auto-prep — auto-draft the full doc packet when engaging a job. */
+/** Toggle Scout's auto-prep — auto-draft the full doc packet when engaging a job. */
 export async function setAutoPrepAction(enabled: boolean): Promise<Result> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
@@ -57,7 +57,7 @@ export async function setAutoPrepAction(enabled: boolean): Promise<Result> {
     return {
       ok: true,
       message: enabled
-        ? "Auto-prep on — Kai will draft your packet when you open a role."
+        ? "Auto-prep on — Scout will draft your packet when you open a role."
         : "Auto-prep off — you'll draft documents manually.",
     };
   } catch (error) {
@@ -148,7 +148,7 @@ export async function removeAiSettingsAction(): Promise<Result> {
   if (!user) return { ok: false, message: "Please sign in again." };
   await clearUserAiSettings(user.id);
   revalidatePath("/dashboard/settings");
-  return { ok: true, message: "AI provider removed. Kai will use the server default if available." };
+  return { ok: true, message: "AI provider removed. Scout will use the server default if available." };
 }
 
 /**

@@ -1,8 +1,8 @@
 import type { AIMessage } from "../providers/types";
-import { formatKaiContextAsPrompt } from "../context/builder";
-import type { KaiUserContext } from "../context/types";
+import { formatScoutContextAsPrompt } from "../context/builder";
+import type { ScoutUserContext } from "../context/types";
 
-export const KAI_SYSTEM_PROMPT = `You are Kai — the operating intelligence of CareerOS. You are not a chatbot feature bolted onto a product. You ARE the product. Every recommendation, analysis, job match, learning suggestion, and career decision in CareerOS flows through you.
+export const SCOUT_SYSTEM_PROMPT = `You are Scout — the operating intelligence of CareerOS. You are not a chatbot feature bolted onto a product. You ARE the product. Every recommendation, analysis, job match, learning suggestion, and career decision in CareerOS flows through you.
 
 ## Your Role
 You are the user's career agent: mentor, strategist, analyst, researcher, and execution partner combined. You genuinely work between the user's visits: scheduled background runs scan their market and write what they find to a ledger, which appears in your context as "Background Agency Findings". You may reference background work ONLY when a finding backs it — cite what's actually there. If the findings section is empty, you have NOT been working in the background since their last visit: never invent "while you were away" claims; offer to check live now instead. You also pull live data at conversation time via your tools.
@@ -43,7 +43,7 @@ You are a character, not a faceless assistant. Users should recognize you.
 - If the user's evidence contradicts their stated goals: point it out constructively and suggest a path to close the gap
 - If data is missing or uncertain: say so explicitly rather than inventing claims
 - If an action would affect an external system: describe exactly what would happen and ask for approval first
-- If Kai is operating without real-time market data: acknowledge this limitation clearly and work with available evidence
+- If Scout is operating without real-time market data: acknowledge this limitation clearly and work with available evidence
 
 ## Global Shifts & Career Strategy
 People burn years and money on directions the world is quietly moving away from — protecting them from that is part of your job. Use the get_world_shifts tool when the user asks about world events, whether their field is safe, or whether to rethink strategy.
@@ -66,16 +66,16 @@ The job search is a mental-health battleground: low hire rates, frequent ghostin
 - When recommending a next step, explain both WHAT to do and WHY it will move the career forward
 - For honesty on hard topics: be direct but constructive. "Your resume lacks measurable outcomes — here is how to fix it" not "Your resume is bad"`;
 
-export function buildKaiMessages(
-  userContext: KaiUserContext,
+export function buildScoutMessages(
+  userContext: ScoutUserContext,
   conversationHistory: Array<{ role: "user" | "assistant"; content: string }>,
   userMessage: string,
 ): AIMessage[] {
-  const contextBlock = formatKaiContextAsPrompt(userContext);
+  const contextBlock = formatScoutContextAsPrompt(userContext);
 
   const systemMessage: AIMessage = {
     role: "system",
-    content: `${KAI_SYSTEM_PROMPT}\n\n---\n\n${contextBlock}`,
+    content: `${SCOUT_SYSTEM_PROMPT}\n\n---\n\n${contextBlock}`,
   };
 
   const history: AIMessage[] = conversationHistory.map((m) => ({
@@ -86,6 +86,6 @@ export function buildKaiMessages(
   return [systemMessage, ...history, { role: "user", content: userMessage }];
 }
 
-export function buildKaiUnconfiguredMessage(providerName: string): string {
-  return `Kai requires an AI provider to be configured. Set AI_PROVIDER="${providerName}" and the corresponding API key in your environment to enable full career intelligence.`;
+export function buildScoutUnconfiguredMessage(providerName: string): string {
+  return `Scout requires an AI provider to be configured. Set AI_PROVIDER="${providerName}" and the corresponding API key in your environment to enable full career intelligence.`;
 }

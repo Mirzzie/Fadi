@@ -2,13 +2,13 @@ import { Sparkles } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-type KaiBadgeProps = {
+type ScoutBadgeProps = {
   size?: "xs" | "sm" | "md" | "lg";
   showName?: boolean;
   className?: string;
 };
 
-export function KaiBadge({ size = "sm", showName = true, className }: KaiBadgeProps) {
+export function ScoutBadge({ size = "sm", showName = true, className }: ScoutBadgeProps) {
   const avatarSize = {
     xs: "size-5",
     sm: "size-7",
@@ -57,7 +57,7 @@ export function KaiBadge({ size = "sm", showName = true, className }: KaiBadgePr
         />
       </div>
       {showName ? (
-        <span className={cn("font-semibold text-primary", nameSize)}>Kai</span>
+        <span className={cn("font-semibold text-primary", nameSize)}>Scout</span>
       ) : null}
     </div>
   );

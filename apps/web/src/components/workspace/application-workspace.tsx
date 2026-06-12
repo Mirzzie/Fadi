@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { KaiBadge } from "@/components/ui/kai-badge";
+import { ScoutBadge } from "@/components/ui/scout-badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
@@ -189,7 +189,7 @@ export function ApplicationWorkspace({
               : m,
           ),
         );
-        setError("Could not reach Kai. Check your connection.");
+        setError("Could not reach Scout. Check your connection.");
       } finally {
         setIsStreaming(false);
       }
@@ -214,11 +214,11 @@ export function ApplicationWorkspace({
   return (
     <div className="flex h-full gap-4">
       {/* Left: Chat */}
-      <div className="kai-glow-sm flex min-w-0 flex-1 flex-col rounded-xl border border-border/60 bg-card">
+      <div className="scout-glow-sm flex min-w-0 flex-1 flex-col rounded-xl border border-border/60 bg-card">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border/60 px-4 py-3">
           <div className="flex items-center gap-3 min-w-0">
-            <KaiBadge size="xs" showName={false} />
+            <ScoutBadge size="xs" showName={false} />
             <div className="min-w-0">
               <p className="truncate text-sm font-medium">{jobTitle}</p>
               <p className="text-xs text-muted-foreground">{jobCompany}</p>
@@ -286,7 +286,7 @@ export function ApplicationWorkspace({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask Kai to generate a document or refine your application..."
+              placeholder="Ask Scout to generate a document or refine your application..."
               rows={2}
               disabled={isStreaming}
               className="flex-1 resize-none text-sm"
@@ -328,7 +328,7 @@ export function ApplicationWorkspace({
 
           {artifacts.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              Generated documents will appear here. Ask Kai to create a CV, cover letter, or any
+              Generated documents will appear here. Ask Scout to create a CV, cover letter, or any
               other application asset.
             </p>
           ) : (
@@ -366,7 +366,7 @@ export function ApplicationWorkspace({
         <div className="gradient-border glass-card rounded-xl p-3">
           <p className="text-xs leading-relaxed text-muted-foreground">
             <span className="font-medium text-primary">Nothing is sent automatically.</span>{" "}
-            Review every document before using it. Kai prepares; you decide.
+            Review every document before using it. Scout prepares; you decide.
           </p>
         </div>
       </div>
@@ -419,12 +419,12 @@ function WorkspaceMessage({
   message: Message;
   isStreaming: boolean;
 }) {
-  const isKai = message.role === "assistant";
+  const isScout = message.role === "assistant";
 
   return (
-    <div className={cn("flex items-start gap-2.5", !isKai && "flex-row-reverse")}>
-      {isKai ? (
-        <KaiBadge size="xs" showName={false} className="shrink-0 pt-0.5" />
+    <div className={cn("flex items-start gap-2.5", !isScout && "flex-row-reverse")}>
+      {isScout ? (
+        <ScoutBadge size="xs" showName={false} className="shrink-0 pt-0.5" />
       ) : (
         <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-medium">
           You
@@ -433,7 +433,7 @@ function WorkspaceMessage({
       <div
         className={cn(
           "max-w-[82%] rounded-xl px-3 py-2 text-sm leading-relaxed",
-          isKai ? "bg-muted/40 border border-border/40" : "bg-primary/15",
+          isScout ? "bg-muted/40 border border-border/40" : "bg-primary/15",
         )}
       >
         {message.content ? (

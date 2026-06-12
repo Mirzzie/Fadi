@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Server-side voice input: record the mic, auto-stop on silence, and transcribe
- * via Whisper (`/api/kai/transcribe` → Groq free tier). Works in ANY browser —
+ * via Whisper (`/api/scout/transcribe` → Groq free tier). Works in ANY browser —
  * unlike the Web Speech API, which depends on Google's backend and fails on
  * Linux Chromium / Brave. No interim results (Whisper is one-shot), so the UI
  * shows "listening / transcribing" states instead.
@@ -112,7 +112,7 @@ export function useGroqVoice({
       try {
         const fd = new FormData();
         fd.append("audio", blob, "audio.webm");
-        const res = await fetch("/api/kai/transcribe", { method: "POST", body: fd });
+        const res = await fetch("/api/scout/transcribe", { method: "POST", body: fd });
         if (!res.ok) {
           const data = (await res.json().catch(() => ({}))) as { error?: string };
           onErrorRef.current?.(data.error ?? "Couldn't transcribe that. Try again.");

@@ -7,19 +7,19 @@ flowchart TD
     Welcome[Welcome] --> Auth[Sign In or Sign Up]
     Auth --> Check{Onboarding Complete?}
     Check -->|No| Resume[Resume Upload]
-    Check -->|Yes| Dashboard[Kai Command Center]
+    Check -->|Yes| Dashboard[Scout Command Center]
     Resume --> LinkedIn[LinkedIn Import]
     LinkedIn --> Profile[Profile Details]
     Profile --> Goals[Career Goals]
     Goals --> Niche[Niche Discovery]
-    Niche --> Validate[Kai Niche Validation]
+    Niche --> Validate[Scout Niche Validation]
     Validate --> Generate[Generate Career Analysis]
     Generate --> Analysis[Analysis Result]
     Analysis --> Dashboard
     Dashboard --> Jobs[Job Recommendations]
     Dashboard --> Apps[Application Tracker]
     Dashboard --> Learning[Learning Recommendations]
-    Dashboard --> Assistant[Kai Assistant]
+    Dashboard --> Assistant[Scout Assistant]
     Jobs --> JobDetail[Job Detail]
     JobDetail --> Save[Save Job]
     Save --> CreateApp[Create Application]
@@ -32,12 +32,12 @@ flowchart TD
 
 Purpose:
 
-- Introduce Kai as the career operating system in one screen.
+- Introduce Scout as the career operating system in one screen.
 - Move the user to sign up.
 
 MVP content:
 
-- Kai introduction in first person.
+- Scout introduction in first person.
 - Three specific value statements (honest mentoring, proactive discovery, evidence-based guidance).
 - Sign up / log in CTA.
 
@@ -67,13 +67,13 @@ MVP behavior:
 - User can enter LinkedIn URL for reference.
 - Official API import is deferred unless easily approved.
 
-Kai says: "LinkedIn helps me understand how you present yourself publicly. If direct import is unavailable, paste your profile text here and I will still use it."
+Scout says: "LinkedIn helps me understand how you present yourself publicly. If direct import is unavailable, paste your profile text here and I will still use it."
 
 ### Profile Details
 
 Purpose:
 
-- Let the user confirm and correct Kai's inferences.
+- Let the user confirm and correct Scout's inferences.
 
 Fields:
 
@@ -91,7 +91,7 @@ Fields:
 
 Purpose:
 
-- Focus Kai's analysis and niche validation.
+- Focus Scout's analysis and niche validation.
 
 Fields:
 
@@ -106,21 +106,21 @@ Fields:
 
 Purpose:
 
-- Kai asks about the user's direction and validates it honestly against available data.
+- Scout asks about the user's direction and validates it honestly against available data.
 
 Flow:
 
-1. Kai asks exploratory questions about the user's goals and interests.
+1. Scout asks exploratory questions about the user's goals and interests.
 2. User states or confirms a direction.
-3. Kai validates the direction against available market data.
-4. Kai returns an honest assessment: supported, challenged, or redirected with evidence.
-5. User can accept Kai's assessment, push back, or revise their direction.
+3. Scout validates the direction against available market data.
+4. Scout returns an honest assessment: supported, challenged, or redirected with evidence.
+5. User can accept Scout's assessment, push back, or revise their direction.
 
 States:
 
-- Kai asking questions
+- Scout asking questions
 - User providing direction
-- Kai validating (processing)
+- Scout validating (processing)
 - Validation result (supported / challenged / redirect)
 - User confirms or revises
 
@@ -130,7 +130,7 @@ Purpose:
 
 - Maintain trust during the generation wait.
 
-Kai narrates each step:
+Scout narrates each step:
 
 - Reading your CV.
 - Comparing LinkedIn context.
@@ -144,11 +144,11 @@ Kai narrates each step:
 
 Purpose:
 
-- Deliver first major Kai value moment: the honest, evidence-grounded career intelligence report.
+- Deliver first major Scout value moment: the honest, evidence-grounded career intelligence report.
 
 Sections:
 
-- Kai summary card with niche assessment
+- Scout summary card with niche assessment
 - Career readiness score with component breakdown
 - Resume quality score with component breakdown
 - Strengths (with evidence)
@@ -158,28 +158,28 @@ Sections:
 - Learning path (market demand prioritized)
 - Recommended career system: what to do, in what order
 
-### Kai Command Center (Dashboard)
+### Scout Command Center (Dashboard)
 
 Purpose:
 
-- Main operating screen for the user. Kai's primary surface.
+- Main operating screen for the user. Scout's primary surface.
 
 Sections:
 
-- Kai action feed: what Kai has prepared, found, or surfaced
+- Scout action feed: what Scout has prepared, found, or surfaced
 - Career readiness snapshot
 - Priority next actions with reasoning
 - Top job recommendations
 - Application tracker summary
 - Learning recommendations
 - Market signal updates
-- Kai assistant entry point
+- Scout assistant entry point
 
 ### Job Recommendations
 
 Purpose:
 
-- Show Kai-curated, personalized opportunities.
+- Show Scout-curated, personalized opportunities.
 
 Sections:
 
@@ -193,7 +193,7 @@ Sections:
 
 Purpose:
 
-- Track applications manually with Kai's assistance.
+- Track applications manually with Scout's assistance.
 
 Sections:
 
@@ -202,13 +202,13 @@ Sections:
 - Notes and next action
 - Generated assets (resume draft, cover letter) — Phase 2
 
-### Kai Assistant
+### Scout Assistant
 
 Purpose:
 
 - Answer grounded career questions including challenging and contrarian ones.
 
-Kai is present, honest, and evidence-backed. It will challenge assumptions if data warrants it.
+Scout is present, honest, and evidence-backed. It will challenge assumptions if data warrants it.
 
 Capabilities:
 
@@ -224,6 +224,6 @@ Phase 1 boundaries:
 
 ## Phase 2 Additions
 
-- Voice entry point visible in the Kai command center and assistant.
-- "Speak to Kai" button that activates Browser Web Speech API.
-- Voice responses from Kai alongside text.
+- Voice entry point visible in the Scout command center and assistant.
+- "Speak to Scout" button that activates Browser Web Speech API.
+- Voice responses from Scout alongside text.

@@ -89,7 +89,7 @@ export function AiProviderForm({ descriptors, initial }: Props) {
           <div>
             <h3 className="text-sm font-semibold">Fallback provider</h3>
             <p className="text-xs text-muted-foreground">
-              Used automatically when the primary is rate-limited or out of quota — Kai stays up.
+              Used automatically when the primary is rate-limited or out of quota — Scout stays up.
               Tip: a free local Ollama makes a great fallback.
             </p>
           </div>

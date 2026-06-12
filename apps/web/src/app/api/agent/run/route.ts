@@ -8,7 +8,7 @@ import { serverEnv } from "@/lib/env.server";
 import { logger } from "@/lib/observability/logger";
 
 /**
- * Scheduled trigger for Kai's background agency. Protected by CRON_SECRET —
+ * Scheduled trigger for Scout's background agency. Protected by CRON_SECRET —
  * Vercel Cron sends it as `Authorization: Bearer <CRON_SECRET>` automatically;
  * any other scheduler (docker cron, systemd timer, GitHub Action) can do the
  * same. Without the secret configured the route refuses to run.

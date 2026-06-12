@@ -3,29 +3,29 @@
 import { ArrowUpRight } from "lucide-react";
 import Link from "next/link";
 
-import { KaiChat } from "@/components/kai/kai-chat";
+import { ScoutChat } from "@/components/scout/scout-chat";
 import { useOsMode } from "./os-mode";
 
-export type KaiOpportunity = { label: string; detail: string; href: string };
+export type ScoutOpportunity = { label: string; detail: string; href: string };
 
 /**
- * Kai-mode home (Option 3): Kai is the centrepiece. A living core greets the
+ * Scout-mode home (Option 3): Scout is the centrepiece. A living core greets the
  * user, surfaces real opportunities, and the conversation happens right here —
- * the assistant-first face of the OS. Reuses the same Kai engine (KaiChat).
+ * the assistant-first face of the OS. Reuses the same Scout engine (ScoutChat).
  */
-export function KaiHome({
+export function ScoutHome({
   greeting,
   subline,
   opportunities = [],
 }: {
   greeting: string;
   subline?: string;
-  opportunities?: KaiOpportunity[];
+  opportunities?: ScoutOpportunity[];
 }) {
-  const { kaiVoiceNonce } = useOsMode();
+  const { scoutVoiceNonce } = useOsMode();
   return (
     <div className="mx-auto flex h-[calc(100vh-9rem)] max-w-3xl flex-col items-center">
-      {/* Living Kai core */}
+      {/* Living Scout core */}
       <div className="relative mt-2 grid place-items-center">
         <div className="absolute size-40 animate-ping rounded-full bg-primary/15 [animation-duration:4s]" />
         <div className="absolute size-28 rounded-full bg-primary/20 blur-2xl" />
@@ -41,7 +41,7 @@ export function KaiHome({
         ) : null}
       </div>
 
-      {/* Live opportunities Kai has lined up */}
+      {/* Live opportunities Scout has lined up */}
       {opportunities.length > 0 ? (
         <div className="mt-5 grid w-full gap-2 sm:grid-cols-3">
           {opportunities.map((opp, i) => (
@@ -61,8 +61,8 @@ export function KaiHome({
       ) : null}
 
       {/* Conversation */}
-      <div className="kai-glow-sm mt-5 min-h-0 w-full flex-1 overflow-hidden rounded-2xl border border-border/60 bg-card/70 backdrop-blur">
-        <KaiChat autoListenNonce={kaiVoiceNonce} />
+      <div className="scout-glow-sm mt-5 min-h-0 w-full flex-1 overflow-hidden rounded-2xl border border-border/60 bg-card/70 backdrop-blur">
+        <ScoutChat autoListenNonce={scoutVoiceNonce} />
       </div>
     </div>
   );

@@ -97,7 +97,7 @@ export function ProfileForm({
             value={form.linkedInText}
             onChange={(e) => set("linkedInText", e.target.value)}
             rows={4}
-            placeholder="Paste your LinkedIn summary and experience so Kai can reason from it."
+            placeholder="Paste your LinkedIn summary and experience so Scout can reason from it."
             className={cn(inputCls, "h-auto py-2")}
           />
         </Field>

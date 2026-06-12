@@ -2,7 +2,7 @@
 
 How CareerOS gets trustworthy, up-to-date signal about jobs, the labor market,
 the economy/geopolitics, and AI/skill shifts — and how all of it is wired
-through the Kai Throne so it becomes *personalized* intelligence, not a news feed.
+through the Scout Throne so it becomes *personalized* intelligence, not a news feed.
 
 Governed by [[PLATFORM_IDEOLOGY]] (honest intelligence, quality over volume) and
 the psychological-lens mandate (this data must reduce anxiety with context, not
@@ -14,10 +14,10 @@ manufacture it). Last updated 2026-06-03.
 
 We never show raw feeds. Every external signal is **scored for relevance against
 the user's own profile** (target role, skills, gaps, location, seniority) before
-Kai ever surfaces it. A layoff in a sector you don't target is noise; a layoff in
+Scout ever surfaces it. A layoff in a sector you don't target is noise; a layoff in
 yours is context that protects your morale ("it's the market, not you") and may
 change your strategy. **Signal → normalize → store → score against profile →
-Kai decides if/how to surface.**
+Scout decides if/how to surface.**
 
 We also follow the AI-provider pattern already in `lib/ai/`: every source is a
 pluggable provider with an honest `isConfigured` flag. **No key → the source
@@ -45,7 +45,7 @@ spend their limited energy on a dead posting).
 
 **Ghost-job / repost detection** (49% AI-dismiss + ghost-posting problem): track
 `first_seen_at` ourselves and compare to the ATS `updated_at`/`posted_at`; flag
-postings that are reposted or stale. Surfaces as a Kai warning, not a silent drop.
+postings that are reposted or stale. Surfaces as a Scout warning, not a silent drop.
 
 **Recommended start (free, no key):** Remotive + Arbeitnow + direct Greenhouse/
 Lever feeds for liveness. Add Adzuna (free key) for salary/market stats, then
@@ -75,7 +75,7 @@ the Career Intelligence Report.
 ## 3. Geopolitical & economic events affecting the job market
 
 Goal: when something structural shifts (sector layoffs, rate hikes, a regional
-shock), Kai gives **honest context** — both for strategy and for morale.
+shock), Scout gives **honest context** — both for strategy and for morale.
 
 | Source | What it gives | Cost | Key? | Integration |
 |---|---|---|---|---|
@@ -122,7 +122,7 @@ your field and you don't have it yet — here's a concrete 2-week path." This is
 
 ---
 
-## 6. Architecture — wiring it through the Kai Throne
+## 6. Architecture — wiring it through the Scout Throne
 
 ```
 External APIs ─┐
@@ -141,7 +141,7 @@ External APIs ─┐
                                    │ relevance scoring vs profile
                                    ▼
         ┌──────────────────────────────────────────────────────────┐
-        │  Kai Throne (orchestrator)                                 │
+        │  Scout Throne (orchestrator)                                 │
         │   └─ Market-Intelligence mini-agent                        │
         │        • personalized "what changed in your market" brief  │
         │        • skill-shift alerts vs YOUR gaps                    │
@@ -149,7 +149,7 @@ External APIs ─┐
         │        • liveness alerts ("3 saved jobs closed")           │
         └───────┬───────────────┬───────────────┬───────────────────┘
                 ▼               ▼               ▼
-   career-trajectory      Resilience Engine    Kai chat/voice
+   career-trajectory      Resilience Engine    Scout chat/voice
    (marketDemand input)   (morale framing)     (context)
 ```
 
@@ -164,7 +164,7 @@ sources report themselves unavailable rather than erroring.
   daily, BLS/O*NET weekly (slow-moving). Results normalized into `market_signals`
   with a TTL so we never hammer rate limits and can analyze offline.
 - **Job-liveness poller**: for each tracked/saved application, re-check the ATS
-  endpoint; on 404/drop, mark `closed` and notify Kai.
+  endpoint; on 404/drop, mark `closed` and notify Scout.
 
 ### Relevance algorithm (`lib/data-sources/relevance.ts`)
 Score each signal 0–100 against the user profile:
@@ -178,8 +178,8 @@ firehose into "your three things that matter today."
 - **Resilience Engine** — sector-wide rejection/layoff context feeds the morale
   framing ("rejections are up across your field this quarter — adjust, don't
   despair").
-- **Kai context builder** (`lib/ai/context/builder.ts`) — top personalized
-  signals injected so Kai can speak to them in chat/voice.
+- **Scout context builder** (`lib/ai/context/builder.ts`) — top personalized
+  signals injected so Scout can speak to them in chat/voice.
 
 ---
 

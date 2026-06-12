@@ -1,5 +1,5 @@
 import type { AIProvider } from "@/lib/ai/providers/types";
-import type { KaiUserContext } from "@/lib/ai/context/types";
+import type { ScoutUserContext } from "@/lib/ai/context/types";
 
 // ─── Agent types ──────────────────────────────────────────────────────────────
 
@@ -20,7 +20,7 @@ export type AgentType =
 
 export interface AgentContext {
   userId: string;
-  userContext: KaiUserContext;
+  userContext: ScoutUserContext;
   jobId?: string;
   jobTitle?: string;
   jobCompany?: string;
@@ -114,7 +114,7 @@ export interface PendingApproval {
 
 // ─── Agent interface ──────────────────────────────────────────────────────────
 
-export interface KaiAgent {
+export interface ScoutAgent {
   readonly type: AgentType;
   readonly name: string;
   readonly description: string;
@@ -127,7 +127,7 @@ export interface KaiAgent {
   ): AsyncGenerator<{ delta: string; artifact?: AgentArtifact }>;
 }
 
-// ─── Orchestrator task (what Kai decides to spawn) ────────────────────────────
+// ─── Orchestrator task (what Scout decides to spawn) ────────────────────────────
 
 export interface OrchestratorDecision {
   agentType: AgentType;

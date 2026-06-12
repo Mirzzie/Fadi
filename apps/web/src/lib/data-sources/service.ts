@@ -14,7 +14,7 @@ export interface LocationFilter {
 
 /**
  * Market-intelligence service — the seam between raw external sources and the
- * Kai Throne. It fans out to every configured source in parallel, normalizes,
+ * Scout Throne. It fans out to every configured source in parallel, normalizes,
  * and scores everything against the user's profile, so what comes back is
  * already personalized: "the signals that matter to YOU", not a news dump.
  */
@@ -91,7 +91,7 @@ function marketCacheKey(profile: RelevanceProfile, opts: { threshold?: number; l
   ]);
 }
 
-/** Personalized market intelligence for Kai's context + the dashboard brief. */
+/** Personalized market intelligence for Scout's context + the dashboard brief. */
 export async function getMarketIntelligence(
   profile: RelevanceProfile,
   opts: { threshold?: number; limit?: number } = {},
@@ -192,10 +192,10 @@ export async function discoverJobs(
 }
 
 /**
- * Compact, honest summary for injection into Kai's system context. Empty string
- * when nothing relevant is live — Kai then simply doesn't claim to have market news.
+ * Compact, honest summary for injection into Scout's system context. Empty string
+ * when nothing relevant is live — Scout then simply doesn't claim to have market news.
  */
-export function summarizeForKai(intel: MarketIntelligence): string {
+export function summarizeForScout(intel: MarketIntelligence): string {
   if (intel.signals.length === 0) return "";
 
   const lines = intel.signals.map(

@@ -2,7 +2,7 @@
 
 ## Experience Direction
 
-CareerOS is Kai. Every screen the user sees is Kai's operating surface. The interface is not a dashboard with an AI assistant widget attached — it is the physical form that Kai takes in the browser. The entire product should feel like entering the mind of a calm, intelligent career strategist who is working on your behalf.
+CareerOS is Scout. Every screen the user sees is Scout's operating surface. The interface is not a dashboard with an AI assistant widget attached — it is the physical form that Scout takes in the browser. The entire product should feel like entering the mind of a calm, intelligent career strategist who is working on your behalf.
 
 The interface must never feel like:
 
@@ -16,17 +16,17 @@ The interface must feel like:
 - A mission control center for career growth
 - A professional command hub driven by intelligence
 - A dynamic AI action workspace
-- A personal career strategy environment where Kai is always present
+- A personal career strategy environment where Scout is always present
 
 ## Core UX Principles
 
-### Kai-First, Always
+### Scout-First, Always
 
-Kai is present as the central product experience on every screen. The user should always see what Kai is doing, what Kai has prepared, what Kai recommends, and what needs their attention. There is no screen where Kai is absent.
+Scout is present as the central product experience on every screen. The user should always see what Scout is doing, what Scout has prepared, what Scout recommends, and what needs their attention. There is no screen where Scout is absent.
 
 ### Low Friction
 
-The product reduces user effort. The user should not need to search, compare, rewrite, track, and remember everything manually. Kai does the heavy lifting; the user approves and adjusts.
+The product reduces user effort. The user should not need to search, compare, rewrite, track, and remember everything manually. Scout does the heavy lifting; the user approves and adjusts.
 
 ### Action Oriented
 
@@ -34,21 +34,21 @@ Every major screen helps the user answer:
 
 - What is happening?
 - What should I do next?
-- What is Kai doing for me right now?
+- What is Scout doing for me right now?
 - What needs my approval?
 - What changed since I last logged in?
 
 ### Explainable Intelligence
 
-Scores, rankings, and recommendations include clear reasoning and evidence sources. The user must understand why Kai recommends something — especially when Kai challenges a decision.
+Scores, rankings, and recommendations include clear reasoning and evidence sources. The user must understand why Scout recommends something — especially when Scout challenges a decision.
 
 ### Honest, Not Comfortable
 
-Kai's interface reflects Kai's honest-mentor identity. The UI does not hide bad news. If a niche is risky, if a score is low, or if a direction is not supported by data, the interface surfaces that clearly and constructively — with a path forward.
+Scout's interface reflects Scout's honest-mentor identity. The UI does not hide bad news. If a niche is risky, if a score is low, or if a direction is not supported by data, the interface surfaces that clearly and constructively — with a path forward.
 
 ### Calm Professionalism
 
-The product feels supportive and strategic, not noisy, gimmicky, or anxious. Kai is calm even when the market is not.
+The product feels supportive and strategic, not noisy, gimmicky, or anxious. Scout is calm even when the market is not.
 
 ## Main Screens
 
@@ -56,21 +56,21 @@ The product feels supportive and strategic, not noisy, gimmicky, or anxious. Kai
 
 Purpose:
 
-- Introduce Kai as the career operating system.
+- Introduce Scout as the career operating system.
 - Establish trust.
-- Communicate that Kai will actively work on the user's career.
+- Communicate that Scout will actively work on the user's career.
 
 Key elements:
 
-- Kai introduction in first person.
+- Scout introduction in first person.
 - Clear authentication path.
-- Short explanation of what Kai will do after onboarding.
+- Short explanation of what Scout will do after onboarding.
 
 ### Authentication
 
 Purpose:
 
-- Create a durable account so Kai can remember everything.
+- Create a durable account so Scout can remember everything.
 
 Current options:
 
@@ -81,14 +81,14 @@ Current options:
 
 Purpose:
 
-- Gather career data AND have Kai begin the first substantive conversation about the user's direction.
+- Gather career data AND have Scout begin the first substantive conversation about the user's direction.
 
 Key UX requirements:
 
-- Kai guides the process conversationally, not through a cold form sequence.
+- Scout guides the process conversationally, not through a cold form sequence.
 - Show what data is being gathered and why.
-- Niche discovery: Kai asks about the user's goals, interests, and ambitions.
-- Niche validation: Kai returns a candid assessment of that direction with evidence — not just confirmation.
+- Niche discovery: Scout asks about the user's goals, interests, and ambitions.
+- Niche validation: Scout returns a candid assessment of that direction with evidence — not just confirmation.
 - Let users review and correct important profile facts.
 - Keep the process guided, intelligent, and lightweight.
 
@@ -96,7 +96,7 @@ Key UX requirements:
 
 Purpose:
 
-- Present Kai's honest, evidence-grounded understanding of the user's career state and direction.
+- Present Scout's honest, evidence-grounded understanding of the user's career state and direction.
 
 Key elements:
 
@@ -111,11 +111,11 @@ Key elements:
 
 Purpose:
 
-- The main Kai operating surface after onboarding. This is where the user lives in CareerOS.
+- The main Scout operating surface after onboarding. This is where the user lives in CareerOS.
 
 Key elements:
 
-- Kai action feed: what Kai has prepared, found, or wants to surface.
+- Scout action feed: what Scout has prepared, found, or wants to surface.
 - Priority recommendations with evidence.
 - Active agent tasks and status.
 - Upcoming deadlines.
@@ -129,7 +129,7 @@ Key elements:
 
 Purpose:
 
-- Show Kai-discovered opportunities and explain fit.
+- Show Scout-discovered opportunities and explain fit.
 
 Key elements:
 
@@ -142,7 +142,7 @@ Key elements:
 
 Purpose:
 
-- Help users prepare, track, and improve applications — with Kai's help.
+- Help users prepare, track, and improve applications — with Scout's help.
 
 Key elements:
 
@@ -172,7 +172,7 @@ Key elements:
 
 Purpose:
 
-- Show the real-time market context Kai is using to assess the user's direction.
+- Show the real-time market context Scout is using to assess the user's direction.
 
 Key elements:
 
@@ -187,7 +187,7 @@ Key elements:
 
 Purpose:
 
-- Make Kai's work transparent: what it is doing, what it has prepared, what is pending approval.
+- Make Scout's work transparent: what it is doing, what it has prepared, what is pending approval.
 
 Key elements:
 
@@ -202,9 +202,9 @@ Key elements:
 
 Preferred patterns:
 
-- Kai conversation cards with evidence inlining.
+- Scout conversation cards with evidence inlining.
 - AI action feeds with approval queues.
-- Timeline of Kai activity.
+- Timeline of Scout activity.
 - Voice interaction (Phase 2, Browser Web Speech API).
 - Real-time market signal updates.
 - Smart recommendations with source attribution.
@@ -222,7 +222,7 @@ Avoid:
 
 ## Tone and Content Guidelines
 
-The product voice matches Kai's persona:
+The product voice matches Scout's persona:
 
 - Intelligent
 - Professional
@@ -232,7 +232,7 @@ The product voice matches Kai's persona:
 - Specific
 - Evidence-backed
 
-Kai should:
+Scout should:
 
 - Explain reasoning and cite evidence.
 - Surface uncomfortable truths constructively.
@@ -244,11 +244,11 @@ Kai should:
 
 The user must always understand:
 
-- What data Kai has used and where it came from.
-- What Kai recommends and why.
-- When Kai is being contrarian and what data supports that position.
-- What Kai wants to do next.
+- What data Scout has used and where it came from.
+- What Scout recommends and why.
+- When Scout is being contrarian and what data supports that position.
+- What Scout wants to do next.
 - Whether an action will affect an external system.
 - How to approve, edit, reject, or undo actions.
 
-Kai's transparency is the foundation of trust. Never hide the reasoning.
+Scout's transparency is the foundation of trust. Never hide the reasoning.

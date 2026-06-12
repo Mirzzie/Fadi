@@ -23,7 +23,7 @@ const KIND_LABELS: Record<string, string> = {
 /**
  * Phase-1 editor: title + body with debounced autosave and a plain-text export.
  * Phase 2 swaps the textarea for a rich editor with fonts + switchable templates;
- * Phase 3 lets Kai generate straight into it; Phase 4 adds PDF/DOCX export.
+ * Phase 3 lets Scout generate straight into it; Phase 4 adds PDF/DOCX export.
  */
 export function DocumentEditor({
   id,
@@ -123,7 +123,7 @@ export function DocumentEditor({
       </div>
 
       {/* Page */}
-      <div className="kai-glow-sm flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/60 bg-card">
+      <div className="scout-glow-sm flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/60 bg-card">
         <input
           value={title}
           onChange={(e) => onChange({ title: e.target.value })}
@@ -133,7 +133,7 @@ export function DocumentEditor({
         <textarea
           value={content}
           onChange={(e) => onChange({ content: e.target.value })}
-          placeholder="Start writing, or ask Kai to draft this for a specific role…"
+          placeholder="Start writing, or ask Scout to draft this for a specific role…"
           className="min-h-0 flex-1 resize-none bg-transparent px-5 py-4 font-mono text-sm leading-relaxed outline-none"
         />
       </div>

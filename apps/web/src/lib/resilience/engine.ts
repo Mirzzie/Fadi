@@ -66,7 +66,7 @@ export type MomentumSnapshot = {
 
 /**
  * Apply gentle time decay to a stored momentum value. Decay is paused while the
- * user is in a deliberate rest window (Kai protects momentum during recovery),
+ * user is in a deliberate rest window (Scout protects momentum during recovery),
  * and momentum floors at MOMENTUM_MIN — it never collapses to a punishing zero.
  */
 export function decayMomentum(snapshot: MomentumSnapshot, now: Date = new Date()): number {

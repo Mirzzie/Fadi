@@ -1,7 +1,7 @@
 /**
  * Structured resume model. A resume document stores this as JSON in
  * `documents.content` so the form editor and live preview share one shape, and
- * Kai can later generate straight into it (Phase 3) or export it (Phase 4).
+ * Scout can later generate straight into it (Phase 3) or export it (Phase 4).
  */
 
 export type ResumeExperience = {

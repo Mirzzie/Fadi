@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The Motivation Engine helps users sustain effort during career growth and job search. It should encourage momentum without trivializing serious career challenges. Kai's honest-mentor identity applies here too — motivation is grounded in real progress, not empty positivity.
+The Motivation Engine helps users sustain effort during career growth and job search. It should encourage momentum without trivializing serious career challenges. Scout's honest-mentor identity applies here too — motivation is grounded in real progress, not empty positivity.
 
 ## Motivation Principles
 
@@ -23,7 +23,7 @@ The Motivation Engine helps users sustain effort during career growth and job se
 - Small next actions
 - Weekly progress summaries
 - Momentum recovery prompts when progress has stalled
-- Honest check-ins from Kai when the system detects effort has dropped
+- Honest check-ins from Scout when the system detects effort has dropped
 
 ## Architecture
 
@@ -34,9 +34,9 @@ flowchart TD
     Scoring --> Confidence[Career Confidence Score]
     Scoring --> Milestones[Milestone Detection]
     Scoring --> Stall[Stall Detection]
-    Milestones --> Feed[Kai Action Feed]
+    Milestones --> Feed[Scout Action Feed]
     Stall --> Recovery[Honest Recovery Prompt]
-    Confidence --> Kai[Kai Encouragement]
+    Confidence --> Scout[Scout Encouragement]
     Feed --> User[User]
 ```
 
@@ -79,7 +79,7 @@ At scale:
 - Keep scores explainable.
 - Reward meaningful career actions, not vanity activity.
 - Let users pause reminders.
-- Use Kai's persona voice for all motivation copy — honest, specific, calm.
+- Use Scout's persona voice for all motivation copy — honest, specific, calm.
 - Avoid comparing unemployed users harshly against each other.
 - Make system adherence visible.
 

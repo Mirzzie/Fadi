@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The Career Performance Trajectory (CPT) is a continuous algorithm that runs alongside Kai, measuring the user's actual competitive position in the job market and predicting their path to the next career milestone.
+The Career Performance Trajectory (CPT) is a continuous algorithm that runs alongside Scout, measuring the user's actual competitive position in the job market and predicting their path to the next career milestone.
 
 This is not a gamification layer. It is a diagnostic and prediction engine — the equivalent of a fitness tracker for job searching, built on real market benchmarks.
 
@@ -14,7 +14,7 @@ The job market is opaque. Most job seekers operate without any signal of how the
 
 This uncertainty is a major driver of anxiety, burnout, and poor decision-making. The user either gives up too early (because they cannot see progress) or continues a failing strategy too long (because they have no objective feedback).
 
-The CPT gives Kai the data it needs to give the user honest, specific, actionable intelligence about their search.
+The CPT gives Scout the data it needs to give the user honest, specific, actionable intelligence about their search.
 
 ---
 
@@ -39,8 +39,8 @@ The CPT gives Kai the data it needs to give the user honest, specific, actionabl
 | Skill coverage | % of target role required skills documented in profile |
 | Proof of work density | Number and quality of projects, contributions, publications |
 | LinkedIn completeness | Profile sections, connections in target field |
-| Career readiness score | Composite from Kai's career analysis |
-| Resume quality score | From Kai's career analysis |
+| Career readiness score | Composite from Scout's career analysis |
+| Resume quality score | From Scout's career analysis |
 
 ### Market Benchmarks (sourced from research data, updated periodically)
 
@@ -73,7 +73,7 @@ Computed per application before and after submission.
 
 **Output**: 0–100 integer. 70+ is viable. 85+ is strong.
 
-**Use**: Kai uses AQS to tell the user whether an application is ready to send or needs improvement — before it is sent. Low AQS triggers specific improvement suggestions.
+**Use**: Scout uses AQS to tell the user whether an application is ready to send or needs improvement — before it is sent. Low AQS triggers specific improvement suggestions.
 
 ---
 
@@ -88,7 +88,7 @@ Computed per application before and after submission.
 - 8–15%: Strong — candidate is well-targeted and differentiated
 - 15%+: Exceptional — likely strong network activation or highly in-demand profile
 
-**Use**: Kai uses RRI to identify whether the user's strategy is working and surface the specific factors most likely to improve it.
+**Use**: Scout uses RRI to identify whether the user's strategy is working and surface the specific factors most likely to improve it.
 
 ---
 
@@ -124,7 +124,7 @@ Compares the user's target role to actual market hiring signals:
 
 **Output**: Alignment rating (strong / moderate / misaligned) with specific signals.
 
-**Use**: Kai uses MDA to validate or challenge the user's career direction with real data. If a field is declining or oversaturated, Kai says so — honestly, specifically, and with a recommended adjustment.
+**Use**: Scout uses MDA to validate or challenge the user's career direction with real data. If a field is declining or oversaturated, Scout says so — honestly, specifically, and with a recommended adjustment.
 
 ---
 
@@ -157,7 +157,7 @@ A composite of all six scores, weighted by their relative impact on job search o
 **Output**:
 - A 0–100 score (current snapshot)
 - A 30-day trajectory line (rising, flat, falling)
-- A verbal assessment from Kai ("Your competitive position is improving. The main bottleneck is your application response rate, which is below market average for your target role. Here is why and what to change.")
+- A verbal assessment from Scout ("Your competitive position is improving. The main bottleneck is your application response rate, which is below market average for your target role. Here is why and what to change.")
 
 ---
 
@@ -167,7 +167,7 @@ A composite of all six scores, weighted by their relative impact on job search o
 
 **Model**: Based on current RRI, AQS, NAS, and historical market data for the user's target role and geography.
 
-**Example output**: "At your current application rate and response rate, Kai estimates your first interview within 4–6 weeks. Improving your AQS from 68 to 80+ would shorten this to 2–3 weeks."
+**Example output**: "At your current application rate and response rate, Scout estimates your first interview within 4–6 weeks. Improving your AQS from 68 to 80+ would shorten this to 2–3 weeks."
 
 ### Time-to-Offer Estimate
 
@@ -187,13 +187,13 @@ The algorithm identifies the single biggest factor limiting progress at any give
 6. **Market misalignment** — target field or role is declining, oversaturated, or geographically mismatched
 7. **Volume** — not enough applications for the current conversion rate to generate results in a reasonable timeframe
 
-Kai surfaces the bottleneck and addresses it with a specific, actionable recommendation — not generic advice.
+Scout surfaces the bottleneck and addresses it with a specific, actionable recommendation — not generic advice.
 
 ---
 
-## What Kai Does With This Data
+## What Scout Does With This Data
 
-Kai uses the CPT algorithm to power:
+Scout uses the CPT algorithm to power:
 
 1. **Daily briefing**: "Here is where your search stands. Your RRI improved this week. Your most urgent action is..."
 2. **Application gating**: "This application scores 62/100 AQS. Before you send it, here are three specific improvements that will raise it to 80+."
@@ -207,7 +207,7 @@ Kai uses the CPT algorithm to power:
 
 ### Phase 1 (current)
 
-Compute AQS per application using the Kai career report data and JD text. Display to the user before they finalize any application.
+Compute AQS per application using the Scout career report data and JD text. Display to the user before they finalize any application.
 
 ### Phase 2
 
@@ -219,7 +219,7 @@ Integrate market benchmark data from job source APIs. Compute MDA against live m
 
 ### Phase 4
 
-Full CPT dashboard with trajectory visualisation. Bottleneck identification surfaced proactively by Kai. Real-time network activation tracking.
+Full CPT dashboard with trajectory visualisation. Bottleneck identification surfaced proactively by Scout. Real-time network activation tracking.
 
 ---
 
@@ -227,8 +227,8 @@ Full CPT dashboard with trajectory visualisation. Bottleneck identification surf
 
 - Not a vanity metric. The CPT tells the truth, even when it is uncomfortable.
 - Not a gamification system. There are no streaks, badges, or leaderboards.
-- Not a forecast that pretends certainty. Estimates are ranges, not guarantees, and Kai communicates uncertainty explicitly.
-- Not a replacement for the user's judgment. The algorithm informs Kai's recommendations. The user always has the final say.
+- Not a forecast that pretends certainty. Estimates are ranges, not guarantees, and Scout communicates uncertainty explicitly.
+- Not a replacement for the user's judgment. The algorithm informs Scout's recommendations. The user always has the final say.
 
 ---
 

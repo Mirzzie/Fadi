@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { auth } from "@/lib/auth/auth";
 import { getCurrentAuthUser } from "@/lib/auth/session";
-import { buildKaiContext } from "@/lib/ai/context/builder";
+import { buildScoutContext } from "@/lib/ai/context/builder";
 import { buildProviderChain } from "@/lib/ai/registry";
 import { getUserProviderConfigs } from "@/lib/ai/user-settings";
 import { ResilientProvider } from "@/lib/ai/resilient";
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
 
   const { jobId, jobTitle, jobCompany, jobDescription, message, history } = parsed.data;
 
-  const userContext = await buildKaiContext(user.id, { includeLiveMarket: true });
+  const userContext = await buildScoutContext(user.id, { includeLiveMarket: true });
 
   if (!userContext) {
     return new Response(

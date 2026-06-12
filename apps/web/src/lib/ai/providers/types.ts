@@ -42,7 +42,7 @@ export type ToolExecutor = (
 ) => Promise<{ summary: string; data?: unknown; view?: string }>;
 
 export interface ToolRunResult {
-  /** Kai's final natural-language answer after any tools ran. */
+  /** Scout's final natural-language answer after any tools ran. */
   text: string;
   /** Structured results for visual rendering, in call order. */
   toolResults: Array<{ name: string; view: string; data: unknown }>;

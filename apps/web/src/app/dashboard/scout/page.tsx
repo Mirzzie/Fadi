@@ -3,14 +3,14 @@ import { redirect } from "next/navigation";
 import { Sparkles } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { KaiChat } from "@/components/kai/kai-chat";
+import { ScoutChat } from "@/components/scout/scout-chat";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getOnboardingStatus } from "@/lib/onboarding/status";
 
-export const metadata: Metadata = { title: "Kai" };
+export const metadata: Metadata = { title: "Scout" };
 export const dynamic = "force-dynamic";
 
-export default async function KaiPage() {
+export default async function ScoutPage() {
   const user = await getCurrentAuthUser();
   if (!user) redirect("/auth/sign-in");
 
@@ -28,7 +28,7 @@ export default async function KaiPage() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="font-semibold tracking-tight">Kai</h1>
+                <h1 className="font-semibold tracking-tight">Scout</h1>
                 <span className="rounded-full bg-emerald-400/15 px-2 py-0.5 text-xs font-medium text-emerald-400">
                   Active
                 </span>
@@ -44,8 +44,8 @@ export default async function KaiPage() {
         </div>
 
         {/* Chat */}
-        <div className="kai-glow-sm min-h-0 flex-1 overflow-hidden rounded-xl border border-border/60 bg-card">
-          <KaiChat />
+        <div className="scout-glow-sm min-h-0 flex-1 overflow-hidden rounded-xl border border-border/60 bg-card">
+          <ScoutChat />
         </div>
 
         <p className="shrink-0 text-center text-xs text-muted-foreground">
@@ -53,7 +53,7 @@ export default async function KaiPage() {
           <a href="/dashboard/settings" className="text-primary hover:underline">
             Settings
           </a>{" "}
-          to wake Kai. Kai never acts externally without your approval.
+          to wake Scout. Scout never acts externally without your approval.
         </p>
       </div>
     </AppShell>

@@ -1,5 +1,5 @@
 import type { AIProvider } from "@/lib/ai/providers/types";
-import { formatKaiContextAsPrompt } from "@/lib/ai/context/builder";
+import { formatScoutContextAsPrompt } from "@/lib/ai/context/builder";
 import { HUMANIZE_CORE, HUMANIZE_PROSE, HUMANIZE_RESUME } from "@/lib/documents/humanize";
 
 import type {
@@ -8,7 +8,7 @@ import type {
   AgentTask,
   AgentTool,
   AgentToolResult,
-  KaiAgent,
+  ScoutAgent,
 } from "./types";
 
 // ─── Tools ────────────────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ const researchCompanyTool: AgentTool = {
 
 // ─── Agent ────────────────────────────────────────────────────────────────────
 
-export class ApplicationAgent implements KaiAgent {
+export class ApplicationAgent implements ScoutAgent {
   readonly type = "application" as const;
   readonly name = "Application Agent";
   readonly description =
@@ -161,9 +161,9 @@ export class ApplicationAgent implements KaiAgent {
   ];
 
   buildSystemPrompt(context: AgentContext): string {
-    const userContextBlock = formatKaiContextAsPrompt(context.userContext);
+    const userContextBlock = formatScoutContextAsPrompt(context.userContext);
 
-    return `You are Kai's Application Agent — a specialized sub-agent activated for a specific job application.
+    return `You are Scout's Application Agent — a specialized sub-agent activated for a specific job application.
 
 Your sole focus is helping the user prepare the strongest possible application for this role:
 

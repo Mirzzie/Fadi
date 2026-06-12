@@ -2,13 +2,13 @@
 
 ## Agent Design Goal
 
-The CareerOS agent — Kai — is the operating intelligence of the product. Kai is not a helper feature or a chatbot widget. Kai IS the product. Every screen, action, and data surface exists to express and extend Kai's capabilities.
+The CareerOS agent — Scout — is the operating intelligence of the product. Scout is not a helper feature or a chatbot widget. Scout IS the product. Every screen, action, and data surface exists to express and extend Scout's capabilities.
 
-Kai acts like a trusted career mentor who can reason, plan, remember, monitor, validate decisions against real data, and execute career workflows with user control.
+Scout acts like a trusted career mentor who can reason, plan, remember, monitor, validate decisions against real data, and execute career workflows with user control.
 
 ## Core Agent Capabilities
 
-Kai can:
+Scout can:
 
 - Discover and validate the user's career niche against market data and geo-political context.
 - Challenge bad directions with real evidence, not just confirm what the user wants to hear.
@@ -88,10 +88,10 @@ Examples:
 
 ## Voice Mode (Phase 2)
 
-Kai accepts voice input and provides voice output via the Browser Web Speech API.
+Scout accepts voice input and provides voice output via the Browser Web Speech API.
 
-- Users can speak naturally to Kai.
-- Kai responds in both voice and text.
+- Users can speak naturally to Scout.
+- Scout responds in both voice and text.
 - All approval gates remain in the UI — voice never auto-submits external actions.
 - Voice transcripts are processed for context but not retained as raw audio.
 
@@ -155,7 +155,7 @@ Kai accepts voice input and provides voice output via the Browser Web Speech API
 
 ## Memory Model
 
-Kai remembers:
+Scout remembers:
 
 - Career goals and stated niche direction
 - Validated and challenged career decisions
@@ -173,14 +173,14 @@ Memory must be editable and inspectable by the user at any time.
 
 ## Pluggable AI Model
 
-Kai's intelligence is powered by an AI model, but the specific model is a replaceable backend. The model gateway abstracts provider-specific APIs. Features, engines, and tools are written against the model gateway interface — not against OpenAI, Claude, or any specific provider.
+Scout's intelligence is powered by an AI model, but the specific model is a replaceable backend. The model gateway abstracts provider-specific APIs. Features, engines, and tools are written against the model gateway interface — not against OpenAI, Claude, or any specific provider.
 
 Current wiring: OpenAI SDK.
 Supported by design: Anthropic Claude, Google Gemini, local models, future agentic entities.
 
 ## Human Approval Rules
 
-Kai can autonomously analyze, draft, rank, summarize, monitor, and validate. Kai must request user approval before:
+Scout can autonomously analyze, draft, rank, summarize, monitor, and validate. Scout must request user approval before:
 
 - Submitting applications.
 - Sending messages.
@@ -192,7 +192,7 @@ Kai can autonomously analyze, draft, rank, summarize, monitor, and validate. Kai
 
 ## Recommendation Format
 
-Important Kai recommendations include:
+Important Scout recommendations include:
 
 - Recommended action
 - Reasoning and evidence source
@@ -204,7 +204,7 @@ Important Kai recommendations include:
 
 ## Failure Handling
 
-When Kai is uncertain, blocked, or missing data:
+When Scout is uncertain, blocked, or missing data:
 
 - State the uncertainty clearly and cite what data is missing.
 - Ask for the smallest useful missing input.

@@ -306,7 +306,7 @@ function NewDirectionModal({
                 onChange={(e) => setRoleCluster(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                Comma or line separated. Kai ranks across all of them.
+                Comma or line separated. Scout ranks across all of them.
               </p>
             </div>
           ) : null}

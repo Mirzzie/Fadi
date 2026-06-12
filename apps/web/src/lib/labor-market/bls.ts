@@ -5,7 +5,7 @@ import { logger } from "@/lib/observability/logger";
 
 /**
  * US labor-market snapshot from the Bureau of Labor Statistics — real government
- * data, grounding Kai's market context (replaces the old "marketDemand not
+ * data, grounding Scout's market context (replaces the old "marketDemand not
  * implemented" placeholder). Works KEYLESS (BLS v1, ~25 req/day); a BLS_API_KEY
  * upgrades to v2 (500/day). Cached aggressively — these series update monthly.
  */
@@ -25,7 +25,7 @@ export type LaborSnapshot = {
   openingsTrend: Trend | null;
   quitsRate: number | null;
   asOf: string | null;
-  /** One-line honest summary for Kai to cite. Empty when no data. */
+  /** One-line honest summary for Scout to cite. Empty when no data. */
   summary: string;
 };
 

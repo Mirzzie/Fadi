@@ -12,9 +12,9 @@ import type { OnboardingFormValues } from "@/lib/onboarding/validation";
 import { cn } from "@/lib/utils";
 
 /**
- * Kai-led conversational welcome — the OS's first-run. Instead of a dead form, Kai
+ * Scout-led conversational welcome — the OS's first-run. Instead of a dead form, Scout
  * talks the user through setting up their first track, one question at a time.
- * Scripted + Kai-voiced (reliable, no AI dependency on the very first impression);
+ * Scripted + Scout-voiced (reliable, no AI dependency on the very first impression);
  * it collects exactly the fields onboarding needs, then hands off to the dashboard
  * where the guidance layer takes over.
  */
@@ -24,7 +24,7 @@ type Chip = { value: string; label: string };
 
 type Step = {
   key: keyof OnboardingFormValues;
-  kai: string | ((v: Values) => string);
+  scout: string | ((v: Values) => string);
   type: "text" | "textarea" | "chips";
   placeholder?: string;
   chips?: Chip[];
@@ -35,7 +35,7 @@ type Step = {
 const STEPS: Step[] = [
   {
     key: "fullName",
-    kai: "Hey — I'm Kai, your career operating system. I'll get you set up in about two minutes, then I'll guide you from there. First: what should I call you?",
+    scout: "Hey — I'm Scout, your career operating system. I'll get you set up in about two minutes, then I'll guide you from there. First: what should I call you?",
     type: "text",
     placeholder: "Your name",
     min: 2,
@@ -43,7 +43,7 @@ const STEPS: Step[] = [
   },
   {
     key: "targetRole",
-    kai: (v) =>
+    scout: (v) =>
       `Good to meet you, ${(v.fullName ?? "").trim().split(/\s+/)[0] || "there"}. What role or field are you aiming for? This becomes your first track — you can add more directions later.`,
     type: "text",
     placeholder: "e.g. Financial Analyst, UX Designer, SOC Analyst, Registered Nurse",
@@ -52,7 +52,7 @@ const STEPS: Step[] = [
   },
   {
     key: "locationPreference",
-    kai: "Where do you want to work? A city, a country, or just “remote” all work.",
+    scout: "Where do you want to work? A city, a country, or just “remote” all work.",
     type: "text",
     placeholder: "Dublin, Ireland · Remote",
     min: 2,
@@ -60,7 +60,7 @@ const STEPS: Step[] = [
   },
   {
     key: "experienceLevel",
-    kai: "How far along are you?",
+    scout: "How far along are you?",
     type: "chips",
     chips: [
       { value: "entry", label: "Entry / Graduate" },
@@ -73,7 +73,7 @@ const STEPS: Step[] = [
   },
   {
     key: "careerGoals",
-    kai: "What do you actually want from this move? Be honest — money, stability, a fresh start, growth. This shapes how I guide you, so it's worth a real answer.",
+    scout: "What do you actually want from this move? Be honest — money, stability, a fresh start, growth. This shapes how I guide you, so it's worth a real answer.",
     type: "textarea",
     placeholder: "e.g. Land a stable mid-level role within 6 months and stop feeling stuck where I am.",
     min: 20,
@@ -81,7 +81,7 @@ const STEPS: Step[] = [
   },
   {
     key: "resumeText",
-    kai: "Paste your CV — or just the gist of your experience, skills, and education. I use this to match real roles and write your documents from evidence, not guesses.",
+    scout: "Paste your CV — or just the gist of your experience, skills, and education. I use this to match real roles and write your documents from evidence, not guesses.",
     type: "textarea",
     placeholder: "Paste your CV text, or a summary of your experience…",
     min: 50,
@@ -89,7 +89,7 @@ const STEPS: Step[] = [
   },
   {
     key: "linkedInProfile",
-    kai: "Last thing — your LinkedIn URL, or a few lines about your background. Then I'll set everything up.",
+    scout: "Last thing — your LinkedIn URL, or a few lines about your background. Then I'll set everything up.",
     type: "text",
     placeholder: "linkedin.com/in/you — or a short bio",
     min: 2,
@@ -97,17 +97,17 @@ const STEPS: Step[] = [
   },
 ];
 
-type Bubble = { from: "kai" | "user"; text: string };
+type Bubble = { from: "scout" | "user"; text: string };
 
-function kaiText(step: Step, values: Values): string {
-  return typeof step.kai === "function" ? step.kai(values) : step.kai;
+function scoutText(step: Step, values: Values): string {
+  return typeof step.scout === "function" ? step.scout(values) : step.scout;
 }
 
-export function KaiOnboarding({ onUseForm }: { onUseForm?: () => void }) {
+export function ScoutOnboarding({ onUseForm }: { onUseForm?: () => void }) {
   const router = useRouter();
   const [values, setValues] = useState<Values>({});
   const [stepIndex, setStepIndex] = useState(0);
-  const [bubbles, setBubbles] = useState<Bubble[]>([{ from: "kai", text: kaiText(STEPS[0], {}) }]);
+  const [bubbles, setBubbles] = useState<Bubble[]>([{ from: "scout", text: scoutText(STEPS[0], {}) }]);
   const [draft, setDraft] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, startTransition] = useTransition();
@@ -136,7 +136,7 @@ export function KaiOnboarding({ onUseForm }: { onUseForm?: () => void }) {
     setDraft("");
 
     if (nextIndex < STEPS.length) {
-      transcript.push({ from: "kai", text: kaiText(STEPS[nextIndex], nextValues) });
+      transcript.push({ from: "scout", text: scoutText(STEPS[nextIndex], nextValues) });
       setBubbles(transcript);
       setStepIndex(nextIndex);
       return;
@@ -144,7 +144,7 @@ export function KaiOnboarding({ onUseForm }: { onUseForm?: () => void }) {
 
     // All collected — confirm and create.
     transcript.push({
-      from: "kai",
+      from: "scout",
       text: `Perfect. Setting up your Career OS around “${nextValues.targetRole}”…`,
     });
     setBubbles(transcript);
@@ -156,7 +156,7 @@ export function KaiOnboarding({ onUseForm }: { onUseForm?: () => void }) {
         setError(res.message ?? "Something went wrong saving your setup.");
         setBubbles((b) => [
           ...b,
-          { from: "kai", text: "Hm — I couldn't save that. Mind trying the last answer again?" },
+          { from: "scout", text: "Hm — I couldn't save that. Mind trying the last answer again?" },
         ]);
         setStepIndex(STEPS.length - 1);
         return;
@@ -170,9 +170,9 @@ export function KaiOnboarding({ onUseForm }: { onUseForm?: () => void }) {
     <div className="mx-auto flex h-[min(80vh,640px)] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-border/60 bg-card/70 shadow-2xl backdrop-blur">
       {/* Header */}
       <div className="flex items-center gap-3 border-b border-border/50 px-5 py-3">
-        <KaiOrb />
+        <ScoutOrb />
         <div className="flex-1">
-          <p className="text-sm font-semibold tracking-tight">Kai</p>
+          <p className="text-sm font-semibold tracking-tight">Scout</p>
           <p className="text-xs text-muted-foreground">Setting up your Career OS</p>
         </div>
         <div className="flex items-center gap-1.5">
@@ -198,11 +198,11 @@ export function KaiOnboarding({ onUseForm }: { onUseForm?: () => void }) {
               b.from === "user" ? "flex-row-reverse" : "",
             )}
           >
-            {b.from === "kai" ? <KaiOrb size="sm" /> : null}
+            {b.from === "scout" ? <ScoutOrb size="sm" /> : null}
             <div
               className={cn(
                 "max-w-[80%] rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
-                b.from === "kai"
+                b.from === "scout"
                   ? "rounded-bl-sm bg-muted/70"
                   : "rounded-br-sm bg-primary text-primary-foreground",
               )}
@@ -286,7 +286,7 @@ export function KaiOnboarding({ onUseForm }: { onUseForm?: () => void }) {
   );
 }
 
-function KaiOrb({ size = "md" }: { size?: "sm" | "md" }) {
+function ScoutOrb({ size = "md" }: { size?: "sm" | "md" }) {
   const dim = size === "sm" ? "size-6" : "size-9";
   const inner = size === "sm" ? "size-2" : "size-3.5";
   return (

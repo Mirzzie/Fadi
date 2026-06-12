@@ -11,7 +11,7 @@ export type CadencePeriod = "day" | "week";
 /**
  * Let the user commit to a cadence on their OWN terms. This is autonomy, not a
  * quota: a small, sustainable target they choose beats an imposed one. We never
- * reward setting it (intent isn't motion) — it just shapes how Kai paces them.
+ * reward setting it (intent isn't motion) — it just shapes how Scout paces them.
  */
 export async function setCommitmentCadence(input: {
   target: number;

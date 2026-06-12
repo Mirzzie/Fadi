@@ -2,15 +2,15 @@
 
 ## Purpose
 
-The AI Safety and Approval System ensures Kai remains user-controlled, auditable, and safe when analyzing sensitive data or preparing external actions.
+The AI Safety and Approval System ensures Scout remains user-controlled, auditable, and safe when analyzing sensitive data or preparing external actions.
 
-The system must prevent unauthorized submission, messaging, profile updates, data sharing, fabricated claims, and unreviewed external actions. This is non-negotiable regardless of how autonomous Kai becomes.
+The system must prevent unauthorized submission, messaging, profile updates, data sharing, fabricated claims, and unreviewed external actions. This is non-negotiable regardless of how autonomous Scout becomes.
 
 ## Safety Principles
 
-- Kai is approval-gated for all external actions.
-- Kai never fabricates data, credentials, skills, or market claims.
-- Kai never takes irreversible external action without explicit user approval.
+- Scout is approval-gated for all external actions.
+- Scout never fabricates data, credentials, skills, or market claims.
+- Scout never takes irreversible external action without explicit user approval.
 - All approvals are logged immutably.
 - Users can always review, revise, or cancel prepared actions before they execute.
 

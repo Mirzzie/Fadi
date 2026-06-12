@@ -20,7 +20,7 @@ CareerOS can proceed to a very small private alpha only after the production-lik
 | Done | Add AI/privacy consent copy | Product | Required before report generation |
 | Not done | Add privacy policy and terms of service | Product/Legal | Required before real users |
 | Not done | Add backup policy | Engineering | Provider backups plus restore test |
-| Not done | Implement niche validation conversation | Product/Engineering | Core of Kai's Phase 1 identity |
+| Not done | Implement niche validation conversation | Product/Engineering | Core of Scout's Phase 1 identity |
 | Not done | Run browser E2E smoke test | Engineering | Sign up, onboarding, report, jobs |
 
 ## Environment Variables

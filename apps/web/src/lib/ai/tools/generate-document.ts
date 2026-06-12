@@ -1,14 +1,14 @@
 import "server-only";
 
 import { generateCareerDocument, type DocKind } from "@/lib/documents/generate";
-import type { KaiTool, KaiToolContext, KaiToolResult } from "./types";
+import type { ScoutTool, ScoutToolContext, ScoutToolResult } from "./types";
 
 /**
- * Kai drafts a tailored career document and saves it — opening in the editor.
+ * Scout drafts a tailored career document and saves it — opening in the editor.
  * Delegates to the shared `generateCareerDocument` (same core the per-job
  * workspace buttons use). Honesty rule lives in those prompts.
  */
-export const generateDocument: KaiTool = {
+export const generateDocument: ScoutTool = {
   name: "generate_document",
   description:
     "Draft and save a tailored career document (resume/CV, cover letter, cold email, or value proposition) for a specific role/company, then open it in the editor. Use when the user asks to create, draft, write, generate, build or tailor any of these.",
@@ -26,7 +26,7 @@ export const generateDocument: KaiTool = {
     required: ["kind"],
   },
 
-  async execute(args, ctx: KaiToolContext): Promise<KaiToolResult> {
+  async execute(args, ctx: ScoutToolContext): Promise<ScoutToolResult> {
     if (!ctx.generate) {
       return { summary: "Document drafting isn't available this turn.", view: "none" };
     }

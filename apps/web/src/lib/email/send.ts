@@ -70,7 +70,7 @@ export async function sendEmail(message: EmailMessage): Promise<{ ok: boolean }>
   }
 }
 
-/** Plain, human email bodies — same voice rules as everything Kai writes:
+/** Plain, human email bodies — same voice rules as everything Scout writes:
  *  no hype, no corporate filler, one clear action. */
 export function resetPasswordEmail(url: string): Pick<EmailMessage, "subject" | "text" | "html"> {
   return {

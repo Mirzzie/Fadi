@@ -137,7 +137,7 @@ export async function generateCareerReportAction(
     };
   }
 
-  // Resolve the SAME per-user provider chain Kai chat uses, so a key set in
+  // Resolve the SAME per-user provider chain Scout chat uses, so a key set in
   // Settings → AI provider drives the report too. buildProviderChain falls back
   // to the server default when the user hasn't configured their own; wrapping it
   // in ResilientProvider gives the report primary→fallback resilience for free.
@@ -250,7 +250,7 @@ ${truncate(context.resumeText, 9000)}
         {
           role: "system",
           content:
-            "You are Kai, CareerOS's career operating intelligence. You are honest, strategic, and evidence-based. Produce specific career guidance grounded in the user's actual profile. Do not invent credentials, job data, salary facts, or market claims. If evidence is limited, say so explicitly.",
+            "You are Scout, CareerOS's career operating intelligence. You are honest, strategic, and evidence-based. Produce specific career guidance grounded in the user's actual profile. Do not invent credentials, job data, salary facts, or market claims. If evidence is limited, say so explicitly.",
         },
         {
           role: "user",

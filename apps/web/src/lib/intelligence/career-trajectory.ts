@@ -231,7 +231,7 @@ function identifyBottleneck(
     return {
       type: "market_misalignment",
       description: `The ${input.targetRole} market is showing declining hiring signals. You may be targeting a shrinking field.`,
-      primaryAction: "Run a niche validation with Kai to assess whether to pivot your target role or adjust your positioning.",
+      primaryAction: "Run a niche validation with Scout to assess whether to pivot your target role or adjust your positioning.",
     };
   }
 
@@ -247,7 +247,7 @@ function identifyBottleneck(
     return {
       type: "network_gap",
       description: "You have almost no referral applications. The data shows 1 referral is worth 40 cold applications.",
-      primaryAction: "Identify 3 people in your target companies this week and send a genuine outreach message. Kai can help you draft it.",
+      primaryAction: "Identify 3 people in your target companies this week and send a genuine outreach message. Scout can help you draft it.",
     };
   }
 
@@ -263,7 +263,7 @@ function identifyBottleneck(
     return {
       type: "targeting",
       description: `Your response rate is significantly below market average. This usually indicates targeting roles where your profile is not a strong match.`,
-      primaryAction: "Ask Kai to identify 5 roles where your profile is objectively a top-20% candidate match rather than an average applicant.",
+      primaryAction: "Ask Scout to identify 5 roles where your profile is objectively a top-20% candidate match rather than an average applicant.",
     };
   }
 
@@ -271,7 +271,7 @@ function identifyBottleneck(
     return {
       type: "volume",
       description: "Application volume is low. At current rates, the search will take significantly longer than necessary.",
-      primaryAction: "Aim for 3–5 high-quality targeted applications per week. Use Kai's workspace to keep quality high without spending 45 minutes per application.",
+      primaryAction: "Aim for 3–5 high-quality targeted applications per week. Use Scout's workspace to keep quality high without spending 45 minutes per application.",
     };
   }
 
@@ -377,14 +377,14 @@ function deriveWeeklyFocus(
       };
     case "targeting":
       return {
-        action: "Ask Kai to identify your 5 strongest role matches from the current job pool",
+        action: "Ask Scout to identify your 5 strongest role matches from the current job pool",
         rationale: "Below-average response rates usually indicate role targeting mismatch — you are competing where you are not the strongest candidate.",
         expectedImpact: "Targeting better-matched roles can 3× your response rate immediately.",
       };
     case "volume":
       return {
-        action: `Send 3–5 high-quality targeted applications this week using Kai's workspace`,
-        rationale: `At your current application pace, the search timeline stretches significantly. ${estimates.estimatedDaysToFirstInterview ? `Kai estimates ${estimates.estimatedDaysToFirstInterview} days to first interview at current pace.` : ""}`,
+        action: `Send 3–5 high-quality targeted applications this week using Scout's workspace`,
+        rationale: `At your current application pace, the search timeline stretches significantly. ${estimates.estimatedDaysToFirstInterview ? `Scout estimates ${estimates.estimatedDaysToFirstInterview} days to first interview at current pace.` : ""}`,
         expectedImpact: "Consistent quality volume is the most reliable path to shortening the search.",
       };
     default:

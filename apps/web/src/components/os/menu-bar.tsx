@@ -5,15 +5,15 @@ import { useEffect, useState } from "react";
 
 import { useWakeWord } from "@/lib/voice/use-wake-word";
 import { cn } from "@/lib/utils";
-import { summonKai, useOsMode } from "./os-mode";
+import { summonScout, useOsMode } from "./os-mode";
 import { TrackSwitcher } from "./track-switcher";
 import { UserMenu } from "./user-menu";
 
-/** Top menu bar — the OS's persistent identity strip: brand, live clock, Kai
- *  status, and the Desk ⇄ Kai mode switch. */
+/** Top menu bar — the OS's persistent identity strip: brand, live clock, Scout
+ *  status, and the Desk ⇄ Scout mode switch. */
 export function MenuBar() {
   const { mode, setMode } = useOsMode();
-  const wake = useWakeWord(summonKai);
+  const wake = useWakeWord(summonScout);
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -36,7 +36,7 @@ export function MenuBar() {
         <span className="font-semibold tracking-tight">Career OS</span>
         <span className="hidden items-center gap-1.5 text-muted-foreground sm:flex">
           <span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_var(--color-emerald-400,#34d399)]" />
-          Kai active
+          Scout active
         </span>
         <span className="text-muted-foreground/50">/</span>
         <TrackSwitcher />
@@ -44,13 +44,13 @@ export function MenuBar() {
 
       {/* Mode switch + clock */}
       <div className="flex items-center gap-3">
-        {/* "Hey Kai" wake word */}
+        {/* "Hey Scout" wake word */}
         {wake.supported ? (
           <button
             type="button"
             onClick={wake.toggle}
             aria-pressed={wake.enabled}
-            title={wake.enabled ? 'Listening for "Hey Kai" — click to stop' : 'Enable "Hey Kai" voice'}
+            title={wake.enabled ? 'Listening for "Hey Scout" — click to stop' : 'Enable "Hey Scout" voice'}
             className={cn(
               "flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium transition-colors",
               wake.enabled
@@ -63,7 +63,7 @@ export function MenuBar() {
             ) : (
               <MicOff className="size-3" aria-hidden="true" />
             )}
-            <span className="hidden sm:inline">Hey Kai</span>
+            <span className="hidden sm:inline">Hey Scout</span>
           </button>
         ) : null}
 
@@ -71,8 +71,8 @@ export function MenuBar() {
           <ModeButton active={mode === "desk"} onClick={() => setMode("desk")} icon={<LayoutGrid className="size-3" />}>
             Desk
           </ModeButton>
-          <ModeButton active={mode === "kai"} onClick={() => setMode("kai")} icon={<Sparkles className="size-3" />}>
-            Kai
+          <ModeButton active={mode === "scout"} onClick={() => setMode("scout")} icon={<Sparkles className="size-3" />}>
+            Scout
           </ModeButton>
         </div>
         <span className="tabular-nums text-muted-foreground">{clock}</span>

@@ -5,7 +5,7 @@ import { getCurrentAuthUser } from "@/lib/auth/session";
 import { createAgentMessagesRepository } from "@careeros/database";
 import { getDatabase } from "@/lib/database/client";
 
-/** Kai's persisted conversation — loaded on mount so Desk and Kai modes share
+/** Scout's persisted conversation — loaded on mount so Desk and Scout modes share
  *  the same history and chats survive reloads. */
 export async function GET() {
   const session = await auth.api.getSession({ headers: await headers() });

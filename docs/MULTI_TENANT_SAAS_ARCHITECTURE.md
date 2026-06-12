@@ -75,7 +75,7 @@ For millions of users:
 - Include user/tenant ID in events, logs, metrics, and traces.
 - Keep entitlements separate from billing records.
 - Design account deletion and tenant deletion as separate workflows.
-- Never allow Kai's memory, recommendations, or market context for one user to leak into another's context.
+- Never allow Scout's memory, recommendations, or market context for one user to leak into another's context.
 
 ## Complexity
 
