@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { DashboardHomeSwitch } from "@/components/os/dashboard-home-switch";
 import { DashboardShell } from "@/components/shells/dashboard-shell";
 import { maybeRunAgentForUser } from "@/lib/agents/background";
 import { deliverDigestToChat, digestSubline, getAgencyDigest } from "@/lib/agents/digest";
@@ -111,21 +110,17 @@ export default async function DashboardPage() {
 
   return (
     <AppShell>
-      <DashboardHomeSwitch
+      <DashboardShell
+        userEmail={user.email}
         greeting={`Hey ${firstName}.`}
         subline={subline}
         opportunities={opportunities}
-        desk={
-          <DashboardShell
-            userEmail={user.email}
-            profileSummary={profileSummary}
-            latestReport={latestReport}
-            recommendedJobsPreview={recommendedJobsPreview}
-            momentum={momentum}
-            marketSignals={marketSignals}
-            setup={setup}
-          />
-        }
+        profileSummary={profileSummary}
+        latestReport={latestReport}
+        recommendedJobsPreview={recommendedJobsPreview}
+        momentum={momentum}
+        marketSignals={marketSignals}
+        setup={setup}
       />
     </AppShell>
   );

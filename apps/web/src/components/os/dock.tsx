@@ -17,9 +17,9 @@ import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
 
-type DockApp = { href: string; label: string; icon: LucideIcon };
+export type DockApp = { href: string; label: string; icon: LucideIcon };
 
-const DOCK_APPS: DockApp[] = [
+export const DOCK_APPS: DockApp[] = [
   { href: "/dashboard", label: "Home", icon: LayoutDashboard },
   { href: "/dashboard/jobs", label: "Jobs", icon: BriefcaseBusiness },
   { href: "/dashboard/niche-finder", label: "Niche Finder", icon: Compass },

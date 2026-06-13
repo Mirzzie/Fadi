@@ -3,19 +3,21 @@
 import { usePathname } from "next/navigation";
 
 import { Dock } from "./dock";
-import { ScoutLauncher } from "./scout-launcher";
+import { ScoutOrb } from "./scout-orb";
 import { MenuBar } from "./menu-bar";
-import { OsModeProvider, useOsMode } from "./os-mode";
+import { CommandBar } from "./command-bar";
+import { ScoutPresenceProvider } from "./scout-presence";
 
 /**
  * The OS chrome that wraps every authenticated screen: a top menu bar, a bottom
- * dock, a desktop "wallpaper", and the always-present Scout orb. Pages render in
- * the desktop area between them. Mode (Desk ⇄ Scout) lives in OsModeProvider.
+ * dock, a desktop "wallpaper", a ⌘K command spotlight, and the ambient, always-
+ * present Scout orb. There is no Desk/Scout mode split — Scout is everywhere.
+ * Pages render in the desktop area; ambient Scout lives in ScoutPresenceProvider.
  */
 export function OsShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   return (
-    <OsModeProvider>
+    <ScoutPresenceProvider>
       <div className="relative flex min-h-screen flex-col">
         {/* Wallpaper */}
         <div
@@ -37,14 +39,9 @@ export function OsShell({ children }: { children: React.ReactNode }) {
           </div>
         </main>
         <Dock />
-        <DeskOnlyScoutOrb />
+        <CommandBar />
+        <ScoutOrb />
       </div>
-    </OsModeProvider>
+    </ScoutPresenceProvider>
   );
-}
-
-/** The corner Scout orb belongs to Desk mode; Scout mode already centres Scout. */
-function DeskOnlyScoutOrb() {
-  const { mode } = useOsMode();
-  return mode === "desk" ? <ScoutLauncher /> : null;
 }

@@ -49,7 +49,17 @@ function toSpeakable(markdown: string): string {
 
 const VOICE_PREF_KEY = "scout-voice-enabled";
 
-export function ScoutChat({ autoListenNonce }: { autoListenNonce?: number } = {}) {
+export function ScoutChat({
+  autoListenNonce,
+  seed,
+  onStateChange,
+}: {
+  autoListenNonce?: number;
+  /** A question handed off from the ⌘K spotlight; fired once per nonce. */
+  seed?: { text: string; nonce: number } | null;
+  /** Publish Scout's live state to the ambient orb (only the orb panel passes this). */
+  onStateChange?: (state: "idle" | "listening" | "thinking" | "speaking") => void;
+} = {}) {
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -278,6 +288,15 @@ export function ScoutChat({ autoListenNonce }: { autoListenNonce?: number } = {}
     sendRef.current = sendMessage;
   }, [sendMessage]);
 
+  // A question seeded from the ⌘K spotlight — fire it once per nonce.
+  const lastSeedNonce = useRef(0);
+  useEffect(() => {
+    if (seed && seed.nonce !== lastSeedNonce.current) {
+      lastSeedNonce.current = seed.nonce;
+      sendMessage(seed.text);
+    }
+  }, [seed, sendMessage]);
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -323,6 +342,12 @@ export function ScoutChat({ autoListenNonce }: { autoListenNonce?: number } = {}
       : isListening
         ? "listening"
         : "idle";
+
+  // Publish that live state up to the ambient orb (no-op unless the orb panel
+  // passed onStateChange — the dedicated Scout page leaves the orb alone).
+  useEffect(() => {
+    onStateChange?.(scoutState);
+  }, [scoutState, onStateChange]);
 
   return (
     <div className="flex h-full flex-col">

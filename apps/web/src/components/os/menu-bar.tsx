@@ -1,18 +1,20 @@
 "use client";
 
-import { LayoutGrid, Mic, MicOff, Sparkles } from "lucide-react";
+import { Mic, MicOff, Search, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { useWakeWord } from "@/lib/voice/use-wake-word";
 import { cn } from "@/lib/utils";
-import { summonScout, useOsMode } from "./os-mode";
+import { ActivityCenter } from "./activity-center";
+import { summonScout, useScout, type ScoutState } from "./scout-presence";
 import { TrackSwitcher } from "./track-switcher";
 import { UserMenu } from "./user-menu";
 
-/** Top menu bar — the OS's persistent identity strip: brand, live clock, Scout
- *  status, and the Desk ⇄ Scout mode switch. */
+/** Top menu bar — the OS's persistent identity strip: brand, track, live Scout
+ *  state, the ⌘K spotlight, "Hey Scout", clock, and the user menu. Scout is
+ *  ambient now, so there's no Desk/Scout mode toggle. */
 export function MenuBar() {
-  const { mode, setMode } = useOsMode();
+  const { state } = useScout();
   const wake = useWakeWord(summonScout);
   const [now, setNow] = useState<Date | null>(null);
 
@@ -28,22 +30,33 @@ export function MenuBar() {
 
   return (
     <header className="sticky top-0 z-40 flex h-9 items-center justify-between border-b border-border/60 bg-background/80 px-3 text-xs backdrop-blur-md duration-500 animate-in fade-in slide-in-from-top-2">
-      {/* Brand */}
+      {/* Brand + live Scout state */}
       <div className="flex items-center gap-2">
         <div className="grid size-5 place-items-center rounded-md bg-gradient-to-br from-primary to-[oklch(0.66_0.22_285)]">
           <Sparkles className="size-3 text-primary-foreground" aria-hidden="true" />
         </div>
         <span className="font-semibold tracking-tight">Career OS</span>
-        <span className="hidden items-center gap-1.5 text-muted-foreground sm:flex">
-          <span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_var(--color-emerald-400,#34d399)]" />
-          Scout active
-        </span>
+        <ScoutStateChip state={state} />
         <span className="text-muted-foreground/50">/</span>
         <TrackSwitcher />
       </div>
 
-      {/* Mode switch + clock */}
+      {/* Spotlight + voice + clock */}
       <div className="flex items-center gap-3">
+        {/* ⌘K command spotlight */}
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new Event("scout:command"))}
+          title="Search or command (⌘K)"
+          className="flex items-center gap-2 rounded-full border border-border/70 bg-muted/40 px-2.5 py-1 font-medium text-muted-foreground transition-colors hover:text-foreground"
+        >
+          <Search className="size-3" aria-hidden="true" />
+          <span className="hidden sm:inline">Search</span>
+          <kbd className="hidden rounded border border-border/60 bg-background/60 px-1 text-[0.6rem] sm:inline">
+            ⌘K
+          </kbd>
+        </button>
+
         {/* "Hey Scout" wake word */}
         {wake.supported ? (
           <button
@@ -67,14 +80,7 @@ export function MenuBar() {
           </button>
         ) : null}
 
-        <div className="flex items-center rounded-full border border-border/70 bg-muted/40 p-0.5">
-          <ModeButton active={mode === "desk"} onClick={() => setMode("desk")} icon={<LayoutGrid className="size-3" />}>
-            Desk
-          </ModeButton>
-          <ModeButton active={mode === "scout"} onClick={() => setMode("scout")} icon={<Sparkles className="size-3" />}>
-            Scout
-          </ModeButton>
-        </div>
+        <ActivityCenter />
         <span className="tabular-nums text-muted-foreground">{clock}</span>
         <UserMenu />
       </div>
@@ -82,31 +88,28 @@ export function MenuBar() {
   );
 }
 
-function ModeButton({
-  active,
-  onClick,
-  icon,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-}) {
+const STATE_TEXT: Record<ScoutState, string> = {
+  idle: "Scout active",
+  listening: "Listening…",
+  thinking: "Thinking…",
+  working: "Working…",
+  speaking: "Speaking…",
+};
+
+/** Live status dot + label reflecting Scout's ambient state. */
+function ScoutStateChip({ state }: { state: ScoutState }) {
+  const busy = state !== "idle";
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        "flex items-center gap-1 rounded-full px-2.5 py-1 font-medium transition-colors",
-        active
-          ? "bg-primary/15 text-primary ring-1 ring-inset ring-primary/30"
-          : "text-muted-foreground hover:text-foreground",
-      )}
-    >
-      {icon}
-      {children}
-    </button>
+    <span className="hidden items-center gap-1.5 text-muted-foreground sm:flex">
+      <span
+        className={cn(
+          "size-1.5 rounded-full",
+          busy
+            ? "bg-primary shadow-[0_0_6px_var(--color-primary)] animate-pulse"
+            : "bg-emerald-400 shadow-[0_0_6px_var(--color-emerald-400,#34d399)]",
+        )}
+      />
+      {STATE_TEXT[state]}
+    </span>
   );
 }

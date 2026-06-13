@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   ArrowRight,
+  ArrowUpRight,
   BriefcaseBusiness,
   GraduationCap,
   Pencil,
@@ -47,8 +48,14 @@ type MarketSignal = {
   reason: string;
 };
 
+export type DashboardOpportunity = { label: string; detail: string; href: string };
+
 type DashboardShellProps = {
   userEmail?: string;
+  /** Personalized greeting + Scout-surfaced opportunities for the Mission Control hero. */
+  greeting?: string;
+  subline?: string;
+  opportunities?: DashboardOpportunity[];
   profileSummary: DashboardProfileSummary | null;
   latestReport: StoredCareerReport | null;
   recommendedJobsPreview: RecommendedJob[];
@@ -59,6 +66,9 @@ type DashboardShellProps = {
 
 export function DashboardShell({
   userEmail,
+  greeting,
+  subline,
+  opportunities = [],
   profileSummary,
   latestReport,
   recommendedJobsPreview,
@@ -68,7 +78,7 @@ export function DashboardShell({
 }: DashboardShellProps) {
   return (
     <div className="mx-auto max-w-shell space-y-6">
-      {/* Banner */}
+      {/* Mission Control hero — greeting + the live opportunities Scout has lined up */}
       <section
         className="relative overflow-hidden rounded-2xl border border-white/10 p-6 sm:p-8"
         style={{ backgroundImage: DASH_BANNER }}
@@ -78,25 +88,44 @@ export function DashboardShell({
           className="pointer-events-none absolute -right-16 -top-20 size-72 rounded-full opacity-30 blur-3xl"
           style={{ background: "oklch(0.66 0.22 300)" }}
         />
-        <div className="relative max-w-2xl">
+        <div className="relative">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white/90">
             <Sparkles className="size-3" aria-hidden="true" />
-            Career command center
+            Mission Control
           </span>
           <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-            Your career, run by Scout
+            {greeting ?? "Your career, run by Scout"}
           </h2>
           <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/70 sm:text-base">
-            Review your profile, generate your Career Intelligence Report, and act on what matters —
-            Scout keeps the rest moving.
+            {subline ??
+              "Review your profile, generate your Career Intelligence Report, and act on what matters — Scout keeps the rest moving."}
           </p>
-          {userEmail ? (
-            <p className="mt-2 text-xs text-white/50">Signed in as {userEmail}</p>
+
+          {/* Live opportunities Scout surfaced — the proactive heart of the OS. */}
+          {opportunities.length > 0 ? (
+            <div className="mt-6 grid gap-2.5 sm:grid-cols-3">
+              {opportunities.map((opp, i) => (
+                <Link
+                  key={`${opp.label}-${opp.detail}-${i}`}
+                  href={opp.href}
+                  className="group rounded-xl border border-white/15 bg-white/5 p-3 text-left backdrop-blur transition-colors hover:border-white/35 hover:bg-white/10"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-white/80">
+                      {opp.label}
+                    </p>
+                    <ArrowUpRight className="size-3.5 shrink-0 text-white/50 transition-colors group-hover:text-white" aria-hidden="true" />
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-sm text-white">{opp.detail}</p>
+                </Link>
+              ))}
+            </div>
           ) : null}
-          <div className="mt-6 flex flex-wrap gap-3">
+
+          <div className="mt-6 flex flex-wrap items-center gap-3">
             <Link
               href="#career-report"
-              className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[oklch(0.64_0.25_300)] to-[oklch(0.6_0.2_262)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_30px_-8px_oklch(0.6_0.24_300_/_0.7)] transition-transform hover:-translate-y-0.5"
+              className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[oklch(0.64_0.25_300)] to-[oklch(0.6_0.2_262)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_30px_-8px_oklch(0.6_0.24_300/0.7)] transition-transform hover:-translate-y-0.5"
             >
               Generate report
               <ArrowRight className="size-4" aria-hidden="true" />
@@ -107,6 +136,9 @@ export function DashboardShell({
             >
               Browse jobs
             </Link>
+            {userEmail ? (
+              <span className="text-xs text-white/40">Signed in as {userEmail}</span>
+            ) : null}
           </div>
         </div>
       </section>
