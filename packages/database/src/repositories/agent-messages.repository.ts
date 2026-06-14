@@ -11,8 +11,8 @@ export type CreateAgentMessageInput = {
 };
 
 /**
- * Kai conversation memory. One row per turn (user / assistant), so Kai's chat
- * persists across sessions and is shared between Desk and Kai modes (both load
+ * Scout conversation memory. One row per turn (user / assistant), so Scout's chat
+ * persists across sessions and is shared between Desk and Scout modes (both load
  * the same history).
  */
 export function createAgentMessagesRepository(db: Database) {

@@ -33,3 +33,6 @@ Thumbs.db
 
 # Visual-verification screenshots (local only)
 .shots/
+
+# Local backup archive (not source)
+claude-backup.tar.gz

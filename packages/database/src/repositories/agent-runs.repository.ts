@@ -12,7 +12,7 @@ import {
 export type CreateFindingInput = Omit<NewAgentFinding, "id" | "runId" | "userId" | "createdAt" | "seenAt">;
 
 /**
- * Kai's background agency ledger. Every digest claim must trace back to a
+ * Scout's background agency ledger. Every digest claim must trace back to a
  * finding row written by a real run — that's what keeps "since you were away"
  * honest instead of generated.
  */
@@ -89,7 +89,7 @@ export function createAgentRunsRepository(db: Database) {
         .where(and(eq(agentFindings.userId, userId), isNull(agentFindings.seenAt)));
     },
 
-    /** Recent findings regardless of seen state (for Kai's context window). */
+    /** Recent findings regardless of seen state (for Scout's context window). */
     async listRecentForUser(userId: string, limit = 12): Promise<AgentFinding[]> {
       return db
         .select()
