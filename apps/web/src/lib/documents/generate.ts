@@ -17,6 +17,7 @@ import {
   HUMANIZE_RESUME,
   stripAiTells,
 } from "@/lib/documents/humanize";
+import { isProseKind, letterFromText, serializeLetter } from "@/lib/documents/letter";
 import { serializeResume, type ResumeData } from "@/lib/documents/resume";
 import { resumeGenerationSchema, toResumeData } from "@/lib/documents/resume-schema";
 import type { DocKind } from "@/lib/jobs/application-types";
@@ -128,11 +129,17 @@ ${HUMANIZE_PROSE}`;
   const draft = await generate.text(system, candidateContext);
   const text = await stripAiTells(draft, (s, u) => generate.text(s, u));
 
+  // Store prose kinds as a structured letter (Body-filled) so the draft opens
+  // straight into the rich editor; other kinds (notes) stay plain text.
+  const content = isProseKind(opts.kind)
+    ? serializeLetter(letterFromText(text, opts.kind))
+    : text;
+
   const doc = await docsRepo.createForUser(userId, {
     ...link,
     kind: opts.kind,
     title: `${label.replace(/\b\w/, (c) => c.toUpperCase())} — ${titleSuffix}`,
-    content: text,
+    content,
     jobContext,
   });
   return { id: doc.id, kind: opts.kind, title: doc.title };

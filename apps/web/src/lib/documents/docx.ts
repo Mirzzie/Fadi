@@ -19,6 +19,14 @@ import {
   type ResumeSectionKey,
   type ResumeTemplate,
 } from "./resume";
+import {
+  isProseKind,
+  LETTER_FIELDS,
+  parseLetter,
+  resolveLetterSignature,
+  type LetterData,
+  type ProseKind,
+} from "./letter";
 
 type DocxStyle = {
   nameAlign: (typeof AlignmentType)[keyof typeof AlignmentType];
@@ -166,6 +174,43 @@ function resumeParagraphs(data: ResumeData, s: DocxStyle): Paragraph[] {
   return p;
 }
 
+/** Build the paragraphs for a cover letter / cold email / value proposition. */
+function letterParagraphs(data: LetterData, kind: ProseKind): Paragraph[] {
+  const fields = LETTER_FIELDS[kind];
+  const p: Paragraph[] = [];
+  const line = (text: string, opts?: { bold?: boolean; color?: string; size?: number }) =>
+    new Paragraph({ children: [new TextRun({ text, bold: opts?.bold, color: opts?.color, size: opts?.size })] });
+
+  if (fields.sender && data.sender.name) p.push(line(data.sender.name, { bold: true }));
+  if (fields.sender) {
+    const contact = [data.sender.email, data.sender.phone, data.sender.location, data.sender.links]
+      .filter(Boolean)
+      .join("  ·  ");
+    if (contact) p.push(line(contact, { size: 18, color: "666666" }));
+  }
+  if (fields.date && data.date) p.push(new Paragraph({ spacing: { before: 160 }, children: [new TextRun({ text: data.date })] }));
+  if (fields.recipient) {
+    for (const text of [data.recipient.name, data.recipient.title, data.recipient.company, data.recipient.location].filter(Boolean))
+      p.push(line(text));
+  }
+  if (fields.subject && data.subject) {
+    p.push(
+      kind === "value_proposition"
+        ? new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ text: data.subject, bold: true })] })
+        : line(`Subject: ${data.subject}`, { bold: true }),
+    );
+  }
+  if (fields.greeting && data.greeting) p.push(new Paragraph({ spacing: { before: 160 }, children: [new TextRun({ text: data.greeting })] }));
+
+  for (const para of data.body.split(/\n{2,}/).map((s) => s.trim()).filter(Boolean))
+    p.push(new Paragraph({ spacing: { after: 120 }, text: para }));
+
+  if (fields.signOff && data.signOff) p.push(new Paragraph({ spacing: { before: 120 }, children: [new TextRun({ text: data.signOff })] }));
+  const signature = resolveLetterSignature(data);
+  if (fields.signature && signature) p.push(line(signature, { bold: true }));
+  return p;
+}
+
 /** Build a .docx Buffer — template + section order aware for resumes. */
 export async function documentToDocx(doc: {
   kind: string;
@@ -185,6 +230,11 @@ export async function documentToDocx(doc: {
     bodyFont = resolveResumeFont(data.font)?.docxName ?? style.bodyFont;
     bodySize = resolveResumeFontSize(data.fontSize)?.docxHalfPt ?? 21;
     children = resumeParagraphs(data, style);
+  } else if (isProseKind(doc.kind)) {
+    const data = parseLetter(doc.content, doc.kind);
+    bodyFont = resolveResumeFont(data.font)?.docxName ?? style.bodyFont;
+    bodySize = resolveResumeFontSize(data.fontSize)?.docxHalfPt ?? 21;
+    children = letterParagraphs(data, doc.kind);
   } else {
     children = [
       new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun({ text: doc.title, bold: true })] }),

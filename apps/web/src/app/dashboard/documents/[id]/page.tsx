@@ -3,7 +3,9 @@ import { notFound, redirect } from "next/navigation";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { DocumentEditor } from "@/components/documents/document-editor";
+import { LetterEditor } from "@/components/documents/letter-editor";
 import { ResumeEditor } from "@/components/documents/resume-editor";
+import { isProseKind } from "@/lib/documents/letter";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
 import {
@@ -51,6 +53,13 @@ export default async function DocumentEditorPage({
             name: t.name,
             config: t.config,
           }))}
+        />
+      ) : isProseKind(doc.kind) ? (
+        <LetterEditor
+          id={doc.id}
+          kind={doc.kind}
+          initialTitle={doc.title}
+          initialContent={doc.content}
         />
       ) : (
         <DocumentEditor

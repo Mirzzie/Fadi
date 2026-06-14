@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
 import { PrintNow } from "@/components/documents/print-now";
+import { LetterPreview } from "@/components/documents/letter-preview";
 import { ResumePreview } from "@/components/documents/resume-preview";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
+import { isProseKind, parseLetter } from "@/lib/documents/letter";
 import { parseResume, type ResumeTemplate } from "@/lib/documents/resume";
 import { createDocumentsRepository } from "@careeros/database";
 
@@ -33,6 +35,8 @@ export default async function DocumentPrintPage({
             data={parseResume(doc.content)}
             template={(doc.template as ResumeTemplate) || "classic"}
           />
+        ) : isProseKind(doc.kind) ? (
+          <LetterPreview data={parseLetter(doc.content, doc.kind)} kind={doc.kind} />
         ) : (
           <article className="space-y-3">
             <h1 className="text-lg font-bold">{doc.title}</h1>

@@ -32,7 +32,7 @@ import {
 } from "@/lib/documents/resume";
 
 const field =
-  "w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15";
+  "nice-scrollbar w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15";
 
 const SECTION_TITLES: Record<ResumeSectionKey, string> = {
   summary: "Summary",
@@ -179,7 +179,7 @@ export function ResumeEditor({
       case "summary":
         return (
           <textarea
-            className={`${field} min-h-20`}
+            className={`${field} min-h-24`}
             value={data.summary}
             onChange={(e) => patch({ summary: e.target.value })}
             placeholder="A sharp 2–3 line professional summary."
@@ -194,7 +194,7 @@ export function ResumeEditor({
               <input className={field} placeholder="Location" value={exp.location} onChange={(e) => updateList(data, patch, "experiences", i, { location: e.target.value })} />
               <input className={field} placeholder="Period (e.g. Jan 2024 – Present)" value={exp.period} onChange={(e) => updateList(data, patch, "experiences", i, { period: e.target.value })} />
             </div>
-            <textarea className={`${field} mt-2 min-h-16`} placeholder="Achievements — one per line" value={exp.bullets} onChange={(e) => updateList(data, patch, "experiences", i, { bullets: e.target.value })} />
+            <textarea className={`${field} mt-2 min-h-20`} placeholder="Achievements — one per line" value={exp.bullets} onChange={(e) => updateList(data, patch, "experiences", i, { bullets: e.target.value })} />
           </RepeatItem>
         ));
       case "projects":
@@ -204,7 +204,7 @@ export function ResumeEditor({
               <input className={field} placeholder="Project title" value={p.title} onChange={(e) => updateList(data, patch, "projects", i, { title: e.target.value })} />
               <input className={field} placeholder="URL" value={p.url} onChange={(e) => updateList(data, patch, "projects", i, { url: e.target.value })} />
             </div>
-            <textarea className={`${field} mt-2 min-h-14`} placeholder="What you built and the impact" value={p.description} onChange={(e) => updateList(data, patch, "projects", i, { description: e.target.value })} />
+            <textarea className={`${field} mt-2 min-h-16`} placeholder="What you built and the impact" value={p.description} onChange={(e) => updateList(data, patch, "projects", i, { description: e.target.value })} />
           </RepeatItem>
         ));
       case "education":
@@ -399,14 +399,14 @@ export function ResumeEditor({
       {/* Honest reads-human check across the resume's prose */}
       <AiTellCheck text={proseText} />
 
-      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-2">
+      <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-2">
         {/* Live preview */}
-        <div className="min-h-0 overflow-y-auto rounded-xl border border-border/60 bg-white p-8 text-[13px] text-zinc-800 shadow-sm">
+        <div className="nice-scrollbar min-h-0 overflow-y-auto rounded-xl border border-border/60 bg-white p-8 text-[13px] text-zinc-800 shadow-sm lg:p-10">
           <ResumePreview data={data} template={template} />
         </div>
 
         {/* Form */}
-        <div className="min-h-0 space-y-4 overflow-y-auto pr-1">
+        <div className="nice-scrollbar min-h-0 space-y-4 overflow-y-auto pr-2">
           <Section title="Personal details">
             <div className="grid gap-2 sm:grid-cols-2">
               <Labeled label="Full name">
