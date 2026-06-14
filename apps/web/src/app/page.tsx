@@ -69,7 +69,7 @@ const howItWorks = [
   },
 ];
 
-type Signal = { label: string; value: string; bars: number[] };
+type Signal = { label: string; value: string; bars: number[]; realTrend?: boolean };
 
 // Sample signals for anonymous visitors — replaced by the viewer's real numbers
 // when they're signed in (see buildSignals).
@@ -101,27 +101,33 @@ async function buildSignals(): Promise<{ signals: Signal[]; personalized: boolea
   const readiness = report?.career_readiness_score ?? null;
   const resume = report?.resume_quality_score ?? null;
 
+  // realTrend gates the sparkline: only Momentum has a true history, so the other
+  // metrics show their number without a decorative (fake) trend line.
   const signals: Signal[] = [
     {
       label: "Career readiness",
       value: readiness != null ? String(readiness) : "—",
       bars: DEMO_SIGNALS[0].bars,
+      realTrend: false,
     },
     {
       label: "Resume quality",
       value: resume != null ? String(resume) : "—",
       bars: DEMO_SIGNALS[1].bars,
+      realTrend: false,
     },
     {
       label: "Top job match",
       value: topMatch > 0 ? `${topMatch}%` : "—",
       bars: DEMO_SIGNALS[2].bars,
+      realTrend: false,
     },
     {
       label: "Momentum",
       value: String(Math.round(momentum.momentum)),
       // Real momentum history — forward motion per day over the last 10 days.
       bars: momentumHistory,
+      realTrend: true,
     },
   ];
 
@@ -146,7 +152,11 @@ export default async function Home() {
   const { signals, personalized } = await buildSignals();
 
   return (
-    <div className="min-h-screen bg-background">
+    // The marketing page is authored as a fixed dark experience (white text on a
+    // dark mesh). Scope `dark` to it so it renders correctly even when the user's
+    // saved theme is light — otherwise bg-background turns white and the white
+    // text disappears. App screens still follow the global theme.
+    <div className="dark min-h-screen bg-background text-foreground">
       {/* ── Framed mesh hero ───────────────────────────────────────────────── */}
       <div className="p-2.5 sm:p-3.5">
         <section
@@ -247,7 +257,11 @@ export default async function Home() {
                       <span className="size-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
                       Live
                     </span>
-                  ) : null}
+                  ) : (
+                    <span className="rounded-full border border-white/20 px-1.5 py-0.5 text-[0.6rem] font-medium tracking-normal text-white/50">
+                      Sample
+                    </span>
+                  )}
                 </p>
                 <div className="divide-y divide-white/10">
                   {signals.map((s) => (
@@ -259,7 +273,9 @@ export default async function Home() {
                         {s.label}
                       </span>
                       <div className="flex items-center gap-5">
-                        <Sparkline bars={s.bars} />
+                        {/* Anonymous panel is a labeled sample (decorative bars OK);
+                            for a live viewer, only show a sparkline that's a real trend. */}
+                        {!personalized || s.realTrend ? <Sparkline bars={s.bars} /> : null}
                         <span
                           className="min-w-[3.5rem] text-right text-3xl font-light tabular-nums text-white sm:text-4xl"
                           style={{ fontFamily: "var(--font-display)" }}

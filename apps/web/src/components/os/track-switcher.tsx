@@ -3,6 +3,7 @@
 import { Check, ChevronDown, Compass, Loader2, Plus, Target } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -208,16 +209,21 @@ function NewDirectionModal({
     });
   }
 
-  return (
+  // Portal to <body>: the menu bar's backdrop-blur creates a containing block, so
+  // a `fixed` overlay rendered inside it would be positioned relative to the 36px
+  // bar (pinned to the top, clipped) instead of the viewport.
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
     <div
       className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-4 backdrop-blur-sm duration-150 animate-in fade-in"
       onMouseDown={onClose}
     >
       <div
-        className="w-full max-w-lg overflow-hidden rounded-2xl border border-border/70 bg-card text-sm shadow-2xl duration-200 animate-in fade-in zoom-in-95"
+        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border/70 bg-card text-sm shadow-2xl duration-200 animate-in fade-in zoom-in-95"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="border-b border-border/60 bg-gradient-to-br from-primary/10 to-transparent px-5 py-4">
+        <div className="shrink-0 border-b border-border/60 bg-gradient-to-br from-primary/10 to-transparent px-5 py-4">
           <h2 className="text-base font-semibold tracking-tight">Start a new direction</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
             Tell me where you&apos;re headed — branch of your field or a whole new one — and I&apos;ll
@@ -225,7 +231,7 @@ function NewDirectionModal({
           </p>
         </div>
 
-        <div className="max-h-[70vh] space-y-4 overflow-y-auto px-5 py-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
           <div className="space-y-1.5">
             <Label>What kind of move is this?</Label>
             <div className="grid gap-1.5">
@@ -356,7 +362,7 @@ function NewDirectionModal({
           ) : null}
         </div>
 
-        <div className="flex items-center justify-end gap-2 border-t border-border/60 px-5 py-3">
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border/60 px-5 py-3">
           <Button type="button" variant="ghost" onClick={onClose} disabled={pending}>
             Cancel
           </Button>
@@ -366,6 +372,7 @@ function NewDirectionModal({
           </Button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
