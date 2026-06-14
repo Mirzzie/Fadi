@@ -14,6 +14,13 @@
 
 import type { DataSourceCapability, MarketSignal, SignalQuery, SignalSource } from "../types";
 
+/** BLS reports a period label ("May 2026"); `publishedAt` is contractually ISO. */
+function labelToIso(label?: string | null): string | undefined {
+  if (!label) return undefined;
+  const d = new Date(label);
+  return Number.isNaN(d.getTime()) ? undefined : d.toISOString();
+}
+
 /** Pure: turn a labor snapshot into a market signal (structural param → testable). */
 export function snapshotToSignal(
   snap: { summary: string; asOf?: string | null },
@@ -25,7 +32,7 @@ export function snapshotToSignal(
     kind: "labor",
     title: snap.summary,
     url: "https://www.bls.gov/data/",
-    publishedAt: snap.asOf ?? undefined,
+    publishedAt: labelToIso(snap.asOf),
     // Attach the user's terms so this macro signal ranks as relevant context
     // rather than being filtered out by the relevance threshold.
     skills: keywords.slice(0, 3),

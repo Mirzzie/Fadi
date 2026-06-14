@@ -38,35 +38,44 @@ export function ActivityCenter() {
   const ref = useRef<HTMLDivElement>(null);
   const nudgedFor = useRef<string | null>(null);
 
-  // Load the feed on mount; the freshest unseen finding becomes the orb nudge.
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/scout/activity");
-        if (!res.ok) return;
-        const data = (await res.json()) as { unseenCount: number; findings: Finding[] };
-        if (cancelled) return;
-        setFindings(data.findings);
-        setUnseen(data.unseenCount);
+  // Pull the feed; the freshest unseen finding becomes the orb nudge. The OS
+  // shell persists across navigations, so we also refresh when the user returns
+  // to the tab — otherwise the bell would freeze at its mount-time value while
+  // the background agency keeps logging findings.
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/scout/activity");
+      if (!res.ok) return;
+      const data = (await res.json()) as { unseenCount: number; findings: Finding[] };
+      setFindings(data.findings);
+      setUnseen(data.unseenCount);
 
-        const topUnseen = data.findings.find((f) => !f.seen);
-        if (topUnseen && nudgedFor.current !== topUnseen.id) {
-          nudgedFor.current = topUnseen.id;
-          showNudge({
-            label: KIND_LABEL[topUnseen.kind] ?? "While you were away",
-            detail: topUnseen.title,
-            href: topUnseen.href ?? "/dashboard",
-          });
-        }
-      } catch {
-        /* a quiet bell is fine on failure */
+      const topUnseen = data.findings.find((f) => !f.seen);
+      if (topUnseen && nudgedFor.current !== topUnseen.id) {
+        nudgedFor.current = topUnseen.id;
+        showNudge({
+          label: KIND_LABEL[topUnseen.kind] ?? "While you were away",
+          detail: topUnseen.title,
+          href: topUnseen.href ?? "/dashboard",
+        });
       }
-    })();
-    return () => {
-      cancelled = true;
-    };
+    } catch {
+      /* a quiet bell is fine on failure */
+    }
   }, [showNudge]);
+
+  useEffect(() => {
+    void load();
+    function onFocus() {
+      if (document.visibilityState === "visible") void load();
+    }
+    window.addEventListener("visibilitychange", onFocus);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.removeEventListener("visibilitychange", onFocus);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [load]);
 
   // Close on outside click / Esc.
   useEffect(() => {

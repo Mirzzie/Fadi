@@ -51,7 +51,12 @@ export function ScoutPresenceProvider({ children }: { children: React.ReactNode 
   const seedNonce = useRef(0);
 
   const openScout = useCallback(() => setOpen(true), []);
-  const closeScout = useCallback(() => setOpen(false), []);
+  // Clear any spotlight seed on close so reopening via the orb doesn't re-fire
+  // the previous ⌘K question (each ScoutChat mount resets its own seen-nonce).
+  const closeScout = useCallback(() => {
+    setOpen(false);
+    setSeed(null);
+  }, []);
 
   const openWithQuery = useCallback((text: string) => {
     const trimmed = text.trim();

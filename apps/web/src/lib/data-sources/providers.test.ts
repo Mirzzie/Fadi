@@ -80,9 +80,11 @@ describe("BLS labor provider", () => {
     expect(signal).toMatchObject({
       sourceId: "bls",
       kind: "labor",
-      publishedAt: "May 2026",
       regions: ["US", "United States"],
     });
+    // The BLS period label is normalized to an ISO date for `publishedAt`.
+    expect(signal?.publishedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(new Date(signal!.publishedAt!).getUTCFullYear()).toBe(2026);
     // User terms ride along so the macro signal clears the relevance threshold.
     expect(signal?.skills).toEqual(["frontend", "react", "typescript"]);
   });

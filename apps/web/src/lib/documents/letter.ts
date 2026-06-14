@@ -153,9 +153,14 @@ export function resolveLetterSignature(data: LetterData): string {
   return data.signature || data.sender.name;
 }
 
-/** Build the structured form of a Scout draft (plain prose → a Body-filled letter). */
+/**
+ * Build the structured form of a Scout draft. The generator returns a complete,
+ * ready-to-use letter/email (its own greeting + sign-off live inside the prose),
+ * so we drop the whole thing into the Body and clear the default greeting/sign-off
+ * blocks — otherwise the preview/PDF/DOCX would show them twice.
+ */
 export function letterFromText(text: string, kind: ProseKind): LetterData {
-  return { ...emptyLetter(kind), body: text.trim() };
+  return { ...emptyLetter(kind), greeting: "", signOff: "", body: text.trim() };
 }
 
 /** Readable plain-text form — for clipboard, the docx fallback, and workspace previews. */
@@ -165,7 +170,7 @@ export function letterToPlainText(data: LetterData): string {
   if (data.greeting) blocks.push(data.greeting);
   if (data.body) blocks.push(data.body);
   if (data.signOff) blocks.push(data.signOff);
-  const sig = data.signature || data.sender.name;
+  const sig = resolveLetterSignature(data);
   if (sig) blocks.push(sig);
   return blocks.join("\n\n").trim();
 }

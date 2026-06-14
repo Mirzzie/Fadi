@@ -68,10 +68,13 @@ describe("letter model", () => {
     expect(resolveLetterSignature({ ...d, signature: "M. Casual" })).toBe("M. Casual");
   });
 
-  it("builds a structured letter from a plain Scout draft", () => {
-    const d = letterFromText("  A drafted body.  ", "email");
-    expect(d.body).toBe("A drafted body.");
-    expect(d.greeting).toBe("Hi,");
+  it("builds a structured letter from a plain Scout draft without doubling the greeting/sign-off", () => {
+    const d = letterFromText("  Hi Jane,\n\nI'd love to chat.\n\nThanks,\nMira  ", "email");
+    expect(d.body).toBe("Hi Jane,\n\nI'd love to chat.\n\nThanks,\nMira");
+    // The draft carries its own salutation + sign-off, so the structured blocks
+    // are cleared to avoid rendering them twice.
+    expect(d.greeting).toBe("");
+    expect(d.signOff).toBe("");
   });
 
   it("produces readable plain text and a list snippet", () => {

@@ -87,19 +87,26 @@ export class LightcastSkillsSource implements SignalSource {
       const terms = query.keywords.slice(0, 3).filter(Boolean);
       if (terms.length === 0) return [];
 
-      const found: string[] = [];
-      for (const term of terms) {
-        const params = new URLSearchParams({ q: term, limit: "5", fields: "id,name" });
-        const res = await fetch(`${SKILLS_API}?${params}`, {
-          headers: { Authorization: `Bearer ${token}` },
-          signal: AbortSignal.timeout(8000),
-        });
-        if (!res.ok) continue;
-        const data = (await res.json()) as { data?: Array<{ name?: string }> };
-        for (const s of data.data ?? []) if (s.name) found.push(s.name);
-      }
+      // The per-term lookups are independent — run them concurrently (one slow or
+      // failing term shouldn't serialize or sink the others).
+      const perTerm = await Promise.all(
+        terms.map(async (term) => {
+          try {
+            const params = new URLSearchParams({ q: term, limit: "5", fields: "id,name" });
+            const res = await fetch(`${SKILLS_API}?${params}`, {
+              headers: { Authorization: `Bearer ${token}` },
+              signal: AbortSignal.timeout(8000),
+            });
+            if (!res.ok) return [];
+            const data = (await res.json()) as { data?: Array<{ name?: string }> };
+            return (data.data ?? []).map((s) => s.name).filter((n): n is string => Boolean(n));
+          } catch {
+            return [];
+          }
+        }),
+      );
 
-      const signal = skillsToSignal(found, query.keywords);
+      const signal = skillsToSignal(perTerm.flat(), query.keywords);
       return signal ? [signal] : [];
     } catch {
       return [];

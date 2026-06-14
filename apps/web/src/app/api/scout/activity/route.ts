@@ -1,6 +1,3 @@
-import { headers } from "next/headers";
-
-import { auth } from "@/lib/auth/auth";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { createAgentRunsRepository } from "@careeros/database";
 import { getDatabase } from "@/lib/database/client";
@@ -12,9 +9,8 @@ import { getDatabase } from "@/lib/database/client";
  * looked. No generation here: every row traces to an agent_findings entry.
  */
 export async function GET() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) return new Response("Unauthorized", { status: 401 });
-
+  // getCurrentAuthUser resolves the session itself and returns null when absent,
+  // so a single call both authenticates and yields the user (no double decode).
   const user = await getCurrentAuthUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
 
@@ -39,9 +35,8 @@ export async function GET() {
 }
 
 export async function POST() {
-  const session = await auth.api.getSession({ headers: await headers() });
-  if (!session?.user) return new Response("Unauthorized", { status: 401 });
-
+  // getCurrentAuthUser resolves the session itself and returns null when absent,
+  // so a single call both authenticates and yields the user (no double decode).
   const user = await getCurrentAuthUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
 
