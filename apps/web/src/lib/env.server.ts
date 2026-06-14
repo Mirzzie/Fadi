@@ -48,6 +48,9 @@ const serverEnvSchema = z.object({
   BLS_API_KEY: z.string().optional(),
   ONET_API_KEY: z.string().optional(),
   FRED_API_KEY: z.string().optional(),
+  // Lightcast Open Skills — free skills taxonomy (sign-up → client id/secret).
+  LIGHTCAST_CLIENT_ID: z.string().optional(),
+  LIGHTCAST_CLIENT_SECRET: z.string().optional(),
 });
 
 export const serverEnv = {
@@ -84,5 +87,7 @@ export const serverEnv = {
     BLS_API_KEY: process.env.BLS_API_KEY,
     ONET_API_KEY: process.env.ONET_API_KEY,
     FRED_API_KEY: process.env.FRED_API_KEY,
+    LIGHTCAST_CLIENT_ID: process.env.LIGHTCAST_CLIENT_ID,
+    LIGHTCAST_CLIENT_SECRET: process.env.LIGHTCAST_CLIENT_SECRET,
   }),
 };
