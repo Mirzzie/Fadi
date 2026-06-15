@@ -3,12 +3,12 @@ import {
   BriefcaseBusiness,
   ChevronRight,
   ListChecks,
-  Sparkles,
   Target,
   TrendingUp,
 } from "lucide-react";
 import Link from "next/link";
 
+import { FadiLogo } from "@/components/brand/fadi-logo";
 import { FadiBadge } from "@/components/ui/fadi-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { getCurrentAuthUser } from "@/lib/auth/session";
@@ -184,9 +184,7 @@ export default async function Home() {
             {/* Nav */}
             <nav className="flex items-center justify-between px-6 py-5 sm:px-10">
               <Link href="/" className="flex items-center gap-2.5">
-                <div className="glow-primary flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-[oklch(0.7_0.2_330)] to-[oklch(0.6_0.2_270)]">
-                  <Sparkles className="size-4 text-white" aria-hidden="true" />
-                </div>
+                <FadiLogo className="glow-primary size-8" />
                 <span className="font-semibold tracking-tight text-white">FadiOS</span>
               </Link>
               <div className="hidden items-center gap-8 md:flex">
@@ -422,9 +420,7 @@ export default async function Home() {
       <footer className="border-t border-border/60 py-8">
         <div className="mx-auto flex max-w-shell items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-2">
-            <div className="flex size-6 items-center justify-center rounded-md bg-primary">
-              <Sparkles className="size-3 text-primary-foreground" aria-hidden="true" />
-            </div>
+            <FadiLogo className="size-6" />
             <span className="text-sm font-medium">FadiOS</span>
           </div>
           <p className="text-xs text-muted-foreground">

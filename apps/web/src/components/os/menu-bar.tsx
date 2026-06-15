@@ -1,8 +1,9 @@
 "use client";
 
-import { Mic, MicOff, Search, Sparkles } from "lucide-react";
+import { Mic, MicOff, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { FadiLogo } from "@/components/brand/fadi-logo";
 import { useWakeWord } from "@/lib/voice/use-wake-word";
 import { cn } from "@/lib/utils";
 import { ActivityCenter } from "./activity-center";
@@ -32,9 +33,7 @@ export function MenuBar() {
     <header className="sticky top-0 z-40 flex h-9 items-center justify-between border-b border-border/60 bg-background/80 px-3 text-xs backdrop-blur-md duration-500 animate-in fade-in slide-in-from-top-2">
       {/* Brand + live Fadi state */}
       <div className="flex items-center gap-2">
-        <div className="grid size-5 place-items-center rounded-md bg-gradient-to-br from-primary to-[oklch(0.66_0.22_285)]">
-          <Sparkles className="size-3 text-primary-foreground" aria-hidden="true" />
-        </div>
+        <FadiLogo className="size-5" />
         <span className="font-semibold tracking-tight">FadiOS</span>
         <FadiStateChip state={state} />
         <span className="text-muted-foreground/50">/</span>

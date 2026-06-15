@@ -1,7 +1,8 @@
-import { CheckCircle2, Sparkles } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
+import { FadiLogo } from "@/components/brand/fadi-logo";
 import { AuthForm } from "@/components/auth/auth-form";
 import { SocialButtons } from "@/components/auth/social-buttons";
 import { FadiBadge } from "@/components/ui/fadi-badge";
@@ -59,9 +60,7 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
       <header className="relative z-10 border-b border-border/60 bg-background/80 backdrop-blur-sm">
         <div className="mx-auto flex h-16 max-w-shell items-center px-4 sm:px-6">
           <Link href="/" className="flex items-center gap-2.5">
-            <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
-              <Sparkles className="size-4 text-primary-foreground" aria-hidden="true" />
-            </div>
+            <FadiLogo className="size-8" />
             <span className="font-semibold tracking-tight">FadiOS</span>
           </Link>
         </div>
