@@ -59,6 +59,15 @@ export const auth = betterAuth({
         }
       : {}),
   },
+  // Let a signed-in user connect a social login to their existing account (e.g.
+  // an email signup later linking LinkedIn). The user proves ownership via the
+  // OAuth round-trip, so a differing provider email is allowed.
+  account: {
+    accountLinking: {
+      enabled: true,
+      allowDifferentEmails: true,
+    },
+  },
   emailAndPassword: {
     enabled: true,
     // Without a configured sender this logs the link (dev) / an error (prod)
