@@ -10,7 +10,41 @@ export type UseSpeechOutputOptions = {
   pitch?: number;
   volume?: number;
   voiceURI?: string;
+  /** Fadi has a male voice — prefer a male-sounding system voice. */
+  preferMale?: boolean;
 };
+
+// Known male voice names across platforms (Apple, Microsoft, Google, Android).
+// The Web Speech API doesn't expose gender, so we match on these + a "male" tag.
+const MALE_VOICE_HINT =
+  /\b(male|guy|christopher|eric|brian|davis|tony|jason|david|mark|daniel|alex|fred|aaron|arthur|oliver|rishi|tom|james|john|matthew|ryan|roger|steffan|reed|gordon|george|liam)\b/i;
+
+const NATURAL_VOICE_HINT = /natural|neural|enhanced|online|premium|siri|wavenet/i;
+
+/** Pick the best voice: prefer male + natural English when Fadi is speaking. */
+function selectVoice(
+  voices: SpeechSynthesisVoice[],
+  opts: { language: string; preferMale: boolean; voiceURI?: string },
+): SpeechSynthesisVoice | undefined {
+  if (voices.length === 0) return undefined;
+  if (opts.voiceURI) {
+    const exact = voices.find((v) => v.voiceURI === opts.voiceURI);
+    if (exact) return exact;
+  }
+  const lang = opts.language.toLowerCase().slice(0, 2);
+  const inLang = voices.filter((v) => v.lang?.toLowerCase().startsWith(lang));
+  const pool = inLang.length > 0 ? inLang : voices;
+
+  const score = (v: SpeechSynthesisVoice): number => {
+    let s = 0;
+    if (opts.preferMale && MALE_VOICE_HINT.test(v.name)) s += 5;
+    if (NATURAL_VOICE_HINT.test(v.name)) s += 2;
+    if (/^en-(us|gb)/i.test(v.lang)) s += 1;
+    if (v.localService) s += 0.5; // local voices avoid network hiccups
+    return s;
+  };
+  return [...pool].sort((a, b) => score(b) - score(a))[0];
+}
 
 export type UseSpeechOutputReturn = {
   state: SpeechOutputState;
@@ -26,6 +60,7 @@ export function useSpeechOutput({
   pitch = 1,
   volume = 1,
   voiceURI,
+  preferMale = true,
 }: UseSpeechOutputOptions = {}): UseSpeechOutputReturn {
   const [state, setState] = useState<SpeechOutputState>("idle");
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
@@ -62,23 +97,13 @@ export function useSpeechOutput({
       utterance.pitch = pitch;
       utterance.volume = volume;
 
-      // Find a preferred voice
-      const availableVoices = window.speechSynthesis.getVoices();
-
-      if (voiceURI) {
-        const preferred = availableVoices.find((v) => v.voiceURI === voiceURI);
-        if (preferred) utterance.voice = preferred;
-      } else {
-        // Prefer a natural-sounding English voice
-        const natural = availableVoices.find(
-          (v) =>
-            v.lang.startsWith("en") &&
-            (v.name.toLowerCase().includes("natural") ||
-              v.name.toLowerCase().includes("neural") ||
-              v.name.toLowerCase().includes("enhanced")),
-        );
-        if (natural) utterance.voice = natural;
-      }
+      // Prefer Fadi's male, natural-sounding English voice.
+      const chosen = selectVoice(window.speechSynthesis.getVoices(), {
+        language,
+        preferMale,
+        voiceURI,
+      });
+      if (chosen) utterance.voice = chosen;
 
       utterance.onstart = () => setState("speaking");
       utterance.onend = () => {
@@ -94,7 +119,7 @@ export function useSpeechOutput({
       setState("speaking");
       window.speechSynthesis.speak(utterance);
     },
-    [isSupported, language, rate, pitch, volume, voiceURI],
+    [isSupported, language, rate, pitch, volume, voiceURI, preferMale],
   );
 
   const stop = useCallback(() => {

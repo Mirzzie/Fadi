@@ -92,16 +92,26 @@ export function ProfileForm({
             className={inputCls}
           />
         </Field>
-        <Field label="LinkedIn context (paste your About / experience)">
+        <Field label="Career history — LinkedIn (your source of truth)">
+          <p className="-mt-0.5 text-xs text-muted-foreground">
+            The full, role-agnostic record Fadi grounds everything in. We can&apos;t pull it from
+            LinkedIn automatically — paste your About + experience, or upload your LinkedIn
+            &ldquo;Save to PDF&rdquo; export. Your resumes can be tailored per role; this stays complete.
+          </p>
+          <CvUpload label="Upload LinkedIn PDF export" onExtracted={(text) => set("linkedInText", text)} />
           <textarea
             value={form.linkedInText}
             onChange={(e) => set("linkedInText", e.target.value)}
-            rows={4}
-            placeholder="Paste your LinkedIn summary and experience so Scout can reason from it."
+            rows={6}
+            placeholder="Paste your LinkedIn About + experience here, or upload the PDF above."
             className={cn(inputCls, "h-auto py-2")}
           />
         </Field>
-        <Field label="Resume / CV">
+        <Field label="Resume / CV (a role-tailored example — optional)">
+          <p className="-mt-0.5 text-xs text-muted-foreground">
+            Used as supporting detail. A resume is often tailored to one role and may omit
+            experience, so your LinkedIn above stays the source of truth.
+          </p>
           <CvUpload onExtracted={(text) => set("resumeText", text)} />
           <textarea
             value={form.resumeText}

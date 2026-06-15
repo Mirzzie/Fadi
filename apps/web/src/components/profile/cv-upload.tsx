@@ -15,9 +15,12 @@ import { cn } from "@/lib/utils";
 export function CvUpload({
   onExtracted,
   className,
+  label = "Upload CV (PDF, DOCX, TXT)",
 }: {
   onExtracted: (text: string) => void;
   className?: string;
+  /** Button label — same parser works for a LinkedIn "Save to PDF" export. */
+  label?: string;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [pending, startTransition] = useTransition();
@@ -59,7 +62,7 @@ export function CvUpload({
         ) : (
           <FileUp className="size-4" aria-hidden="true" />
         )}
-        {pending ? "Parsing…" : "Upload CV (PDF, DOCX, TXT)"}
+        {pending ? "Parsing…" : label}
       </Button>
       {status ? (
         <p

@@ -5,6 +5,7 @@ import { after } from "next/server";
 import { AppShell } from "@/components/layout/app-shell";
 import { DashboardShell } from "@/components/shells/dashboard-shell";
 import { maybeRunAgentForUser } from "@/lib/agents/background";
+import { composeBriefing } from "@/lib/agents/briefing";
 import { deliverDigestToChat, digestSubline, getAgencyDigest } from "@/lib/agents/digest";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDashboardProfileSummary, getLatestCareerReport } from "@/lib/career-report/data";
@@ -43,7 +44,7 @@ export default async function DashboardPage() {
       getAgencyDigest(user.id),
     ]);
 
-  // Deliver the background-agency digest into Scout's chat (once per finding),
+  // Deliver the background-agency digest into Fadi's chat (once per finding),
   // and kick off the next agency pass after the response is sent — this keeps
   // the agency real even on deployments with no cron scheduler.
   if (digest) {
@@ -78,14 +79,14 @@ export default async function DashboardPage() {
   const firstName = profileSummary?.fullName?.trim().split(/\s+/)[0] || "there";
   const jobsCount = recommendedJobsPreview.length;
   // The digest leads when the background agency found something — that's the
-  // real "Scout has been working" moment, grounded in the findings ledger.
+  // real "Fadi has been working" moment, grounded in the findings ledger.
   const subline = digest
     ? digestSubline(digest)
     : jobsCount > 0
       ? `I've lined up ${jobsCount} role${jobsCount === 1 ? "" : "s"} matched to you, plus your latest market signals. Ask me anything — or tell me what you're working on.`
       : `I'm watching your target market. Ask me about your roadmap, a specific role, or your next move.`;
 
-  // Real opportunities Scout surfaces in Scout mode — fresh agency findings lead,
+  // Real opportunities Fadi surfaces in Fadi mode — fresh agency findings lead,
   // then the guided next step, then top matched roles + a live signal.
   const opportunities = [
     ...(digest?.findings ?? []).slice(0, 2).map((finding) => ({
@@ -108,10 +109,31 @@ export default async function DashboardPage() {
     })),
   ].slice(0, 3);
 
+  // Fadi's proactive briefing — composed from the data already fetched above, so
+  // every spoken line traces to something real (honest, never fabricated).
+  const briefing = composeBriefing({
+    firstName,
+    findings: digest?.findings,
+    topJob: recommendedJobsPreview[0]
+      ? { title: recommendedJobsPreview[0].title, company: recommendedJobsPreview[0].company }
+      : null,
+    signal: marketSignals[0] ? { title: marketSignals[0].title, url: marketSignals[0].url } : null,
+    momentum: {
+      cadenceTarget: momentum.cadenceTarget,
+      cadencePeriod: momentum.cadencePeriod,
+      qualityApplicationsThisPeriod: momentum.qualityApplicationsThisPeriod,
+      isResting: momentum.isResting,
+    },
+    learning: latestReport?.recommended_learning_path?.[0]
+      ? { title: latestReport.recommended_learning_path[0].title }
+      : null,
+  });
+
   return (
     <AppShell>
       <DashboardShell
         userEmail={user.email}
+        briefing={briefing}
         greeting={`Hey ${firstName}.`}
         subline={subline}
         opportunities={opportunities}

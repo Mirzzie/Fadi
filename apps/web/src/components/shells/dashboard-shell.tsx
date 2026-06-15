@@ -11,8 +11,10 @@ import {
 } from "lucide-react";
 
 import { GenerateReportButton } from "@/components/dashboard/generate-report-button";
+import { FadiBriefing } from "@/components/os/fadi-briefing";
 import { GuidedSetup } from "@/components/os/guided-setup";
 import { MomentumPanel, type MomentumView } from "@/components/resilience/momentum-panel";
+import type { Briefing } from "@/lib/agents/briefing";
 import type { SetupState } from "@/lib/guidance/setup";
 import { matchAccent } from "@/lib/jobs/match-accent";
 import { buttonVariants } from "@/components/ui/button";
@@ -52,7 +54,9 @@ export type DashboardOpportunity = { label: string; detail: string; href: string
 
 type DashboardShellProps = {
   userEmail?: string;
-  /** Personalized greeting + Scout-surfaced opportunities for the Mission Control hero. */
+  /** Fadi's proactive spoken briefing, shown at the top of Mission Control. */
+  briefing?: Briefing;
+  /** Personalized greeting + Fadi-surfaced opportunities for the Mission Control hero. */
   greeting?: string;
   subline?: string;
   opportunities?: DashboardOpportunity[];
@@ -66,6 +70,7 @@ type DashboardShellProps = {
 
 export function DashboardShell({
   userEmail,
+  briefing,
   greeting,
   subline,
   opportunities = [],
@@ -78,7 +83,10 @@ export function DashboardShell({
 }: DashboardShellProps) {
   return (
     <div className="mx-auto max-w-shell space-y-6">
-      {/* Mission Control hero — greeting + the live opportunities Scout has lined up */}
+      {/* Fadi greets you first — his proactive, spoken briefing. */}
+      {briefing ? <FadiBriefing briefing={briefing} /> : null}
+
+      {/* Mission Control hero — greeting + the live opportunities Fadi has lined up */}
       <section
         className="relative overflow-hidden rounded-2xl border border-white/10 p-6 sm:p-8"
         style={{ backgroundImage: DASH_BANNER }}
@@ -94,14 +102,14 @@ export function DashboardShell({
             Mission Control
           </span>
           <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-            {greeting ?? "Your career, run by Scout"}
+            {greeting ?? "Your career, run by Fadi"}
           </h2>
           <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/70 sm:text-base">
             {subline ??
-              "Review your profile, generate your Career Intelligence Report, and act on what matters — Scout keeps the rest moving."}
+              "Review your profile, generate your Career Intelligence Report, and act on what matters — Fadi keeps the rest moving."}
           </p>
 
-          {/* Live opportunities Scout surfaced — the proactive heart of the OS. */}
+          {/* Live opportunities Fadi surfaced — the proactive heart of the OS. */}
           {opportunities.length > 0 ? (
             <div className="mt-6 grid gap-2.5 sm:grid-cols-3">
               {opportunities.map((opp, i) => (
@@ -190,7 +198,7 @@ export function DashboardShell({
             <div>
               <CardTitle>Onboarding profile summary</CardTitle>
               <CardDescription>
-                The data CareerOS AI will use for your first report.
+                The data FadiOS AI will use for your first report.
               </CardDescription>
             </div>
             <Link
@@ -368,7 +376,7 @@ function MarketSignalsCard({ signals }: { signals: MarketSignal[] }) {
           </ul>
         ) : (
           <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-            No live signals clear the relevance threshold for your profile right now. Scout keeps
+            No live signals clear the relevance threshold for your profile right now. Fadi keeps
             watching — set a target role in your profile to sharpen this.
           </div>
         )}

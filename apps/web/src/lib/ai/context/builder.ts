@@ -8,13 +8,14 @@ import {
   createSavedJobsRepository,
 } from "@careeros/database";
 
+import { composeCareerEvidence } from "@/lib/career/evidence";
 import { getDatabase } from "@/lib/database/client";
 import { getMarketIntelligence } from "@/lib/data-sources/service";
 import { getMomentumSummary } from "@/lib/resilience/service";
 
-import type { ScoutUserContext } from "./types";
+import type { FadiUserContext } from "./types";
 
-export interface BuildScoutContextOptions {
+export interface BuildFadiContextOptions {
   /**
    * Fetch live market signals from external sources. Adds network latency, so
    * it's OFF by default (the per-message chat path stays fast). The dashboard
@@ -29,10 +30,10 @@ function truncate(text: string | null | undefined, max: number): string | null {
   return text.length > max ? `${text.slice(0, max)}\n[truncated for context]` : text;
 }
 
-export async function buildScoutContext(
+export async function buildFadiContext(
   userId: string,
-  options: BuildScoutContextOptions = {},
-): Promise<ScoutUserContext | null> {
+  options: BuildFadiContextOptions = {},
+): Promise<FadiUserContext | null> {
   const db = getDatabase();
 
   const [careerProfile, profile, resume, linkedIn, report, savedJobsList, momentum, findings] =
@@ -51,7 +52,7 @@ export async function buildScoutContext(
 
   // Live, personalized market intelligence — opt-in (see options doc above).
   const skillGaps = (report?.missingSkills as Array<{ title: string; detail: string }>) ?? [];
-  let marketContext: ScoutUserContext["marketContext"] = {
+  let marketContext: FadiUserContext["marketContext"] = {
     available: false,
     note: "Live market intelligence is available but not loaded for this turn (kept off to keep chat fast). The dashboard market brief shows the full picture.",
     signals: [],
@@ -156,7 +157,7 @@ export async function buildScoutContext(
   };
 }
 
-export function formatScoutContextAsPrompt(ctx: ScoutUserContext): string {
+export function formatFadiContextAsPrompt(ctx: FadiUserContext): string {
   const lines: string[] = [];
 
   lines.push("# User Career Context");
@@ -170,20 +171,14 @@ export function formatScoutContextAsPrompt(ctx: ScoutUserContext): string {
 
   lines.push("");
   lines.push("## Career Evidence");
-
-  if (ctx.evidence.hasResume && ctx.evidence.resumeText) {
-    lines.push("### Resume");
-    lines.push(ctx.evidence.resumeText);
-  } else {
-    lines.push("Resume: Not provided yet.");
-  }
-
-  if (ctx.evidence.hasLinkedIn && ctx.evidence.linkedInText) {
-    lines.push("### LinkedIn");
-    lines.push(ctx.evidence.linkedInText);
-  } else {
-    lines.push("LinkedIn: Not provided yet.");
-  }
+  // LinkedIn (the full record) is the source of truth; a resume is a role-tailored
+  // excerpt. composeCareerEvidence enforces that hierarchy + the honest labels.
+  lines.push(
+    composeCareerEvidence({
+      resumeText: ctx.evidence.resumeText,
+      linkedInText: ctx.evidence.linkedInText,
+    }).block,
+  );
 
   if (ctx.analysis.hasReport) {
     lines.push("");

@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Inter } from "next/font/google";
-import Script from "next/script";
 
 import { QueryProvider } from "@/components/providers/query-provider";
 
 import "./globals.css";
 
-// Set the theme before paint so there's no flash. `beforeInteractive` runs this
-// early without React rendering a raw <script> (which React 19 flags as an error).
+// Set the theme before paint so there's no flash. An inline script via
+// dangerouslySetInnerHTML is the App Router pattern that actually executes
+// pre-hydration (next/script children are flagged + not run by React 19).
 const THEME_INIT = `try{var t=localStorage.getItem('theme');if(t==='light')document.documentElement.classList.remove('dark');else document.documentElement.classList.add('dark');}catch(e){}`;
 
 const geistSans = Geist({
@@ -28,8 +28,8 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "CareerOS AI",
-    template: "%s | CareerOS AI",
+    default: "FadiOS AI",
+    template: "%s | FadiOS AI",
   },
   description: "AI-first career operating system MVP foundation.",
 };
@@ -46,9 +46,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} dark h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
-        <Script id="theme-init" strategy="beforeInteractive">
-          {THEME_INIT}
-        </Script>
+        <script id="theme-init" dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
         <QueryProvider>{children}</QueryProvider>
       </body>
     </html>

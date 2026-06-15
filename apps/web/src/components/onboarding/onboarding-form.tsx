@@ -29,12 +29,12 @@ const steps = [
   {
     title: "Profile evidence",
     aiCopy:
-      "Now add the career evidence I can read. Upload your CV (PDF, DOCX or TXT) or paste it — plus any LinkedIn context.",
+      "Now the career evidence I'll reason from. Your LinkedIn is the full record — paste it or your profile URL. A resume is optional and is often tailored to one role, so I treat LinkedIn as the source of truth.",
   },
   {
     title: "Career goals",
     aiCopy:
-      "Finally, describe what you want CareerOS AI to optimize for. Your goals will shape the first dashboard recommendations.",
+      "Finally, describe what you want FadiOS AI to optimize for. Your goals will shape the first dashboard recommendations.",
   },
 ];
 
@@ -175,17 +175,17 @@ export function OnboardingForm() {
       {activeStep === 1 ? (
         <div className="space-y-4">
           <FieldError message={form.formState.errors.linkedInProfile?.message}>
-            <Label htmlFor="linkedin-profile">LinkedIn profile text or URL</Label>
+            <Label htmlFor="linkedin-profile">Career history — LinkedIn (your source of truth)</Label>
             <Textarea
               id="linkedin-profile"
-              placeholder="Paste your LinkedIn profile text or profile URL..."
+              placeholder="Paste your LinkedIn About + experience (the full record), or your profile URL..."
               rows={5}
               {...form.register("linkedInProfile")}
             />
           </FieldError>
 
           <FieldError message={form.formState.errors.resumeText?.message}>
-            <Label htmlFor="resume-text">Resume / CV</Label>
+            <Label htmlFor="resume-text">Resume / CV (a role-tailored example — optional)</Label>
             <CvUpload
               onExtracted={(text) =>
                 form.setValue("resumeText", text, { shouldValidate: true, shouldDirty: true })
@@ -206,7 +206,7 @@ export function OnboardingForm() {
           <Label htmlFor="career-goals">Career goals</Label>
           <Textarea
             id="career-goals"
-            placeholder="Describe your target role, timeline, constraints, and what you want CareerOS AI to help with."
+            placeholder="Describe your target role, timeline, constraints, and what you want FadiOS AI to help with."
             rows={8}
             {...form.register("careerGoals")}
           />

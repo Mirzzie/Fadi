@@ -4,6 +4,7 @@ import { createCareerReportsRepository } from "@careeros/database";
 import { revalidatePath } from "next/cache";
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
+import { composeCareerEvidence } from "@/lib/career/evidence";
 import { getCareerReportContext } from "@/lib/career-report/data";
 import { careerIntelligenceReportSchema } from "@/lib/career-report/schema";
 import { getDatabase } from "@/lib/database/client";
@@ -100,7 +101,7 @@ function getUserFacingProviderErrorMessage(details: ProviderErrorDetails) {
     return "The configured AI model is unavailable. Check OPENAI_MODEL and try again.";
   }
 
-  return "CareerOS could not generate the report right now. Please try again later.";
+  return "FadiOS could not generate the report right now. Please try again later.";
 }
 
 function shouldRefundProviderFailure(details: ProviderErrorDetails) {
@@ -137,7 +138,7 @@ export async function generateCareerReportAction(
     };
   }
 
-  // Resolve the SAME per-user provider chain Scout chat uses, so a key set in
+  // Resolve the SAME per-user provider chain Fadi chat uses, so a key set in
   // Settings → AI provider drives the report too. buildProviderChain falls back
   // to the server default when the user hasn't configured their own; wrapping it
   // in ResilientProvider gives the report primary→fallback resilience for free.
@@ -188,14 +189,17 @@ export async function generateCareerReportAction(
     };
   }
 
-  if (!context.resumeText || !context.careerGoals || !context.targetRole) {
+  // Career history can come from LinkedIn (preferred — the full record) OR a
+  // resume; require at least one, not the resume specifically.
+  const hasHistory = Boolean(context.resumeText || context.linkedInProfileText);
+  if (!hasHistory || !context.careerGoals || !context.targetRole) {
     logger.warn("career_report.generate.context_incomplete", {
       userId: user.id,
     });
 
     return {
       ok: false,
-      message: "Your onboarding data is incomplete. Add resume text, target role, and goals first.",
+      message: "Your onboarding data is incomplete. Add your career history (LinkedIn or resume), target role, and goals first.",
     };
   }
 
@@ -231,11 +235,7 @@ User profile:
 - Career goals: ${truncate(context.careerGoals, 1600)}
 ${labor.summary ? `\nCurrent labor market (real BLS data — use for honest context, not alarm):\n${labor.summary}` : ""}
 
-LinkedIn context:
-${truncate(context.linkedInProfileText, 5000)}
-
-Resume text:
-${truncate(context.resumeText, 9000)}
+${composeCareerEvidence({ resumeText: context.resumeText, linkedInText: context.linkedInProfileText }).block}
 `;
 
   try {
@@ -250,7 +250,7 @@ ${truncate(context.resumeText, 9000)}
         {
           role: "system",
           content:
-            "You are Scout, CareerOS's career operating intelligence. You are honest, strategic, and evidence-based. Produce specific career guidance grounded in the user's actual profile. Do not invent credentials, job data, salary facts, or market claims. If evidence is limited, say so explicitly.",
+            "You are Fadi, FadiOS's career operating intelligence. You are honest, strategic, and evidence-based. Produce specific career guidance grounded in the user's actual profile. Do not invent credentials, job data, salary facts, or market claims. If evidence is limited, say so explicitly.",
         },
         {
           role: "user",

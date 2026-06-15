@@ -2,6 +2,7 @@
 
 import {
   AudioLines,
+  Compass,
   FileText,
   Loader2,
   Mic,
@@ -10,30 +11,31 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { ScoutBadge } from "@/components/ui/scout-badge";
+import { FadiBadge } from "@/components/ui/fadi-badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useGroqVoice } from "@/lib/voice/use-groq-voice";
 import { useSpeechOutput } from "@/lib/voice/use-speech-output";
 import { cn } from "@/lib/utils";
 
-export type ScoutToolResultView = { name: string; view: string; data: unknown };
+export type FadiToolResultView = { name: string; view: string; data: unknown };
 
 type Message = {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
-  toolResults?: ScoutToolResultView[];
+  toolResults?: FadiToolResultView[];
 };
 
 const INITIAL_MESSAGE: Message = {
   id: "init",
   role: "assistant",
   content:
-    "Hello. I'm Scout, your career agent.\n\nI have your profile and career analysis loaded. Ask me anything — your skill gaps, whether a role is worth pursuing, how to improve your resume for a specific job, what's happening in your target market, or what your next move should be.\n\nI'll be direct. If something doesn't add up, I'll tell you.",
+    "Hello. I'm Fadi, your career agent.\n\nI have your profile and career analysis loaded. Ask me anything — your skill gaps, whether a role is worth pursuing, how to improve your resume for a specific job, what's happening in your target market, or what your next move should be.\n\nI'll be direct. If something doesn't add up, I'll tell you.",
   timestamp: new Date(),
 };
 
@@ -47,9 +49,9 @@ function toSpeakable(markdown: string): string {
     .replace(/\n/g, " ");
 }
 
-const VOICE_PREF_KEY = "scout-voice-enabled";
+const VOICE_PREF_KEY = "fadi-voice-enabled";
 
-export function ScoutChat({
+export function FadiChat({
   autoListenNonce,
   seed,
   onStateChange,
@@ -57,19 +59,23 @@ export function ScoutChat({
   autoListenNonce?: number;
   /** A question handed off from the ⌘K spotlight; fired once per nonce. */
   seed?: { text: string; nonce: number } | null;
-  /** Publish Scout's live state to the ambient orb (only the orb panel passes this). */
+  /** Publish Fadi's live state to the ambient orb (only the orb panel passes this). */
   onStateChange?: (state: "idle" | "listening" | "thinking" | "speaking") => void;
 } = {}) {
+  const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
   const [input, setInput] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  // Voice preference survives sessions — it's what lets Scout greet you ALOUD
+  // Voice preference survives sessions — it's what lets Fadi greet you ALOUD
   // with the background digest when you come back.
   const [voiceEnabled, setVoiceEnabled] = useState(false);
   useEffect(() => {
-    // Migrate the pre-rename pref key so nobody silently loses their voice setting.
+    // Migrate the pre-rename pref keys (Kai → Scout → Fadi) so nobody silently
+    // loses their voice setting.
     setVoiceEnabled(
-      (localStorage.getItem(VOICE_PREF_KEY) ?? localStorage.getItem("kai-voice-enabled")) === "1",
+      (localStorage.getItem(VOICE_PREF_KEY) ??
+        localStorage.getItem("scout-voice-enabled") ??
+        localStorage.getItem("kai-voice-enabled")) === "1",
     );
   }, []);
   useEffect(() => {
@@ -110,13 +116,13 @@ export function ScoutChat({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  // Load persisted conversation on mount → chats survive reloads and Desk/Scout
+  // Load persisted conversation on mount → chats survive reloads and Desk/Fadi
   // modes stay in sync (both read the same history).
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/scout/history");
+        const res = await fetch("/api/fadi/history");
         if (!res.ok) return;
         const data = (await res.json()) as {
           messages: Array<{
@@ -137,7 +143,7 @@ export function ScoutChat({
           })),
         );
 
-        // Scout speaks a background digest that just landed — only the newest
+        // Fadi speaks a background digest that just landed — only the newest
         // message, only when fresh, and only if the user keeps voice on.
         const last = data.messages[data.messages.length - 1];
         const isFresh =
@@ -156,7 +162,7 @@ export function ScoutChat({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Summoned by "Hey Scout": start listening for the user's question immediately.
+  // Summoned by "Hey Fadi": start listening for the user's question immediately.
   useEffect(() => {
     if (autoListenNonce && autoListenNonce > 0) {
       startListening();
@@ -164,7 +170,7 @@ export function ScoutChat({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoListenNonce]);
 
-  // Conversation loop: whenever Scout is idle in hands-free mode (not thinking,
+  // Conversation loop: whenever Fadi is idle in hands-free mode (not thinking,
   // speaking, or already listening), resume listening for the next turn. Back
   // off when the last attempt errored (e.g. flaky speech network) so we don't
   // spin in a tight retry storm.
@@ -208,7 +214,7 @@ export function ScoutChat({
       abortRef.current = new AbortController();
 
       try {
-        const res = await fetch("/api/scout/chat", {
+        const res = await fetch("/api/fadi/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ message: text.trim(), history }),
@@ -216,7 +222,7 @@ export function ScoutChat({
         });
 
         if (!res.ok || !res.body) {
-          throw new Error(`Scout returned ${res.status}`);
+          throw new Error(`Fadi returned ${res.status}`);
         }
 
         const reader = res.body.getReader();
@@ -237,12 +243,15 @@ export function ScoutChat({
 
             try {
               const parsed = JSON.parse(data);
-              if (parsed && typeof parsed === "object" && "scoutTools" in parsed) {
+              if (parsed && typeof parsed === "object" && "fadiTools" in parsed) {
                 // Structured tool results → render as cards/tiles.
-                const toolResults = (parsed as { scoutTools: ScoutToolResultView[] }).scoutTools;
+                const toolResults = (parsed as { fadiTools: FadiToolResultView[] }).fadiTools;
                 setMessages((prev) =>
                   prev.map((m) => (m.id === assistantId ? { ...m, toolResults } : m)),
                 );
+                // A voice/chat action that mutated the app (e.g. created a track) →
+                // refresh so the menu-bar switcher + dashboard follow without a reload.
+                if (toolResults.some((t) => t.view === "track_created")) router.refresh();
               } else if (typeof parsed === "string") {
                 fullResponse += parsed;
                 setMessages((prev) =>
@@ -274,7 +283,7 @@ export function ScoutChat({
               : m,
           ),
         );
-        setError("Failed to reach Scout. Try again in a moment.");
+        setError("Failed to reach Fadi. Try again in a moment.");
       } finally {
         setIsStreaming(false);
         abortRef.current = null;
@@ -328,14 +337,14 @@ export function ScoutChat({
       stopSpeaking();
     } else {
       setConversationMode(true);
-      setVoiceEnabled(true); // Scout speaks its replies in conversation mode
+      setVoiceEnabled(true); // Fadi speaks its replies in conversation mode
       setError(null);
       startListening();
     }
   }
 
-  // Scout's live state — drives the animated persona orb.
-  const scoutState: "speaking" | "thinking" | "listening" | "idle" = isSpeaking
+  // Fadi's live state — drives the animated persona orb.
+  const fadiState: "speaking" | "thinking" | "listening" | "idle" = isSpeaking
     ? "speaking"
     : isStreaming || isTranscribing
       ? "thinking"
@@ -344,10 +353,10 @@ export function ScoutChat({
         : "idle";
 
   // Publish that live state up to the ambient orb (no-op unless the orb panel
-  // passed onStateChange — the dedicated Scout page leaves the orb alone).
+  // passed onStateChange — the dedicated Fadi page leaves the orb alone).
   useEffect(() => {
-    onStateChange?.(scoutState);
-  }, [scoutState, onStateChange]);
+    onStateChange?.(fadiState);
+  }, [fadiState, onStateChange]);
 
   return (
     <div className="flex h-full flex-col">
@@ -379,19 +388,19 @@ export function ScoutChat({
       {/* Live conversation persona */}
       {conversationMode ? (
         <div className="mx-4 mb-2 flex items-center gap-3 rounded-xl border border-primary/25 bg-primary/5 px-4 py-3">
-          <ScoutOrb state={scoutState} />
+          <FadiOrb state={fadiState} />
           <div className="min-w-0 flex-1">
             <p className="text-sm font-medium">
-              {scoutState === "speaking"
-                ? "Scout is speaking…"
-                : scoutState === "thinking"
-                  ? "Scout is thinking…"
-                  : scoutState === "listening"
+              {fadiState === "speaking"
+                ? "Fadi is speaking…"
+                : fadiState === "thinking"
+                  ? "Fadi is thinking…"
+                  : fadiState === "listening"
                     ? "Listening — go ahead"
                     : "Say something…"}
             </p>
             <p className="text-xs text-muted-foreground">
-              Hands-free — talk naturally, Scout replies out loud.
+              Hands-free — talk naturally, Fadi replies out loud.
             </p>
           </div>
           <Button type="button" variant="outline" size="sm" onClick={toggleConversation}>
@@ -411,12 +420,12 @@ export function ScoutChat({
             placeholder={
               isListening
                 ? "Listening... speak now"
-                : "Ask Scout anything about your career..."
+                : "Ask Fadi anything about your career..."
             }
             rows={2}
             disabled={isStreaming}
             className="flex-1 resize-none text-sm"
-            aria-label="Message to Scout"
+            aria-label="Message to Fadi"
           />
           <div className="flex flex-col gap-1.5">
             <Button
@@ -437,7 +446,7 @@ export function ScoutChat({
               className={cn("size-9 shrink-0", isListening && "animate-pulse")}
               onClick={toggleVoiceInput}
               disabled={isTranscribing}
-              title={isListening ? "Stop & transcribe" : isTranscribing ? "Transcribing…" : "Speak to Scout"}
+              title={isListening ? "Stop & transcribe" : isTranscribing ? "Transcribing…" : "Speak to Fadi"}
               aria-label={isListening ? "Stop voice input" : "Start voice input"}
             >
               {isTranscribing ? (
@@ -454,7 +463,7 @@ export function ScoutChat({
               variant={voiceEnabled ? "default" : "outline"}
               className="size-9 shrink-0"
               onClick={toggleVoiceOutput}
-              title={voiceEnabled ? "Mute Scout voice" : "Enable Scout voice"}
+              title={voiceEnabled ? "Mute Fadi voice" : "Enable Fadi voice"}
               aria-label={voiceEnabled ? "Disable voice output" : "Enable voice output"}
             >
               {voiceEnabled || isSpeaking ? (
@@ -480,7 +489,7 @@ export function ScoutChat({
           </Button>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          Press Enter to send, Shift+Enter for a new line. Scout uses your career profile and analysis for context.
+          Press Enter to send, Shift+Enter for a new line. Fadi uses your career profile and analysis for context.
         </p>
       </div>
     </div>
@@ -494,13 +503,13 @@ function MessageBubble({
   message: Message;
   isStreaming: boolean;
 }) {
-  const isScout = message.role === "assistant";
+  const isFadi = message.role === "assistant";
   const hasTools = (message.toolResults?.length ?? 0) > 0;
 
   return (
-    <div className={cn("flex items-start gap-3", !isScout && "flex-row-reverse")}>
-      {isScout ? (
-        <ScoutBadge size="xs" showName={false} className="shrink-0 pt-0.5" />
+    <div className={cn("flex items-start gap-3", !isFadi && "flex-row-reverse")}>
+      {isFadi ? (
+        <FadiBadge size="xs" showName={false} className="shrink-0 pt-0.5" />
       ) : (
         <div className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary text-xs font-medium text-secondary-foreground">
           You
@@ -510,7 +519,7 @@ function MessageBubble({
         <div
           className={cn(
             "rounded-xl px-3.5 py-2.5 text-sm leading-relaxed",
-            isScout ? "bg-card border border-border/60" : "bg-primary/15 text-foreground",
+            isFadi ? "bg-card border border-border/60" : "bg-primary/15 text-foreground",
           )}
         >
           {message.content ? (
@@ -518,18 +527,18 @@ function MessageBubble({
           ) : isStreaming ? (
             <span className="flex items-center gap-1.5 text-muted-foreground">
               <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-              Scout is thinking...
+              Fadi is thinking...
             </span>
           ) : null}
         </div>
-        {hasTools ? <ScoutToolResults results={message.toolResults!} /> : null}
+        {hasTools ? <FadiToolResults results={message.toolResults!} /> : null}
       </div>
     </div>
   );
 }
 
-/** Visual render of what Scout's tools returned — job cards, performance tiles. */
-function ScoutToolResults({ results }: { results: ScoutToolResultView[] }) {
+/** Visual render of what Fadi's tools returned — job cards, performance tiles. */
+function FadiToolResults({ results }: { results: FadiToolResultView[] }) {
   return (
     <div className="space-y-3">
       {results.map((r, i) => (
@@ -549,7 +558,7 @@ type JobCard = {
   url?: string;
 };
 
-function renderToolResult(r: ScoutToolResultView) {
+function renderToolResult(r: FadiToolResultView) {
   const data = r.data as Record<string, unknown> | undefined;
 
   if ((r.view === "jobs" || r.view === "updates") && data) {
@@ -603,6 +612,26 @@ function renderToolResult(r: ScoutToolResultView) {
           <span className="block truncate text-sm font-medium">{d.title}</span>
           <span className="text-xs text-muted-foreground">
             {d.company} · added to tracker — open Applications →
+          </span>
+        </span>
+      </a>
+    );
+  }
+
+  if (r.view === "track_created" && data) {
+    const d = data as { trackId?: string; label?: string; targetRole?: string };
+    return (
+      <a
+        href="/dashboard"
+        className="group flex items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3 transition-colors hover:border-primary/50"
+      >
+        <span className="grid size-9 shrink-0 place-items-center rounded-md bg-primary/15 text-primary">
+          <Compass className="size-5" aria-hidden="true" />
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-medium">{d.label ?? "New direction"}</span>
+          <span className="text-xs text-muted-foreground">
+            {d.targetRole ? `${d.targetRole} · ` : ""}new direction created &amp; active — open dashboard →
           </span>
         </span>
       </a>
@@ -681,8 +710,8 @@ function renderToolResult(r: ScoutToolResultView) {
   return null;
 }
 
-/** Animated Scout persona — reacts to whether Scout is listening, thinking, or speaking. */
-function ScoutOrb({ state }: { state: "speaking" | "thinking" | "listening" | "idle" }) {
+/** Animated Fadi persona — reacts to whether Fadi is listening, thinking, or speaking. */
+function FadiOrb({ state }: { state: "speaking" | "thinking" | "listening" | "idle" }) {
   return (
     <div className="relative grid size-10 shrink-0 place-items-center">
       {state === "listening" ? (
