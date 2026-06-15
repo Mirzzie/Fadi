@@ -40,7 +40,7 @@ export function FadiBriefing({ briefing }: { briefing: Briefing }) {
   }
 
   return (
-    <section className="gradient-border glass-card rounded-2xl p-4 sm:p-5">
+    <section className="glass-holo rounded-2xl p-4 sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <span className="relative grid size-8 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.66_0.22_285)] ring-2 ring-primary/20">

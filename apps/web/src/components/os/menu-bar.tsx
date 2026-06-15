@@ -1,6 +1,6 @@
 "use client";
 
-import { Mic, MicOff, Search } from "lucide-react";
+import { LayoutGrid, Mic, MicOff, Monitor, Search, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { FadiLogo } from "@/components/brand/fadi-logo";
@@ -8,8 +8,11 @@ import { useWakeWord } from "@/lib/voice/use-wake-word";
 import { cn } from "@/lib/utils";
 import { ActivityCenter } from "./activity-center";
 import { summonFadi, useFadi, type FadiState } from "./fadi-presence";
+import { useOsMode } from "./os-mode";
 import { TrackSwitcher } from "./track-switcher";
 import { UserMenu } from "./user-menu";
+
+const VOICE_PREF_KEY = "fadi-voice-enabled";
 
 /** Top menu bar — the OS's persistent identity strip: brand, track, live Fadi
  *  state, the ⌘K spotlight, "Hey Fadi", clock, and the user menu. Fadi is
@@ -79,11 +82,72 @@ export function MenuBar() {
           </button>
         ) : null}
 
+        <VoiceToggle />
+        <ModeToggle />
         <ActivityCenter />
         <span className="tabular-nums text-muted-foreground">{clock}</span>
         <UserMenu />
       </div>
     </header>
+  );
+}
+
+/** Ambient living shell ⇄ windowed desktop. */
+function ModeToggle() {
+  const { mode, toggle, ready } = useOsMode();
+  if (!ready) return null; // avoid SSR/first-render mismatch on the persisted mode
+  const desktop = mode === "desktop";
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-pressed={desktop}
+      title={desktop ? "Switch to ambient shell" : "Switch to desktop (windows)"}
+      className={cn(
+        "flex items-center gap-1.5 rounded-full border border-border/70 px-2.5 py-1 font-medium transition-colors",
+        desktop ? "bg-primary/15 text-primary ring-1 ring-inset ring-primary/30" : "text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {desktop ? <Monitor className="size-3" aria-hidden="true" /> : <LayoutGrid className="size-3" aria-hidden="true" />}
+      <span className="hidden sm:inline">{desktop ? "Desktop" : "Ambient"}</span>
+    </button>
+  );
+}
+
+/** Mute / unmute Fadi's voice (talk-by-default). */
+function VoiceToggle() {
+  const [on, setOn] = useState<boolean | null>(null);
+  useEffect(() => {
+    try {
+      setOn(localStorage.getItem(VOICE_PREF_KEY) === "1");
+    } catch {
+      setOn(false);
+    }
+  }, []);
+  if (on === null) return null;
+  function toggle() {
+    const next = !on;
+    setOn(next);
+    try {
+      localStorage.setItem(VOICE_PREF_KEY, next ? "1" : "0");
+    } catch {
+      /* ignore */
+    }
+    if (!next) window.speechSynthesis?.cancel();
+  }
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-pressed={Boolean(on)}
+      title={on ? "Fadi's voice is on — mute" : "Unmute Fadi's voice"}
+      className={cn(
+        "grid size-7 place-items-center rounded-full border border-border/70 transition-colors",
+        on ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground",
+      )}
+    >
+      {on ? <Volume2 className="size-3.5" aria-hidden="true" /> : <VolumeX className="size-3.5" aria-hidden="true" />}
+    </button>
   );
 }
 

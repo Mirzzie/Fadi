@@ -1,10 +1,11 @@
 "use client";
 
-import { ArrowUpRight, Sparkles, X } from "lucide-react";
+import { ArrowUpRight, X } from "lucide-react";
 import Link from "next/link";
 
 import { FadiChat } from "@/components/fadi/fadi-chat";
 import { cn } from "@/lib/utils";
+import { FadiCore } from "./fadi-core";
 import { useFadi, type FadiState } from "./fadi-presence";
 
 /**
@@ -103,10 +104,7 @@ const STATE_LABEL: Record<FadiState, string> = {
   speaking: "Speaking…",
 };
 
-/**
- * The orb itself. A teal→violet core with a state-driven aura: idle breathes,
- * listening ripples, thinking/working shimmer-spins, speaking pulses fast.
- */
+/** The orb is the living Fadi core, made clickable when it's the ambient launcher. */
 function OrbButton({
   state,
   onClick,
@@ -116,42 +114,18 @@ function OrbButton({
   onClick?: () => void;
   size?: "sm" | "lg";
 }) {
-  const active = state !== "idle";
+  const px = size === "lg" ? 56 : 28;
   const Wrapper = onClick ? "button" : "div";
   return (
     <Wrapper
       {...(onClick ? { type: "button" as const, onClick, "aria-label": "Open Fadi" } : {})}
       className={cn(
-        "group relative grid place-items-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.66_0.22_285)] shadow-xl ring-2 ring-primary/30",
+        "group grid place-items-center rounded-full",
         onClick && "transition-transform hover:scale-105 active:scale-95",
-        size === "lg" ? "size-14" : "size-7",
       )}
       data-state={state}
     >
-      {/* Outer breathing / ripple aura */}
-      <span
-        className={cn(
-          "absolute inset-0 rounded-full bg-primary/30",
-          state === "listening" || state === "speaking"
-            ? "animate-ping [animation-duration:1.4s]"
-            : "fadi-breathe",
-        )}
-      />
-      {/* Thinking/working shimmer ring */}
-      {active && state !== "listening" ? (
-        <span
-          aria-hidden="true"
-          className="absolute -inset-1 rounded-full border border-primary/40 fadi-orbit"
-        />
-      ) : null}
-      <Sparkles
-        className={cn(
-          "relative text-primary-foreground",
-          size === "lg" ? "size-6" : "size-3.5",
-          state === "thinking" || state === "working" ? "animate-pulse" : "",
-        )}
-        aria-hidden="true"
-      />
+      <FadiCore state={state} size={px} />
     </Wrapper>
   );
 }

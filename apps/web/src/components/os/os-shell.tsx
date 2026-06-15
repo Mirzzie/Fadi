@@ -2,46 +2,63 @@
 
 import { usePathname } from "next/navigation";
 
+import { BootSequence } from "./boot-sequence";
+import { Desktop } from "./desktop";
 import { Dock } from "./dock";
 import { FadiOrb } from "./fadi-orb";
 import { MenuBar } from "./menu-bar";
 import { CommandBar } from "./command-bar";
 import { FadiPresenceProvider } from "./fadi-presence";
+import { OsModeProvider, useOsMode } from "./os-mode";
+import { WindowManagerProvider } from "./window-manager";
 
 /**
- * The OS chrome that wraps every authenticated screen: a top menu bar, a bottom
- * dock, a desktop "wallpaper", a ⌘K command spotlight, and the ambient, always-
- * present Fadi orb. There is no Desk/Fadi mode split — Fadi is everywhere.
- * Pages render in the desktop area; ambient Fadi lives in FadiPresenceProvider.
+ * The FadiOS chrome that wraps every authenticated screen: a top menu bar, a
+ * bottom dock, a living holographic wallpaper, a ⌘K spotlight, the ambient Fadi
+ * orb, and a cinematic wake. It runs in two switchable faces — an **ambient**
+ * shell (your route screens) and a windowed **desktop** — and Fadi is everywhere.
  */
 export function OsShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
   return (
     <FadiPresenceProvider>
-      <div className="relative flex min-h-screen flex-col">
-        {/* Wallpaper */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none fixed inset-0 -z-10 bg-background"
-        >
-          <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_50%_-10%,oklch(0.66_0.22_285/0.18),transparent_60%)]" />
-          <div className="absolute inset-0 bg-[radial-gradient(90%_60%_at_100%_100%,oklch(0.72_0.19_192/0.12),transparent_55%)]" />
-        </div>
+      <OsModeProvider>
+        <WindowManagerProvider>
+          <OsShellInner>{children}</OsShellInner>
+        </WindowManagerProvider>
+      </OsModeProvider>
+    </FadiPresenceProvider>
+  );
+}
 
-        <MenuBar />
-        <main className="flex-1 px-3 pb-24 pt-4 sm:px-6">
-          {/* Keyed by route so each navigation fades + slides in. */}
-          <div
-            key={pathname}
-            className="duration-300 animate-in fade-in slide-in-from-bottom-2"
-          >
+function OsShellInner({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const { mode } = useOsMode();
+
+  return (
+    <div className="relative flex min-h-screen flex-col">
+      {/* Living holographic wallpaper */}
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 bg-background">
+        <div className="absolute inset-0 bg-[radial-gradient(120%_80%_at_50%_-10%,oklch(0.66_0.22_285/0.18),transparent_60%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(90%_60%_at_100%_100%,oklch(0.72_0.19_192/0.12),transparent_55%)]" />
+        <div className="holo-grid absolute inset-0 opacity-60" />
+        <div className="holo-scanlines absolute inset-0 opacity-40" />
+      </div>
+
+      <MenuBar />
+      <main className="flex-1 px-3 pb-24 pt-4 sm:px-6">
+        {mode === "desktop" ? (
+          <Desktop />
+        ) : (
+          // Keyed by route so each navigation fades + slides in.
+          <div key={pathname} className="duration-300 animate-in fade-in slide-in-from-bottom-2">
             {children}
           </div>
-        </main>
-        <Dock />
-        <CommandBar />
-        <FadiOrb />
-      </div>
-    </FadiPresenceProvider>
+        )}
+      </main>
+      <Dock />
+      <CommandBar />
+      <FadiOrb />
+      <BootSequence />
+    </div>
   );
 }
