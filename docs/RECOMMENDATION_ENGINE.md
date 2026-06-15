@@ -2,9 +2,9 @@
 
 ## Purpose
 
-The Recommendation Engine decides what Scout surfaces to the user next. It combines career analysis, niche validation outcomes, job matches, applications, learning gaps, market signals, motivation state, and user feedback into a prioritized action feed.
+The Recommendation Engine decides what Fadi surfaces to the user next. It combines career analysis, niche validation outcomes, job matches, applications, learning gaps, market signals, motivation state, and user feedback into a prioritized action feed.
 
-This engine drives the Scout Command Center — the central operating surface of CareerOS.
+This engine drives the Fadi Command Center — the central operating surface of CareerOS.
 
 ## Recommendation Types
 
@@ -31,7 +31,7 @@ flowchart TD
     Rules --> Ranker[Ranking Model]
     Ranker --> Explainer[Explanation Generator]
     Gateway[Model Gateway] --> Explainer
-    Explainer --> Feed[Scout Action Feed]
+    Explainer --> Feed[Fadi Action Feed]
     Feed --> Feedback[Accept, Dismiss, Complete]
     Feedback --> Events[Event Bus]
     Events --> Features

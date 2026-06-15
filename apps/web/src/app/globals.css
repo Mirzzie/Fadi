@@ -157,33 +157,33 @@
 }
 
 @layer utilities {
-  .scout-glow {
+  .fadi-glow {
     box-shadow: 0 0 0 1px oklch(0.72 0.19 192 / 25%), 0 0 24px oklch(0.72 0.19 192 / 12%);
   }
 
-  /* ── Ambient Scout orb states ────────────────────────────────────────── */
+  /* ── Ambient Fadi orb states ────────────────────────────────────────── */
 
   /* Idle: a slow, living breath. */
-  @keyframes scout-breathe {
+  @keyframes fadi-breathe {
     0%, 100% { transform: scale(1); opacity: 0.5; }
     50% { transform: scale(1.18); opacity: 0.25; }
   }
-  .scout-breathe {
-    animation: scout-breathe 3.6s ease-in-out infinite;
+  .fadi-breathe {
+    animation: fadi-breathe 3.6s ease-in-out infinite;
   }
 
   /* Thinking / working: a shimmer ring that orbits the core. */
-  @keyframes scout-orbit {
+  @keyframes fadi-orbit {
     to { transform: rotate(360deg); }
   }
-  .scout-orbit {
+  .fadi-orbit {
     border-style: dashed;
-    animation: scout-orbit 4s linear infinite;
+    animation: fadi-orbit 4s linear infinite;
   }
   @media (prefers-reduced-motion: reduce) {
-    .scout-breathe, .scout-orbit { animation: none; }
+    .fadi-breathe, .fadi-orbit { animation: none; }
   }
-  .scout-glow-sm {
+  .fadi-glow-sm {
     box-shadow: 0 0 0 1px oklch(0.72 0.19 192 / 20%), 0 0 12px oklch(0.72 0.19 192 / 10%);
   }
 

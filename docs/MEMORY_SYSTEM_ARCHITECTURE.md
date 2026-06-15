@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The Memory System gives Scout durable understanding of the user across every session and every workflow. It stores career facts, preferences, goals, niche validation history, application history, learning progress, interview feedback, rejected and accepted recommendations, and inferred patterns.
+The Memory System gives Fadi durable understanding of the user across every session and every workflow. It stores career facts, preferences, goals, niche validation history, application history, learning progress, interview feedback, rejected and accepted recommendations, and inferred patterns.
 
 Memory must be transparent, editable, permission-aware, and useful across every engine.
 
@@ -23,7 +23,7 @@ flowchart LR
     Classifier --> Consent[Consent and Policy Check]
     Consent --> Store[(Memory Store — PostgreSQL)]
     Store --> Retriever[Memory Retriever]
-    Retriever --> Context[Scout Context Builder]
+    Retriever --> Context[Fadi Context Builder]
     Store --> UserUI[Memory Review UI]
     UserUI --> Corrections[User Corrections]
     Corrections --> Store
@@ -32,7 +32,7 @@ flowchart LR
 
 ## Important Memory Categories
 
-Scout should remember across sessions:
+Fadi should remember across sessions:
 
 - Stated and validated career niche and direction.
 - Niche validation history: what was challenged, what was confirmed, what was revised.
@@ -109,11 +109,11 @@ Add memory compaction, privacy-aware summarization, retention tiers, and regiona
 - Summarize conversations into user-safe memory records.
 - Version important memories.
 - Mark inferred memory as inferred until confirmed by the user.
-- Build memory correction UX early — users must be able to inspect and edit what Scout remembers.
+- Build memory correction UX early — users must be able to inspect and edit what Fadi remembers.
 - Attach source references to every memory.
 - Use user filters in every memory query.
 - Do not allow memories from one user to leak into another user's context.
-- Track niche validation history explicitly — it is load-bearing for Scout's honest-mentor identity.
+- Track niche validation history explicitly — it is load-bearing for Fadi's honest-mentor identity.
 
 ## Complexity
 

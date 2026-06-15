@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The MVP sitemap keeps the product small enough for one developer while establishing Scout's identity as the entire CareerOS operating system — not a feature bolted onto a dashboard.
+The MVP sitemap keeps the product small enough for one developer while establishing Fadi's identity as the entire CareerOS operating system — not a feature bolted onto a dashboard.
 
 ## Sitemap
 
@@ -13,7 +13,7 @@ flowchart TD
     Public --> Login[Login]
     Public --> Signup[Signup]
 
-    App[Authenticated App — Scout's Domain]
+    App[Authenticated App — Fadi's Domain]
     App --> Onboarding[Onboarding]
     Onboarding --> Resume[Resume Upload]
     Onboarding --> LinkedIn[LinkedIn Import]
@@ -22,8 +22,8 @@ flowchart TD
     Onboarding --> Niche[Niche Discovery and Validation]
     Onboarding --> Analysis[Career Analysis]
 
-    App --> Dashboard[Scout Command Center]
-    Dashboard --> Assistant[Scout Assistant]
+    App --> Dashboard[Fadi Command Center]
+    Dashboard --> Assistant[Fadi Assistant]
     Dashboard --> Jobs[Job Recommendations]
     Dashboard --> Applications[Application Tracker]
     Dashboard --> Learning[Learning Recommendations]
@@ -34,7 +34,7 @@ flowchart TD
 
 ### Public
 
-- Welcome (Scout introduction)
+- Welcome (Fadi introduction)
 - Login
 - Signup
 
@@ -44,14 +44,14 @@ flowchart TD
 - LinkedIn Import
 - Profile Details
 - Career Goals
-- Niche Discovery and Validation (Scout validates the user's direction)
-- Career Analysis Loading (with Scout narration)
+- Niche Discovery and Validation (Fadi validates the user's direction)
+- Career Analysis Loading (with Fadi narration)
 - Career Analysis Result
 
 ### Authenticated App
 
-- Scout Command Center (main operating surface)
-- Scout Assistant
+- Fadi Command Center (main operating surface)
+- Fadi Assistant
 - Job Recommendations
 - Job Detail
 - Application Tracker
@@ -61,13 +61,13 @@ flowchart TD
 
 ## MVP Navigation
 
-Primary navigation (Scout's domains):
+Primary navigation (Fadi's domains):
 
 - Command Center
 - Jobs
 - Applications
 - Learning
-- Scout (assistant)
+- Fadi (assistant)
 
 Secondary navigation:
 
@@ -77,7 +77,7 @@ Secondary navigation:
 
 ## Phase 2 Additions
 
-- Voice entry point (microphone button) in Scout Command Center and Scout Assistant.
+- Voice entry point (microphone button) in Fadi Command Center and Fadi Assistant.
 - Market Intelligence Hub (once real-time data sources are integrated).
 
 ## Excluded Screens in Phase 1
@@ -95,6 +95,6 @@ Secondary navigation:
 
 ## UX Priority
 
-The first screen after onboarding must be the Scout Command Center, not a generic chat page. Scout is present across every screen, but the command center carries the operating system identity through its action feed, analysis summary, job recommendations, learning path, and application tracker.
+The first screen after onboarding must be the Fadi Command Center, not a generic chat page. Fadi is present across every screen, but the command center carries the operating system identity through its action feed, analysis summary, job recommendations, learning path, and application tracker.
 
 Voice must be designable in Phase 1 even if not implemented: no UI pattern should structurally prevent voice from being added in Phase 2.

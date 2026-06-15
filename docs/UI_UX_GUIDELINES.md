@@ -2,7 +2,7 @@
 
 ## Experience Direction
 
-CareerOS is Scout. Every screen the user sees is Scout's operating surface. The interface is not a dashboard with an AI assistant widget attached — it is the physical form that Scout takes in the browser. The entire product should feel like entering the mind of a calm, intelligent career strategist who is working on your behalf.
+CareerOS is Fadi. Every screen the user sees is Fadi's operating surface. The interface is not a dashboard with an AI assistant widget attached — it is the physical form that Fadi takes in the browser. The entire product should feel like entering the mind of a calm, intelligent career strategist who is working on your behalf.
 
 The interface must never feel like:
 
@@ -16,17 +16,17 @@ The interface must feel like:
 - A mission control center for career growth
 - A professional command hub driven by intelligence
 - A dynamic AI action workspace
-- A personal career strategy environment where Scout is always present
+- A personal career strategy environment where Fadi is always present
 
 ## Core UX Principles
 
-### Scout-First, Always
+### Fadi-First, Always
 
-Scout is present as the central product experience on every screen. The user should always see what Scout is doing, what Scout has prepared, what Scout recommends, and what needs their attention. There is no screen where Scout is absent.
+Fadi is present as the central product experience on every screen. The user should always see what Fadi is doing, what Fadi has prepared, what Fadi recommends, and what needs their attention. There is no screen where Fadi is absent.
 
 ### Low Friction
 
-The product reduces user effort. The user should not need to search, compare, rewrite, track, and remember everything manually. Scout does the heavy lifting; the user approves and adjusts.
+The product reduces user effort. The user should not need to search, compare, rewrite, track, and remember everything manually. Fadi does the heavy lifting; the user approves and adjusts.
 
 ### Action Oriented
 
@@ -34,21 +34,21 @@ Every major screen helps the user answer:
 
 - What is happening?
 - What should I do next?
-- What is Scout doing for me right now?
+- What is Fadi doing for me right now?
 - What needs my approval?
 - What changed since I last logged in?
 
 ### Explainable Intelligence
 
-Scores, rankings, and recommendations include clear reasoning and evidence sources. The user must understand why Scout recommends something — especially when Scout challenges a decision.
+Scores, rankings, and recommendations include clear reasoning and evidence sources. The user must understand why Fadi recommends something — especially when Fadi challenges a decision.
 
 ### Honest, Not Comfortable
 
-Scout's interface reflects Scout's honest-mentor identity. The UI does not hide bad news. If a niche is risky, if a score is low, or if a direction is not supported by data, the interface surfaces that clearly and constructively — with a path forward.
+Fadi's interface reflects Fadi's honest-mentor identity. The UI does not hide bad news. If a niche is risky, if a score is low, or if a direction is not supported by data, the interface surfaces that clearly and constructively — with a path forward.
 
 ### Calm Professionalism
 
-The product feels supportive and strategic, not noisy, gimmicky, or anxious. Scout is calm even when the market is not.
+The product feels supportive and strategic, not noisy, gimmicky, or anxious. Fadi is calm even when the market is not.
 
 ## Main Screens
 
@@ -56,21 +56,21 @@ The product feels supportive and strategic, not noisy, gimmicky, or anxious. Sco
 
 Purpose:
 
-- Introduce Scout as the career operating system.
+- Introduce Fadi as the career operating system.
 - Establish trust.
-- Communicate that Scout will actively work on the user's career.
+- Communicate that Fadi will actively work on the user's career.
 
 Key elements:
 
-- Scout introduction in first person.
+- Fadi introduction in first person.
 - Clear authentication path.
-- Short explanation of what Scout will do after onboarding.
+- Short explanation of what Fadi will do after onboarding.
 
 ### Authentication
 
 Purpose:
 
-- Create a durable account so Scout can remember everything.
+- Create a durable account so Fadi can remember everything.
 
 Current options:
 
@@ -81,14 +81,14 @@ Current options:
 
 Purpose:
 
-- Gather career data AND have Scout begin the first substantive conversation about the user's direction.
+- Gather career data AND have Fadi begin the first substantive conversation about the user's direction.
 
 Key UX requirements:
 
-- Scout guides the process conversationally, not through a cold form sequence.
+- Fadi guides the process conversationally, not through a cold form sequence.
 - Show what data is being gathered and why.
-- Niche discovery: Scout asks about the user's goals, interests, and ambitions.
-- Niche validation: Scout returns a candid assessment of that direction with evidence — not just confirmation.
+- Niche discovery: Fadi asks about the user's goals, interests, and ambitions.
+- Niche validation: Fadi returns a candid assessment of that direction with evidence — not just confirmation.
 - Let users review and correct important profile facts.
 - Keep the process guided, intelligent, and lightweight.
 
@@ -96,7 +96,7 @@ Key UX requirements:
 
 Purpose:
 
-- Present Scout's honest, evidence-grounded understanding of the user's career state and direction.
+- Present Fadi's honest, evidence-grounded understanding of the user's career state and direction.
 
 Key elements:
 
@@ -111,11 +111,11 @@ Key elements:
 
 Purpose:
 
-- The main Scout operating surface after onboarding. This is where the user lives in CareerOS.
+- The main Fadi operating surface after onboarding. This is where the user lives in CareerOS.
 
 Key elements:
 
-- Scout action feed: what Scout has prepared, found, or wants to surface.
+- Fadi action feed: what Fadi has prepared, found, or wants to surface.
 - Priority recommendations with evidence.
 - Active agent tasks and status.
 - Upcoming deadlines.
@@ -129,7 +129,7 @@ Key elements:
 
 Purpose:
 
-- Show Scout-discovered opportunities and explain fit.
+- Show Fadi-discovered opportunities and explain fit.
 
 Key elements:
 
@@ -142,7 +142,7 @@ Key elements:
 
 Purpose:
 
-- Help users prepare, track, and improve applications — with Scout's help.
+- Help users prepare, track, and improve applications — with Fadi's help.
 
 Key elements:
 
@@ -172,7 +172,7 @@ Key elements:
 
 Purpose:
 
-- Show the real-time market context Scout is using to assess the user's direction.
+- Show the real-time market context Fadi is using to assess the user's direction.
 
 Key elements:
 
@@ -187,7 +187,7 @@ Key elements:
 
 Purpose:
 
-- Make Scout's work transparent: what it is doing, what it has prepared, what is pending approval.
+- Make Fadi's work transparent: what it is doing, what it has prepared, what is pending approval.
 
 Key elements:
 
@@ -202,9 +202,9 @@ Key elements:
 
 Preferred patterns:
 
-- Scout conversation cards with evidence inlining.
+- Fadi conversation cards with evidence inlining.
 - AI action feeds with approval queues.
-- Timeline of Scout activity.
+- Timeline of Fadi activity.
 - Voice interaction (Phase 2, Browser Web Speech API).
 - Real-time market signal updates.
 - Smart recommendations with source attribution.
@@ -222,7 +222,7 @@ Avoid:
 
 ## Tone and Content Guidelines
 
-The product voice matches Scout's persona:
+The product voice matches Fadi's persona:
 
 - Intelligent
 - Professional
@@ -232,7 +232,7 @@ The product voice matches Scout's persona:
 - Specific
 - Evidence-backed
 
-Scout should:
+Fadi should:
 
 - Explain reasoning and cite evidence.
 - Surface uncomfortable truths constructively.
@@ -244,11 +244,11 @@ Scout should:
 
 The user must always understand:
 
-- What data Scout has used and where it came from.
-- What Scout recommends and why.
-- When Scout is being contrarian and what data supports that position.
-- What Scout wants to do next.
+- What data Fadi has used and where it came from.
+- What Fadi recommends and why.
+- When Fadi is being contrarian and what data supports that position.
+- What Fadi wants to do next.
 - Whether an action will affect an external system.
 - How to approve, edit, reject, or undo actions.
 
-Scout's transparency is the foundation of trust. Never hide the reasoning.
+Fadi's transparency is the foundation of trust. Never hide the reasoning.

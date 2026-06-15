@@ -2,7 +2,7 @@
  * Hacker News (Algolia Search API) — leading indicator of where tech & AI are
  * heading. Free, no key. We use it as a skill-trend signal: highly-upvoted recent
  * stories mentioning the user's field/skills reveal what the modern industry is
- * moving toward, so Scout can tell the user what to learn next.
+ * moving toward, so Fadi can tell the user what to learn next.
  * https://hn.algolia.com/api
  */
 

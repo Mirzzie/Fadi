@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 /**
  * The OS "Setup Assistant" — a guided path the user follows after logging in.
  * Reflects real state (from getSetupState) and points at the single next move,
- * so CareerOS guides instead of dumping a blank dashboard on a new user.
+ * so FadiOS guides instead of dumping a blank dashboard on a new user.
  */
 export function GuidedSetup({ setup }: { setup: SetupState }) {
   const { steps, completed, total, percent, nextStep } = setup;
@@ -21,7 +21,7 @@ export function GuidedSetup({ setup }: { setup: SetupState }) {
             <Rocket className="size-4" aria-hidden="true" />
           </span>
           <div>
-            <h2 className="text-sm font-semibold tracking-tight">Set up your Career OS</h2>
+            <h2 className="text-sm font-semibold tracking-tight">Set up your FadiOS</h2>
             <p className="text-xs text-muted-foreground">
               {completed} of {total} done — follow the path and I&apos;ll guide each step.
             </p>

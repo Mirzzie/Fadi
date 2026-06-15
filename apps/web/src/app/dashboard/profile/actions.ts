@@ -24,7 +24,7 @@ export type ExtractCvResult = { ok: boolean; message: string; text?: string };
 /**
  * Extract plain text from an uploaded CV (PDF/DOCX/DOC/TXT). The text is
  * returned to the form — NOT saved directly — so the user reviews exactly what
- * was parsed before it becomes the evidence Scout reasons from.
+ * was parsed before it becomes the evidence Fadi reasons from.
  */
 export async function extractCvTextAction(formData: FormData): Promise<ExtractCvResult> {
   const user = await getCurrentAuthUser();

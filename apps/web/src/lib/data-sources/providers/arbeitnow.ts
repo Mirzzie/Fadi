@@ -34,7 +34,7 @@ export class ArbeitnowSource implements JobSource {
   async fetchJobs(query: SignalQuery): Promise<JobPosting[]> {
     try {
       const res = await fetch(ARBEITNOW_API, {
-        headers: { "User-Agent": "CareerOS/1.0 (career intelligence)" },
+        headers: { "User-Agent": "FadiOS/1.0 (career intelligence)" },
         signal: AbortSignal.timeout(8000),
       });
       if (!res.ok) return [];

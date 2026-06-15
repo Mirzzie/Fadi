@@ -15,9 +15,9 @@ import { getRecommendedJobsForUser } from "@/lib/jobs/data";
 import { logger } from "@/lib/observability/logger";
 
 /**
- * Scout's background agency — the pass Scout makes over a user's market without
+ * Fadi's background agency — the pass Fadi makes over a user's market without
  * them asking. Everything it learns is written as agent_findings rows, and the
- * "since you were away" digest is composed ONLY from those rows: Scout never
+ * "since you were away" digest is composed ONLY from those rows: Fadi never
  * claims background work that isn't on this ledger.
  *
  * Triggered two ways, same code path:

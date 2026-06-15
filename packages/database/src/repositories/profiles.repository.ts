@@ -60,7 +60,7 @@ export function createProfilesRepository(db: Database) {
       return profile ?? null;
     },
 
-    /** Toggle Scout's auto-prep (auto-draft the full doc packet when engaging a job). */
+    /** Toggle Fadi's auto-prep (auto-draft the full doc packet when engaging a job). */
     async setAutoPrep(userId: string, enabled: boolean): Promise<Profile | null> {
       const [profile] = await db
         .update(profiles)

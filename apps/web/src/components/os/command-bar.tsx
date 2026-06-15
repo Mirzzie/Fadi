@@ -6,17 +6,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 import { DOCK_APPS } from "./dock";
-import { useScout } from "./scout-presence";
+import { useFadi } from "./fadi-presence";
 
 /**
  * The OS command spotlight (⌘K / Ctrl+K). Two lanes: jump to any app, or just
- * say what you want in plain language and hand it to Scout — the same tool-calling
+ * say what you want in plain language and hand it to Fadi — the same tool-calling
  * agent answers, so there's no second brain to maintain. Opened by the shortcut
- * or the menu-bar affordance (which fires the `scout:command` event).
+ * or the menu-bar affordance (which fires the `fadi:command` event).
  */
 export function CommandBar() {
   const router = useRouter();
-  const { openWithQuery } = useScout();
+  const { openWithQuery } = useFadi();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
@@ -36,10 +36,10 @@ export function CommandBar() {
       setOpen(true);
     }
     window.addEventListener("keydown", onKey);
-    window.addEventListener("scout:command", onTrigger);
+    window.addEventListener("fadi:command", onTrigger);
     return () => {
       window.removeEventListener("keydown", onKey);
-      window.removeEventListener("scout:command", onTrigger);
+      window.removeEventListener("fadi:command", onTrigger);
     };
   }, []);
 
@@ -61,7 +61,7 @@ export function CommandBar() {
   }, [query]);
 
   const hasQuery = query.trim().length > 0;
-  // Row 0 is always "Ask Scout" when there's a query; app rows follow.
+  // Row 0 is always "Ask Fadi" when there's a query; app rows follow.
   const rows = hasQuery ? 1 + apps.length : apps.length;
 
   function run(index: number) {
@@ -112,7 +112,7 @@ export function CommandBar() {
               setActive(0);
             }}
             onKeyDown={onInputKey}
-            placeholder="Search apps, or ask Scout anything…"
+            placeholder="Search apps, or ask Fadi anything…"
             className="h-12 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
           <kbd className="hidden shrink-0 rounded border border-border/60 bg-muted/50 px-1.5 py-0.5 text-[0.65rem] text-muted-foreground sm:inline">
@@ -128,7 +128,7 @@ export function CommandBar() {
               onMouseEnter={() => setActive(0)}
               onClick={() => run(0)}
               icon={<Sparkles className="size-4 text-primary" aria-hidden="true" />}
-              title={`Ask Scout: “${query.trim()}”`}
+              title={`Ask Fadi: “${query.trim()}”`}
               hint="Enter"
               emphasis
             />

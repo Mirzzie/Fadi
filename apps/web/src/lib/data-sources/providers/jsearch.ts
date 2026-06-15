@@ -86,7 +86,7 @@ export class JSearchSource implements JobSource {
         headers: {
           "X-RapidAPI-Key": this.apiKey!,
           "X-RapidAPI-Host": "jsearch.p.rapidapi.com",
-          "User-Agent": "CareerOS/1.0 (career intelligence)",
+          "User-Agent": "FadiOS/1.0 (career intelligence)",
         },
         signal: AbortSignal.timeout(9000),
       });

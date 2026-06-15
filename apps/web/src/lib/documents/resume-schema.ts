@@ -3,7 +3,7 @@ import { z } from "zod";
 import { DEFAULT_SECTION_ORDER, newId, type ResumeData } from "./resume";
 
 /**
- * The shape Scout generates for a tailored resume. No `id`s (we add them) and
+ * The shape Fadi generates for a tailored resume. No `id`s (we add them) and
  * bullets as an array (we join to the editor's newline format). Kept flat and
  * simple so smaller/free models produce valid JSON reliably.
  */

@@ -12,9 +12,9 @@ import { experienceLevelOptions, type OnboardingFormValues } from "@/lib/onboard
 import { logger } from "@/lib/observability/logger";
 
 /**
- * The Scout-led welcome as a REAL AI conversation. Each turn the model both replies
+ * The Fadi-led welcome as a REAL AI conversation. Each turn the model both replies
  * to the user AND tracks the structured fields it has gathered so far + whether
- * it's done — so onboarding feels like talking to Scout, not filling a form, while
+ * it's done — so onboarding feels like talking to Fadi, not filling a form, while
  * staying reliable enough to actually create the profile + first track.
  *
  * Degrades honestly: a brand-new user has no AI key, so this falls back to the
@@ -51,7 +51,7 @@ export type OnboardingChatResult =
     }
   | { ok: false; error: "provider" | "auth"; message: string };
 
-const SYSTEM = `You are Scout, CareerOS's career operating system, welcoming a brand-new user on their first login. Run a warm, BRIEF conversation to set up their first career track.
+const SYSTEM = `You are Fadi, FadiOS's career operating system, welcoming a brand-new user on their first login. Run a warm, BRIEF conversation to set up their first career track.
 
 Collect — conversationally, ONE topic at a time, reacting to each answer before moving on.
 
@@ -68,7 +68,7 @@ OPTIONAL bonuses (ask once, in passing — NEVER block finishing on them; if the
 
 Style: warm, sharp, concise (1-3 sentences). Never dump a list of questions. This serves ANY field — finance, healthcare, trades, tech — not just tech.
 
-Every turn, output: reply (your next message), collected (EVERYTHING gathered so far across the whole conversation — keep a field null until you truly have it), and complete. Set complete=true as soon as you have the five REQUIRED fields — do NOT keep the user waiting for the optional bonuses. NEVER invent, assume, or guess a field — only fill it from what the user actually told you. ONLY when complete is true, make reply a short warm closing line telling them you're setting up their Career OS now; until then, NEVER say you're setting things up.`;
+Every turn, output: reply (your next message), collected (EVERYTHING gathered so far across the whole conversation — keep a field null until you truly have it), and complete. Set complete=true as soon as you have the five REQUIRED fields — do NOT keep the user waiting for the optional bonuses. NEVER invent, assume, or guess a field — only fill it from what the user actually told you. ONLY when complete is true, make reply a short warm closing line telling them you're setting up their FadiOS now; until then, NEVER say you're setting things up.`;
 
 function normalizeExperience(value: string | null): OnboardingFormValues["experienceLevel"] {
   const s = (value ?? "").toLowerCase();
@@ -116,7 +116,7 @@ export async function onboardingChatAction(
       exhausted: isProviderExhausted(err) || isRateLimited(err),
       error: err instanceof Error ? err.message : "unknown",
     });
-    return { ok: false, error: "provider", message: "Scout's AI is unavailable right now." };
+    return { ok: false, error: "provider", message: "Fadi's AI is unavailable right now." };
   }
 
   // Don't depend on the model flipping `complete` — some models never do, which
@@ -166,7 +166,7 @@ export async function onboardingChatAction(
   const firstName = (values.fullName.split(/\s+/)[0] ?? "").trim();
   const closing = turn.complete
     ? turn.reply
-    : `That's everything I need${firstName ? `, ${firstName}` : ""} — setting up your Career OS now.`;
+    : `That's everything I need${firstName ? `, ${firstName}` : ""} — setting up your FadiOS now.`;
   return {
     ok: true,
     reply: closing,

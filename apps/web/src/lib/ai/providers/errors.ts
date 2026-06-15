@@ -83,5 +83,5 @@ export function aiErrorMessage(
   if (/fetch failed|ECONNREFUSED|ENOTFOUND|timeout/i.test(msg)) {
     return `Couldn't reach ${who}. If you're using a local model (Ollama), make sure it's running.`;
   }
-  return `Scout couldn't reach ${who}. Please try again in a moment.`;
+  return `Fadi couldn't reach ${who}. Please try again in a moment.`;
 }

@@ -3,14 +3,14 @@ import "server-only";
 import { createApplicationsRepository } from "@careeros/database";
 
 import { getDatabase } from "@/lib/database/client";
-import type { ScoutTool, ScoutToolContext, ScoutToolResult } from "./types";
+import type { FadiTool, FadiToolContext, FadiToolResult } from "./types";
 
 /**
- * Scout ACTS: add a role to the user's application tracker. Approval-gated by the
+ * Fadi ACTS: add a role to the user's application tracker. Approval-gated by the
  * conversation (the user asked for it) and never sends anything externally —
  * just records it as a "interested" application they can work in the tracker.
  */
-export const trackApplication: ScoutTool = {
+export const trackApplication: FadiTool = {
   name: "track_application",
   description:
     "Add a job to the user's application tracker (records company, role, and optionally the job description). Use when the user says things like 'track this', 'add this job', 'I'm applying to X', or 'save this application'.",
@@ -24,7 +24,7 @@ export const trackApplication: ScoutTool = {
     required: ["company", "title"],
   },
 
-  async execute(args, ctx: ScoutToolContext): Promise<ScoutToolResult> {
+  async execute(args, ctx: FadiToolContext): Promise<FadiToolResult> {
     const company = typeof args.company === "string" ? args.company.trim() : "";
     const title = typeof args.title === "string" ? args.title.trim() : "";
     if (!company || !title) {

@@ -43,7 +43,7 @@ export function createCareerProfilesRepository(db: Database) {
     },
 
     /**
-     * The user's ACTIVE career track — what jobs, the report, documents, and Scout
+     * The user's ACTIVE career track — what jobs, the report, documents, and Fadi
      * should all key off. Falls back to the latest profile when none is flagged
      * active yet (back-compat for rows created before tracks existed).
      */
@@ -177,7 +177,7 @@ export function createCareerProfilesRepository(db: Database) {
       return updated;
     },
 
-    /** Store the Scout-generated role synonyms for a specific track. */
+    /** Store the Fadi-generated role synonyms for a specific track. */
     async setRoleSynonyms(id: string, roleSynonyms: string[]): Promise<void> {
       await db
         .update(careerProfiles)

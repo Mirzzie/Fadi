@@ -73,7 +73,7 @@ export class ReedSource implements JobSource {
       const res = await fetch(`${REED_API}?${params}`, {
         headers: {
           Authorization: `Basic ${auth}`,
-          "User-Agent": "CareerOS/1.0 (career intelligence)",
+          "User-Agent": "FadiOS/1.0 (career intelligence)",
         },
         signal: AbortSignal.timeout(8000),
       });

@@ -2,7 +2,7 @@
 
 ## Decision
 
-The MVP implements a focused Scout career agent: grounded, honest, and product-scoped. It does not yet have full multi-agent orchestration or browser automation, but it expresses Scout's core identity — an honest mentor that validates decisions, explains gaps, and prescribes next steps.
+The MVP implements a focused Fadi career agent: grounded, honest, and product-scoped. It does not yet have full multi-agent orchestration or browser automation, but it expresses Fadi's core identity — an honest mentor that validates decisions, explains gaps, and prescribes next steps.
 
 The MVP agent can answer questions, explain analysis, validate career directions against available data, recommend next actions, and call a small set of internal functions. It cannot yet execute external actions autonomously.
 
@@ -39,7 +39,7 @@ The MVP agent can answer questions, explain analysis, validate career directions
 
 ```mermaid
 flowchart TD
-    User[User Input] --> AssistantAPI[Scout Agent API]
+    User[User Input] --> AssistantAPI[Fadi Agent API]
     AssistantAPI --> Context[Context Builder]
     Context --> Profile[Profile]
     Context --> Analysis[Career Analysis]
@@ -57,7 +57,7 @@ flowchart TD
 
 ## Model Gateway
 
-All AI calls go through the model gateway abstraction. The current provider is OpenAI, but the design allows swapping to Claude, Gemini, or a local model without changing Scout's behavior. No agent code imports provider SDKs directly.
+All AI calls go through the model gateway abstraction. The current provider is OpenAI, but the design allows swapping to Claude, Gemini, or a local model without changing Fadi's behavior. No agent code imports provider SDKs directly.
 
 ## Context Builder
 
@@ -117,7 +117,7 @@ Any function that mutates data must be confirmed by the user in the UI flow.
 
 ## Niche Validation Design
 
-When the user states a career direction, Scout:
+When the user states a career direction, Fadi:
 
 1. Retrieves available market signal data for that role and geography.
 2. Checks for known hype patterns, market contraction signals, or saturation.
@@ -125,7 +125,7 @@ When the user states a career direction, Scout:
 4. If data has concerns: surfaces the concern clearly, explains the market reality, and offers alternatives or a more accurate framing.
 5. Never suppresses a concern to make the user feel better.
 
-This is core to Scout's honest-mentor identity and must never be softened to a generic encouragement response.
+This is core to Fadi's honest-mentor identity and must never be softened to a generic encouragement response.
 
 ## Complexity
 

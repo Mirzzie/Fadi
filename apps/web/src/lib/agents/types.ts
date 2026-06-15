@@ -1,5 +1,5 @@
 import type { AIProvider } from "@/lib/ai/providers/types";
-import type { ScoutUserContext } from "@/lib/ai/context/types";
+import type { FadiUserContext } from "@/lib/ai/context/types";
 
 // ─── Agent types ──────────────────────────────────────────────────────────────
 
@@ -20,7 +20,7 @@ export type AgentType =
 
 export interface AgentContext {
   userId: string;
-  userContext: ScoutUserContext;
+  userContext: FadiUserContext;
   jobId?: string;
   jobTitle?: string;
   jobCompany?: string;
@@ -114,7 +114,7 @@ export interface PendingApproval {
 
 // ─── Agent interface ──────────────────────────────────────────────────────────
 
-export interface ScoutAgent {
+export interface FadiAgent {
   readonly type: AgentType;
   readonly name: string;
   readonly description: string;
@@ -127,7 +127,7 @@ export interface ScoutAgent {
   ): AsyncGenerator<{ delta: string; artifact?: AgentArtifact }>;
 }
 
-// ─── Orchestrator task (what Scout decides to spawn) ────────────────────────────
+// ─── Orchestrator task (what Fadi decides to spawn) ────────────────────────────
 
 export interface OrchestratorDecision {
   agentType: AgentType;

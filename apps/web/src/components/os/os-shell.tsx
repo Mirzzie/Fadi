@@ -3,21 +3,21 @@
 import { usePathname } from "next/navigation";
 
 import { Dock } from "./dock";
-import { ScoutOrb } from "./scout-orb";
+import { FadiOrb } from "./fadi-orb";
 import { MenuBar } from "./menu-bar";
 import { CommandBar } from "./command-bar";
-import { ScoutPresenceProvider } from "./scout-presence";
+import { FadiPresenceProvider } from "./fadi-presence";
 
 /**
  * The OS chrome that wraps every authenticated screen: a top menu bar, a bottom
  * dock, a desktop "wallpaper", a ⌘K command spotlight, and the ambient, always-
- * present Scout orb. There is no Desk/Scout mode split — Scout is everywhere.
- * Pages render in the desktop area; ambient Scout lives in ScoutPresenceProvider.
+ * present Fadi orb. There is no Desk/Fadi mode split — Fadi is everywhere.
+ * Pages render in the desktop area; ambient Fadi lives in FadiPresenceProvider.
  */
 export function OsShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   return (
-    <ScoutPresenceProvider>
+    <FadiPresenceProvider>
       <div className="relative flex min-h-screen flex-col">
         {/* Wallpaper */}
         <div
@@ -40,8 +40,8 @@ export function OsShell({ children }: { children: React.ReactNode }) {
         </main>
         <Dock />
         <CommandBar />
-        <ScoutOrb />
+        <FadiOrb />
       </div>
-    </ScoutPresenceProvider>
+    </FadiPresenceProvider>
   );
 }

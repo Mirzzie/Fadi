@@ -2,13 +2,13 @@
 
 ## Agent Design Goal
 
-The CareerOS agent — Scout — is the operating intelligence of the product. Scout is not a helper feature or a chatbot widget. Scout IS the product. Every screen, action, and data surface exists to express and extend Scout's capabilities.
+The CareerOS agent — Fadi — is the operating intelligence of the product. Fadi is not a helper feature or a chatbot widget. Fadi IS the product. Every screen, action, and data surface exists to express and extend Fadi's capabilities.
 
-Scout acts like a trusted career mentor who can reason, plan, remember, monitor, validate decisions against real data, and execute career workflows with user control.
+Fadi acts like a trusted career mentor who can reason, plan, remember, monitor, validate decisions against real data, and execute career workflows with user control.
 
 ## Core Agent Capabilities
 
-Scout can:
+Fadi can:
 
 - Discover and validate the user's career niche against market data and geo-political context.
 - Challenge bad directions with real evidence, not just confirm what the user wants to hear.
@@ -88,10 +88,10 @@ Examples:
 
 ## Voice Mode (Phase 2)
 
-Scout accepts voice input and provides voice output via the Browser Web Speech API.
+Fadi accepts voice input and provides voice output via the Browser Web Speech API.
 
-- Users can speak naturally to Scout.
-- Scout responds in both voice and text.
+- Users can speak naturally to Fadi.
+- Fadi responds in both voice and text.
 - All approval gates remain in the UI — voice never auto-submits external actions.
 - Voice transcripts are processed for context but not retained as raw audio.
 
@@ -155,7 +155,7 @@ Scout accepts voice input and provides voice output via the Browser Web Speech A
 
 ## Memory Model
 
-Scout remembers:
+Fadi remembers:
 
 - Career goals and stated niche direction
 - Validated and challenged career decisions
@@ -173,14 +173,14 @@ Memory must be editable and inspectable by the user at any time.
 
 ## Pluggable AI Model
 
-Scout's intelligence is powered by an AI model, but the specific model is a replaceable backend. The model gateway abstracts provider-specific APIs. Features, engines, and tools are written against the model gateway interface — not against OpenAI, Claude, or any specific provider.
+Fadi's intelligence is powered by an AI model, but the specific model is a replaceable backend. The model gateway abstracts provider-specific APIs. Features, engines, and tools are written against the model gateway interface — not against OpenAI, Claude, or any specific provider.
 
 Current wiring: OpenAI SDK.
 Supported by design: Anthropic Claude, Google Gemini, local models, future agentic entities.
 
 ## Human Approval Rules
 
-Scout can autonomously analyze, draft, rank, summarize, monitor, and validate. Scout must request user approval before:
+Fadi can autonomously analyze, draft, rank, summarize, monitor, and validate. Fadi must request user approval before:
 
 - Submitting applications.
 - Sending messages.
@@ -192,7 +192,7 @@ Scout can autonomously analyze, draft, rank, summarize, monitor, and validate. S
 
 ## Recommendation Format
 
-Important Scout recommendations include:
+Important Fadi recommendations include:
 
 - Recommended action
 - Reasoning and evidence source
@@ -204,7 +204,7 @@ Important Scout recommendations include:
 
 ## Failure Handling
 
-When Scout is uncertain, blocked, or missing data:
+When Fadi is uncertain, blocked, or missing data:
 
 - State the uncertainty clearly and cite what data is missing.
 - Ask for the smallest useful missing input.

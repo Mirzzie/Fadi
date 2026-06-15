@@ -3,14 +3,14 @@ import { redirect } from "next/navigation";
 import { Sparkles } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { ScoutChat } from "@/components/scout/scout-chat";
+import { FadiChat } from "@/components/fadi/fadi-chat";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getOnboardingStatus } from "@/lib/onboarding/status";
 
-export const metadata: Metadata = { title: "Scout" };
+export const metadata: Metadata = { title: "Fadi" };
 export const dynamic = "force-dynamic";
 
-export default async function ScoutPage() {
+export default async function FadiPage() {
   const user = await getCurrentAuthUser();
   if (!user) redirect("/auth/sign-in");
 
@@ -28,7 +28,7 @@ export default async function ScoutPage() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="font-semibold tracking-tight">Scout</h1>
+                <h1 className="font-semibold tracking-tight">Fadi</h1>
                 <span className="rounded-full bg-emerald-400/15 px-2 py-0.5 text-xs font-medium text-emerald-400">
                   Active
                 </span>
@@ -44,8 +44,8 @@ export default async function ScoutPage() {
         </div>
 
         {/* Chat */}
-        <div className="scout-glow-sm min-h-0 flex-1 overflow-hidden rounded-xl border border-border/60 bg-card">
-          <ScoutChat />
+        <div className="fadi-glow-sm min-h-0 flex-1 overflow-hidden rounded-xl border border-border/60 bg-card">
+          <FadiChat />
         </div>
 
         <p className="shrink-0 text-center text-xs text-muted-foreground">
@@ -53,7 +53,7 @@ export default async function ScoutPage() {
           <a href="/dashboard/settings" className="text-primary hover:underline">
             Settings
           </a>{" "}
-          to wake Scout. Scout never acts externally without your approval.
+          to wake Fadi. Fadi never acts externally without your approval.
         </p>
       </div>
     </AppShell>

@@ -87,7 +87,7 @@ These decisions have been made and should be captured as formal ADRs:
 3. **PostgreSQL as the database**: Docker locally, managed provider for production; all migrations must run against vanilla PostgreSQL.
 4. **Drizzle ORM with committed migrations**: type-safe, SQL-forward, portable; chosen over Prisma for its SQL visibility and service extraction compatibility.
 5. **Pluggable AI model gateway**: OpenAI currently wired; Claude, Gemini, and local models supported by design; no feature code imports provider SDKs directly.
-6. **Scout as the entire product**: not a chatbot widget or a supplementary assistant; the entire UI is Scout's operating surface.
+6. **Fadi as the entire product**: not a chatbot widget or a supplementary assistant; the entire UI is Fadi's operating surface.
 
 ## ADRs Required Before Implementation Expands
 

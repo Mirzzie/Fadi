@@ -10,7 +10,7 @@ const serverEnvSchema = z.object({
   BETTER_AUTH_TRUSTED_ORIGINS: z.string().optional(),
   // Transactional email (password reset / verification). Both required to send.
   RESEND_API_KEY: z.string().optional(),
-  EMAIL_FROM: z.string().optional(), // e.g. "CareerOS <noreply@yourdomain.com>"
+  EMAIL_FROM: z.string().optional(), // e.g. "FadiOS <noreply@yourdomain.com>"
   // Shared secret for the background-agency cron route (/api/agent/run).
   CRON_SECRET: z.string().optional(),
   // Social sign-in (Better Auth) — a provider's buttons appear only when both

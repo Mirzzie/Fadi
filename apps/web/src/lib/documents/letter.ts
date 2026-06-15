@@ -1,7 +1,7 @@
 /**
  * Structured model for the prose document kinds — cover letters, cold emails, and
  * value propositions. Mirrors `resume.ts`: content is stored as JSON, but the
- * parser is tolerant so any legacy plain-text doc (or a Scout draft that's just
+ * parser is tolerant so any legacy plain-text doc (or a Fadi draft that's just
  * prose) opens cleanly with its text in the Body — nothing is ever lost.
  *
  * Fonts/sizes are shared with the resume editor (the same ATS-safe set), so a
@@ -154,7 +154,7 @@ export function resolveLetterSignature(data: LetterData): string {
 }
 
 /**
- * Build the structured form of a Scout draft. The generator returns a complete,
+ * Build the structured form of a Fadi draft. The generator returns a complete,
  * ready-to-use letter/email (its own greeting + sign-off live inside the prose),
  * so we drop the whole thing into the Body and clear the default greeting/sign-off
  * blocks — otherwise the preview/PDF/DOCX would show them twice.

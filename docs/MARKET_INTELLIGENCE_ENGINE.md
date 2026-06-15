@@ -2,9 +2,9 @@
 
 ## Purpose
 
-The Market Intelligence Engine gives Scout's recommendations their factual spine. It monitors labor market signals and translates them into user-specific career context: demand trends, salary intelligence, hiring waves, layoff patterns, industry shifts, geo-political signals, and emerging skill demand.
+The Market Intelligence Engine gives Fadi's recommendations their factual spine. It monitors labor market signals and translates them into user-specific career context: demand trends, salary intelligence, hiring waves, layoff patterns, industry shifts, geo-political signals, and emerging skill demand.
 
-This engine is what separates Scout from a generic career chatbot. Scout's advice is grounded in current data, not static recommendations or fabricated optimism.
+This engine is what separates Fadi from a generic career chatbot. Fadi's advice is grounded in current data, not static recommendations or fabricated optimism.
 
 ## Sources
 
@@ -31,9 +31,9 @@ flowchart TD
     Classify --> Store[(Market Signal Store)]
     Store --> Relevance[User Relevance Matching]
     Profile[User Goals, Location, Industry] --> Relevance
-    Relevance --> Summary[Scout Summary with Source Attribution]
+    Relevance --> Summary[Fadi Summary with Source Attribution]
     Gateway[Model Gateway] --> Summary
-    Summary --> CommandCenter[Scout Command Center]
+    Summary --> CommandCenter[Fadi Command Center]
     Summary --> NicheValidation[Niche Validation Engine]
     Summary --> Recommendations[Recommendation Engine]
 ```
@@ -52,14 +52,14 @@ flowchart TD
 
 ## Real-Time Grounding Requirement
 
-Market intelligence must be grounded in current data. Scout never:
+Market intelligence must be grounded in current data. Fadi never:
 
 - Presents old data as current.
 - Invents market trends that are not sourced.
 - Confirms a niche direction without checking actual hiring signals.
 - Hypes sectors that the data does not support.
 
-Every market output includes source name, source URL, publication date, observed date, and a confidence level. Users can ask Scout to show the evidence behind any market claim.
+Every market output includes source name, source URL, publication date, observed date, and a confidence level. Users can ask Fadi to show the evidence behind any market claim.
 
 ## Phase 1 MVP Version
 
@@ -96,7 +96,7 @@ At scale:
 - Store dates and source attribution on every record.
 - Separate raw signal ingestion from model gateway summarization.
 - Use confidence and freshness scoring for every signal.
-- Connect market signals to Scout's recommendations, not generic news feeds.
+- Connect market signals to Fadi's recommendations, not generic news feeds.
 - Validate that geo-political signals come from authoritative sources.
 - Do not allow market summaries to drift toward generic career advice.
 

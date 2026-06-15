@@ -12,7 +12,7 @@ import { getDatabase } from "@/lib/database/client";
 
 /**
  * The OS guidance layer — "what should I do next?" computed from the user's
- * REAL state, not a static tour. This is how CareerOS turns a login into a
+ * REAL state, not a static tour. This is how FadiOS turns a login into a
  * guided path: personalize → analyze → discover → act. Each step is gated on a
  * concrete artifact existing, so completion is honest (no fake checkmarks).
  */
@@ -20,7 +20,7 @@ import { getDatabase } from "@/lib/database/client";
 export type SetupStep = {
   id: string;
   title: string;
-  /** Scout-voiced one-liner on why this matters / what to do. */
+  /** Fadi-voiced one-liner on why this matters / what to do. */
   description: string;
   href: string;
   cta: string;

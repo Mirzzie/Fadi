@@ -71,7 +71,7 @@ export class AdzunaSource implements JobSource {
 
     try {
       const res = await fetch(`${ADZUNA_API}/${country}/search/1?${params}`, {
-        headers: { "User-Agent": "CareerOS/1.0 (career intelligence)" },
+        headers: { "User-Agent": "FadiOS/1.0 (career intelligence)" },
         signal: AbortSignal.timeout(8000),
       });
       if (!res.ok) return [];

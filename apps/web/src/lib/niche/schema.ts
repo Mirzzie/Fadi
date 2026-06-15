@@ -3,7 +3,7 @@ import { z } from "zod";
 /**
  * Niche Finder — the honest diagnostic for people paralyzed by choice (too many
  * branches in one field, or torn across fields). The user pours in their
- * situation; CareerOS gathers REAL data (live postings + BLS) and Scout returns an
+ * situation; FadiOS gathers REAL data (live postings + BLS) and Fadi returns an
  * un-sugar-coated reality per niche + a pathway, so they waste less time/money.
  */
 
@@ -12,7 +12,7 @@ export const nicheFinderInputSchema = z.object({
   interests: z.string().trim().max(2000).optional().default(""),
   constraints: z.string().trim().max(2000).optional().default(""),
   location: z.string().trim().max(120).optional().default(""),
-  /** Optional candidate niches the user is torn between. Empty → Scout proposes. */
+  /** Optional candidate niches the user is torn between. Empty → Fadi proposes. */
   candidateNiches: z.array(z.string().trim().min(2).max(80)).max(6).optional().default([]),
 });
 export type NicheFinderInput = z.infer<typeof nicheFinderInputSchema>;
@@ -39,7 +39,7 @@ export type NicheEvidence = {
   sources: string[];
 };
 
-/** Stage 2: Scout's honest analysis per niche. Grounded in the evidence above. */
+/** Stage 2: Fadi's honest analysis per niche. Grounded in the evidence above. */
 export const nicheAnalysisSchema = z.object({
   name: z.string(),
   domain: z.string(),

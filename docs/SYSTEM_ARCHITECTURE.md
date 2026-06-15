@@ -2,28 +2,28 @@
 
 ## Architecture Intent
 
-CareerOS is an agentic career operating system where Scout — the AI — is the entire product. The architecture supports persistent user memory, AI reasoning, proactive background workflows, real-time external data ingestion, explainable recommendations, and human approval for all external actions.
+CareerOS is an agentic career operating system where Fadi — the AI — is the entire product. The architecture supports persistent user memory, AI reasoning, proactive background workflows, real-time external data ingestion, explainable recommendations, and human approval for all external actions.
 
-Scout is powered by a pluggable AI core. The architecture never assumes a specific model provider. Claude, GPT, Gemini, local models, or future agentic entities can be swapped into the model gateway layer without changing product behavior.
+Fadi is powered by a pluggable AI core. The architecture never assumes a specific model provider. Claude, GPT, Gemini, local models, or future agentic entities can be swapped into the model gateway layer without changing product behavior.
 
 ## System Principles
 
-- **Scout-first**: there is no non-Scout part of the product. Every screen and workflow expresses Scout's intelligence.
-- **Pluggable AI core**: the model powering Scout is a replaceable backend behind a model gateway abstraction.
-- **User-controlled automation**: Scout may prepare actions autonomously, but sensitive external actions require explicit user approval.
-- **Proactive and always-on**: Scout monitors opportunities, market shifts, and deadlines continuously — not only when the user is actively using the app.
+- **Fadi-first**: there is no non-Fadi part of the product. Every screen and workflow expresses Fadi's intelligence.
+- **Pluggable AI core**: the model powering Fadi is a replaceable backend behind a model gateway abstraction.
+- **User-controlled automation**: Fadi may prepare actions autonomously, but sensitive external actions require explicit user approval.
+- **Proactive and always-on**: Fadi monitors opportunities, market shifts, and deadlines continuously — not only when the user is actively using the app.
 - **Persistent memory**: user preferences, goals, progress, and outcomes improve future recommendations over time.
-- **Explainability**: scores, rankings, and recommendations must include reasoning and evidence, especially when Scout challenges a user's direction.
+- **Explainability**: scores, rankings, and recommendations must include reasoning and evidence, especially when Fadi challenges a user's direction.
 - **Real-time grounding**: market intelligence, job discovery, and trend analysis must be grounded in current data from trusted sources, not static caches.
-- **Honest-no-fake**: Scout never fabricates data, never hypes, never confirms what is not true.
+- **Honest-no-fake**: Fadi never fabricates data, never hypes, never confirms what is not true.
 - **Modular intelligence**: career analysis, job discovery, applications, learning, market intelligence, networking, and motivation are separable domains.
 - **Compliance-aware**: personal data, employment history, profile information, and application activity must be treated as sensitive.
 
 ## High-Level Components
 
-### Scout Interface Layer (Client Experience)
+### Fadi Interface Layer (Client Experience)
 
-The user-facing application is Scout. There is no part of the UI that exists outside of Scout's operating context.
+The user-facing application is Fadi. There is no part of the UI that exists outside of Fadi's operating context.
 
 Interaction modes:
 
@@ -37,7 +37,7 @@ Interaction modes:
 
 ### API Layer (Next.js Server Actions and Route Handlers)
 
-The API layer exposes product capabilities to the Scout interface layer and coordinates authenticated access to user data, agent state, workflow status, documents, and integrations.
+The API layer exposes product capabilities to the Fadi interface layer and coordinates authenticated access to user data, agent state, workflow status, documents, and integrations.
 
 Core responsibilities:
 
@@ -51,7 +51,7 @@ Core responsibilities:
 
 ### Agent Orchestration Layer
 
-The agent orchestration layer is the control plane for Scout. It interprets user intent, retrieves memory, selects tools, coordinates domain engines, requests approvals, executes approved actions, and writes auditable outcomes.
+The agent orchestration layer is the control plane for Fadi. It interprets user intent, retrieves memory, selects tools, coordinates domain engines, requests approvals, executes approved actions, and writes auditable outcomes.
 
 Core responsibilities:
 
@@ -134,7 +134,7 @@ No engine, service, or product feature should directly depend on a specific mode
 ## Conceptual Data Flow
 
 1. The user authenticates with Better Auth.
-2. Scout begins niche discovery and profile intelligence.
+2. Fadi begins niche discovery and profile intelligence.
 3. The system imports or receives resume, LinkedIn, preference, and goal data.
 4. The Career Intelligence Engine creates an initial profile analysis and niche validation.
 5. The AI Memory System stores user facts, preferences, scores, and recommendations.
@@ -151,11 +151,11 @@ No engine, service, or product feature should directly depend on a specific mode
 CareerOS uses progressive automation levels:
 
 - Level 0: User manually asks for help.
-- Level 1: Scout recommends actions and explains reasoning.
-- Level 2: Scout drafts assets for review.
-- Level 3: Scout executes low-risk internal tasks after approval.
-- Level 4: Scout monitors continuously and prepares actions proactively.
-- Level 5: Scout executes pre-authorized workflows within user-defined boundaries.
+- Level 1: Fadi recommends actions and explains reasoning.
+- Level 2: Fadi drafts assets for review.
+- Level 3: Fadi executes low-risk internal tasks after approval.
+- Level 4: Fadi monitors continuously and prepares actions proactively.
+- Level 5: Fadi executes pre-authorized workflows within user-defined boundaries.
 
 External actions always require explicit approval:
 

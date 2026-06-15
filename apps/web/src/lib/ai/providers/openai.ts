@@ -82,7 +82,7 @@ export class OpenAIProvider implements AIProvider {
 
   async chat(messages: AIMessage[], options?: ChatOptions): Promise<string> {
     if (!this.client) {
-      return "Scout is not configured. Add an AI provider and API key in Settings.";
+      return "Fadi is not configured. Add an AI provider and API key in Settings.";
     }
     const response = await this.client.chat.completions.create({
       model: this.model,
@@ -119,7 +119,7 @@ export class OpenAIProvider implements AIProvider {
     if (!this.client) {
       return new ReadableStream<string>({
         start(controller) {
-          controller.enqueue("Scout is not configured. Add an AI provider and API key in Settings.");
+          controller.enqueue("Fadi is not configured. Add an AI provider and API key in Settings.");
           controller.close();
         },
       });

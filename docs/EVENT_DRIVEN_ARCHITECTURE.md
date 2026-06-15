@@ -2,9 +2,9 @@
 
 ## Purpose
 
-CareerOS needs event-driven architecture because Scout is proactive. Profile changes, new job discoveries, market signal changes, deadline arrivals, learning progress, and agent task completions should trigger Scout recommendations and workflows — without requiring the user to manually refresh or ask.
+CareerOS needs event-driven architecture because Fadi is proactive. Profile changes, new job discoveries, market signal changes, deadline arrivals, learning progress, and agent task completions should trigger Fadi recommendations and workflows — without requiring the user to manually refresh or ask.
 
-This is what makes Scout feel like it is working for the user around the clock.
+This is what makes Fadi feel like it is working for the user around the clock.
 
 ## Event Principles
 
@@ -20,7 +20,7 @@ This is what makes Scout feel like it is working for the user around the clock.
 ```mermaid
 flowchart LR
     Services[Domain Services] --> Bus[Event Bus]
-    Bus --> Agent[Scout Agent Workers]
+    Bus --> Agent[Fadi Agent Workers]
     Bus --> Rec[Recommendation Workers]
     Bus --> Memory[Memory Workers]
     Bus --> Analytics[Analytics Pipeline]

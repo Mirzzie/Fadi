@@ -2,9 +2,9 @@
 
 ## Purpose
 
-The CareerOS knowledge graph models relationships between roles, skills, industries, companies, credentials, learning resources, jobs, and career paths. It gives Scout a structured career intelligence layer beyond isolated documents or embeddings.
+The CareerOS knowledge graph models relationships between roles, skills, industries, companies, credentials, learning resources, jobs, and career paths. It gives Fadi a structured career intelligence layer beyond isolated documents or embeddings.
 
-The knowledge graph enables Scout to understand career adjacencies, explain role transitions, identify transferable skills, and validate niche directions with structured reasoning.
+The knowledge graph enables Fadi to understand career adjacencies, explain role transitions, identify transferable skills, and validate niche directions with structured reasoning.
 
 ## Graph Concepts
 

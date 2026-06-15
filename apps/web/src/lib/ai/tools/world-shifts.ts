@@ -10,23 +10,23 @@ import {
   WORLD_SHIFTS_VERSION,
 } from "@/lib/intelligence/world-shifts";
 
-import type { ScoutTool, ScoutToolResult } from "./types";
+import type { FadiTool, FadiToolResult } from "./types";
 
 /**
  * Global-shifts advisory: the curated structural-forces catalog ranked for
  * this user's field, plus live geopolitical/market news scored against their
  * profile. Honest by construction — catalog entries carry sources + review
- * dates, live items come from real feeds, and nothing here predicts. Scout's
+ * dates, live items come from real feeds, and nothing here predicts. Fadi's
  * job on top: scenario-frame ("if this persists, X faces pressure — here's
  * the hedge"), never doom.
  */
-export const getWorldShifts: ScoutTool = {
+export const getWorldShifts: FadiTool = {
   name: "get_world_shifts",
   description:
     "Get the structural global forces (AI disruption, geopolitical fragmentation, inflation, demographics, climate, shock-resilience) ranked for the user's field, plus live news signals scored against their profile. Use when the user asks whether world events should change their career strategy, whether their field is safe/future-proof, about wars/inflation/AI/climate and their career, or for a career direction stress-test.",
   parameters: { type: "object", properties: {} },
 
-  async execute(_args, ctx): Promise<ScoutToolResult> {
+  async execute(_args, ctx): Promise<FadiToolResult> {
     const track = await createCareerProfilesRepository(getDatabase()).getActiveForUser(ctx.userId);
     if (!track?.targetRole) {
       return {

@@ -44,7 +44,7 @@ export type MomentumSummary = {
   recentEvents: ResilienceEvent[];
 };
 
-/** The read model for the dashboard and for Scout's context. Decays to "now". */
+/** The read model for the dashboard and for Fadi's context. Decays to "now". */
 export async function getMomentumSummary(userId: string): Promise<MomentumSummary> {
   const r = repo();
   const state = await r.ensureMomentumState(userId);

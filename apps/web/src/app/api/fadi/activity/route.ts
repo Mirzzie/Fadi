@@ -4,7 +4,7 @@ import { getDatabase } from "@/lib/database/client";
 
 /**
  * The OS activity feed — recent background-agency findings (the auditable ledger
- * behind Scout's "while you were away" work). GET returns the recent feed plus an
+ * behind Fadi's "while you were away" work). GET returns the recent feed plus an
  * unseen count for the menu-bar bell; POST marks everything seen once the user has
  * looked. No generation here: every row traces to an agent_findings entry.
  */

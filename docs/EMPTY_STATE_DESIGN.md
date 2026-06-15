@@ -2,30 +2,30 @@
 
 ## Purpose
 
-Empty states should reduce anxiety, explain why a section is empty, and guide the user toward one useful action. They should not feel like errors or dead ends. All empty states come from Scout — there is no part of CareerOS that exists outside Scout.
+Empty states should reduce anxiety, explain why a section is empty, and guide the user toward one useful action. They should not feel like errors or dead ends. All empty states come from Fadi — there is no part of CareerOS that exists outside Fadi.
 
 ## Empty State Principles
 
-- Scout says what is missing.
-- Scout explains why it matters.
+- Fadi says what is missing.
+- Fadi explains why it matters.
 - Offer one primary action.
-- Keep Scout's tone calm and specific.
+- Keep Fadi's tone calm and specific.
 - Avoid blame.
-- Never use a generic loading spinner without Scout narrating what is happening.
+- Never use a generic loading spinner without Fadi narrating what is happening.
 
-## Scout Command Center Empty State
+## Fadi Command Center Empty State
 
 When onboarding is incomplete:
 
 ```text
-[Scout Command Center]
+[Fadi Command Center]
 Your command center will be ready after your first Career Intelligence Report.
 
-[Scout speaks]
+[Fadi speaks]
 [Continue onboarding button]
 ```
 
-Scout says:
+Fadi says:
 
 > I need your CV, profile details, and career goal before I can build a useful command center. Complete onboarding and I will prepare your first analysis — including an honest assessment of your direction.
 
@@ -45,7 +45,7 @@ No CV uploaded yet.
 [Continue manually]
 ```
 
-Scout says:
+Fadi says:
 
 > A CV helps me understand your experience quickly. If you do not have one ready, you can continue manually and add it later.
 
@@ -69,7 +69,7 @@ No LinkedIn profile added.
 [Skip for now]
 ```
 
-Scout says:
+Fadi says:
 
 > LinkedIn context helps me compare your public profile with your CV. You can skip this now, but the analysis may be less precise.
 
@@ -88,7 +88,7 @@ Not yet assessed.
 [Start niche discovery]
 ```
 
-Scout says:
+Fadi says:
 
 > I have not yet assessed your career direction against market data. This is an important step — it tells you whether the path you are planning is supported by current hiring reality.
 
@@ -107,7 +107,7 @@ No report generated yet.
 [Generate report]
 ```
 
-Scout says:
+Fadi says:
 
 > Once your profile is ready, I can generate your first Career Intelligence Report — with strengths, gaps, an honest niche assessment, learning recommendations, and readiness scores.
 
@@ -127,7 +127,7 @@ No recommendations yet.
 [Update target role]
 ```
 
-Scout says:
+Fadi says:
 
 > I do not have enough job data yet to surface strong matches. Search for a target role or update your goals so I can refine the recommendations.
 
@@ -151,7 +151,7 @@ No applications tracked yet.
 [Add application manually]
 ```
 
-Scout says:
+Fadi says:
 
 > When you save a role or apply somewhere, track it here so I can help you stay organised and follow up.
 
@@ -174,7 +174,7 @@ No learning path yet.
 [Generate from skill gaps]
 ```
 
-Scout says:
+Fadi says:
 
 > I can recommend learning actions after I understand your target role and skill gaps. I prioritise recommendations by what the market currently values most for your direction.
 
@@ -182,18 +182,18 @@ Primary action:
 
 - Generate from skill gaps
 
-## Scout Assistant Empty State
+## Fadi Assistant Empty State
 
 Before the first message:
 
 ```text
-[Scout]
+[Fadi]
 Ask about your report, your direction, your skills, or what to do next.
 
 [Starter prompts]
 ```
 
-Scout says:
+Fadi says:
 
 > Ask me about your career report, your niche assessment, your strongest opportunities, or the fastest way to improve your readiness score. I will give you a straight answer.
 

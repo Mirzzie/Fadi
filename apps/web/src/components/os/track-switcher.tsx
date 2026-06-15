@@ -24,7 +24,7 @@ const INTENTS: Array<{ value: string; label: string; hint: string }> = [
   { value: "part_time", label: "Part-time / gig / side income", hint: "Non-mainstream, student-abroad, freelance." },
 ];
 
-// Domain-agnostic on purpose — CareerOS serves every industry, not just tech.
+// Domain-agnostic on purpose — FadiOS serves every industry, not just tech.
 const DOMAINS = [
   "Information Technology", "Cybersecurity", "Software Development", "Data & Analytics",
   "Finance", "Accounting", "Banking", "Marketing", "Sales", "Healthcare", "Nursing",
@@ -312,7 +312,7 @@ function NewDirectionModal({
                 onChange={(e) => setRoleCluster(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                Comma or line separated. Scout ranks across all of them.
+                Comma or line separated. Fadi ranks across all of them.
               </p>
             </div>
           ) : null}

@@ -1,5 +1,5 @@
 /**
- * Psychological framing for the Resilience Engine — Scout's voice.
+ * Psychological framing for the Resilience Engine — Fadi's voice.
  *
  * Every line here obeys the standing mandate: protect the user's mindset and
  * locus of control. Rules: reward effort the user controls; never shame a dip;
@@ -9,7 +9,7 @@
 
 import type { CadenceAdherence, ForwardMotionKind, MomentumBand } from "./engine";
 
-/** What Scout says when momentum sits in a given band. Honest, never hollow. */
+/** What Fadi says when momentum sits in a given band. Honest, never hollow. */
 export function momentumMessage(band: MomentumBand): string {
   switch (band) {
     case "peak":
@@ -62,7 +62,7 @@ export function cadenceMessage(adherence: CadenceAdherence): string {
 }
 
 /**
- * The rejection autopsy prompts — what Scout asks after a "no". The framing turns
+ * The rejection autopsy prompts — what Fadi asks after a "no". The framing turns
  * a loss into information: data that improves the next application.
  */
 export const REJECTION_AUTOPSY_PROMPTS: ReadonlyArray<{ key: string; question: string }> = [
@@ -86,7 +86,7 @@ export const REJECTION_AUTOPSY_PROMPTS: ReadonlyArray<{ key: string; question: s
 
 /**
  * Honest nudge when self-reported activity looks implausible (anomaly detection).
- * Not an accusation — an invitation to add the real data so Scout can actually help.
+ * Not an accusation — an invitation to add the real data so Fadi can actually help.
  */
 export function anomalyNudge(rejectionsLogged: number, applicationsSent: number): string {
   return `I'm seeing ${rejectionsLogged} rejections but only ${applicationsSent} applications on file. I can't spot a useful pattern without the applications behind them — want to add them? These numbers aren't a score anyone else sees; they only exist so I can read your situation and give you better advice. Inflating them just makes my read worse.`;

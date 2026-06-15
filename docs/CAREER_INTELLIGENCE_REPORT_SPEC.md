@@ -2,7 +2,7 @@
 
 ## Purpose
 
-The Career Intelligence Report is the first major Scout value moment. It should feel like a personal career strategist and honest mentor has reviewed the user's CV, LinkedIn profile, and goals — and returned an accurate, specific, actionable assessment. The report does not just validate goals; it challenges them where the data warrants it.
+The Career Intelligence Report is the first major Fadi value moment. It should feel like a personal career strategist and honest mentor has reviewed the user's CV, LinkedIn profile, and goals — and returned an accurate, specific, actionable assessment. The report does not just validate goals; it challenges them where the data warrants it.
 
 ## Report Inputs
 
@@ -25,7 +25,7 @@ flowchart TD
     CV[CV Data] --> Normalize[Normalize Profile]
     LinkedIn[LinkedIn Data] --> Normalize
     Manual[Manual Profile] --> Normalize
-    Goals[Career Goals] --> Analyze[Scout Career Analysis]
+    Goals[Career Goals] --> Analyze[Fadi Career Analysis]
     MarketData[Available Market Signals] --> NicheValidate[Niche Validation]
     Normalize --> Analyze
     NicheValidate --> Analyze
@@ -36,7 +36,7 @@ flowchart TD
 
 ## Report Sections
 
-### 1. Scout Summary Card
+### 1. Fadi Summary Card
 
 Purpose:
 
@@ -49,7 +49,7 @@ Content:
 - Niche assessment: supported, challenged, or redirected.
 - Evidence basis for the assessment.
 
-Scout copy pattern:
+Fadi copy pattern:
 
 > I see you as a [career identity] with strengths in [strengths]. Your target direction is [target role]. [Honest assessment based on available market data]. The most important thing I noticed is [specific, evidence-grounded insight].
 
@@ -57,7 +57,7 @@ Scout copy pattern:
 
 Purpose:
 
-- Communicate Scout's honest view of the user's career direction, grounded in data.
+- Communicate Fadi's honest view of the user's career direction, grounded in data.
 
 Content:
 
@@ -66,7 +66,7 @@ Content:
 - Source attribution and confidence level.
 - Next step given the assessment.
 
-Scout copy patterns:
+Fadi copy patterns:
 
 Supported: > The data supports your direction in [geography]. [Specific evidence from job data and market signals]. Here is what the realistic path looks like.
 
@@ -107,7 +107,7 @@ Content:
 - Severity.
 - Suggested concrete action.
 
-Scout copy pattern:
+Fadi copy pattern:
 
 > The biggest gap for your target role is [skill or evidence]. This matters because hiring teams for [role] typically expect [requirement]. The fastest way to address it is [specific action].
 
@@ -137,7 +137,7 @@ Content:
 - Source attribution and date.
 - Confidence caveat.
 
-Scout copy pattern:
+Fadi copy pattern:
 
 > From the data available for your geography, demand for [target role] appears [level] based on [source summary]. This is a directional signal. I will update this as better data becomes available in Phase 3.
 
@@ -182,7 +182,7 @@ Score components:
 
 Score range: 0-100.
 
-Scout copy pattern:
+Fadi copy pattern:
 
 > Your resume quality score is [score]/100. The strongest area is [strength]. The biggest improvement is [specific, actionable improvement].
 
@@ -203,7 +203,7 @@ Score components:
 
 Score range: 0-100.
 
-Scout copy pattern:
+Fadi copy pattern:
 
 > Your career readiness score is [score]/100 for [target role]. You are strongest in [strength]. The fastest path to improvement is [specific action].
 
@@ -211,7 +211,7 @@ Scout copy pattern:
 
 Purpose:
 
-- Give the user a concrete ordered plan, not just a score. This is Scout's system prescription.
+- Give the user a concrete ordered plan, not just a score. This is Fadi's system prescription.
 
 Content:
 
@@ -219,7 +219,7 @@ Content:
 - Each step tied to a specific goal, action, and expected outcome.
 - Timeline recommendation.
 
-Scout copy pattern:
+Fadi copy pattern:
 
 > Based on your analysis, here is the system I recommend: First, [specific action and why]. Second, [specific action and why]. Third, [specific action and why]. Follow this for [timeframe] and your readiness score should improve significantly.
 
@@ -230,7 +230,7 @@ Scout copy pattern:
 Career Intelligence Report
 Generated from: CV + LinkedIn + Profile + Market Signals
 
-[Scout Summary Card]
+[Fadi Summary Card]
 "I see you as..." + niche assessment
 
 [Scores]
@@ -283,4 +283,4 @@ Available signal with source and confidence caveat
 - User rates report useful.
 - User engages with niche assessment (reads it, does not immediately dismiss).
 - User clicks a recommended next action or system step.
-- User asks Scout a report-related question.
+- User asks Fadi a report-related question.

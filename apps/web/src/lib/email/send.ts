@@ -70,20 +70,20 @@ export async function sendEmail(message: EmailMessage): Promise<{ ok: boolean }>
   }
 }
 
-/** Plain, human email bodies — same voice rules as everything Scout writes:
+/** Plain, human email bodies — same voice rules as everything Fadi writes:
  *  no hype, no corporate filler, one clear action. */
 export function resetPasswordEmail(url: string): Pick<EmailMessage, "subject" | "text" | "html"> {
   return {
-    subject: "Reset your CareerOS password",
-    text: `Someone (hopefully you) asked to reset your CareerOS password.\n\nReset it here: ${url}\n\nIf this wasn't you, ignore this email — your password is unchanged. The link expires in 1 hour.`,
-    html: `<p>Someone (hopefully you) asked to reset your CareerOS password.</p><p><a href="${url}">Reset your password</a></p><p>If this wasn't you, ignore this email — your password is unchanged. The link expires in 1 hour.</p>`,
+    subject: "Reset your FadiOS password",
+    text: `Someone (hopefully you) asked to reset your FadiOS password.\n\nReset it here: ${url}\n\nIf this wasn't you, ignore this email — your password is unchanged. The link expires in 1 hour.`,
+    html: `<p>Someone (hopefully you) asked to reset your FadiOS password.</p><p><a href="${url}">Reset your password</a></p><p>If this wasn't you, ignore this email — your password is unchanged. The link expires in 1 hour.</p>`,
   };
 }
 
 export function verifyEmailEmail(url: string): Pick<EmailMessage, "subject" | "text" | "html"> {
   return {
-    subject: "Verify your CareerOS email",
-    text: `Confirm this is your email address to secure your CareerOS account.\n\nVerify here: ${url}\n\nIf you didn't create a CareerOS account, ignore this email.`,
-    html: `<p>Confirm this is your email address to secure your CareerOS account.</p><p><a href="${url}">Verify your email</a></p><p>If you didn't create a CareerOS account, ignore this email.</p>`,
+    subject: "Verify your FadiOS email",
+    text: `Confirm this is your email address to secure your FadiOS account.\n\nVerify here: ${url}\n\nIf you didn't create a FadiOS account, ignore this email.`,
+    html: `<p>Confirm this is your email address to secure your FadiOS account.</p><p><a href="${url}">Verify your email</a></p><p>If you didn't create a FadiOS account, ignore this email.</p>`,
   };
 }

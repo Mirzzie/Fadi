@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 export default function ResetPasswordPage() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Card className="scout-glow-sm w-full max-w-md">
+      <Card className="fadi-glow-sm w-full max-w-md">
         <CardHeader>
           <CardTitle className="text-xl">Set a new password</CardTitle>
           <CardDescription>Choose a new password for your account.</CardDescription>

@@ -27,7 +27,7 @@ flowchart LR
     AppAPI --> Reports[Reports Module]
     AppAPI --> Jobs[Jobs Module]
     AppAPI --> Learning[Learning Module]
-    AppAPI --> Assistant[Scout Assistant Module]
+    AppAPI --> Assistant[Fadi Assistant Module]
     AppAPI --> Niche[Niche Validation Module]
 
     Career --> Data[Repository Interfaces]
@@ -157,7 +157,7 @@ All modules share one PostgreSQL database in Phase 1, but ownership is clear:
 | `career_reports` | Career Intelligence |
 | `jobs`, `saved_jobs`, `job_recommendations`, `applications` | Job/Application |
 | `learning_recommendations` | Learning |
-| `agent_messages` | Scout Assistant |
+| `agent_messages` | Fadi Assistant |
 | `market_signals` | Market Intelligence |
 | `events` | Analytics/Telemetry |
 

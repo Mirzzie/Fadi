@@ -230,7 +230,7 @@ Suggested fields:
 
 ### ai_memories
 
-Stores persistent Scout memory.
+Stores persistent Fadi memory.
 
 Suggested fields:
 
@@ -433,7 +433,7 @@ Suggested fields:
 
 ### agent_tasks
 
-Stores Scout work items.
+Stores Fadi work items.
 
 Suggested fields:
 
@@ -453,13 +453,13 @@ Suggested fields:
 
 ### agent_messages
 
-Stores Scout conversation messages.
+Stores Fadi conversation messages.
 
 Suggested fields:
 
 - id
 - user_id
-- role (user, scout, system)
+- role (user, fadi, system)
 - content
 - context_summary
 - created_at

@@ -2,22 +2,22 @@
 
 ## Purpose
 
-This blueprint links the CareerOS architecture documents into one implementation-ready technical foundation. The system is designed as an Agentic AI Career Operating System built around Scout — an AI that IS the entire product, not a widget inside it.
+This blueprint links the CareerOS architecture documents into one implementation-ready technical foundation. The system is designed as an Agentic AI Career Operating System built around Fadi — an AI that IS the entire product, not a widget inside it.
 
 ## Product Architecture North Star
 
-CareerOS is not a chatbot, job board, or ATS. It is an AI operating layer — called Scout — that observes, reasons, validates, recommends, and executes approved career workflows on behalf of users, proactively and around the clock.
+CareerOS is not a chatbot, job board, or ATS. It is an AI operating layer — called Fadi — that observes, reasons, validates, recommends, and executes approved career workflows on behalf of users, proactively and around the clock.
 
 Core architecture themes:
 
-- **Scout is the product**: every screen and workflow expresses Scout's intelligence; there is no non-Scout surface.
-- **Pluggable AI core**: the model powering Scout is a replaceable backend behind a model gateway abstraction; Claude, GPT, Gemini, local models, or future agents can be swapped in.
+- **Fadi is the product**: every screen and workflow expresses Fadi's intelligence; there is no non-Fadi surface.
+- **Pluggable AI core**: the model powering Fadi is a replaceable backend behind a model gateway abstraction; Claude, GPT, Gemini, local models, or future agents can be swapped in.
 - **Real-time grounding**: market intelligence, job discovery, and niche validation must be grounded in current data from trusted third-party APIs — not static caches.
-- **Agent orchestration as the control plane**: Scout plans, tools, memory retrieval, and workflow execution are coordinated by an orchestration layer.
-- **Event-driven workflows for proactive behavior**: profile changes, market signals, new jobs, and deadlines trigger Scout actions without user intervention.
-- **Persistent, inspectable memory**: Scout remembers the user's career trajectory and adapts over time.
+- **Agent orchestration as the control plane**: Fadi plans, tools, memory retrieval, and workflow execution are coordinated by an orchestration layer.
+- **Event-driven workflows for proactive behavior**: profile changes, market signals, new jobs, and deadlines trigger Fadi actions without user intervention.
+- **Persistent, inspectable memory**: Fadi remembers the user's career trajectory and adapts over time.
 - **Domain engines**: career, jobs, applications, learning, market, networking, recommendations, and motivation are separable domains each owned by a dedicated engine.
-- **Strict safety and approval controls**: all external actions are approval-gated; Scout never acts externally without user consent.
+- **Strict safety and approval controls**: all external actions are approval-gated; Fadi never acts externally without user consent.
 - **Multi-tenant SaaS foundations**: designed to serve millions of users from day one in architecture, even while building for first 100 in implementation.
 - **Voice as a core channel**: voice interaction (Browser Web Speech API) is Phase 2, not a future maybe.
 
@@ -25,7 +25,7 @@ Core architecture themes:
 
 ```mermaid
 flowchart TD
-    ScoutUX[Scout Interface] --> API[Next.js API Layer]
+    FadiUX[Fadi Interface] --> API[Next.js API Layer]
     API --> Agent[Agent Orchestration]
     Agent --> Memory[Memory System]
     Agent --> Rec[Recommendation Engine]
@@ -56,14 +56,14 @@ flowchart TD
 
 ### Foundation
 
-- [PROJECT_INIT.md](PROJECT_INIT.md): product vision, Scout identity, modules, and long-term maturity.
+- [PROJECT_INIT.md](PROJECT_INIT.md): product vision, Fadi identity, modules, and long-term maturity.
 - [SYSTEM_ARCHITECTURE.md](SYSTEM_ARCHITECTURE.md): system architecture with pluggable AI core and real-time data layer.
 - [AGENT_FRAMEWORK.md](AGENT_FRAMEWORK.md): agent modes, tools, memory, and approval rules.
 - [DATABASE_SCHEMA.md](DATABASE_SCHEMA.md): conceptual data model.
 - [API_INTEGRATIONS.md](API_INTEGRATIONS.md): integration landscape and constraints.
-- [UI_UX_GUIDELINES.md](UI_UX_GUIDELINES.md): Scout-first UX direction.
+- [UI_UX_GUIDELINES.md](UI_UX_GUIDELINES.md): Fadi-first UX direction.
 - [MVP_ROADMAP.md](MVP_ROADMAP.md): phased product roadmap.
-- [AI_PERSONA_DESIGN.md](AI_PERSONA_DESIGN.md): Scout persona, behavior, and guardrails.
+- [AI_PERSONA_DESIGN.md](AI_PERSONA_DESIGN.md): Fadi persona, behavior, and guardrails.
 
 ### Implementation Architecture
 

@@ -3,21 +3,21 @@
 import { ArrowUpRight, Sparkles, X } from "lucide-react";
 import Link from "next/link";
 
-import { ScoutChat } from "@/components/scout/scout-chat";
+import { FadiChat } from "@/components/fadi/fadi-chat";
 import { cn } from "@/lib/utils";
-import { useScout, type ScoutState } from "./scout-presence";
+import { useFadi, type FadiState } from "./fadi-presence";
 
 /**
- * The ambient, *living* Scout — present on every screen. It's not a button you
+ * The ambient, *living* Fadi — present on every screen. It's not a button you
  * press to "enter assistant mode"; it's a companion that breathes while idle,
  * reacts when it listens, shimmers while it thinks, and proactively surfaces what
  * the background agency found (the nudge bubble). Clicking it — or saying
- * "Hey Scout" — expands the conversation. The chat engine is unchanged; the orb
- * only reflects Scout's live state and hands off seeded questions from ⌘K.
+ * "Hey Fadi" — expands the conversation. The chat engine is unchanged; the orb
+ * only reflects Fadi's live state and hands off seeded questions from ⌘K.
  */
-export function ScoutOrb() {
-  const { open, openScout, closeScout, state, setState, voiceNonce, seed, nudge, dismissNudge } =
-    useScout();
+export function FadiOrb() {
+  const { open, openFadi, closeFadi, state, setState, voiceNonce, seed, nudge, dismissNudge } =
+    useFadi();
 
   return (
     <>
@@ -51,15 +51,15 @@ export function ScoutOrb() {
           </div>
         ) : null}
 
-        <OrbButton state={state} onClick={openScout} />
+        <OrbButton state={state} onClick={openFadi} />
       </div>
 
       {/* Conversation panel */}
       {open ? (
         <div className="fixed inset-0 z-50">
           <button
-            aria-label="Close Scout"
-            onClick={closeScout}
+            aria-label="Close Fadi"
+            onClick={closeFadi}
             className="absolute inset-0 bg-black/50 backdrop-blur-sm"
           />
           <div className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-border/60 bg-card shadow-2xl duration-300 animate-in slide-in-from-right">
@@ -67,14 +67,14 @@ export function ScoutOrb() {
               <div className="flex items-center gap-2">
                 <OrbButton state={state} size="sm" />
                 <div className="leading-tight">
-                  <span className="block text-sm font-semibold">Scout</span>
+                  <span className="block text-sm font-semibold">Fadi</span>
                   <span className="block text-[0.65rem] text-muted-foreground">
                     {STATE_LABEL[state]}
                   </span>
                 </div>
               </div>
               <button
-                onClick={closeScout}
+                onClick={closeFadi}
                 aria-label="Close"
                 className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
               >
@@ -82,7 +82,7 @@ export function ScoutOrb() {
               </button>
             </div>
             <div className="min-h-0 flex-1">
-              <ScoutChat
+              <FadiChat
                 autoListenNonce={voiceNonce}
                 seed={seed}
                 onStateChange={setState}
@@ -95,7 +95,7 @@ export function ScoutOrb() {
   );
 }
 
-const STATE_LABEL: Record<ScoutState, string> = {
+const STATE_LABEL: Record<FadiState, string> = {
   idle: "Active",
   listening: "Listening…",
   thinking: "Thinking…",
@@ -112,7 +112,7 @@ function OrbButton({
   onClick,
   size = "lg",
 }: {
-  state: ScoutState;
+  state: FadiState;
   onClick?: () => void;
   size?: "sm" | "lg";
 }) {
@@ -120,7 +120,7 @@ function OrbButton({
   const Wrapper = onClick ? "button" : "div";
   return (
     <Wrapper
-      {...(onClick ? { type: "button" as const, onClick, "aria-label": "Open Scout" } : {})}
+      {...(onClick ? { type: "button" as const, onClick, "aria-label": "Open Fadi" } : {})}
       className={cn(
         "group relative grid place-items-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.66_0.22_285)] shadow-xl ring-2 ring-primary/30",
         onClick && "transition-transform hover:scale-105 active:scale-95",
@@ -134,14 +134,14 @@ function OrbButton({
           "absolute inset-0 rounded-full bg-primary/30",
           state === "listening" || state === "speaking"
             ? "animate-ping [animation-duration:1.4s]"
-            : "scout-breathe",
+            : "fadi-breathe",
         )}
       />
       {/* Thinking/working shimmer ring */}
       {active && state !== "listening" ? (
         <span
           aria-hidden="true"
-          className="absolute -inset-1 rounded-full border border-primary/40 scout-orbit"
+          className="absolute -inset-1 rounded-full border border-primary/40 fadi-orbit"
         />
       ) : null}
       <Sparkles

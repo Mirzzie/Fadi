@@ -1,7 +1,7 @@
 /**
  * Live job/news sources return HTML descriptions (Remotive, Arbeitnow, etc.).
  * We store and surface plain text, so strip tags + decode the common entities
- * here at the normalization seam — every consumer (job card, Scout context,
+ * here at the normalization seam — every consumer (job card, Fadi context,
  * workspace) then gets clean, readable copy instead of raw `<p>` soup.
  */
 

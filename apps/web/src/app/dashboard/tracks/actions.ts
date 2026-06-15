@@ -10,7 +10,7 @@ import { logger } from "@/lib/observability/logger";
 
 /**
  * Career tracks — the user's parallel career directions. A track IS a
- * career_profiles row; exactly one is active and drives jobs/report/docs/Scout.
+ * career_profiles row; exactly one is active and drives jobs/report/docs/Fadi.
  * These actions back the menu-bar track switcher + the "New direction" flow.
  */
 

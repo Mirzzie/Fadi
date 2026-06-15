@@ -44,8 +44,8 @@ export default async function SettingsPage() {
                 </span>
               </h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Scout works with any provider. Bring your own key — it&apos;s encrypted at rest and
-                only ever used to power your Scout.
+                Fadi works with any provider. Bring your own key — it&apos;s encrypted at rest and
+                only ever used to power your Fadi.
               </p>
             </div>
           </div>

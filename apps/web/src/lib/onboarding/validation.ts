@@ -27,7 +27,7 @@ export type OnboardingFormValues = z.infer<typeof onboardingFormSchema>;
  * Lenient server-side completion schema. Onboarding only needs the five
  * essentials to bootstrap a career track; resume + LinkedIn are optional
  * enrichments the OS collects afterward (see the OS guidance layer). The
- * Scout-led conversation can't reliably extract a pasted CV/LinkedIn, and the
+ * Fadi-led conversation can't reliably extract a pasted CV/LinkedIn, and the
  * strict form schema blocking on them stranded new users on "Setting things
  * up…". The manual form still enforces `onboardingFormSchema` client-side, so
  * this only loosens the conversational path.

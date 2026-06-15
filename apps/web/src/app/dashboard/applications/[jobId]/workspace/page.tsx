@@ -81,7 +81,7 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
           <JobLivenessBanner jobId={job.id} jobUrl={job.url} />
         </div>
 
-        {/* Auto-prep — if the user opted in, Scout drafts the packet on open */}
+        {/* Auto-prep — if the user opted in, Fadi drafts the packet on open */}
         {profile?.autoPrepEnabled ? (
           <div className="shrink-0">
             <AutoPrepRunner jobId={job.id} enabled hasDocs={jobDocs.length > 0} />

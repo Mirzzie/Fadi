@@ -6,7 +6,7 @@ CareerOS
 
 ## Vision
 
-CareerOS is an agentic AI-first career operating system. It is not a job board, an applicant tracking system, or a chatbot. It is a living, proactive career intelligence platform where Scout — the AI — IS the product. Every screen, action, and data surface in CareerOS is Scout.
+CareerOS is an agentic AI-first career operating system. It is not a job board, an applicant tracking system, or a chatbot. It is a living, proactive career intelligence platform where Fadi — the AI — IS the product. Every screen, action, and data surface in CareerOS is Fadi.
 
 The product should feel like a dedicated AI career professional working for the user 24 hours a day: discovering opportunities, validating niche decisions, surfacing market intelligence, building proof of work, and advancing the user's career even when they are not actively using the app.
 
@@ -16,34 +16,34 @@ Traditional career platforms ask users to search, compare, apply, track, learn, 
 
 Core product contrasts:
 
-- Traditional platforms are search-first; CareerOS is agent-first — Scout acts, the user approves.
+- Traditional platforms are search-first; CareerOS is agent-first — Fadi acts, the user approves.
 - Traditional platforms react to user input; CareerOS proactively monitors and surfaces what matters.
 - Traditional dashboards show data; CareerOS interprets data, validates decisions, and prescribes action.
-- Traditional tools fragment resumes, applications, learning, and market research; CareerOS unifies them under one operating intelligence called Scout.
+- Traditional tools fragment resumes, applications, learning, and market research; CareerOS unifies them under one operating intelligence called Fadi.
 
-## What Scout Is
+## What Fadi Is
 
-Scout is not a chatbot widget or corner overlay. Scout is the entire CareerOS system. There is no non-Scout part of the product. The UI renders Scout's intelligence; the data layer feeds Scout; the agent layer executes Scout's actions.
+Fadi is not a chatbot widget or corner overlay. Fadi is the entire CareerOS system. There is no non-Fadi part of the product. The UI renders Fadi's intelligence; the data layer feeds Fadi; the agent layer executes Fadi's actions.
 
 ### Pluggable AI Core
 
-CareerOS is the product layer. The AI model powering Scout is a replaceable backend. Scout can be driven by Claude, GPT, Gemini, local models, or future agentic entities. No feature design should hard-code model-specific assumptions.
+CareerOS is the product layer. The AI model powering Fadi is a replaceable backend. Fadi can be driven by Claude, GPT, Gemini, local models, or future agentic entities. No feature design should hard-code model-specific assumptions.
 
 ### Multi-Modal
 
-Scout is voice and text. The user can speak to Scout and Scout speaks back. Text interaction ships in Phase 1. Voice interaction via the Browser Web Speech API ships in Phase 2. Voice is core to Scout's identity.
+Fadi is voice and text. The user can speak to Fadi and Fadi speaks back. Text interaction ships in Phase 1. Voice interaction via the Browser Web Speech API ships in Phase 2. Voice is core to Fadi's identity.
 
 ### Always-On and Proactive
 
-Scout works in the background 24x7 even when the user is offline. It discovers opportunities, monitors market shifts, tracks deadlines, and prepares actions for the user's review.
+Fadi works in the background 24x7 even when the user is offline. It discovers opportunities, monitors market shifts, tracks deadlines, and prepares actions for the user's review.
 
 ### Honest Mentor, Not an Assistant
 
-Scout is a trusted mentor and guru — not a yes-man. It gives sometimes contrarian, fact-checked advice. It validates decisions against geo-political context, job market reality, and current affairs. It tells the user when something is hype, when a niche is declining, and when a pivot would serve them better.
+Fadi is a trusted mentor and guru — not a yes-man. It gives sometimes contrarian, fact-checked advice. It validates decisions against geo-political context, job market reality, and current affairs. It tells the user when something is hype, when a niche is declining, and when a pivot would serve them better.
 
 ## Primary Goal
 
-Create a zero-friction career growth experience where users receive high-value career guidance grounded in real-time data. Scout should continuously:
+Create a zero-friction career growth experience where users receive high-value career guidance grounded in real-time data. Fadi should continuously:
 
 - Discover relevant career opportunities, events, and communities.
 - Validate and challenge career niche decisions with market evidence.
@@ -58,9 +58,9 @@ Create a zero-friction career growth experience where users receive high-value c
 
 ## Core Experience
 
-Scout is the central interface of CareerOS. The product experience should feel like entering a career command center where Scout is the operating system. There is no part of the UI that exists separately from Scout.
+Fadi is the central interface of CareerOS. The product experience should feel like entering a career command center where Fadi is the operating system. There is no part of the UI that exists separately from Fadi.
 
-Scout must be able to:
+Fadi must be able to:
 
 - Speak and listen (Phase 2, Browser Web Speech API).
 - Analyze user data and external market signals grounded in current data.
@@ -77,11 +77,11 @@ Scout must be able to:
 
 ### 1. Welcome Experience
 
-Scout introduces itself and communicates what it will do.
+Fadi introduces itself and communicates what it will do.
 
 Example tone:
 
-> I am Scout, your career operating system. I will help you find and validate your niche, discover opportunities, build proof of work, and create a concrete system for advancing your career. I work 24x7 on your behalf. Let's start.
+> I am Fadi, your career operating system. I will help you find and validate your niche, discover opportunities, build proof of work, and create a concrete system for advancing your career. I work 24x7 on your behalf. Let's start.
 
 ### 2. Authentication
 
@@ -89,7 +89,7 @@ Authentication is required. The system depends on durable user identity, memory,
 
 ### 3. Profile Discovery
 
-Scout gathers and normalizes career profile data:
+Fadi gathers and normalizes career profile data:
 
 - LinkedIn profile data or guided profile creation
 - Resume or CV data
@@ -101,18 +101,18 @@ Scout gathers and normalizes career profile data:
 
 ### 4. Niche Discovery and Validation
 
-Scout does not accept the user's stated goal at face value. It validates the goal against:
+Fadi does not accept the user's stated goal at face value. It validates the goal against:
 
 - Current job market data for the user's geography
 - Geo-political and economic context
 - Industry trends and signal data
 - The user's actual transferable skills and experience
 
-Scout then either confirms the direction with evidence, challenges it with data, or proposes alternatives worth exploring. This is the honest mentor moment.
+Fadi then either confirms the direction with evidence, challenges it with data, or proposes alternatives worth exploring. This is the honest mentor moment.
 
 ### 5. AI Career Analysis
 
-Scout produces an initial career intelligence report:
+Fadi produces an initial career intelligence report:
 
 - Career identity and positioning summary
 - Professional strengths grounded in evidence
@@ -141,7 +141,7 @@ Scout produces an initial career intelligence report:
 3. Profile Discovery
 4. Niche Discovery and Validation
 5. Career Analysis
-6. Career Command Center (main Scout operating surface)
+6. Career Command Center (main Fadi operating surface)
 7. Opportunity Center
 8. Application Workspace
 9. Networking Guide
@@ -152,13 +152,13 @@ Scout produces an initial career intelligence report:
 
 ## Personalisation by Career Stage
 
-Scout delivers completely different experiences for:
+Fadi delivers completely different experiences for:
 
 - **Fresh graduates**: guidance on building a first professional identity, where to start, what to build.
 - **Mid-career switchers**: validation of the pivot, bridge-building, transferable skills reframing.
 - **Experienced professionals**: senior market intelligence, executive networking, strategic positioning.
 
-Scout adapts to the user's geography, language, industry, and pace.
+Fadi adapts to the user's geography, language, industry, and pace.
 
 ## Long-Term Vision
 
@@ -172,4 +172,4 @@ CareerOS should evolve across five maturity stages:
 
 The final product promise:
 
-> I have a dedicated AI career professional working for me around the clock. I don't search for jobs. Scout does.
+> I have a dedicated AI career professional working for me around the clock. I don't search for jobs. Fadi does.

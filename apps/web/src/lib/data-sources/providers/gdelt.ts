@@ -84,7 +84,7 @@ export class GdeltSource implements SignalSource {
 
     try {
       const res = await fetch(`${GDELT_DOC_API}?${params}`, {
-        headers: { "User-Agent": "CareerOS/1.0 (career intelligence)" },
+        headers: { "User-Agent": "FadiOS/1.0 (career intelligence)" },
         signal: AbortSignal.timeout(8000),
       });
       if (!res.ok) return null;

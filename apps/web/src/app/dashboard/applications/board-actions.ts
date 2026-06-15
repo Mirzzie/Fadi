@@ -91,7 +91,7 @@ export async function updateApplicationAction(
   }
 }
 
-/** Scout drafts a document for THIS application — saved + linked to it. */
+/** Fadi drafts a document for THIS application — saved + linked to it. */
 export async function generateApplicationDocumentAction(
   applicationId: string,
   kind: DocKind,
@@ -106,7 +106,7 @@ export async function generateApplicationDocumentAction(
 
     const generate = await getUserDocGenerate(user.id);
     if (!generate) {
-      return { ok: false, message: "Connect an AI provider in Settings to let Scout draft documents." };
+      return { ok: false, message: "Connect an AI provider in Settings to let Fadi draft documents." };
     }
 
     const doc = await generateCareerDocument(
@@ -128,6 +128,6 @@ export async function generateApplicationDocumentAction(
       userId: user.id,
       error: error instanceof Error ? error.message : "unknown",
     });
-    return { ok: false, message: "Scout couldn't draft that. Check your AI provider and try again." };
+    return { ok: false, message: "Fadi couldn't draft that. Check your AI provider and try again." };
   }
 }

@@ -68,7 +68,7 @@ describe("letter model", () => {
     expect(resolveLetterSignature({ ...d, signature: "M. Casual" })).toBe("M. Casual");
   });
 
-  it("builds a structured letter from a plain Scout draft without doubling the greeting/sign-off", () => {
+  it("builds a structured letter from a plain Fadi draft without doubling the greeting/sign-off", () => {
     const d = letterFromText("  Hi Jane,\n\nI'd love to chat.\n\nThanks,\nMira  ", "email");
     expect(d.body).toBe("Hi Jane,\n\nI'd love to chat.\n\nThanks,\nMira");
     // The draft carries its own salutation + sign-off, so the structured blocks

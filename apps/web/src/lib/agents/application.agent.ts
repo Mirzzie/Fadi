@@ -1,5 +1,5 @@
 import type { AIProvider } from "@/lib/ai/providers/types";
-import { formatScoutContextAsPrompt } from "@/lib/ai/context/builder";
+import { formatFadiContextAsPrompt } from "@/lib/ai/context/builder";
 import { HUMANIZE_CORE, HUMANIZE_PROSE, HUMANIZE_RESUME } from "@/lib/documents/humanize";
 
 import type {
@@ -8,7 +8,7 @@ import type {
   AgentTask,
   AgentTool,
   AgentToolResult,
-  ScoutAgent,
+  FadiAgent,
 } from "./types";
 
 // ─── Tools ────────────────────────────────────────────────────────────────────
@@ -145,7 +145,7 @@ const researchCompanyTool: AgentTool = {
 
 // ─── Agent ────────────────────────────────────────────────────────────────────
 
-export class ApplicationAgent implements ScoutAgent {
+export class ApplicationAgent implements FadiAgent {
   readonly type = "application" as const;
   readonly name = "Application Agent";
   readonly description =
@@ -161,9 +161,9 @@ export class ApplicationAgent implements ScoutAgent {
   ];
 
   buildSystemPrompt(context: AgentContext): string {
-    const userContextBlock = formatScoutContextAsPrompt(context.userContext);
+    const userContextBlock = formatFadiContextAsPrompt(context.userContext);
 
-    return `You are Scout's Application Agent — a specialized sub-agent activated for a specific job application.
+    return `You are Fadi's Application Agent — a specialized sub-agent activated for a specific job application.
 
 Your sole focus is helping the user prepare the strongest possible application for this role:
 
@@ -197,7 +197,7 @@ You can generate and iterate on:
 - Be direct: if the user is underqualified for this role, say so constructively and help them anyway
 
 ## Tools
-When the user asks to generate a document, call the appropriate tool and then produce the full document content in your response. The user reviews and approves before anything leaves CareerOS.
+When the user asks to generate a document, call the appropriate tool and then produce the full document content in your response. The user reviews and approves before anything leaves FadiOS.
 
 ---
 

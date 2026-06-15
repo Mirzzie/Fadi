@@ -4,7 +4,7 @@ import { Suspense } from "react";
 
 import { AuthForm } from "@/components/auth/auth-form";
 import { SocialButtons } from "@/components/auth/social-buttons";
-import { ScoutBadge } from "@/components/ui/scout-badge";
+import { FadiBadge } from "@/components/ui/fadi-badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { SocialProvider } from "@/lib/auth/social";
 
@@ -13,14 +13,14 @@ type AuthShellProps = {
   socialProviders?: SocialProvider[];
 };
 
-const signUpScoutPoints = [
+const signUpFadiPoints = [
   "Analyze your resume and LinkedIn profile",
   "Surface jobs that match your actual skills",
   "Build a learning path to close your gaps",
   "Track every application in one place",
 ];
 
-const signInScoutPoints = [
+const signInFadiPoints = [
   "Check for new job matches since your last visit",
   "Review any updated career recommendations",
   "Continue your active learning path",
@@ -29,7 +29,7 @@ const signInScoutPoints = [
 
 export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
   const isSignUp = mode === "sign-up";
-  const scoutPoints = isSignUp ? signUpScoutPoints : signInScoutPoints;
+  const fadiPoints = isSignUp ? signUpFadiPoints : signInFadiPoints;
 
   return (
     <div className="relative flex min-h-screen flex-col bg-background">
@@ -62,7 +62,7 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
             <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
               <Sparkles className="size-4 text-primary-foreground" aria-hidden="true" />
             </div>
-            <span className="font-semibold tracking-tight">CareerOS</span>
+            <span className="font-semibold tracking-tight">FadiOS</span>
           </Link>
         </div>
       </header>
@@ -71,24 +71,24 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
       <main className="relative z-10 flex flex-1 items-center justify-center px-4 py-12 sm:px-6">
         <div className="grid w-full max-w-4xl gap-10 lg:grid-cols-[1fr_420px] lg:items-center">
 
-          {/* Left — Scout intro */}
+          {/* Left — Fadi intro */}
           <div className="hidden space-y-8 lg:block">
             <div className="space-y-4">
-              <ScoutBadge size="md" />
+              <FadiBadge size="md" />
               <h1 className="text-3xl font-semibold tracking-tight">
                 {isSignUp
                   ? "Your career agent is ready to start."
-                  : "Welcome back. Scout has been working."}
+                  : "Welcome back. Fadi has been working."}
               </h1>
               <p className="text-muted-foreground leading-relaxed">
                 {isSignUp
-                  ? "Create your account and Scout will immediately begin analyzing your profile, finding opportunities, and building your career intelligence."
-                  : "Sign in and Scout will brief you on everything it found since you were last here."}
+                  ? "Create your account and Fadi will immediately begin analyzing your profile, finding opportunities, and building your career intelligence."
+                  : "Sign in and Fadi will brief you on everything it found since you were last here."}
               </p>
             </div>
 
             <ul className="space-y-3">
-              {scoutPoints.map((point) => (
+              {fadiPoints.map((point) => (
                 <li key={point} className="flex items-start gap-3 text-sm">
                   <CheckCircle2
                     className="mt-0.5 size-4 shrink-0 text-primary"
@@ -101,7 +101,7 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
 
             <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
               <p className="text-xs text-muted-foreground leading-relaxed">
-                <span className="font-medium text-primary">Scout never acts without your approval.</span>{" "}
+                <span className="font-medium text-primary">Fadi never acts without your approval.</span>{" "}
                 Every external action — applications, messages, profile updates — requires your
                 explicit sign-off.
               </p>
@@ -109,7 +109,7 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
           </div>
 
           {/* Right — Form */}
-          <Card className="scout-glow-sm w-full">
+          <Card className="fadi-glow-sm w-full">
             <CardHeader>
               <CardTitle className="text-xl">
                 {isSignUp ? "Create your account" : "Welcome back"}
@@ -117,7 +117,7 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
               <CardDescription>
                 {isSignUp
                   ? "Start your first Career Intelligence Report."
-                  : "Return to your CareerOS workspace."}
+                  : "Return to your FadiOS workspace."}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -132,7 +132,7 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
                 <AuthForm mode={mode} />
               </Suspense>
               <p className="text-center text-sm text-muted-foreground">
-                {isSignUp ? "Already have an account?" : "New to CareerOS?"}{" "}
+                {isSignUp ? "Already have an account?" : "New to FadiOS?"}{" "}
                 <Link
                   href={isSignUp ? "/auth/sign-in" : "/auth/sign-up"}
                   className="font-medium text-primary underline-offset-4 hover:underline"

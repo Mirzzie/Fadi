@@ -11,7 +11,7 @@ export function SiteHeader() {
           <div className="flex size-8 items-center justify-center rounded-lg bg-primary">
             <Sparkles className="size-4 text-primary-foreground" aria-hidden="true" />
           </div>
-          <span className="font-semibold tracking-tight">CareerOS</span>
+          <span className="font-semibold tracking-tight">FadiOS</span>
         </Link>
         <nav className="flex items-center gap-2">
           <Link href="/auth/sign-in" className={buttonVariants({ variant: "ghost", size: "sm" })}>

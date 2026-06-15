@@ -3,7 +3,7 @@
  * source. Wraps the existing `getLaborMarketSnapshot()` (national unemployment,
  * JOLTS openings, quits) so that data — today only used at career-report time —
  * also flows through the live market-intelligence fan-out onto the dashboard and
- * into Scout's per-message context. Keyless (BLS v1); a BLS_API_KEY upgrades the
+ * into Fadi's per-message context. Keyless (BLS v1); a BLS_API_KEY upgrades the
  * underlying call to v2 (handled inside the labor module).
  *
  * The labor module is `server-only`, so it's pulled via dynamic import inside

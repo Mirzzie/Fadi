@@ -78,7 +78,7 @@ function distinctiveTokens(value: string | null | undefined) {
  *    so any role matches directly;
  *  - every role in an exploration track's `roleCluster` (the user's own related
  *    titles, in any field);
- *  - `roleSynonyms` — equivalent title phrases Scout generated for THIS track's
+ *  - `roleSynonyms` — equivalent title phrases Fadi generated for THIS track's
  *    field (e.g. nurse → "staff nurse", "rn"; finance → "fp&a analyst"). This
  *    replaces the old hardcoded IT-only map, so a nurse or accountant gets the
  *    same quality of title-variant matching an IT seeker does. When no synonyms
@@ -104,7 +104,7 @@ function roleFamilyTerms(
     if (phrase.length >= 4) terms.add(phrase);
   }
 
-  // Scout-generated equivalents for this track's field (domain-agnostic).
+  // Fadi-generated equivalents for this track's field (domain-agnostic).
   for (const s of roleSynonyms ?? []) {
     const phrase = normalize(s).trim();
     if (phrase.length >= 2) terms.add(phrase);

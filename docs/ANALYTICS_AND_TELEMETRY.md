@@ -2,12 +2,12 @@
 
 ## Purpose
 
-Analytics and telemetry help CareerOS improve product quality, Scout's intelligence quality, recommendation usefulness, system performance, and business health — while respecting user privacy.
+Analytics and telemetry help CareerOS improve product quality, Fadi's intelligence quality, recommendation usefulness, system performance, and business health — while respecting user privacy.
 
 ## Measurement Categories
 
 - Product analytics
-- Scout task and agent telemetry
+- Fadi task and agent telemetry
 - Recommendation analytics
 - AI quality metrics
 - Model gateway cost and performance metrics
@@ -21,7 +21,7 @@ Analytics and telemetry help CareerOS improve product quality, Scout's intellige
 flowchart TD
     App[Application Events] --> Collector[Event Collector]
     Services[Service Metrics] --> Collector
-    Agent[Scout Agent Traces] --> Collector
+    Agent[Fadi Agent Traces] --> Collector
     Gateway[Model Gateway Metrics] --> Collector
     Collector --> Stream[Analytics Stream]
     Stream --> Warehouse[(Data Warehouse)]
@@ -44,9 +44,9 @@ Product:
 - Opportunity saved
 - Application asset generated
 - Learning plan created
-- Scout assistant questions asked
+- Fadi assistant questions asked
 
-Scout/Agent:
+Fadi/Agent:
 
 - Task created
 - Task completed
@@ -63,7 +63,7 @@ Quality:
 - Recommendation dismissal reason
 - Generated asset edited heavily (indicator of poor quality)
 - Match explanation feedback
-- Honest-assessment engagement (did user engage with contrarian Scout output?)
+- Honest-assessment engagement (did user engage with contrarian Fadi output?)
 
 ## Phase 1 MVP Version
 
@@ -71,7 +71,7 @@ Quality:
 - Capture model gateway usage metadata and cost estimates.
 - Capture key conversion funnels (onboarding → niche → report → jobs).
 - Never store sensitive raw text in analytics: no resume content, LinkedIn text, prompt content, or salary data in events.
-- Track niche validation outcomes to calibrate Scout's honest-mentor accuracy over time.
+- Track niche validation outcomes to calibrate Fadi's honest-mentor accuracy over time.
 
 ## Future Scale Version
 
@@ -81,7 +81,7 @@ At scale:
 - Experimentation platform.
 - AI evaluation dashboards.
 - Niche validation calibration pipeline.
-- Anomaly detection for Scout task failures.
+- Anomaly detection for Fadi task failures.
 - Privacy-preserving aggregate cohort analytics.
 - Real-time operational dashboards.
 
@@ -93,7 +93,7 @@ At scale:
 - Include user stage, plan, and feature context.
 - Track user consent for analytics where required.
 - Make telemetry sampling configurable.
-- Add niche validation accuracy tracking as a first-class quality metric — it is core to Scout's identity.
+- Add niche validation accuracy tracking as a first-class quality metric — it is core to Fadi's identity.
 
 ## Complexity
 
@@ -104,7 +104,7 @@ At scale:
 ## Implementation Order
 
 1. Define event taxonomy (include niche validation events).
-2. Add product and Scout agent events.
+2. Add product and Fadi agent events.
 3. Add model gateway usage tracking.
 4. Add basic product funnel dashboards.
 5. Add niche validation quality metrics.

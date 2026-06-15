@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Recruiter-grounded formatting guidance (2026 data), shown right in the editor
- * so Scout's advice is visible where it matters. Honest and sourced — not opinion:
+ * so Fadi's advice is visible where it matters. Honest and sourced — not opinion:
  * fonts that pass ATS, recruiter size norms, and a length call based on the
  * user's real experience level.
  */

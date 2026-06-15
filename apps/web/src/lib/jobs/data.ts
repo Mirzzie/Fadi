@@ -36,7 +36,7 @@ export async function getRecommendedJobsForUser(
     resumesRepository.getLatestForUser(userId),
   ]);
 
-  // First time we score this track, have Scout generate domain-agnostic role
+  // First time we score this track, have Fadi generate domain-agnostic role
   // synonyms (nurse → "staff nurse", "rn"; finance → "fp&a analyst") and store
   // them, so title-variant matching is as good for any field as it is for tech.
   // Best-effort + one-time (cached on the track); no AI provider → skip and fall

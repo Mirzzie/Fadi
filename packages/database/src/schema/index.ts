@@ -144,7 +144,7 @@ export const profiles = pgTable(
     email: text("email").notNull(),
     onboardingCompleted: boolean("onboarding_completed").notNull().default(false),
     onboardingCompletedAt: timestamp("onboarding_completed_at", { withTimezone: true }),
-    // When on, Scout auto-prepares the full document packet (CV, cover letter,
+    // When on, Fadi auto-prepares the full document packet (CV, cover letter,
     // cold email, value proposition) the moment a user engages a job, instead
     // of waiting to be asked. Opt-in — defaults off so we never surprise users.
     autoPrepEnabled: boolean("auto_prep_enabled").notNull().default(false),
@@ -186,12 +186,12 @@ export const careerProfiles = pgTable(
     /** For exploration tracks: several target roles to cast a wide net (fresher "any entry role"). */
     roleCluster: jsonb("role_cluster").$type<string[]>(),
     /**
-     * Scout-generated equivalent job-title phrases for THIS track's role(s), used
+     * Fadi-generated equivalent job-title phrases for THIS track's role(s), used
      * to match title variants — domain-agnostic (works for nursing, finance,
      * trades, tech alike), replacing the old hardcoded IT-only synonym map.
      */
     roleSynonyms: jsonb("role_synonyms").$type<string[]>(),
-    /** The one track currently driving jobs/report/documents/Scout for this user. */
+    /** The one track currently driving jobs/report/documents/Fadi for this user. */
     isActive: boolean("is_active").notNull().default(false),
     ...timestamps,
   },
@@ -375,7 +375,7 @@ export const applications = pgTable(
     company: text("company").notNull(),
     title: text("title").notNull(),
     url: text("url"),
-    // Pasted job description — the context Scout tailors documents against.
+    // Pasted job description — the context Fadi tailors documents against.
     jobDescription: text("job_description"),
     status: text("status").notNull().default("saved"),
     priority: text("priority").notNull().default("medium"),
@@ -449,7 +449,7 @@ export const momentumStates = pgTable(
     // Commitment cadence the user set for themselves (their terms, not ours).
     cadenceTarget: integer("cadence_target"), // quality applications per period
     cadencePeriod: text("cadence_period").notNull().default("week"),
-    // Deliberate rest that pauses decay — Scout protects momentum during recovery.
+    // Deliberate rest that pauses decay — Fadi protects momentum during recovery.
     restingUntil: timestamp("resting_until", { withTimezone: true }),
     ...timestamps,
   },
@@ -543,7 +543,7 @@ export const userAiSettings = pgTable(
   (table) => [uniqueIndex("user_ai_settings_user_id_idx").on(table.userId)]
 );
 
-// Career documents Scout helps create — resumes, cover letters, emails, value
+// Career documents Fadi helps create — resumes, cover letters, emails, value
 // propositions. Optionally tied to a specific job/application. Rich-text body
 // stored as `content`; exported to PDF/DOCX on demand. Saved, versionable,
 // downloadable — the backbone of the document workspace.
@@ -592,9 +592,9 @@ export const resumeTemplates = pgTable(
   (table) => [index("resume_templates_user_id_idx").on(table.userId)]
 );
 
-// Scout's background agency. One agent_runs row per pass Scout makes over a user's
+// Fadi's background agency. One agent_runs row per pass Fadi makes over a user's
 // market while they're away; agent_findings are the auditable evidence behind
-// the "since you were away" digest — Scout may only claim what a finding records.
+// the "since you were away" digest — Fadi may only claim what a finding records.
 export const agentRuns = pgTable(
   "agent_runs",
   {

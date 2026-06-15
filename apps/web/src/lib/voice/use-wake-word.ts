@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
- * Continuous "Hey Scout" wake-word listener (browser Web Speech API). When
+ * Continuous "Hey Fadi" wake-word listener (browser Web Speech API). When
  * enabled it listens in the background and fires `onWake` when it hears the
  * phrase, then keeps listening. Honest limits: Chrome/Edge only, needs mic
  * permission, and only works while the tab is open (a web app can't listen when
@@ -27,7 +27,7 @@ type SpeechWindow = {
   webkitSpeechRecognition?: new () => WebSpeechRecognition;
 };
 
-const WAKE_PATTERNS = [/\bhey,?\s*scout\b/i, /\bhi,?\s*scout\b/i, /\bok,?\s*scout\b/i, /\bhey,?\s* ky\b/i];
+const WAKE_PATTERNS = [/\bhey,?\s*fadi\b/i, /\bhi,?\s*fadi\b/i, /\bok,?\s*fadi\b/i, /\bhey,?\s* ky\b/i];
 
 function isSupported(): boolean {
   return (
@@ -83,8 +83,8 @@ export function useWakeWord(onWake: () => void) {
       }
       if (WAKE_PATTERNS.some((p) => p.test(heard))) {
         // Release the mic first (disable so onend won't auto-restart), THEN
-        // summon Scout — otherwise the wake listener and Scout's own recogniser
-        // fight over the microphone and one aborts. User re-toggles "Hey Scout"
+        // summon Fadi — otherwise the wake listener and Fadi's own recogniser
+        // fight over the microphone and one aborts. User re-toggles "Hey Fadi"
         // after the conversation, which is honest, single-mic behaviour.
         enabledRef.current = false;
         setEnabled(false);
@@ -95,7 +95,7 @@ export function useWakeWord(onWake: () => void) {
 
     recognition.onerror = (event) => {
       if (event.error === "not-allowed") {
-        setError("Microphone access denied. Allow it to use “Hey Scout”.");
+        setError("Microphone access denied. Allow it to use “Hey Fadi”.");
         stop();
       }
       // "no-speech"/"aborted" are normal; onend will restart.

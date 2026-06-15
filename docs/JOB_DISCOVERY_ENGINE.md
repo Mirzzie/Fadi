@@ -2,9 +2,9 @@
 
 ## Purpose
 
-The Job Discovery Engine is Scout's always-on opportunity radar. It proactively finds, normalizes, deduplicates, monitors, ranks, and explains job opportunities for each user — continuously, not only when the user is logged in.
+The Job Discovery Engine is Fadi's always-on opportunity radar. It proactively finds, normalizes, deduplicates, monitors, ranks, and explains job opportunities for each user — continuously, not only when the user is logged in.
 
-This is not a search feature the user triggers. Scout monitors the job market 24x7 on the user's behalf and surfaces what matters.
+This is not a search feature the user triggers. Fadi monitors the job market 24x7 on the user's behalf and surfaces what matters.
 
 ## Sources
 
@@ -36,7 +36,7 @@ flowchart TD
     Profile[User Profile and Goals] --> Match
     Match --> Explain[Match Explanation]
     Gateway[Model Gateway] --> Explain
-    Explain --> Opportunities[Scout Opportunity Surface]
+    Explain --> Opportunities[Fadi Opportunity Surface]
     Opportunities --> Feedback[Save, Reject, Apply]
     Feedback --> Events[Event Bus]
     Background[Background Workers — 24x7] --> Ingest
@@ -80,11 +80,11 @@ flowchart TD
 The job discovery engine runs in the background:
 
 - Scheduled ingestion workers poll sources at appropriate intervals.
-- New high-fit jobs trigger a notification to the Scout action feed.
+- New high-fit jobs trigger a notification to the Fadi action feed.
 - Market shifts (sudden hiring surges or layoffs) are surfaced via the market intelligence integration.
 - The engine learns from user save/reject feedback to improve future matches.
 
-Background workers emit events to the event bus, which triggers Scout recommendation updates without user input.
+Background workers emit events to the event bus, which triggers Fadi recommendation updates without user input.
 
 ## Phase 1 MVP Version
 

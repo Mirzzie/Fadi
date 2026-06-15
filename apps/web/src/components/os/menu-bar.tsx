@@ -6,16 +6,16 @@ import { useEffect, useState } from "react";
 import { useWakeWord } from "@/lib/voice/use-wake-word";
 import { cn } from "@/lib/utils";
 import { ActivityCenter } from "./activity-center";
-import { summonScout, useScout, type ScoutState } from "./scout-presence";
+import { summonFadi, useFadi, type FadiState } from "./fadi-presence";
 import { TrackSwitcher } from "./track-switcher";
 import { UserMenu } from "./user-menu";
 
-/** Top menu bar — the OS's persistent identity strip: brand, track, live Scout
- *  state, the ⌘K spotlight, "Hey Scout", clock, and the user menu. Scout is
- *  ambient now, so there's no Desk/Scout mode toggle. */
+/** Top menu bar — the OS's persistent identity strip: brand, track, live Fadi
+ *  state, the ⌘K spotlight, "Hey Fadi", clock, and the user menu. Fadi is
+ *  ambient now, so there's no Desk/Fadi mode toggle. */
 export function MenuBar() {
-  const { state } = useScout();
-  const wake = useWakeWord(summonScout);
+  const { state } = useFadi();
+  const wake = useWakeWord(summonFadi);
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -30,13 +30,13 @@ export function MenuBar() {
 
   return (
     <header className="sticky top-0 z-40 flex h-9 items-center justify-between border-b border-border/60 bg-background/80 px-3 text-xs backdrop-blur-md duration-500 animate-in fade-in slide-in-from-top-2">
-      {/* Brand + live Scout state */}
+      {/* Brand + live Fadi state */}
       <div className="flex items-center gap-2">
         <div className="grid size-5 place-items-center rounded-md bg-gradient-to-br from-primary to-[oklch(0.66_0.22_285)]">
           <Sparkles className="size-3 text-primary-foreground" aria-hidden="true" />
         </div>
-        <span className="font-semibold tracking-tight">Career OS</span>
-        <ScoutStateChip state={state} />
+        <span className="font-semibold tracking-tight">FadiOS</span>
+        <FadiStateChip state={state} />
         <span className="text-muted-foreground/50">/</span>
         <TrackSwitcher />
       </div>
@@ -46,7 +46,7 @@ export function MenuBar() {
         {/* ⌘K command spotlight */}
         <button
           type="button"
-          onClick={() => window.dispatchEvent(new Event("scout:command"))}
+          onClick={() => window.dispatchEvent(new Event("fadi:command"))}
           title="Search or command (⌘K)"
           className="flex items-center gap-2 rounded-full border border-border/70 bg-muted/40 px-2.5 py-1 font-medium text-muted-foreground transition-colors hover:text-foreground"
         >
@@ -57,13 +57,13 @@ export function MenuBar() {
           </kbd>
         </button>
 
-        {/* "Hey Scout" wake word */}
+        {/* "Hey Fadi" wake word */}
         {wake.supported ? (
           <button
             type="button"
             onClick={wake.toggle}
             aria-pressed={wake.enabled}
-            title={wake.enabled ? 'Listening for "Hey Scout" — click to stop' : 'Enable "Hey Scout" voice'}
+            title={wake.enabled ? 'Listening for "Hey Fadi" — click to stop' : 'Enable "Hey Fadi" voice'}
             className={cn(
               "flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium transition-colors",
               wake.enabled
@@ -76,7 +76,7 @@ export function MenuBar() {
             ) : (
               <MicOff className="size-3" aria-hidden="true" />
             )}
-            <span className="hidden sm:inline">Hey Scout</span>
+            <span className="hidden sm:inline">Hey Fadi</span>
           </button>
         ) : null}
 
@@ -88,16 +88,16 @@ export function MenuBar() {
   );
 }
 
-const STATE_TEXT: Record<ScoutState, string> = {
-  idle: "Scout active",
+const STATE_TEXT: Record<FadiState, string> = {
+  idle: "Fadi active",
   listening: "Listening…",
   thinking: "Thinking…",
   working: "Working…",
   speaking: "Speaking…",
 };
 
-/** Live status dot + label reflecting Scout's ambient state. */
-function ScoutStateChip({ state }: { state: ScoutState }) {
+/** Live status dot + label reflecting Fadi's ambient state. */
+function FadiStateChip({ state }: { state: FadiState }) {
   const busy = state !== "idle";
   return (
     <span className="hidden items-center gap-1.5 text-muted-foreground sm:flex">

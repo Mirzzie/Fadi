@@ -9,9 +9,9 @@ import { autoPrepJobAction } from "@/app/dashboard/applications/[jobId]/workspac
 type RunState = "idle" | "running" | "done" | "error";
 
 /**
- * Fires Scout auto-prep when the user opens a role they've engaged — but only if
+ * Fires Fadi auto-prep when the user opens a role they've engaged — but only if
  * they've opted in (`enabled`) and the packet isn't already started
- * (`hasDocs`). Fire-once, non-blocking: the workspace is fully usable while Scout
+ * (`hasDocs`). Fire-once, non-blocking: the workspace is fully usable while Fadi
  * drafts in the background; when it finishes we refresh to reveal the docs.
  */
 export function AutoPrepRunner({
@@ -54,7 +54,7 @@ export function AutoPrepRunner({
       {state === "running" ? (
         <>
           <Loader2 className="size-4 shrink-0 animate-spin text-primary" aria-hidden="true" />
-          <span>Scout is preparing your application packet — CV, cover letter, cold email, and value proposition…</span>
+          <span>Fadi is preparing your application packet — CV, cover letter, cold email, and value proposition…</span>
         </>
       ) : state === "done" ? (
         <>

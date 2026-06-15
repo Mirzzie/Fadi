@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
-import { useScout } from "./scout-presence";
+import { useFadi } from "./fadi-presence";
 
 type Finding = {
   id: string;
@@ -28,10 +28,10 @@ const KIND_LABEL: Record<string, string> = {
  * OS-native notification center — the auditable feed of what the background agency
  * actually did (agent_findings). The bell shows an unseen count; opening it marks
  * them seen. The freshest unseen finding also becomes the orb's proactive nudge,
- * so Scout surfaces it without being asked.
+ * so Fadi surfaces it without being asked.
  */
 export function ActivityCenter() {
-  const { showNudge, dismissNudge } = useScout();
+  const { showNudge, dismissNudge } = useFadi();
   const [open, setOpen] = useState(false);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [unseen, setUnseen] = useState(0);
@@ -44,7 +44,7 @@ export function ActivityCenter() {
   // the background agency keeps logging findings.
   const load = useCallback(async () => {
     try {
-      const res = await fetch("/api/scout/activity");
+      const res = await fetch("/api/fadi/activity");
       if (!res.ok) return;
       const data = (await res.json()) as { unseenCount: number; findings: Finding[] };
       setFindings(data.findings);
@@ -100,7 +100,7 @@ export function ActivityCenter() {
     setFindings((prev) => prev.map((f) => ({ ...f, seen: true })));
     dismissNudge();
     nudgedFor.current = null;
-    void fetch("/api/scout/activity", { method: "POST" });
+    void fetch("/api/fadi/activity", { method: "POST" });
   }, [unseen, dismissNudge]);
 
   function toggle() {
@@ -137,7 +137,7 @@ export function ActivityCenter() {
         >
           <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2">
             <Sparkles className="size-3.5 text-primary" aria-hidden="true" />
-            <span className="text-xs font-semibold">Scout activity</span>
+            <span className="text-xs font-semibold">Fadi activity</span>
           </div>
           {findings.length > 0 ? (
             <ul className="max-h-80 divide-y divide-border/40 overflow-y-auto">
@@ -173,7 +173,7 @@ export function ActivityCenter() {
             </ul>
           ) : (
             <p className="px-3 py-6 text-center text-xs text-muted-foreground">
-              Nothing yet. Scout will log what it finds while you&apos;re away.
+              Nothing yet. Fadi will log what it finds while you&apos;re away.
             </p>
           )}
         </div>

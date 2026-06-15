@@ -43,7 +43,7 @@ function getSafeAuthMessage(message?: string) {
 }
 
 function getDefaultDisplayName(email: string) {
-  return email.split("@")[0] ?? "CareerOS user";
+  return email.split("@")[0] ?? "FadiOS user";
 }
 
 export function AuthForm({ mode }: AuthFormProps) {

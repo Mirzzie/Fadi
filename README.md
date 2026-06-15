@@ -91,3 +91,4 @@ npm run build
 ## Engineering Rule
 
 Keep the MVP small enough for one developer to operate. New database access should go through repository/service modules, and user-owned domain data should remain linked to the app-owned `users.id`.
+

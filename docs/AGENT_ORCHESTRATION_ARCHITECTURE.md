@@ -2,9 +2,9 @@
 
 ## Purpose
 
-The Agent Orchestration Layer is the control plane for Scout. It interprets user intent, retrieves memory, selects tools, coordinates domain engines, requests approvals, executes approved actions, and writes auditable outcomes.
+The Agent Orchestration Layer is the control plane for Fadi. It interprets user intent, retrieves memory, selects tools, coordinates domain engines, requests approvals, executes approved actions, and writes auditable outcomes.
 
-This is not a chatbot loop. It is a workflow orchestration system with AI planning inside explicit product and safety boundaries. Scout is the product; this layer is what makes Scout intelligent and proactive.
+This is not a chatbot loop. It is a workflow orchestration system with AI planning inside explicit product and safety boundaries. Fadi is the product; this layer is what makes Fadi intelligent and proactive.
 
 ## Responsibilities
 
@@ -22,7 +22,7 @@ This is not a chatbot loop. It is a workflow orchestration system with AI planni
 
 ```mermaid
 flowchart TD
-    ScoutUI[Scout Interface] --> API[API Gateway]
+    FadiUI[Fadi Interface] --> API[API Gateway]
     API --> Router[Intent and Event Router]
     Router --> Planner[Agent Planner]
     Planner --> Context[Context Builder]
@@ -36,7 +36,7 @@ flowchart TD
     Gateway --> Model[Pluggable AI Model]
     Engines --> Results[Task Results]
     Results --> Explainer[Explanation Builder]
-    Explainer --> ScoutUI
+    Explainer --> FadiUI
     Results --> Events[Event Bus]
     Events --> MemoryWriter[Memory Writer]
     Events --> Analytics[Telemetry]
@@ -117,7 +117,7 @@ Use an event bus for durable async workflows and a workflow engine for long-runn
 
 ## Background Monitoring Architecture
 
-Scout works 24x7. Background workers:
+Fadi works 24x7. Background workers:
 
 - Check job sources for new opportunities matching the user's profile.
 - Monitor market signal sources for relevant changes.

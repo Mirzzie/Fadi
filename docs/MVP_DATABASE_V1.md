@@ -229,13 +229,13 @@ Fields:
 
 ### agent_messages
 
-Stores Scout conversation messages.
+Stores Fadi conversation messages.
 
 Fields:
 
 - id
 - user_id
-- role (text: user, scout, system)
+- role (text: user, fadi, system)
 - content
 - context_summary
 - created_at

@@ -1,9 +1,9 @@
 /**
  * Structural global forces that reshape careers — the honest, curated backbone
- * behind Scout's "should I rethink my strategy given what's happening in the
+ * behind Fadi's "should I rethink my strategy given what's happening in the
  * world?" advice. Same model as doc-guidance: VERSIONED and dated, sourced
  * from named 2026 publications, refreshed by bumping the version — never
- * presented as prediction. Scout layers live signals (GDELT news, BLS) on top;
+ * presented as prediction. Fadi layers live signals (GDELT news, BLS) on top;
  * this catalog provides the structural context those point-signals lack.
  *
  * Psychological-lens rule (non-negotiable): every shift names BOTH the
@@ -194,7 +194,7 @@ export function relevantShiftsFor(targetRole: string, domain?: string | null): S
   return scored.sort((a, b) => order[a.relation] - order[b.relation]);
 }
 
-/** Compact prompt block — the structural backdrop for Scout / the niche finder. */
+/** Compact prompt block — the structural backdrop for Fadi / the niche finder. */
 export function formatShiftsForPrompt(ranked: ShiftRelevance[], max = 4): string {
   return ranked
     .slice(0, max)

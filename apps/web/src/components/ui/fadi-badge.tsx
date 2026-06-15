@@ -2,13 +2,13 @@ import { Sparkles } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-type ScoutBadgeProps = {
+type FadiBadgeProps = {
   size?: "xs" | "sm" | "md" | "lg";
   showName?: boolean;
   className?: string;
 };
 
-export function ScoutBadge({ size = "sm", showName = true, className }: ScoutBadgeProps) {
+export function FadiBadge({ size = "sm", showName = true, className }: FadiBadgeProps) {
   const avatarSize = {
     xs: "size-5",
     sm: "size-7",
@@ -57,7 +57,7 @@ export function ScoutBadge({ size = "sm", showName = true, className }: ScoutBad
         />
       </div>
       {showName ? (
-        <span className={cn("font-semibold text-primary", nameSize)}>Scout</span>
+        <span className={cn("font-semibold text-primary", nameSize)}>Fadi</span>
       ) : null}
     </div>
   );

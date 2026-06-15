@@ -11,8 +11,8 @@ export type CreateAgentMessageInput = {
 };
 
 /**
- * Scout conversation memory. One row per turn (user / assistant), so Scout's chat
- * persists across sessions and is shared between Desk and Scout modes (both load
+ * Fadi conversation memory. One row per turn (user / assistant), so Fadi's chat
+ * persists across sessions and is shared between Desk and Fadi modes (both load
  * the same history).
  */
 export function createAgentMessagesRepository(db: Database) {

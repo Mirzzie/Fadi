@@ -7,10 +7,10 @@ import { getCurrentAuthUser } from "@/lib/auth/session";
 import { buildProviderChain } from "@/lib/ai/registry";
 import { getUserProviderConfigs } from "@/lib/ai/user-settings";
 import { createResilientChatStream } from "@/lib/ai/resilient";
-import { buildScoutContext } from "@/lib/ai/context/builder";
-import { buildScoutMessages } from "@/lib/ai/prompts/system";
-import { executeScoutTool, getScoutTools } from "@/lib/ai/tools/registry";
-import { toToolSpec, type ScoutToolContext } from "@/lib/ai/tools/types";
+import { buildFadiContext } from "@/lib/ai/context/builder";
+import { buildFadiMessages } from "@/lib/ai/prompts/system";
+import { executeFadiTool, getFadiTools } from "@/lib/ai/tools/registry";
+import { toToolSpec, type FadiToolContext } from "@/lib/ai/tools/types";
 import { createAgentMessagesRepository } from "@careeros/database";
 import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
@@ -60,33 +60,33 @@ export async function POST(req: NextRequest) {
   const { message, history } = parsed.data;
 
   // Build context
-  // Live market signals (GDELT/HN/Remotive) are cached, so Scout's answers stay
+  // Live market signals (GDELT/HN/Remotive) are cached, so Fadi's answers stay
   // grounded in real data without per-message fetch latency.
-  const context = await buildScoutContext(user.id, { includeLiveMarket: true });
+  const context = await buildFadiContext(user.id, { includeLiveMarket: true });
 
   if (!context) {
     return new Response(
-      JSON.stringify({ error: "Complete onboarding before talking to Scout." }),
+      JSON.stringify({ error: "Complete onboarding before talking to Fadi." }),
       { status: 422, headers: { "Content-Type": "application/json" } },
     );
   }
 
   // Build messages
-  const messages = buildScoutMessages(context, history, message);
+  const messages = buildFadiMessages(context, history, message);
 
   // Resolve the user's provider chain (primary → fallback) and stream resiliently:
   // retry transient rate limits, switch providers when one is exhausted.
   const chain = buildProviderChain(await getUserProviderConfigs(user.id));
 
-  logger.info("scout.chat.started", {
+  logger.info("fadi.chat.started", {
     userId: user.id,
     providers: chain.map((p) => `${p.id}:${p.model}`).join(", "),
     historyLength: history.length,
   });
 
-  // Scout's tools (search_jobs, get_performance, …) + the first provider in the
+  // Fadi's tools (search_jobs, get_performance, …) + the first provider in the
   // chain that supports function calling. If none do, we stream plainly.
-  const tools = getScoutTools().map(toToolSpec);
+  const tools = getFadiTools().map(toToolSpec);
   // All tool-capable providers (primary → fallback) so the agentic loop fails
   // over when one is rate-limited/exhausted (e.g. Groq's daily token cap).
   const toolProviders = chain.filter((p) => typeof p.runWithTools === "function");
@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
   // Generation capability for tools that draft content (generate_document),
   // bound to the user's primary provider.
   const genProvider = chain[0];
-  const toolCtx: ScoutToolContext = {
+  const toolCtx: FadiToolContext = {
     userId: user.id,
     generate: genProvider
       ? {
@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
       };
 
       // Persist the conversation so it survives reloads and is shared between
-      // Desk and Scout modes (both load the same history). Best-effort.
+      // Desk and Fadi modes (both load the same history). Best-effort.
       const agentRepo = createAgentMessagesRepository(getDatabase());
       agentRepo.createForUser(user.id, { role: "user", content: message }).catch(() => {});
       const saveAssistant = async (text: string, toolNames?: string) => {
@@ -148,25 +148,25 @@ export async function POST(req: NextRequest) {
         }
       };
 
-      // Agentic path: try each tool-capable provider (primary → fallback) so Scout
+      // Agentic path: try each tool-capable provider (primary → fallback) so Fadi
       // stays up when one is rate-limited/exhausted (e.g. Groq's daily cap).
       for (const tp of toolProviders) {
         try {
           const result = await tp.runWithTools!(
             messages,
             tools,
-            (name, args) => executeScoutTool(name, args, toolCtx),
+            (name, args) => executeFadiTool(name, args, toolCtx),
             { temperature: 0.6 },
             {
               // Render result cards as soon as the tools run…
               onToolResults: (results) => {
                 if (results.length > 0) {
                   controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ scoutTools: results })}\n\n`),
+                    encoder.encode(`data: ${JSON.stringify({ fadiTools: results })}\n\n`),
                   );
                 }
               },
-              // …then stream Scout's answer token by token.
+              // …then stream Fadi's answer token by token.
               onToken: (t) => sendText(t),
             },
           );
@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
           if (!result.text.trim() && result.toolResults.length > 0) sendText("Here's what I found.");
           const saved = result.text.trim() || (result.toolResults.length > 0 ? "Here's what I found." : "");
           await saveAssistant(saved, result.toolResults.map((t) => t.name).join(", ") || undefined);
-          logger.info("scout.chat.completed", {
+          logger.info("fadi.chat.completed", {
             userId: user.id,
             provider: tp.id,
             tools: result.toolResults.map((t) => t.name).join(", "),
@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
           finish();
           return;
         } catch (err) {
-          logger.warn("scout.chat.tool_run_failed", {
+          logger.warn("fadi.chat.tool_run_failed", {
             userId: user.id,
             provider: tp.id,
             error: err instanceof Error ? err.message : "unknown",
@@ -193,7 +193,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Every tool provider failed (e.g. all keys rate-limited). Deterministic
-      // safety net so Scout still ACTS for the common intents rather than
+      // safety net so Fadi still ACTS for the common intents rather than
       // fabricating or just writing prose.
       {
         {
@@ -210,21 +210,21 @@ export async function POST(req: NextRequest) {
                   : /value prop|vpd/i.test(message)
                     ? "value_proposition"
                     : "resume";
-              const r = await executeScoutTool("generate_document", { kind }, toolCtx);
+              const r = await executeFadiTool("generate_document", { kind }, toolCtx);
               if (r.data) {
                 controller.enqueue(
                   encoder.encode(
-                    `data: ${JSON.stringify({ scoutTools: [{ name: "generate_document", view: r.view ?? "document", data: r.data }] })}\n\n`,
+                    `data: ${JSON.stringify({ fadiTools: [{ name: "generate_document", view: r.view ?? "document", data: r.data }] })}\n\n`,
                   ),
                 );
               }
               sendText(r.summary);
               await saveAssistant(r.summary, "generate_document");
-              logger.info("scout.chat.completed", { userId: user.id, tools: "generate_document(fallback)" });
+              logger.info("fadi.chat.completed", { userId: user.id, tools: "generate_document(fallback)" });
               finish();
               return;
             } catch (toolErr) {
-              logger.warn("scout.chat.fallback_tool_failed", {
+              logger.warn("fadi.chat.fallback_tool_failed", {
                 userId: user.id,
                 error: toolErr instanceof Error ? toolErr.message : "unknown",
               });
@@ -234,28 +234,28 @@ export async function POST(req: NextRequest) {
           // Job-search intent → real live cards (never fabricated listings).
           if (/\b(jobs?|roles?|positions?|openings?|listings?|vacanc|hiring)\b/i.test(message)) {
             try {
-              const r = await executeScoutTool("search_jobs", { location: message }, toolCtx);
+              const r = await executeFadiTool("search_jobs", { location: message }, toolCtx);
               if (r.data) {
                 controller.enqueue(
                   encoder.encode(
-                    `data: ${JSON.stringify({ scoutTools: [{ name: "search_jobs", view: r.view ?? "jobs", data: r.data }] })}\n\n`,
+                    `data: ${JSON.stringify({ fadiTools: [{ name: "search_jobs", view: r.view ?? "jobs", data: r.data }] })}\n\n`,
                   ),
                 );
               }
               sendText(r.summary);
               await saveAssistant(r.summary, "search_jobs");
-              logger.info("scout.chat.completed", { userId: user.id, tools: "search_jobs(fallback)" });
+              logger.info("fadi.chat.completed", { userId: user.id, tools: "search_jobs(fallback)" });
               finish();
               return;
             } catch (toolErr) {
-              logger.warn("scout.chat.fallback_tool_failed", {
+              logger.warn("fadi.chat.fallback_tool_failed", {
                 userId: user.id,
                 error: toolErr instanceof Error ? toolErr.message : "unknown",
               });
             }
           }
           // Otherwise fall through to a plain stream (anti-fabrication is enforced
-          // by Scout's system prompt) so Scout still answers conversationally.
+          // by Fadi's system prompt) so Fadi still answers conversationally.
         }
       }
 
@@ -270,7 +270,7 @@ export async function POST(req: NextRequest) {
           sendText(value);
         }
       } catch (err) {
-        logger.error("scout.chat.stream_error", {
+        logger.error("fadi.chat.stream_error", {
           userId: user.id,
           error: err instanceof Error ? err.message : "unknown",
         });

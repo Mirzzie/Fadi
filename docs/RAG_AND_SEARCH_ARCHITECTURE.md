@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Retrieval-Augmented Generation and search provide grounded context for Scout's responses, career analysis, job matching, market summaries, and document generation.
+Retrieval-Augmented Generation and search provide grounded context for Fadi's responses, career analysis, job matching, market summaries, and document generation.
 
-RAG is not memory by itself. It is a retrieval mechanism used by Scout and the domain engines to ground outputs in user-specific and market-specific evidence.
+RAG is not memory by itself. It is a retrieval mechanism used by Fadi and the domain engines to ground outputs in user-specific and market-specific evidence.
 
-Grounded retrieval is especially important for Scout's honest-mentor behavior: when Scout challenges a niche direction or validates a career path, it must cite sources and show the evidence basis.
+Grounded retrieval is especially important for Fadi's honest-mentor behavior: when Fadi challenges a niche direction or validates a career path, it must cite sources and show the evidence basis.
 
 ## Search Domains
 
@@ -24,7 +24,7 @@ Grounded retrieval is especially important for Scout's honest-mentor behavior: w
 
 ```mermaid
 flowchart TD
-    Query[Scout or User Query] --> Router[Search Router]
+    Query[Fadi or User Query] --> Router[Search Router]
     Router --> Keyword[Keyword Search]
     Router --> Vector[Vector Search]
     Router --> Filters[Metadata Filters]
@@ -33,7 +33,7 @@ flowchart TD
     Filters --> Merge
     Merge --> Rerank[Reranker]
     Rerank --> Context[Grounded Context Pack with Source Attribution]
-    Context --> Agent[Scout or Engine]
+    Context --> Agent[Fadi or Engine]
 ```
 
 ## Retrieval Requirements

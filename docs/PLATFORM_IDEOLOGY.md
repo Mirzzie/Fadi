@@ -40,13 +40,13 @@ CareerOS is not a CV generator. It is not a job board. It is not yet another AI 
 
 The goal is to reduce a 45-minute application process to **under 5 minutes for a targeted, high-quality application** — while simultaneously improving the quality of every touchpoint in that application.
 
-Scout, CareerOS's operating intelligence, works on the user's behalf:
+Fadi, CareerOS's operating intelligence, works on the user's behalf:
 - Before the user wakes up
 - While the user is in their current role
 - While the user is studying or building
 - While the user is sleeping
 
-Scout is not a tool the user picks up and puts down. Scout is an ongoing agent that continuously improves the user's competitive position.
+Fadi is not a tool the user picks up and puts down. Fadi is an ongoing agent that continuously improves the user's competitive position.
 
 ---
 
@@ -62,7 +62,7 @@ CareerOS does not help users apply to more jobs. It helps users **apply to the r
 
 In 2026, 73% of employers are skills-based. Degrees matter less. GitHub commits, portfolio projects, published writing, and demonstrated ability matter more.
 
-CareerOS actively helps users build **evidence of capability** — not just document experience. Scout identifies the gaps between where the user is and where they need to be, then helps build proof of work that fills those gaps.
+CareerOS actively helps users build **evidence of capability** — not just document experience. Fadi identifies the gaps between where the user is and where they need to be, then helps build proof of work that fills those gaps.
 
 ### 3. Authenticity as competitive advantage
 
@@ -86,7 +86,7 @@ This principle is made concrete by the **Resilience & Momentum Engine**. The job
 
 This is not gamification of desperation. It is the deliberate opposite:
 
-- **Momentum, not streaks.** A momentum signal that decays gently and never resets to zero — no shame cliff, no all-or-nothing pressure. Choosing to rest *protects* momentum; Scout will tell a user to recover when they are overcooking it, because 66% burnout is the enemy, not the goal.
+- **Momentum, not streaks.** A momentum signal that decays gently and never resets to zero — no shame cliff, no all-or-nothing pressure. Choosing to rest *protects* momentum; Fadi will tell a user to recover when they are overcooking it, because 66% burnout is the enemy, not the goal.
 - **Rejection as fuel.** Every "no" is run through an autopsy that produces a sharper next application and a named pattern. The reward lands on the *learning*, not the loss — which is also why the system cannot be gamed by faking rejections: there is nothing to farm.
 - **You vs. your past self, never vs. other users.** No leaderboards. In a market where most people are losing, social comparison is cruelty. Progress is always measured against the user's own trajectory.
 - **Belonging.** The crisis is partly loneliness (79% report anxiety). Anonymous cohorts normalize the grind without competition.
@@ -97,7 +97,7 @@ Every mechanic in this engine is evaluated against the psychological standard: d
 
 The worst thing CareerOS could do is tell a user what they want to hear.
 
-Scout is not a yes-man. If a career direction is misaligned with market reality, Scout says so — with data. If a resume would not pass a 10-second recruiter scan, Scout says so — specifically. If a role is out of reach at the user's current profile level, Scout says so — and immediately shows the path to change that.
+Fadi is not a yes-man. If a career direction is misaligned with market reality, Fadi says so — with data. If a resume would not pass a 10-second recruiter scan, Fadi says so — specifically. If a role is out of reach at the user's current profile level, Fadi says so — and immediately shows the path to change that.
 
 Honest feedback, delivered with respect and a clear next action, is the most valuable thing a career advisor can provide. CareerOS is built to deliver it at scale.
 
@@ -113,7 +113,7 @@ CareerOS helps them build real proof of work, find the actual entry points into 
 ### The Career Switcher
 Changing direction mid-career with transferable skills that don't map cleanly to job titles. Struggling with how to present their background to a new field. Unsure which roles are realistic vs. aspirational.
 
-Scout identifies the transferable evidence, maps the skill gaps, and builds a bridge — not a fantasy.
+Fadi identifies the transferable evidence, maps the skill gaps, and builds a bridge — not a fantasy.
 
 ### The Experienced Professional in a Competitive Search
 Laid off or voluntarily searching in a market where even strong candidates are waiting 68+ days for offers. Spending hours per application with low signal-to-noise.
@@ -127,7 +127,7 @@ Still in education, but aware that the market they are entering is competitive. 
 
 ## The Prediction Layer
 
-Alongside Scout's active intelligence, CareerOS runs a continuous **Career Performance Trajectory** algorithm.
+Alongside Fadi's active intelligence, CareerOS runs a continuous **Career Performance Trajectory** algorithm.
 
 This is not motivational fiction. It is a data model that tracks:
 

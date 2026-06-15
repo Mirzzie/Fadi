@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     const text = await provider.transcribe(file);
     return Response.json({ text: text.trim() });
   } catch (err) {
-    logger.error("scout.transcribe.failed", {
+    logger.error("fadi.transcribe.failed", {
       userId: user.id,
       provider: cfg?.id,
       error: err instanceof Error ? err.message : "unknown",

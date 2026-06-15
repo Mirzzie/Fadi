@@ -1,7 +1,7 @@
 /**
  * Relevance scoring — pure logic. Turns a global firehose of signals into "the
  * three things that matter to YOU today" by scoring each signal against the
- * user's profile. Nothing reaches the user (or Scout's mouth) below threshold.
+ * user's profile. Nothing reaches the user (or Fadi's mouth) below threshold.
  */
 
 import type { MarketSignal } from "./types";
@@ -107,7 +107,7 @@ export function scoreSignal(signal: MarketSignal, profile: RelevanceProfile): Sc
   };
 }
 
-/** Score, filter below threshold, and rank. The output is what Scout may surface. */
+/** Score, filter below threshold, and rank. The output is what Fadi may surface. */
 export function rankSignals(
   signals: MarketSignal[],
   profile: RelevanceProfile,

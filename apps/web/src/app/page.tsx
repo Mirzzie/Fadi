@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-import { ScoutBadge } from "@/components/ui/scout-badge";
+import { FadiBadge } from "@/components/ui/fadi-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getLatestCareerReport } from "@/lib/career-report/data";
@@ -24,38 +24,38 @@ const features = [
     icon: Target,
     title: "Career Intelligence",
     description:
-      "Scout reads your resume and profile, maps your strengths, identifies skill gaps, and generates a career readiness score with concrete next steps.",
+      "Fadi reads your resume and profile, maps your strengths, identifies skill gaps, and generates a career readiness score with concrete next steps.",
   },
   {
     icon: BriefcaseBusiness,
     title: "Smart Job Matching",
     description:
-      "Scout matches you against curated opportunities, explains exactly why each role fits, and learns from what you save or skip.",
+      "Fadi matches you against curated opportunities, explains exactly why each role fits, and learns from what you save or skip.",
   },
   {
     icon: BookOpen,
     title: "Learning Paths",
     description:
-      "From your skill gaps, Scout builds a prioritized learning plan tied directly to your target roles, with courses and certifications ranked by impact.",
+      "From your skill gaps, Fadi builds a prioritized learning plan tied directly to your target roles, with courses and certifications ranked by impact.",
   },
   {
     icon: ListChecks,
     title: "Application Workspace",
     description:
-      "Track every application, prepare role-specific assets, and manage deadlines. Scout prepares everything for your review before anything is sent.",
+      "Track every application, prepare role-specific assets, and manage deadlines. Fadi prepares everything for your review before anything is sent.",
   },
 ];
 
 const howItWorks = [
   {
     step: "01",
-    title: "Tell Scout who you are",
-    body: "Paste your resume, add LinkedIn context, and share your career goals. Scout reads everything and builds your professional profile.",
+    title: "Tell Fadi who you are",
+    body: "Paste your resume, add LinkedIn context, and share your career goals. Fadi reads everything and builds your professional profile.",
   },
   {
     step: "02",
     title: "Get your first analysis",
-    body: "Scout generates a Career Intelligence Report: strengths, gaps, role-fit score, and a prioritized list of next actions.",
+    body: "Fadi generates a Career Intelligence Report: strengths, gaps, role-fit score, and a prioritized list of next actions.",
   },
   {
     step: "03",
@@ -64,8 +64,8 @@ const howItWorks = [
   },
   {
     step: "04",
-    title: "Scout keeps working",
-    body: "As you progress, Scout updates recommendations, surfaces new opportunities, and helps you stay ahead of the market.",
+    title: "Fadi keeps working",
+    body: "As you progress, Fadi updates recommendations, surfaces new opportunities, and helps you stay ahead of the market.",
   },
 ];
 
@@ -145,7 +145,7 @@ const HERO_MESH =
 const navLinks = [
   { label: "Features", href: "#features" },
   { label: "How it works", href: "#how" },
-  { label: "Scout", href: "#trust" },
+  { label: "Fadi", href: "#trust" },
 ];
 
 export default async function Home() {
@@ -187,7 +187,7 @@ export default async function Home() {
                 <div className="glow-primary flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-[oklch(0.7_0.2_330)] to-[oklch(0.6_0.2_270)]">
                   <Sparkles className="size-4 text-white" aria-hidden="true" />
                 </div>
-                <span className="font-semibold tracking-tight text-white">CareerOS</span>
+                <span className="font-semibold tracking-tight text-white">FadiOS</span>
               </Link>
               <div className="hidden items-center gap-8 md:flex">
                 {navLinks.map((link) => (
@@ -298,7 +298,7 @@ export default async function Home() {
                 },
                 {
                   title: "Every Application Counts: Quality Over Volume",
-                  body: "Skip the spray-and-pray. Scout helps you send fewer, sharper applications and learn from every outcome.",
+                  body: "Skip the spray-and-pray. Fadi helps you send fewer, sharper applications and learn from every outcome.",
                 },
                 {
                   title: "The Hidden Market: Signals Most People Miss",
@@ -324,7 +324,7 @@ export default async function Home() {
                 Everything your career needs in one place.
               </h2>
               <p className="mt-3 text-muted-foreground">
-                Scout connects your profile, the job market, and your learning goals into one
+                Fadi connects your profile, the job market, and your learning goals into one
                 intelligent career command center.
               </p>
             </div>
@@ -352,7 +352,7 @@ export default async function Home() {
         <section id="how" className="border-b border-border/60 py-20 sm:py-28">
           <div className="mx-auto max-w-shell px-4 sm:px-6">
             <div className="mx-auto mb-14 max-w-xl text-center">
-              <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">How Scout works.</h2>
+              <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">How Fadi works.</h2>
               <p className="mt-3 text-muted-foreground">
                 Four steps from first sign-in to active career momentum.
               </p>
@@ -370,15 +370,15 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* Scout trust strip */}
+        {/* Fadi trust strip */}
         <section id="trust" className="border-b border-border/60 bg-primary/5 py-12">
           <div className="mx-auto max-w-shell px-4 sm:px-6">
             <div className="flex flex-col items-center gap-6 text-center sm:flex-row sm:justify-between sm:text-left">
               <div className="space-y-1">
-                <p className="font-semibold">Scout never acts without your approval.</p>
+                <p className="font-semibold">Fadi never acts without your approval.</p>
                 <p className="text-sm text-muted-foreground">
                   Every application, message, and external action requires your explicit sign-off.
-                  Scout prepares. You decide.
+                  Fadi prepares. You decide.
                 </p>
               </div>
               <TrendingUp className="size-10 shrink-0 text-primary opacity-60" aria-hidden="true" />
@@ -389,14 +389,14 @@ export default async function Home() {
         {/* CTA */}
         <section className="py-24 sm:py-32">
           <div className="mx-auto max-w-shell px-4 text-center sm:px-6">
-            <ScoutBadge size="md" showName={false} className="justify-center mb-6" />
+            <FadiBadge size="md" showName={false} className="justify-center mb-6" />
             <h2 className="text-4xl font-semibold tracking-tight sm:text-5xl">
               Ready to run your career
               <br />
               at full intelligence?
             </h2>
             <p className="mx-auto mt-4 max-w-md text-muted-foreground">
-              Create an account, complete a short profile, and Scout will have your first Career
+              Create an account, complete a short profile, and Fadi will have your first Career
               Intelligence Report ready in minutes.
             </p>
             <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
@@ -425,10 +425,10 @@ export default async function Home() {
             <div className="flex size-6 items-center justify-center rounded-md bg-primary">
               <Sparkles className="size-3 text-primary-foreground" aria-hidden="true" />
             </div>
-            <span className="text-sm font-medium">CareerOS</span>
+            <span className="text-sm font-medium">FadiOS</span>
           </div>
           <p className="text-xs text-muted-foreground">
-            Scout is an AI assistant. Always review recommendations before acting.
+            Fadi is an AI assistant. Always review recommendations before acting.
           </p>
         </div>
       </footer>
