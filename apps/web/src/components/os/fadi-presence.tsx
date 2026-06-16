@@ -34,6 +34,10 @@ type FadiPresenceValue = {
   /** Fadi's live state — drives the ambient orb's animation + the menu-bar chip. */
   state: FadiState;
   setState: (state: FadiState) => void;
+  /** True whenever Fadi's voice is actually speaking (any source — boot, briefing, chat). */
+  speaking: boolean;
+  /** What the visuals should show: "speaking" while Fadi talks, else the live state. */
+  displayState: FadiState;
   /** A proactive heads-up the orb surfaces (e.g. an unseen background finding). */
   nudge: FadiNudge | null;
   showNudge: (nudge: FadiNudge) => void;
@@ -48,7 +52,18 @@ export function FadiPresenceProvider({ children }: { children: React.ReactNode }
   const [voiceNonce, setVoiceNonce] = useState(0);
   const [state, setState] = useState<FadiState>("idle");
   const [nudge, setNudge] = useState<FadiNudge | null>(null);
+  const [speaking, setSpeaking] = useState(false);
   const seedNonce = useRef(0);
+
+  // Poll the speech engine so the living core reacts whenever Fadi talks, no
+  // matter which component triggered the speech (boot, dashboard briefing, chat…).
+  useEffect(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const id = window.setInterval(() => {
+      setSpeaking(window.speechSynthesis.speaking && !window.speechSynthesis.paused);
+    }, 180);
+    return () => window.clearInterval(id);
+  }, []);
 
   const openFadi = useCallback(() => setOpen(true), []);
   // Clear any spotlight seed on close so reopening via the orb doesn't re-fire
@@ -82,6 +97,10 @@ export function FadiPresenceProvider({ children }: { children: React.ReactNode }
     return () => window.removeEventListener("fadi:summon", onSummon);
   }, []);
 
+  // Speech wins the visuals: while Fadi talks, show "speaking" regardless of the
+  // underlying chat state.
+  const displayState: FadiState = speaking ? "speaking" : state;
+
   const value = useMemo<FadiPresenceValue>(
     () => ({
       open,
@@ -92,11 +111,13 @@ export function FadiPresenceProvider({ children }: { children: React.ReactNode }
       voiceNonce,
       state,
       setState,
+      speaking,
+      displayState,
       nudge,
       showNudge,
       dismissNudge,
     }),
-    [open, openFadi, closeFadi, openWithQuery, seed, voiceNonce, state, nudge, showNudge, dismissNudge],
+    [open, openFadi, closeFadi, openWithQuery, seed, voiceNonce, state, speaking, displayState, nudge, showNudge, dismissNudge],
   );
 
   return <FadiPresenceContext.Provider value={value}>{children}</FadiPresenceContext.Provider>;

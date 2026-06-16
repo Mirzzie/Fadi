@@ -17,7 +17,7 @@ import { useFadi, type FadiState } from "./fadi-presence";
  * only reflects Fadi's live state and hands off seeded questions from ⌘K.
  */
 export function FadiOrb() {
-  const { open, openFadi, closeFadi, state, setState, voiceNonce, seed, nudge, dismissNudge } =
+  const { open, openFadi, closeFadi, displayState, setState, voiceNonce, seed, nudge, dismissNudge } =
     useFadi();
 
   return (
@@ -52,7 +52,7 @@ export function FadiOrb() {
           </div>
         ) : null}
 
-        <OrbButton state={state} onClick={openFadi} />
+        <OrbButton state={displayState} onClick={openFadi} />
       </div>
 
       {/* Conversation panel */}
@@ -66,11 +66,11 @@ export function FadiOrb() {
           <div className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l border-border/60 bg-card shadow-2xl duration-300 animate-in slide-in-from-right">
             <div className="flex h-12 shrink-0 items-center justify-between border-b border-border/60 px-4">
               <div className="flex items-center gap-2">
-                <OrbButton state={state} size="sm" />
+                <OrbButton state={displayState} size="sm" />
                 <div className="leading-tight">
                   <span className="block text-sm font-semibold">Fadi</span>
                   <span className="block text-[0.65rem] text-muted-foreground">
-                    {STATE_LABEL[state]}
+                    {STATE_LABEL[displayState]}
                   </span>
                 </div>
               </div>

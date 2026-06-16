@@ -53,6 +53,17 @@ export function FadiCore({
         transition={reduce ? undefined : { duration: speaking ? 1.3 : 3.2, repeat: Infinity, ease: "easeInOut" }}
       />
 
+      {/* Speaking ripple — an unmistakable "Fadi is talking" pulse outward */}
+      {speaking && !reduce ? (
+        <motion.span
+          className="absolute inset-0 rounded-full border-2"
+          style={{ borderColor: TEAL_HALO }}
+          initial={{ scale: 0.7, opacity: 0.7 }}
+          animate={{ scale: 1.4, opacity: 0 }}
+          transition={{ duration: 1.05, repeat: Infinity, ease: "easeOut" }}
+        />
+      ) : null}
+
       {/* Outer ring */}
       <motion.svg
         viewBox="0 0 100 100"

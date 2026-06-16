@@ -3,7 +3,7 @@
 import { Bell, MessageSquare, StickyNote } from "lucide-react";
 
 import { FadiCore } from "./fadi-core";
-import { useFadi } from "./fadi-presence";
+import { summonFadi, useFadi } from "./fadi-presence";
 import { WindowLayer } from "./window";
 import { useWindows, type WindowApp } from "./window-manager";
 
@@ -19,7 +19,7 @@ const APPS: Array<{ app: WindowApp; label: string; icon: typeof Bell }> = [
  * mode (toggled from the menu bar).
  */
 export function Desktop() {
-  const { state } = useFadi();
+  const { displayState } = useFadi();
   const { open } = useWindows();
 
   return (
@@ -27,10 +27,18 @@ export function Desktop() {
       {/* Centerpiece — pointer-events pass through to windows except the controls */}
       <div className="pointer-events-none absolute inset-0 grid place-items-center">
         <div className="pointer-events-auto flex flex-col items-center gap-6 text-center">
-          <FadiCore state={state} size={168} />
+          <button
+            type="button"
+            onClick={summonFadi}
+            aria-label="Talk to Fadi"
+            title="Click and talk to Fadi"
+            className="rounded-full transition-transform hover:scale-105 active:scale-95"
+          >
+            <FadiCore state={displayState} size={168} />
+          </button>
           <div>
             <h1 className="text-glow text-xl font-semibold tracking-tight">FadiOS Desktop</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Open an app, or just talk to Fadi.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Open an app, or click Fadi to talk.</p>
           </div>
           <div className="flex gap-3">
             {APPS.map(({ app, label, icon: Icon }) => (

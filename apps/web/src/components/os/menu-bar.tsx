@@ -18,7 +18,7 @@ const VOICE_PREF_KEY = "fadi-voice-enabled";
  *  state, the ⌘K spotlight, "Hey Fadi", clock, and the user menu. Fadi is
  *  ambient now, so there's no Desk/Fadi mode toggle. */
 export function MenuBar() {
-  const { state } = useFadi();
+  const { displayState } = useFadi();
   const wake = useWakeWord(summonFadi);
   const [now, setNow] = useState<Date | null>(null);
 
@@ -38,7 +38,7 @@ export function MenuBar() {
       <div className="flex items-center gap-2">
         <FadiLogo className="size-5" />
         <span className="font-semibold tracking-tight">FadiOS</span>
-        <FadiStateChip state={state} />
+        <FadiStateChip state={displayState} />
         <span className="text-muted-foreground/50">/</span>
         <TrackSwitcher />
       </div>
