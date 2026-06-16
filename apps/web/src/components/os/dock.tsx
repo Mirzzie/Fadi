@@ -16,24 +16,29 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
+import { useOsMode } from "./os-mode";
+import { useWindows, type WindowApp } from "./window-manager";
 
-export type DockApp = { href: string; label: string; icon: LucideIcon };
+export type DockApp = { href: string; label: string; icon: LucideIcon; app: WindowApp };
 
 export const DOCK_APPS: DockApp[] = [
-  { href: "/dashboard", label: "Home", icon: LayoutDashboard },
-  { href: "/dashboard/jobs", label: "Jobs", icon: BriefcaseBusiness },
-  { href: "/dashboard/niche-finder", label: "Niche Finder", icon: Compass },
-  { href: "/dashboard/applications", label: "Applications", icon: KanbanSquare },
-  { href: "/dashboard/documents", label: "Documents", icon: FileText },
-  { href: "/dashboard/learning", label: "Learning", icon: GraduationCap },
-  { href: "/dashboard/fadi", label: "Fadi", icon: Sparkles },
-  { href: "/dashboard/profile", label: "Profile", icon: UserRoundCog },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings },
+  { href: "/dashboard", label: "Home", icon: LayoutDashboard, app: "home" },
+  { href: "/dashboard/jobs", label: "Jobs", icon: BriefcaseBusiness, app: "jobs" },
+  { href: "/dashboard/niche-finder", label: "Niche Finder", icon: Compass, app: "niche" },
+  { href: "/dashboard/applications", label: "Applications", icon: KanbanSquare, app: "applications" },
+  { href: "/dashboard/documents", label: "Documents", icon: FileText, app: "documents" },
+  { href: "/dashboard/learning", label: "Learning", icon: GraduationCap, app: "learning" },
+  { href: "/dashboard/fadi", label: "Fadi", icon: Sparkles, app: "fadi" },
+  { href: "/dashboard/profile", label: "Profile", icon: UserRoundCog, app: "profile" },
+  { href: "/dashboard/settings", label: "Settings", icon: Settings, app: "settings" },
 ];
 
-/** The OS dock — app launcher pinned to the bottom, present in both modes. */
+/** The OS dock — in ambient mode it navigates; in desktop mode it opens windows. */
 export function Dock() {
   const pathname = usePathname();
+  const { mode } = useOsMode();
+  const { open } = useWindows();
+  const desktop = mode === "desktop";
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-3 z-40 flex justify-center px-3">
@@ -43,15 +48,11 @@ export function Dock() {
       >
         {DOCK_APPS.map((app) => {
           const active =
-            app.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(app.href);
-          return (
-            <Link
-              key={app.href}
-              href={app.href}
-              title={app.label}
-              aria-label={app.label}
-              className="group relative grid size-11 place-items-center rounded-xl transition-transform duration-150 hover:-translate-y-1.5"
-            >
+            !desktop && (app.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(app.href));
+          const cls =
+            "group relative grid size-11 place-items-center rounded-xl transition-transform duration-150 hover:-translate-y-1.5";
+          const inner = (
+            <>
               <span
                 className={cn(
                   "grid size-11 place-items-center rounded-xl border transition-colors",
@@ -62,17 +63,24 @@ export function Dock() {
               >
                 <app.icon className="size-5" aria-hidden="true" />
               </span>
-              {/* Running indicator dot */}
               <span
                 className={cn(
                   "absolute -bottom-0.5 size-1 rounded-full bg-primary transition-opacity",
                   active ? "opacity-100" : "opacity-0",
                 )}
               />
-              {/* Hover label */}
               <span className="pointer-events-none absolute -top-8 scale-90 rounded-md border border-border/60 bg-popover px-2 py-0.5 text-xs font-medium opacity-0 shadow-md transition-all group-hover:scale-100 group-hover:opacity-100">
                 {app.label}
               </span>
+            </>
+          );
+          return desktop ? (
+            <button key={app.href} type="button" onClick={() => open(app.app)} title={app.label} aria-label={app.label} className={cls}>
+              {inner}
+            </button>
+          ) : (
+            <Link key={app.href} href={app.href} title={app.label} aria-label={app.label} className={cls}>
+              {inner}
             </Link>
           );
         })}

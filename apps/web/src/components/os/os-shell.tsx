@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
 import { BootSequence } from "./boot-sequence";
 import { Desktop } from "./desktop";
@@ -33,6 +33,17 @@ export function OsShell({ children }: { children: React.ReactNode }) {
 function OsShellInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { mode } = useOsMode();
+  // When a route is embedded inside a desktop window (?os=window), drop the OS
+  // chrome so there's no nested menu-bar/dock/orb — just the app's content.
+  const chromeless = useSearchParams().get("os") === "window";
+
+  if (chromeless) {
+    return (
+      <div className="min-h-screen bg-background">
+        <main className="px-3 py-4 sm:px-5">{children}</main>
+      </div>
+    );
+  }
 
   return (
     <div className="relative flex min-h-screen flex-col">

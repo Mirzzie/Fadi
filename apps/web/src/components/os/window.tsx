@@ -98,10 +98,34 @@ function ResizeHandle({ onResize }: { onResize: (dx: number, dy: number) => void
   );
 }
 
+// Route apps are embedded via a chromeless iframe (?os=window) so the full page
+// renders inside the window without nested OS chrome.
+const ROUTE: Partial<Record<WindowApp, string>> = {
+  home: "/dashboard",
+  jobs: "/dashboard/jobs",
+  documents: "/dashboard/documents",
+  applications: "/dashboard/applications",
+  learning: "/dashboard/learning",
+  niche: "/dashboard/niche-finder",
+  profile: "/dashboard/profile",
+  settings: "/dashboard/settings",
+};
+
 function AppContent({ app }: { app: WindowApp }) {
   if (app === "fadi") return <FadiChat />;
   if (app === "activity") return <ActivityPanel />;
-  return <NotesPanel />;
+  if (app === "notes") return <NotesPanel />;
+  const route = ROUTE[app];
+  if (route) {
+    return (
+      <iframe
+        src={`${route}?os=window`}
+        title={app}
+        className="h-full w-full border-0 bg-background"
+      />
+    );
+  }
+  return null;
 }
 
 type Finding = { id: string; kind: string; title: string; detail: string | null; href: string | null };

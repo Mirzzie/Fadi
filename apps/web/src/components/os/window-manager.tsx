@@ -2,8 +2,19 @@
 
 import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
-/** The apps that can open as desktop windows in this slice. */
-export type WindowApp = "fadi" | "activity" | "notes";
+/** Apps that can open as desktop windows — client panels + every route (iframed). */
+export type WindowApp =
+  | "fadi"
+  | "activity"
+  | "notes"
+  | "home"
+  | "jobs"
+  | "documents"
+  | "applications"
+  | "learning"
+  | "niche"
+  | "profile"
+  | "settings";
 
 export type OsWindow = {
   id: string;
@@ -28,6 +39,14 @@ const META: Record<WindowApp, { title: string; w: number; h: number }> = {
   fadi: { title: "Fadi", w: 420, h: 560 },
   activity: { title: "Activity", w: 380, h: 460 },
   notes: { title: "Notes", w: 360, h: 380 },
+  home: { title: "Mission Control", w: 920, h: 620 },
+  jobs: { title: "Jobs", w: 900, h: 600 },
+  documents: { title: "Documents", w: 900, h: 600 },
+  applications: { title: "Applications", w: 960, h: 600 },
+  learning: { title: "Learning", w: 880, h: 600 },
+  niche: { title: "Niche Finder", w: 880, h: 600 },
+  profile: { title: "Profile", w: 760, h: 620 },
+  settings: { title: "Settings", w: 760, h: 620 },
 };
 
 const WindowManagerContext = createContext<WindowManagerValue | null>(null);
