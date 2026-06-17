@@ -10,6 +10,7 @@ import {
   Settings,
   Sparkles,
   UserRoundCog,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -26,6 +27,7 @@ export const DOCK_APPS: DockApp[] = [
   { href: "/dashboard/jobs", label: "Jobs", icon: BriefcaseBusiness, app: "jobs" },
   { href: "/dashboard/niche-finder", label: "Niche Finder", icon: Compass, app: "niche" },
   { href: "/dashboard/applications", label: "Applications", icon: KanbanSquare, app: "applications" },
+  { href: "/dashboard/network", label: "Network", icon: Users, app: "network" },
   { href: "/dashboard/documents", label: "Documents", icon: FileText, app: "documents" },
   { href: "/dashboard/learning", label: "Learning", icon: GraduationCap, app: "learning" },
   { href: "/dashboard/fadi", label: "Fadi", icon: Sparkles, app: "fadi" },

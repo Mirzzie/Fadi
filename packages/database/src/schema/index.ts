@@ -638,6 +638,40 @@ export const agentFindings = pgTable(
   ]
 );
 
+// ── Referrals & networking ────────────────────────────────────────────────────
+// 1 referral ≈ 40 cold applications (market research). A referral target is a
+// person or a path to a warm intro at a company the user is pursuing. We reward
+// the controllable ASK (status → asked), never whether the referral comes through.
+export const referralTargets = pgTable(
+  "referral_targets",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    applicationId: uuid("application_id").references(() => applications.id, {
+      onDelete: "set null",
+    }),
+    company: text("company").notNull(),
+    roleTitle: text("role_title"),
+    contactName: text("contact_name"),
+    contactRole: text("contact_role"),
+    // How the user knows (or could reach) them — drives the outreach tone.
+    relationship: text("relationship").notNull().default("cold"), // alumni | former_colleague | second_degree | friend | recruiter | cold
+    channel: text("channel"), // linkedin | email | mutual | event
+    status: text("status").notNull().default("identified"), // identified | asked | responded | referred | declined
+    outreachDraft: text("outreach_draft"),
+    notes: text("notes"),
+    askedAt: timestamp("asked_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index("referral_targets_user_id_idx").on(table.userId),
+    index("referral_targets_user_status_idx").on(table.userId, table.status),
+    index("referral_targets_application_id_idx").on(table.applicationId),
+  ]
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type AuthIdentity = typeof authIdentities.$inferSelect;
@@ -665,3 +699,5 @@ export type ResumeTemplateRow = typeof resumeTemplates.$inferSelect;
 export type AgentRun = typeof agentRuns.$inferSelect;
 export type AgentFinding = typeof agentFindings.$inferSelect;
 export type NewAgentFinding = typeof agentFindings.$inferInsert;
+export type ReferralTarget = typeof referralTargets.$inferSelect;
+export type NewReferralTarget = typeof referralTargets.$inferInsert;

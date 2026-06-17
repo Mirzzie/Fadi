@@ -149,10 +149,69 @@ const getRejectionPatterns: FadiTool = {
   },
 };
 
+const REFERRAL_RELATIONSHIPS = [
+  "alumni",
+  "former_colleague",
+  "second_degree",
+  "friend",
+  "recruiter",
+  "cold",
+] as const;
+
+const draftReferralOutreachTool: FadiTool = {
+  name: "draft_referral_outreach",
+  description:
+    "Add a referral target at a company and draft a short, sendable outreach message asking for a referral or warm intro. Use for 'help me get a referral at X', 'draft my message to someone at X', 'who should I ask at X'. A referral is worth ~40 cold applications. Company is required; role/contact are optional.",
+  parameters: {
+    type: "object",
+    properties: {
+      company: { type: "string", description: "The company to get a referral into." },
+      role: { type: "string", description: "The role the user is targeting there, if known." },
+      contactName: { type: "string", description: "Name of a specific person to reach, if any." },
+      contactRole: { type: "string", description: "That person's job/title, if known." },
+      relationship: {
+        type: "string",
+        enum: [...REFERRAL_RELATIONSHIPS],
+        description: "How the user knows or could reach them.",
+      },
+    },
+    required: ["company"],
+  },
+  async execute(args, ctx): Promise<FadiToolResult> {
+    const company = typeof args.company === "string" ? args.company.trim() : "";
+    if (!company) {
+      return { summary: "Which company do you want a referral into? Tell me and I'll set it up and draft the message.", view: "none" };
+    }
+    const opt = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
+    const rel = typeof args.relationship === "string" && (REFERRAL_RELATIONSHIPS as readonly string[]).includes(args.relationship)
+      ? (args.relationship as (typeof REFERRAL_RELATIONSHIPS)[number])
+      : "cold";
+
+    const { addReferralTarget, draftOutreachFor } = await import("@/lib/network/referrals");
+    const target = await addReferralTarget(ctx.userId, {
+      company,
+      roleTitle: opt(args.role),
+      contactName: opt(args.contactName),
+      contactRole: opt(args.contactRole),
+      relationship: rel,
+    });
+    const res = await draftOutreachFor(ctx.userId, target.id);
+
+    return {
+      summary: res.draft
+        ? `I added ${company} as a referral target and drafted a message you can send:\n\n${res.draft}\n\nWhen you actually reach out, mark "I reached out" on the Network page — that ask is your highest-leverage move.`
+        : `I added ${company} as a referral target. Open the Network page to draft and send your outreach.`,
+      view: "none",
+      data: { id: target.id, company, draft: res.draft ?? null },
+    };
+  },
+};
+
 const TOOLS: FadiTool[] = [
   searchJobs,
   getPerformance,
   getRejectionPatterns,
+  draftReferralOutreachTool,
   getCareerUpdates,
   generateDocument,
   trackApplication,
