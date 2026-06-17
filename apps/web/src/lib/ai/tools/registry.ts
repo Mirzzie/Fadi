@@ -2,7 +2,7 @@ import "server-only";
 
 import { getRecommendedJobsForUser } from "@/lib/jobs/data";
 import { parseLocation, getCountry } from "@/lib/jobs/locations";
-import { getMomentumSummary } from "@/lib/resilience/service";
+import { getMomentumSummary, summarizeRejectionPatterns } from "@/lib/resilience/service";
 import { createTrackTool } from "./create-track";
 import { generateDocument } from "./generate-document";
 import { getLaborMarket } from "./labor-market";
@@ -123,9 +123,36 @@ const getCareerUpdates: FadiTool = {
   },
 };
 
+const getRejectionPatterns: FadiTool = {
+  name: "get_rejection_patterns",
+  description:
+    "Run a rejection autopsy across the user's rejected applications: surface the named pattern (e.g. filtered before a human, or losing at the interview stage) and the sharper next move. Use for 'why do I keep getting rejected', 'run a rejection autopsy', 'what's the pattern in my no's'. Grounded only in real logged rejections.",
+  parameters: { type: "object", properties: {} },
+  async execute(_args, ctx): Promise<FadiToolResult> {
+    const { rejectionCount, insight } = await summarizeRejectionPatterns(ctx.userId);
+    if (rejectionCount === 0 || !insight) {
+      return {
+        summary:
+          "You haven't logged any rejections yet, so there's no pattern to read. When a 'no' comes in, log it and I'll turn it into a sharper next application — I won't guess at a pattern that isn't there.",
+        view: "none",
+      };
+    }
+    const patternLine = insight.pattern
+      ? `The pattern across your ${rejectionCount} rejection(s): ${insight.pattern.name}. ${insight.pattern.evidence}`
+      : `Across your ${rejectionCount} rejection(s) there isn't a strong enough pattern to call one honestly yet.`;
+    const steps = insight.sharperNextApplication.map((s, i) => `${i + 1}. ${s}`).join(" ");
+    return {
+      summary: `${patternLine} Sharper next application: ${steps} ${insight.reframe}`.trim(),
+      view: "none",
+      data: { rejectionCount, insight },
+    };
+  },
+};
+
 const TOOLS: FadiTool[] = [
   searchJobs,
   getPerformance,
+  getRejectionPatterns,
   getCareerUpdates,
   generateDocument,
   trackApplication,

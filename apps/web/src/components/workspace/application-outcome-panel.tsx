@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CheckCircle2, Heart, Send, XCircle } from "lucide-react";
+import { ArrowRight, CheckCircle2, Heart, Search, Send, Target, XCircle } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,7 @@ import {
   submitRejectionAutopsy,
   type RejectionStage,
 } from "@/app/dashboard/applications/actions";
+import type { RejectionInsight } from "@/lib/resilience/autopsy";
 
 type AutopsyPrompt = { key: string; question: string };
 
@@ -60,9 +61,12 @@ export function ApplicationOutcomePanel({
   const [rejectionMessage, setRejectionMessage] = useState<string | null>(null);
   const [nudge, setNudge] = useState<string | null>(null);
   const [reflection, setReflection] = useState<Record<string, string>>({});
-  const [reward, setReward] = useState<{ message: string; momentum: number; delta: number } | null>(
-    null,
-  );
+  const [reward, setReward] = useState<{
+    message: string;
+    momentum: number;
+    delta: number;
+    insight: RejectionInsight;
+  } | null>(null);
 
   // The "stage" prompt is captured up front with the chips below, so the autopsy
   // form only needs the reflective questions.
@@ -109,7 +113,12 @@ export function ApplicationOutcomePanel({
         setError(res.message);
         return;
       }
-      setReward({ message: res.message, momentum: res.momentum, delta: res.delta });
+      setReward({
+        message: res.message,
+        momentum: res.momentum,
+        delta: res.delta,
+        insight: res.insight,
+      });
       setPhase("done");
     });
   }
@@ -211,11 +220,46 @@ export function ApplicationOutcomePanel({
       ) : null}
 
       {phase === "done" && reward ? (
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 space-y-4">
           <p className="flex items-start gap-2 text-sm">
             <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
             <span>{reward.message}</span>
           </p>
+
+          {/* The "no" turned into information: a named pattern + a sharper next move. */}
+          {reward.insight.pattern ? (
+            <div className="rounded-md border border-primary/30 bg-primary/5 p-3">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Search className="size-4 text-primary" aria-hidden="true" />
+                {reward.insight.pattern.name}
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">{reward.insight.pattern.evidence}</p>
+            </div>
+          ) : null}
+
+          {reward.insight.sharperNextApplication.length > 0 ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-sm font-semibold">
+                <Target className="size-4 text-primary" aria-hidden="true" />
+                Your sharper next application
+              </div>
+              <ul className="space-y-1.5">
+                {reward.insight.sharperNextApplication.map((step, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
+                    <ArrowRight className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden="true" />
+                    <span>{step}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
+          {reward.insight.reframe ? (
+            <p className="border-l-2 border-primary/40 pl-3 text-sm italic text-muted-foreground">
+              {reward.insight.reframe}
+            </p>
+          ) : null}
+
           <p className="text-xs text-muted-foreground">
             Momentum +{reward.delta} → {Math.round(reward.momentum)}/100. That counted because you
             faced it and learned from it — the part you control.

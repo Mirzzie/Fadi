@@ -1,4 +1,4 @@
-import { and, count, desc, eq, gte, isNotNull } from "drizzle-orm";
+import { and, count, desc, eq, gte, isNotNull, ne } from "drizzle-orm";
 
 import type { Database } from "../client";
 import {
@@ -133,6 +133,26 @@ export function createResilienceRepository(db: Database) {
         .returning();
 
       return updated;
+    },
+
+    /**
+     * The user's other rejected applications — the raw material for a cross-rejection
+     * PATTERN (e.g. "always filtered at the keyword stage"). Newest first; the
+     * current application can be excluded so the autopsy compares against the rest.
+     */
+    async listRejectedApplications(
+      userId: string,
+      opts: { limit?: number; excludeId?: string } = {},
+    ): Promise<Application[]> {
+      const where = [eq(applications.userId, userId), eq(applications.outcome, "rejected")];
+      if (opts.excludeId) where.push(ne(applications.id, opts.excludeId));
+
+      return db
+        .select()
+        .from(applications)
+        .where(and(...where))
+        .orderBy(desc(applications.outcomeAt))
+        .limit(opts.limit ?? 20);
     },
 
     /** Count applications the user has actually sent (appliedAt set) — for anomaly checks. */

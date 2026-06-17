@@ -11,6 +11,7 @@ import {
   logRejection,
   type LogRejectionResult,
 } from "@/lib/resilience/service";
+import type { RejectionInsight } from "@/lib/resilience/autopsy";
 
 export type RejectionStage = "keyword" | "screen" | "interview" | "final";
 
@@ -79,7 +80,7 @@ export async function submitRejectionAutopsy(input: {
   applicationId: string;
   reflection: { stage?: string; feedback?: string; lesson?: string; nextAction?: string };
 }): Promise<
-  | { ok: true; message: string; momentum: number; delta: number; band: string }
+  | { ok: true; message: string; momentum: number; delta: number; band: string; insight: RejectionInsight }
   | { ok: false; message: string }
 > {
   const user = await getCurrentAuthUser();
@@ -94,6 +95,7 @@ export async function submitRejectionAutopsy(input: {
       momentum: motion.momentum,
       delta: motion.delta,
       band: motion.band,
+      insight: motion.insight,
     };
   } catch (error) {
     logger.error("applications.autopsy_failed", {

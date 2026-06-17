@@ -20,6 +20,7 @@ import {
   forwardMotionMessage,
   momentumMessage,
 } from "./framing";
+import { analyzeRejection, type RejectionInsight } from "./autopsy";
 
 function repo() {
   return createResilienceRepository(getDatabase());
@@ -209,16 +210,58 @@ export async function logRejection(
   return { ok: true, autopsyPrompts: REJECTION_AUTOPSY_PROMPTS, motion, anomalyNudge: nudge };
 }
 
-/** Complete the rejection autopsy — where the real forward-motion reward lands. */
+export type RejectionAutopsyOutcome = ForwardMotionOutcome & { insight: RejectionInsight };
+
+/**
+ * Complete the rejection autopsy — where the real forward-motion reward lands, and
+ * where the "no" is turned into information. We analyse this rejection against the
+ * user's other rejections to surface a named pattern + a sharper next application,
+ * record the forward motion (tagging the pattern in the ledger), and hand both
+ * back so Fadi can show the user what they just learned.
+ */
 export async function completeRejectionAutopsy(
   userId: string,
   applicationId: string,
   reflection: { stage?: string; feedback?: string; lesson?: string; nextAction?: string },
-): Promise<ForwardMotionOutcome> {
-  return recordForwardMotion(userId, "rejection_autopsy", {
+): Promise<RejectionAutopsyOutcome> {
+  const r = repo();
+  const [application, priorRejections] = await Promise.all([
+    r.getApplicationForUser(userId, applicationId),
+    r.listRejectedApplications(userId, { excludeId: applicationId, limit: 20 }),
+  ]);
+
+  const insight = application
+    ? await analyzeRejection({ userId, application, reflection, priorRejections })
+    : { pattern: null, sharperNextApplication: [], reframe: "" };
+
+  const motion = await recordForwardMotion(userId, "rejection_autopsy", {
     applicationId,
-    metadata: { ...reflection },
+    metadata: { ...reflection, pattern: insight.pattern?.name ?? null },
   });
+
+  return { ...motion, insight };
+}
+
+/**
+ * A read-only cross-rejection read for Fadi (voice/agent): "what pattern do my
+ * rejections show?". Grounded only in real rejected applications — returns null
+ * when there are none, so Fadi can't claim a pattern that doesn't exist.
+ */
+export async function summarizeRejectionPatterns(
+  userId: string,
+): Promise<{ rejectionCount: number; insight: RejectionInsight | null }> {
+  const r = repo();
+  const rejections = await r.listRejectedApplications(userId, { limit: 20 });
+  if (rejections.length === 0) return { rejectionCount: 0, insight: null };
+
+  const [latest, ...rest] = rejections;
+  const insight = await analyzeRejection({
+    userId,
+    application: latest,
+    reflection: { stage: latest.rejectionStage ?? undefined },
+    priorRejections: rest,
+  });
+  return { rejectionCount: rejections.length, insight };
 }
 
 /** Let the user set a sustainable cadence on their own terms. */
