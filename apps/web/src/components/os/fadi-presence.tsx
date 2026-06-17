@@ -2,6 +2,8 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 
+import { subscribeFadiSpeaking } from "@/lib/voice/fadi-speech";
+
 /**
  * Fadi is ambient — one presence the whole OS shares, not a mode you toggle into.
  * This context holds everything the persistent Fadi orb and the command spotlight
@@ -55,15 +57,9 @@ export function FadiPresenceProvider({ children }: { children: React.ReactNode }
   const [speaking, setSpeaking] = useState(false);
   const seedNonce = useRef(0);
 
-  // Poll the speech engine so the living core reacts whenever Fadi talks, no
-  // matter which component triggered the speech (boot, dashboard briefing, chat…).
-  useEffect(() => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-    const id = window.setInterval(() => {
-      setSpeaking(window.speechSynthesis.speaking && !window.speechSynthesis.paused);
-    }, 180);
-    return () => window.clearInterval(id);
-  }, []);
+  // The shared speech controller tells us whenever Fadi talks — premium neural
+  // audio or the browser fallback — so the living core reacts to all of it.
+  useEffect(() => subscribeFadiSpeaking(setSpeaking), []);
 
   const openFadi = useCallback(() => setOpen(true), []);
   // Clear any spotlight seed on close so reopening via the orb doesn't re-fire

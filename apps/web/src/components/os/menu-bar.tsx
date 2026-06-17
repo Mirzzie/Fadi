@@ -4,6 +4,7 @@ import { LayoutGrid, Mic, MicOff, Monitor, Search, Volume2, VolumeX } from "luci
 import { useEffect, useState } from "react";
 
 import { FadiLogo } from "@/components/brand/fadi-logo";
+import { stopFadiSpeech } from "@/lib/voice/fadi-speech";
 import { useWakeWord } from "@/lib/voice/use-wake-word";
 import { cn } from "@/lib/utils";
 import { ActivityCenter } from "./activity-center";
@@ -133,7 +134,7 @@ function VoiceToggle() {
     } catch {
       /* ignore */
     }
-    if (!next) window.speechSynthesis?.cancel();
+    if (!next) stopFadiSpeech();
   }
   return (
     <button
