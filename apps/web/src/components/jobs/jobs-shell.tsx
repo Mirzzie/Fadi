@@ -1,4 +1,4 @@
-import { BriefcaseBusiness, CalendarClock, MapPin, Signal, Wallet } from "lucide-react";
+import { BriefcaseBusiness, CalendarClock, Info, MapPin, Signal, Wallet } from "lucide-react";
 
 import { JobActions } from "@/components/jobs/job-actions";
 import { JobDescription } from "@/components/jobs/job-description";
@@ -16,6 +16,8 @@ type JobsShellProps = {
   selectedModes: WorkMode[];
   selectedTypes: EmploymentType[];
   selectedVisa: VisaFilter;
+  /** Honest advisory when the live sources don't cover the user's field. */
+  coverageNotice?: string | null;
 };
 
 export function JobsShell({
@@ -25,6 +27,7 @@ export function JobsShell({
   selectedModes,
   selectedTypes,
   selectedVisa,
+  coverageNotice,
 }: JobsShellProps) {
   return (
     <div className="mx-auto max-w-shell space-y-6">
@@ -60,6 +63,13 @@ export function JobsShell({
           />
         </div>
       </section>
+
+      {coverageNotice ? (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
+          <Info className="mt-0.5 size-4 shrink-0 text-amber-500" aria-hidden="true" />
+          <p className="text-foreground/90">{coverageNotice}</p>
+        </div>
+      ) : null}
 
       {jobs.length > 0 ? (
         <section className="space-y-4">

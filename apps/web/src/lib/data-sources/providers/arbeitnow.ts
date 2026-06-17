@@ -30,6 +30,7 @@ export class ArbeitnowSource implements JobSource {
   readonly isConfigured = true; // keyless
   readonly capabilities: DataSourceCapability[] = ["job_listings"];
   readonly cost = "free" as const;
+  readonly coverage = "tech" as const; // predominantly IT/engineering ATS feed — dropped for non-tech users
 
   async fetchJobs(query: SignalQuery): Promise<JobPosting[]> {
     try {

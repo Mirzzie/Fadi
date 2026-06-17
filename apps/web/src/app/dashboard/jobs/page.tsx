@@ -5,6 +5,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { JobsShell } from "@/components/jobs/jobs-shell";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDashboardProfileSummary } from "@/lib/career-report/data";
+import { getJobSourceCoverage } from "@/lib/data-sources/service";
 import { getRecommendedJobsForUser } from "@/lib/jobs/data";
 import type { EmploymentType, VisaFilter, WorkMode } from "@/lib/jobs/filters";
 import { getCountry, parseLocation } from "@/lib/jobs/locations";
@@ -63,6 +64,10 @@ export default async function JobsPage({
     visa,
   });
 
+  // Honest, domain-agnostic: if the live sources don't cover this user's field,
+  // say so (and how to fix it) rather than showing tech noise or a blank list.
+  const coverage = getJobSourceCoverage(profile?.domain);
+
   return (
     <AppShell>
       <JobsShell
@@ -72,6 +77,7 @@ export default async function JobsPage({
         selectedModes={modes}
         selectedTypes={types}
         selectedVisa={visa}
+        coverageNotice={coverage.message}
       />
     </AppShell>
   );

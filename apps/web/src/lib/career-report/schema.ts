@@ -45,6 +45,8 @@ export type DashboardProfileSummary = {
   fullName: string | null;
   email?: string;
   targetRole: string | null;
+  /** The active track's field/industry — drives domain-aware job-source coverage. */
+  domain: string | null;
   locationPreference: string | null;
   experienceLevel: string | null;
   careerGoals: string | null;

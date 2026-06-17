@@ -75,6 +75,12 @@ export interface SignalSource extends DataSourceBase {
 
 /** Job board / aggregator / ATS sources return live postings. */
 export interface JobSource extends DataSourceBase {
+  /**
+   * Industry breadth of this source's catalog. "tech" sources (e.g. Remotive) are
+   * dropped for non-tech users so a nurse isn't fed software roles. Defaults to
+   * "general" (cross-industry) when a source doesn't declare it.
+   */
+  readonly coverage?: import("./coverage").SourceCoverage;
   fetchJobs(query: SignalQuery): Promise<JobPosting[]>;
   /**
    * Liveness check: is this posting still open / accepting applications?

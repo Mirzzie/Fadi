@@ -18,6 +18,7 @@ type CareerReportContext = {
   fullName: string | null;
   email?: string;
   targetRole: string | null;
+  domain: string | null;
   locationPreference: string | null;
   experienceLevel: string | null;
   careerGoals: string | null;
@@ -69,6 +70,7 @@ export async function getCareerReportContext(userId: string): Promise<CareerRepo
     fullName: profile?.fullName ?? null,
     email: profile?.email ?? undefined,
     targetRole: careerProfile.targetRole,
+    domain: careerProfile.domain ?? null,
     locationPreference: careerProfile.location,
     experienceLevel: careerProfile.experienceLevel,
     careerGoals: careerProfile.careerGoal,
@@ -90,6 +92,7 @@ export async function getDashboardProfileSummary(
     fullName: context.fullName,
     email: context.email,
     targetRole: context.targetRole,
+    domain: context.domain,
     locationPreference: context.locationPreference,
     experienceLevel: context.experienceLevel,
     careerGoals: context.careerGoals,

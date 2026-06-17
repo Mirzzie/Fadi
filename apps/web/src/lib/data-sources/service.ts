@@ -2,9 +2,15 @@ import "server-only";
 
 import { logger } from "@/lib/observability/logger";
 import { parseLocation } from "@/lib/jobs/locations";
+import {
+  decideJobCoverage,
+  isLikelyTechDomain,
+  type JobSourceCoverage,
+  type SourceCoverage,
+} from "./coverage";
 import { getConfiguredJobSources, getConfiguredSignalSources } from "./registry";
 import { rankSignals, type RelevanceProfile, type ScoredSignal } from "./relevance";
-import type { JobPosting, SignalQuery } from "./types";
+import type { JobPosting, JobSource, SignalQuery } from "./types";
 
 /** Explicit location filter from the UI switcher; overrides the profile's region. */
 export interface LocationFilter {
@@ -131,30 +137,46 @@ export async function getMarketIntelligence(
   return intel;
 }
 
-/** Live job discovery across configured job sources, deduped by title+company. */
-// Sources whose catalog is overwhelmingly tech/startup roles. For a non-tech
-// user (finance, healthcare, trades…) these are mostly noise, so we drop them
-// and lean on the cross-sector aggregators (Reed/Jooble/Adzuna).
-const TECH_FOCUSED_SOURCES = new Set(["remotive", "arbeitnow", "hackernews"]);
-
-function isLikelyTechDomain(domain?: string | null): boolean {
-  if (!domain) return true; // unknown domain → keep every source (back-compat)
-  return /tech|\bit\b|information technology|software|develop|engineer|data|cyber|security|cloud|devops|\bweb\b|\bai\b|\bml\b|computer|programming|sre|network/.test(
-    domain.toLowerCase(),
-  );
+/** A source's declared industry breadth (defaults to general/cross-industry). */
+function sourceCoverage(s: JobSource): SourceCoverage {
+  return s.coverage ?? "general";
 }
 
+/**
+ * Honest coverage read for the Jobs UI: does the configured set actually serve
+ * this user's field, and if not, what unlocks it? Domain-agnostic — never assumes
+ * tech. See lib/data-sources/coverage.ts for the pure decision.
+ */
+export function getJobSourceCoverage(domain?: string | null): JobSourceCoverage {
+  const sources = getConfiguredJobSources().map((s) => ({
+    id: s.id,
+    name: s.name,
+    coverage: sourceCoverage(s),
+  }));
+  return decideJobCoverage(domain, sources);
+}
+
+/** Live job discovery across configured job sources, deduped by title+company. */
 export async function discoverJobs(
   profile: RelevanceProfile,
   limit = 20,
   location?: LocationFilter,
 ): Promise<JobPosting[]> {
   let sources = getConfiguredJobSources();
-  // Domain-aware: a finance user shouldn't be fed a tech-only board. Only filter
-  // when at least one general source survives — never leave the user with zero.
+  // Domain-aware: a finance/healthcare/trades user shouldn't be fed a tech-only
+  // board. For a non-tech field we drop tech sources entirely — and if that leaves
+  // nothing, we return an HONEST empty rather than tech noise (the UI shows a
+  // coverage advisory from getJobSourceCoverage explaining the fix).
   if (!isLikelyTechDomain(profile.domain)) {
-    const general = sources.filter((s) => !TECH_FOCUSED_SOURCES.has(s.id));
-    if (general.length > 0) sources = general;
+    sources = sources.filter((s) => sourceCoverage(s) !== "tech");
+    if (sources.length === 0) {
+      logger.info("data_sources.discover_jobs", {
+        configured: "none_general",
+        query: profile.targetRole ?? "",
+        perSource: "skipped:non_tech_no_general_source",
+      });
+      return [];
+    }
   }
   const query = queryFromProfile(profile, limit, location);
 
