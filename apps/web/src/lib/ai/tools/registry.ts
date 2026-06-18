@@ -5,6 +5,7 @@ import { parseLocation, getCountry } from "@/lib/jobs/locations";
 import { getMomentumSummary, summarizeRejectionPatterns } from "@/lib/resilience/service";
 import { answerBehavioral } from "@/lib/interview/story-bank";
 import { fetchCompanyAtsJobs } from "@/lib/data-sources/ats-boards";
+import { getCareerWeather } from "@/lib/intelligence/career-weather";
 import { createTrackTool } from "./create-track";
 import { generateDocument } from "./generate-document";
 import { getLaborMarket } from "./labor-market";
@@ -273,6 +274,30 @@ const scanCompanyJobsTool: FadiTool = {
   },
 };
 
+const getCareerWeatherTool: FadiTool = {
+  name: "get_career_weather",
+  description:
+    "Give the user a personalized 'career weather' read: what's moving in the world (structural shifts, the economy/inflation/rates, current affairs) and what it means for THEIR specific path — each with a controllable next move. Use for 'what's the outlook for my field', 'should I worry about the economy', 'what's happening in the world that affects my career'.",
+  parameters: { type: "object", properties: {} },
+  async execute(_args, ctx): Promise<FadiToolResult> {
+    const w = await getCareerWeather(ctx.userId);
+    const all = [...w.forces, ...w.macro, ...w.currentAffairs];
+    if (all.length === 0) {
+      return { summary: "Set a career direction and I'll read the world's signals against your path.", view: "none" };
+    }
+    const top = all
+      .slice(0, 5)
+      .map((c) => `• ${c.title} → your move: ${c.move}`)
+      .join("\n");
+    const macroNote = w.macroAvailable ? "" : " (live inflation/rates aren't connected — add a free FRED key to light up the money axis.)";
+    return {
+      summary: `Career weather for ${w.track.targetRole ?? "your path"}:\n${top}\n\nThat's positioning information, not doom — each one has a move you control.${macroNote}`,
+      view: "none",
+      data: { track: w.track, forces: w.forces.length, macro: w.macro.length, news: w.currentAffairs.length },
+    };
+  },
+};
+
 const TOOLS: FadiTool[] = [
   searchJobs,
   getPerformance,
@@ -280,6 +305,7 @@ const TOOLS: FadiTool[] = [
   draftReferralOutreachTool,
   answerBehavioralTool,
   scanCompanyJobsTool,
+  getCareerWeatherTool,
   getCareerUpdates,
   generateDocument,
   trackApplication,

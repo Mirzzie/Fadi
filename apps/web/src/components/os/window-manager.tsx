@@ -13,6 +13,7 @@ export type WindowApp =
   | "applications"
   | "network"
   | "interview"
+  | "intelligence"
   | "learning"
   | "niche"
   | "profile"
@@ -47,6 +48,7 @@ const META: Record<WindowApp, { title: string; w: number; h: number }> = {
   applications: { title: "Applications", w: 960, h: 600 },
   network: { title: "Network", w: 820, h: 620 },
   interview: { title: "Interview prep", w: 820, h: 620 },
+  intelligence: { title: "Career Weather", w: 820, h: 640 },
   learning: { title: "Learning", w: 880, h: 600 },
   niche: { title: "Niche Finder", w: 880, h: 600 },
   profile: { title: "Profile", w: 760, h: 620 },
