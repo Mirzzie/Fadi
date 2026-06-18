@@ -106,6 +106,7 @@ const ROUTE: Partial<Record<WindowApp, string>> = {
   documents: "/dashboard/documents",
   applications: "/dashboard/applications",
   network: "/dashboard/network",
+  interview: "/dashboard/interview",
   learning: "/dashboard/learning",
   niche: "/dashboard/niche-finder",
   profile: "/dashboard/profile",

@@ -3,6 +3,8 @@ import "server-only";
 import { getRecommendedJobsForUser } from "@/lib/jobs/data";
 import { parseLocation, getCountry } from "@/lib/jobs/locations";
 import { getMomentumSummary, summarizeRejectionPatterns } from "@/lib/resilience/service";
+import { answerBehavioral } from "@/lib/interview/story-bank";
+import { fetchCompanyAtsJobs } from "@/lib/data-sources/ats-boards";
 import { createTrackTool } from "./create-track";
 import { generateDocument } from "./generate-document";
 import { getLaborMarket } from "./labor-market";
@@ -207,11 +209,77 @@ const draftReferralOutreachTool: FadiTool = {
   },
 };
 
+const answerBehavioralTool: FadiTool = {
+  name: "answer_behavioral_question",
+  description:
+    "Answer a behavioral interview question ('tell me about a time you…', 'describe a situation where…') using the candidate's OWN interview story bank — their real STAR+Reflection stories. Use when the user is practicing interviews or asks how to answer a behavioral question. Grounded only in their real stories; never invents experience.",
+  parameters: {
+    type: "object",
+    properties: {
+      question: { type: "string", description: "The behavioral interview question to answer." },
+    },
+    required: ["question"],
+  },
+  async execute(args, ctx): Promise<FadiToolResult> {
+    const question = typeof args.question === "string" ? args.question.trim() : "";
+    if (!question) {
+      return { summary: "What behavioral question do you want to practice? Give me the prompt and I'll answer it from your real stories.", view: "none" };
+    }
+    const res = await answerBehavioral(ctx.userId, question);
+    if (!res.ok) return { summary: res.message ?? "Build your story bank first.", view: "none" };
+    return {
+      summary: `Best story for "${question}" — "${res.storyTitle}":\n\n${res.answer}\n\nDeliver it in your own words; don't recite. Want me to tighten any part?`,
+      view: "none",
+      data: { storyTitle: res.storyTitle, answer: res.answer },
+    };
+  },
+};
+
+const scanCompanyJobsTool: FadiTool = {
+  name: "scan_company_jobs",
+  description:
+    "Pull a company's CURRENTLY OPEN roles straight from its applicant-tracking board (Greenhouse / Lever / Ashby) — fresher and far less ghost-prone than aggregators. Use for 'what's open at <company>', 'show me roles at <company>', or to check companies the user is targeting. Provide the company name; optionally a role to filter by.",
+  parameters: {
+    type: "object",
+    properties: {
+      company: { type: "string", description: "The company whose open roles to pull." },
+      role: { type: "string", description: "Optional role/title keyword to filter by." },
+    },
+    required: ["company"],
+  },
+  async execute(args, ctx): Promise<FadiToolResult> {
+    void ctx;
+    const company = typeof args.company === "string" ? args.company.trim() : "";
+    if (!company) {
+      return { summary: "Which company's open roles do you want me to pull?", view: "none" };
+    }
+    const role = typeof args.role === "string" ? args.role.trim() : "";
+    const res = await fetchCompanyAtsJobs(company, { keywords: role ? [role] : [], limit: 15 });
+    if (res.jobs.length === 0) {
+      return {
+        summary: `I couldn't find a public Greenhouse, Lever, or Ashby board for ${company}${role ? ` with "${role}" roles` : ""}. Not every company uses those (or the name might be spelled differently on their board). Want me to search the job aggregators instead?`,
+        view: "none",
+      };
+    }
+    const lines = res.jobs
+      .slice(0, 10)
+      .map((j) => `• ${j.title}${j.location ? ` — ${j.location}` : ""}`)
+      .join("\n");
+    return {
+      summary: `${res.jobs.length} open role(s) at ${company}, live from its ${res.provider} board:\n${lines}\n\nThese come straight from the employer's ATS, so they're current — a referral here is your highest-leverage next move.`,
+      view: "none",
+      data: { company, provider: res.provider, jobs: res.jobs },
+    };
+  },
+};
+
 const TOOLS: FadiTool[] = [
   searchJobs,
   getPerformance,
   getRejectionPatterns,
   draftReferralOutreachTool,
+  answerBehavioralTool,
+  scanCompanyJobsTool,
   getCareerUpdates,
   generateDocument,
   trackApplication,

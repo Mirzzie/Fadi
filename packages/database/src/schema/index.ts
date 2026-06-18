@@ -672,6 +672,33 @@ export const referralTargets = pgTable(
   ]
 );
 
+// ── Interview story bank ──────────────────────────────────────────────────────
+// Reusable STAR+Reflection stories mined from the candidate's REAL experience —
+// a handful of master stories that answer most behavioral questions. Grounded only
+// in their evidence (never invented). Concept adapted from career-ops's Story Bank.
+export const interviewStories = pgTable(
+  "interview_stories",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    // Behavioral themes this story answers (e.g. "leadership", "conflict", "failure").
+    competencies: jsonb("competencies").$type<string[]>().notNull().default([]),
+    // STAR + Reflection — the structure that makes one story reusable across questions.
+    situation: text("situation").notNull().default(""),
+    task: text("task").notNull().default(""),
+    action: text("action").notNull().default(""),
+    result: text("result").notNull().default(""),
+    reflection: text("reflection").notNull().default(""),
+    // "ai" when extracted from evidence, "manual" when the user wrote/edited it.
+    origin: text("origin").notNull().default("manual"),
+    ...timestamps,
+  },
+  (table) => [index("interview_stories_user_id_idx").on(table.userId)]
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type AuthIdentity = typeof authIdentities.$inferSelect;
@@ -701,3 +728,5 @@ export type AgentFinding = typeof agentFindings.$inferSelect;
 export type NewAgentFinding = typeof agentFindings.$inferInsert;
 export type ReferralTarget = typeof referralTargets.$inferSelect;
 export type NewReferralTarget = typeof referralTargets.$inferInsert;
+export type InterviewStory = typeof interviewStories.$inferSelect;
+export type NewInterviewStory = typeof interviewStories.$inferInsert;
