@@ -11,6 +11,8 @@ import type { RecommendedJob } from "@/lib/jobs/types";
 
 type JobsShellProps = {
   jobs: RecommendedJob[];
+  /** The active career direction these roles are matched to — shown for transparency. */
+  activeRole?: string | null;
   selectedCountry: string | null;
   selectedCity: string | null;
   selectedModes: WorkMode[];
@@ -22,6 +24,7 @@ type JobsShellProps = {
 
 export function JobsShell({
   jobs,
+  activeRole,
   selectedCountry,
   selectedCity,
   selectedModes,
@@ -49,8 +52,14 @@ export function JobsShell({
               </h2>
               <p className="text-muted-foreground">
                 Live postings from the connected job sources — Google for Jobs, Adzuna, Reed,
-                Jooble, Remotive and more — matched against your profile. Switch country and city
-                to search anywhere.
+                Jooble, Remotive and more — matched to{" "}
+                {activeRole ? (
+                  <span className="text-foreground">your active direction: {activeRole}</span>
+                ) : (
+                  "your profile"
+                )}
+                . Each card links to the original posting so you can apply directly. Switch country
+                and city to search anywhere.
               </p>
             </div>
           </div>
@@ -108,6 +117,7 @@ export function JobsShell({
                   jobId={job.id}
                   isSaved={job.isSaved}
                   applicationStatus={job.applicationStatus}
+                  url={job.url}
                 />
               </CardContent>
             </Card>

@@ -1,6 +1,6 @@
 "use client";
 
-import { Bookmark, BookmarkCheck, Loader2, Sparkles } from "lucide-react";
+import { Bookmark, BookmarkCheck, ExternalLink, Loader2, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 
@@ -26,9 +26,11 @@ type JobActionsProps = {
   jobId: string;
   isSaved: boolean;
   applicationStatus: ApplicationStatus | null;
+  /** The original posting URL on the source/company site, so the user can apply directly. */
+  url?: string | null;
 };
 
-export function JobActions({ jobId, isSaved, applicationStatus }: JobActionsProps) {
+export function JobActions({ jobId, isSaved, applicationStatus, url }: JobActionsProps) {
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<JobActionResult | null>(null);
 
@@ -64,6 +66,18 @@ export function JobActions({ jobId, isSaved, applicationStatus }: JobActionsProp
           <Sparkles className="size-4" aria-hidden="true" />
           Open workspace
         </Link>
+        {url ? (
+          <a
+            href={url}
+            target="_blank"
+            rel="noreferrer"
+            className={buttonVariants({ variant: "outline" })}
+            title="Open the original posting on the source site to apply directly"
+          >
+            <ExternalLink className="size-4" aria-hidden="true" />
+            View original
+          </a>
+        ) : null}
         <select
           value={applicationStatus ?? ""}
           disabled={isPending}

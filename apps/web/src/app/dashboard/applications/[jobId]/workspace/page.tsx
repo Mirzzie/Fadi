@@ -10,6 +10,8 @@ import {
 
 import { AppShell } from "@/components/layout/app-shell";
 import { ApplicationWorkspace } from "@/components/workspace/application-workspace";
+import { ExternalLink } from "lucide-react";
+
 import { ApplicationOutcomePanel } from "@/components/workspace/application-outcome-panel";
 import { FitGatePanel } from "@/components/workspace/fit-gate-panel";
 import { AutoPrepRunner } from "@/components/workspace/auto-prep-runner";
@@ -75,6 +77,17 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
           <p className="text-sm text-muted-foreground">
             Application workspace — all documents are drafts until you approve them
           </p>
+          {job.url ? (
+            <a
+              href={job.url}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-1 inline-flex items-center gap-1 text-sm text-primary hover:underline"
+              title="Open the original posting on the source site to apply directly"
+            >
+              View the original posting <ExternalLink className="size-3.5" aria-hidden="true" />
+            </a>
+          ) : null}
         </div>
 
         {/* Freshness guard — warn (don't block) if the posting looks closed */}

@@ -72,6 +72,7 @@ export default async function JobsPage({
     <AppShell>
       <JobsShell
         jobs={jobs}
+        activeRole={profile?.targetRole ?? null}
         selectedCountry={getCountry(country)?.code ?? null}
         selectedCity={city ?? null}
         selectedModes={modes}

@@ -35,6 +35,22 @@ function syncKey(profile: RelevanceProfile, location?: LocationFilter): string {
   return `${profile.targetRole}::${profile.region ?? ""}::${location?.country ?? ""}::${location?.city ?? ""}`;
 }
 
+/**
+ * Drop the cached sync window so the next jobs load re-pulls live postings. Called
+ * when the user creates or switches their active direction, so the jobs they see
+ * follow the NEW direction immediately instead of waiting out the TTL. Pass a role
+ * to target just that direction; omit to clear all.
+ */
+export function invalidateJobSync(targetRole?: string): void {
+  if (!targetRole) {
+    lastSyncByKey.clear();
+    return;
+  }
+  for (const key of [...lastSyncByKey.keys()]) {
+    if (key.startsWith(`${targetRole}::`)) lastSyncByKey.delete(key);
+  }
+}
+
 function toRemoteMode(posting: JobPosting): string | null {
   return posting.remote ? "remote" : null;
 }

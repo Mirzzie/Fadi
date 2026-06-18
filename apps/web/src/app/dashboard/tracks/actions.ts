@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
+import { invalidateJobSync } from "@/lib/jobs/sync";
 import { logger } from "@/lib/observability/logger";
 
 /**
@@ -76,6 +77,8 @@ export async function switchTrackAction(
   );
   if (!updated) return { ok: false, message: "That track isn't yours." };
 
+  // Make jobs follow the new direction right away (don't serve the stale sync window).
+  invalidateJobSync(updated.targetRole);
   logger.info("tracks.switched", { userId: user.id, trackId: id.data });
   revalidatePath("/dashboard", "layout");
   return { ok: true };
@@ -119,6 +122,8 @@ export async function createTrackAction(
     makeActive: true,
   });
 
+  // A brand-new direction → pull its jobs fresh on the next load.
+  invalidateJobSync(track.targetRole);
   logger.info("tracks.created", {
     userId: user.id,
     trackId: track.id,
