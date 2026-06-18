@@ -2,7 +2,7 @@ import "server-only";
 
 import { getRecommendedJobsForUser } from "@/lib/jobs/data";
 import { parseLocation, getCountry } from "@/lib/jobs/locations";
-import { getMomentumSummary, summarizeRejectionPatterns } from "@/lib/resilience/service";
+import { getMomentumReflection, getMomentumSummary, summarizeRejectionPatterns } from "@/lib/resilience/service";
 import { answerBehavioral } from "@/lib/interview/story-bank";
 import { fetchCompanyAtsJobs } from "@/lib/data-sources/ats-boards";
 import { getCareerWeather } from "@/lib/intelligence/career-weather";
@@ -331,9 +331,25 @@ const evaluateFitTool: FadiTool = {
   },
 };
 
+const getMomentumReflectionTool: FadiTool = {
+  name: "get_momentum_reflection",
+  description:
+    "Give an honest 'how am I really doing' read: how this week compares to the user's OWN past weeks (never other people), plus a morale-aware single next step. Use for 'am I improving', 'how am I really doing', or when they sound discouraged or stuck.",
+  parameters: { type: "object", properties: {} },
+  async execute(_args, ctx): Promise<FadiToolResult> {
+    const ref = await getMomentumReflection(ctx.userId);
+    return {
+      summary: `${ref.pastSelf.line} ${ref.morale.line} Your one next step: ${ref.morale.nextStep}`,
+      view: "none",
+      data: ref,
+    };
+  },
+};
+
 const TOOLS: FadiTool[] = [
   searchJobs,
   getPerformance,
+  getMomentumReflectionTool,
   getRejectionPatterns,
   draftReferralOutreachTool,
   answerBehavioralTool,

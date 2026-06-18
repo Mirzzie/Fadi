@@ -21,6 +21,7 @@ import {
   momentumMessage,
 } from "./framing";
 import { analyzeRejection, type RejectionInsight } from "./autopsy";
+import { bucketWeeklyMotion, buildReflection, type MomentumReflection } from "./reflection";
 
 function repo() {
   return createResilienceRepository(getDatabase());
@@ -84,6 +85,48 @@ export async function getMomentumSummary(userId: string): Promise<MomentumSummar
     qualityApplicationsThisPeriod,
     recentEvents: await r.listRecentEvents(userId, 12),
   };
+}
+
+/**
+ * The honest "how am I really doing?" read: you-vs-your-past-self standing + a
+ * morale-aware next step. Never compares to other users; never shames a dip.
+ */
+export async function getMomentumReflection(userId: string): Promise<MomentumReflection> {
+  const r = repo();
+  const now = new Date();
+  const [state, events] = await Promise.all([
+    r.ensureMomentumState(userId),
+    r.listRecentEvents(userId, 200),
+  ]);
+
+  const momentum = decayMomentum(
+    { momentum: state.momentum, lastActionAt: state.lastActionAt, restingUntil: state.restingUntil },
+    now,
+  );
+  const band = momentumBand(momentum);
+  const isResting = Boolean(state.restingUntil && state.restingUntil > now);
+
+  const since21 = new Date(now.getTime() - 21 * 24 * 60 * 60 * 1000);
+  const [recentRejections, recentAutopsies] = await Promise.all([
+    r.countEventsSince(userId, "rejection_logged", since21),
+    r.countEventsSince(userId, "rejection_autopsy", since21),
+  ]);
+
+  const lastAction = state.lastActionAt ?? (events[0] ? new Date(events[0].createdAt) : null);
+  const daysSinceLastAction = lastAction
+    ? (now.getTime() - lastAction.getTime()) / (24 * 60 * 60 * 1000)
+    : Number.POSITIVE_INFINITY;
+
+  const buckets = bucketWeeklyMotion(events, now, 12);
+
+  return buildReflection({
+    buckets,
+    band,
+    isResting,
+    recentRejections,
+    recentAutopsies,
+    daysSinceLastAction,
+  });
 }
 
 export type ForwardMotionOutcome = {

@@ -14,6 +14,8 @@ import { GenerateReportButton } from "@/components/dashboard/generate-report-but
 import { FadiBriefing } from "@/components/os/fadi-briefing";
 import { GuidedSetup } from "@/components/os/guided-setup";
 import { MomentumPanel, type MomentumView } from "@/components/resilience/momentum-panel";
+import { MomentumReflectionCard } from "@/components/resilience/momentum-reflection";
+import type { MomentumReflection } from "@/lib/resilience/reflection";
 import type { Briefing } from "@/lib/agents/briefing";
 import type { SetupState } from "@/lib/guidance/setup";
 import { matchAccent } from "@/lib/jobs/match-accent";
@@ -64,6 +66,8 @@ type DashboardShellProps = {
   latestReport: StoredCareerReport | null;
   recommendedJobsPreview: RecommendedJob[];
   momentum: MomentumSummary;
+  /** You-vs-past-self + morale read (honest "how am I really doing"). */
+  reflection?: MomentumReflection | null;
   marketSignals: MarketSignal[];
   setup?: SetupState | null;
 };
@@ -78,6 +82,7 @@ export function DashboardShell({
   latestReport,
   recommendedJobsPreview,
   momentum,
+  reflection,
   marketSignals,
   setup,
 }: DashboardShellProps) {
@@ -188,6 +193,8 @@ export function DashboardShell({
       </section>
 
       <MomentumPanel momentum={toMomentumView(momentum)} />
+
+      {reflection ? <MomentumReflectionCard reflection={reflection} /> : null}
 
       <section className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
         <Card id="career-report">

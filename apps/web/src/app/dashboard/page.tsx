@@ -12,7 +12,7 @@ import { getDashboardProfileSummary, getLatestCareerReport } from "@/lib/career-
 import { getRecommendedJobsForUser } from "@/lib/jobs/data";
 import { getSetupState } from "@/lib/guidance/setup";
 import { getOnboardingStatus } from "@/lib/onboarding/status";
-import { getMomentumSummary } from "@/lib/resilience/service";
+import { getMomentumReflection, getMomentumSummary } from "@/lib/resilience/service";
 import { getMarketIntelligence } from "@/lib/data-sources/service";
 
 export const metadata: Metadata = {
@@ -34,12 +34,13 @@ export default async function DashboardPage() {
     redirect("/onboarding");
   }
 
-  const [profileSummary, latestReport, recommendedJobsPreview, momentum, setup, digest] =
+  const [profileSummary, latestReport, recommendedJobsPreview, momentum, reflection, setup, digest] =
     await Promise.all([
       getDashboardProfileSummary(user.id),
       getLatestCareerReport(user.id),
       getRecommendedJobsForUser(user.id, 3),
       getMomentumSummary(user.id),
+      getMomentumReflection(user.id),
       getSetupState(user.id),
       getAgencyDigest(user.id),
     ]);
@@ -141,6 +142,7 @@ export default async function DashboardPage() {
         latestReport={latestReport}
         recommendedJobsPreview={recommendedJobsPreview}
         momentum={momentum}
+        reflection={reflection}
         marketSignals={marketSignals}
         setup={setup}
       />
