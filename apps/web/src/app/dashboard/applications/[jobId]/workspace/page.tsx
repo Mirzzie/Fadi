@@ -11,6 +11,7 @@ import {
 import { AppShell } from "@/components/layout/app-shell";
 import { ApplicationWorkspace } from "@/components/workspace/application-workspace";
 import { ApplicationOutcomePanel } from "@/components/workspace/application-outcome-panel";
+import { FitGatePanel } from "@/components/workspace/fit-gate-panel";
 import { AutoPrepRunner } from "@/components/workspace/auto-prep-runner";
 import { JobLivenessBanner } from "@/components/workspace/job-liveness-banner";
 import { WorkspaceDocActions } from "@/components/workspace/workspace-doc-actions";
@@ -87,6 +88,15 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
             <AutoPrepRunner jobId={job.id} enabled hasDocs={jobDocs.length > 0} />
           </div>
         ) : null}
+
+        {/* Fit gate — should you even apply? (anti-spray, before you invest time) */}
+        <div className="shrink-0">
+          <FitGatePanel
+            jobTitle={job.title}
+            jobCompany={job.company}
+            jobDescription={job.description ?? undefined}
+          />
+        </div>
 
         {/* Outcome + rejection-autopsy */}
         <div className="shrink-0">

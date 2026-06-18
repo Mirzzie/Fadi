@@ -6,6 +6,7 @@ import { getMomentumSummary, summarizeRejectionPatterns } from "@/lib/resilience
 import { answerBehavioral } from "@/lib/interview/story-bank";
 import { fetchCompanyAtsJobs } from "@/lib/data-sources/ats-boards";
 import { getCareerWeather } from "@/lib/intelligence/career-weather";
+import { evaluateFit } from "@/lib/jobs/fit";
 import { createTrackTool } from "./create-track";
 import { generateDocument } from "./generate-document";
 import { getLaborMarket } from "./labor-market";
@@ -298,6 +299,38 @@ const getCareerWeatherTool: FadiTool = {
   },
 };
 
+const evaluateFitTool: FadiTool = {
+  name: "evaluate_fit",
+  description:
+    "Run an honest FIT CHECK before the user applies: is this specific job worth their limited time? Use when they paste a job description and ask 'should I apply', 'is this worth it', 'am I a fit'. Returns a 0–5 verdict (apply / stretch / skip) graded against their real experience — anti-spray, not résumé scoring.",
+  parameters: {
+    type: "object",
+    properties: {
+      jobDescription: { type: "string", description: "The full job description text to evaluate." },
+      jobTitle: { type: "string", description: "The role title, if known." },
+      company: { type: "string", description: "The company, if known." },
+    },
+    required: ["jobDescription"],
+  },
+  async execute(args, ctx): Promise<FadiToolResult> {
+    const jd = typeof args.jobDescription === "string" ? args.jobDescription : "";
+    const res = await evaluateFit(ctx.userId, {
+      jobDescription: jd,
+      jobTitle: typeof args.jobTitle === "string" ? args.jobTitle : undefined,
+      company: typeof args.company === "string" ? args.company : undefined,
+    });
+    if (!res.ok) return { summary: res.message, view: "none" };
+    const e = res.evaluation;
+    const reasons = e.topReasons.slice(0, 3).map((r) => `• ${r}`).join("\n");
+    const gaps = e.gapsToClose.length > 0 ? `\nTo close the gap: ${e.gapsToClose.slice(0, 3).join("; ")}.` : "";
+    return {
+      summary: `Fit: ${e.overall.toFixed(1)}/5 — ${e.verdict.toUpperCase()}.\n${e.verdictReason}\n${reasons}${gaps}`,
+      view: "none",
+      data: { overall: e.overall, verdict: e.verdict, dimensions: e.dimensions },
+    };
+  },
+};
+
 const TOOLS: FadiTool[] = [
   searchJobs,
   getPerformance,
@@ -306,6 +339,7 @@ const TOOLS: FadiTool[] = [
   answerBehavioralTool,
   scanCompanyJobsTool,
   getCareerWeatherTool,
+  evaluateFitTool,
   getCareerUpdates,
   generateDocument,
   trackApplication,

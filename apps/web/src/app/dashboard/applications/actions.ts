@@ -12,6 +12,7 @@ import {
   type LogRejectionResult,
 } from "@/lib/resilience/service";
 import type { RejectionInsight } from "@/lib/resilience/autopsy";
+import { evaluateFit, type FitResult } from "@/lib/jobs/fit";
 
 export type RejectionStage = "keyword" | "screen" | "interview" | "final";
 
@@ -56,6 +57,25 @@ export async function markApplicationApplied(input: {
     });
     return { ok: false, message: "Something went wrong. Please try again." };
   }
+}
+
+/**
+ * Fit gate — should the user even apply to this job? Runs the honest, anti-spray
+ * fit check (worth-your-time, BEFORE applying) against their real evidence. No
+ * persistence: it guides the decision in the moment.
+ */
+export async function evaluateJobFit(input: {
+  jobTitle: string;
+  company: string;
+  jobDescription: string;
+}): Promise<FitResult> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, reason: "error", message: "Please sign in again." };
+  return evaluateFit(user.id, {
+    jobDescription: input.jobDescription,
+    jobTitle: input.jobTitle,
+    company: input.company,
+  });
 }
 
 /** Log a rejection against a real, sent application and open the autopsy. */
