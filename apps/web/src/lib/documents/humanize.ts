@@ -64,14 +64,26 @@ export const AI_TELL_CATEGORIES = {
     "deep dive",
     "think outside the box",
     "hit the ground running",
+    // Folded in from blader's humanizer (Wikipedia "Signs of AI writing"),
+    // filtered to the ones that actually surface in cover letters / cold emails.
+    "showcase",
+    "showcasing",
+    "underscore",
+    "underscores",
+    "garner",
+    "garnered",
+    "exemplifies",
+    "boasts",
   ],
   /** Stock transitions that mark machine-structured prose. */
   transitions: [
     "furthermore",
     "moreover",
+    "additionally",
     "it is important to note",
     "it's important to note",
     "it is worth noting",
+    "due to the fact that",
     "in conclusion",
     "in summary",
     "in today's fast-paced",
@@ -91,6 +103,11 @@ export const AI_TELL_CATEGORIES = {
     "contribute to the team's success",
     "align with my career goals",
     "make a meaningful impact",
+    // Classic cold-email / cover-letter openers AI reaches for.
+    "i hope this email finds you well",
+    "i hope this finds you well",
+    "i would welcome the opportunity",
+    "perfect fit",
   ],
 } as const;
 
@@ -115,6 +132,16 @@ export const TEMPLATE_PATTERNS: ReadonlyArray<{ label: string; pattern: RegExp }
   {
     label: 'the "not only … but also" construction — split into two plain sentences',
     pattern: /\bnot only\b[^.\n]{0,80}\bbut also\b/i,
+  },
+  {
+    label:
+      'negative parallelism "it\'s not just X, it\'s Y" — a hollow AI rhythm; state the point plainly',
+    pattern: /\bit'?s not just\b[^.\n]{0,60}\bit'?s\b/i,
+  },
+  {
+    label:
+      'copula-avoidance "serves/stands as a testament/reminder" — say the actual fact with "is/was" instead',
+    pattern: /\b(serves|stands|stand|serve) as an? (testament|reminder)\b/i,
   },
 ];
 
@@ -170,6 +197,15 @@ export function burstiness(text: string): number | null {
  *  terse uniformity is the convention there, so only prose paths check this). */
 export const UNIFORM_RHYTHM_THRESHOLD = 0.25;
 
+/** Em-dashes at/above this count read as the AI "—" habit, not human punctuation.
+ *  A real writer uses one for effect; models reach for several per paragraph. */
+export const EM_DASH_OVERUSE_MIN = 3;
+
+/** Count em/en dashes used as punctuation (a high-signal AI style tell). */
+export function emDashCount(text: string): number {
+  return (text.match(/[—–]/g) ?? []).length;
+}
+
 export type HumanityAnalysis = {
   tells: string[];
   templateTells: string[];
@@ -177,6 +213,8 @@ export type HumanityAnalysis = {
   tellDensityPer100: number;
   burstiness: number | null;
   uniformRhythm: boolean;
+  /** Too many em/en dashes — the AI punctuation habit. */
+  emDashOveruse: boolean;
   /** Combined count the critic loop tries to drive to zero. */
   issueCount: number;
 };
@@ -187,6 +225,7 @@ export function analyzeHumanity(text: string): HumanityAnalysis {
   const words = text.trim() ? text.trim().split(/\s+/).length : 0;
   const b = burstiness(text);
   const uniformRhythm = b !== null && b < UNIFORM_RHYTHM_THRESHOLD;
+  const emDashOveruse = emDashCount(text) >= EM_DASH_OVERUSE_MIN;
 
   return {
     tells,
@@ -194,7 +233,9 @@ export function analyzeHumanity(text: string): HumanityAnalysis {
     tellDensityPer100: words > 0 ? (tells.length / words) * 100 : 0,
     burstiness: b,
     uniformRhythm,
-    issueCount: tells.length + templateTells.length + (uniformRhythm ? 1 : 0),
+    emDashOveruse,
+    issueCount:
+      tells.length + templateTells.length + (uniformRhythm ? 1 : 0) + (emDashOveruse ? 1 : 0),
   };
 }
 
@@ -228,6 +269,7 @@ export function buildDeAiSystemPrompt(analysis: {
   tells: string[];
   templateTells?: string[];
   uniformRhythm?: boolean;
+  emDashOveruse?: boolean;
 }): string {
   const parts: string[] = [
     "You are a sharp editor making a draft read like a real person wrote it.",
@@ -243,6 +285,11 @@ export function buildDeAiSystemPrompt(analysis: {
   if (analysis.uniformRhythm) {
     parts.push(
       "The sentences are suspiciously uniform in length — vary the rhythm: mix one short, punchy sentence among longer ones, and vary how sentences open.",
+    );
+  }
+  if (analysis.emDashOveruse) {
+    parts.push(
+      "There are too many em-dashes — a giveaway. Replace most with periods, commas, or colons, or restructure; keep at most one.",
     );
   }
   parts.push(

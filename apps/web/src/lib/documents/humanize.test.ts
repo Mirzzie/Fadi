@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   analyzeHumanity,
   burstiness,
+  emDashCount,
   findAiTells,
   findTemplateTells,
   stripAiTells,
@@ -51,6 +52,17 @@ describe("findAiTells — 2026 AI-accent vocabulary", () => {
       findAiTells("Streamlined onboarding 30% and facilitated weekly client workshops."),
     ).toEqual([]);
   });
+
+  it("catches the cover-letter / cold-email tells folded in from blader's list", () => {
+    expect(findAiTells("I hope this email finds you well.")).toContain(
+      "i hope this email finds you well",
+    );
+    const t = findAiTells("I want to showcase my work and underscore why I'm the perfect fit.");
+    expect(t).toEqual(expect.arrayContaining(["showcase", "underscore", "perfect fit"]));
+    expect(findAiTells("Additionally, our team boasts strong results.")).toEqual(
+      expect.arrayContaining(["additionally", "boasts"]),
+    );
+  });
 });
 
 describe("findTemplateTells", () => {
@@ -67,10 +79,32 @@ describe("findTemplateTells", () => {
     ).toHaveLength(1);
   });
 
+  it("flags negative parallelism and the testament/copula tell", () => {
+    expect(findTemplateTells("It's not just a job, it's a calling.")).toHaveLength(1);
+    expect(findTemplateTells("My career serves as a testament to grit.")).toHaveLength(1);
+  });
+
   it("passes specific, concrete writing", () => {
     expect(
       findTemplateTells("Rebuilt the checkout flow in Q3; drop-off fell from 31% to 13%."),
     ).toEqual([]);
+  });
+});
+
+describe("em-dash overuse", () => {
+  it("counts em/en dashes", () => {
+    expect(emDashCount("One — two — three — four.")).toBe(3);
+    expect(emDashCount("No dashes here, just commas.")).toBe(0);
+  });
+
+  it("flags overuse as an issue but lets a single dash pass", () => {
+    const overused = analyzeHumanity(
+      "I led the team — and shipped on time — under budget — with no churn.",
+    );
+    expect(overused.emDashOveruse).toBe(true);
+    expect(overused.issueCount).toBeGreaterThanOrEqual(1);
+    const fine = analyzeHumanity("I led the team — and we shipped on time.");
+    expect(fine.emDashOveruse).toBe(false);
   });
 });
 
