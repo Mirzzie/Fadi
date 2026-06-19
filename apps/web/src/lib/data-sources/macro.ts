@@ -110,7 +110,23 @@ export function unemploymentReading(ratePct: number): MacroReading {
 
 const FRED_BASE = "https://api.stlouisfred.com/fred/series/observations";
 
-async function fredSeries(seriesId: string, apiKey: string, limit: number): Promise<Observation[]> {
+/** Read the FRED key from the env, trimmed (a stray quote/space silently 400s). */
+async function fredKey(): Promise<string | null> {
+  const { serverEnv } = await import("@/lib/env.server");
+  const key = serverEnv.FRED_API_KEY?.trim().replace(/^["']|["']$/g, "");
+  return key || null;
+}
+
+/** True when a FRED key is configured — lets the UI distinguish "no key" from "fetch failed". */
+export async function isMacroConfigured(): Promise<boolean> {
+  return (await fredKey()) !== null;
+}
+
+async function fredSeries(
+  seriesId: string,
+  apiKey: string,
+  limit: number,
+): Promise<{ obs: Observation[]; status: number }> {
   const params = new URLSearchParams({
     series_id: seriesId,
     api_key: apiKey,
@@ -118,23 +134,31 @@ async function fredSeries(seriesId: string, apiKey: string, limit: number): Prom
     sort_order: "desc",
     limit: String(limit),
   });
-  const res = await fetch(`${FRED_BASE}?${params}`, {
-    headers: { "User-Agent": "FadiOS/1.0 (career intelligence)" },
-    signal: AbortSignal.timeout(6000),
-  });
-  if (!res.ok) return [];
-  return parseObservations(await res.json());
+  try {
+    const res = await fetch(`${FRED_BASE}?${params}`, {
+      headers: { "User-Agent": "FadiOS/1.0 (career intelligence)" },
+      signal: AbortSignal.timeout(6000),
+    });
+    if (!res.ok) return { obs: [], status: res.status };
+    return { obs: parseObservations(await res.json()), status: res.status };
+  } catch {
+    return { obs: [], status: 0 }; // network/timeout
+  }
 }
 
 /**
  * Live US macro snapshot. Returns null when FRED_API_KEY isn't configured (the UI
  * then offers to add it) and tolerates per-series failures — a series that doesn't
- * answer is simply omitted, never faked.
+ * answer is simply omitted, never faked. Logs the FRED HTTP status per series so a
+ * bad key (400) or network issue (0) is diagnosable instead of silently empty.
  */
 export async function getMacroSnapshot(): Promise<MacroSnapshot | null> {
-  const { serverEnv } = await import("@/lib/env.server");
-  const apiKey = serverEnv.FRED_API_KEY;
-  if (!apiKey) return null;
+  const apiKey = await fredKey();
+  const { logger } = await import("@/lib/observability/logger");
+  if (!apiKey) {
+    logger.info("macro.fred.no_key");
+    return null;
+  }
 
   try {
     const [cpi, fedFunds, unrate] = await Promise.all([
@@ -144,14 +168,24 @@ export async function getMacroSnapshot(): Promise<MacroSnapshot | null> {
     ]);
 
     const readings: MacroReading[] = [];
-    const yoy = computeYoY(cpi);
+    const yoy = computeYoY(cpi.obs);
     if (yoy !== null) readings.push(inflationReading(yoy));
-    if (fedFunds[0]) readings.push(rateReading(fedFunds[0].value));
-    if (unrate[0]) readings.push(unemploymentReading(unrate[0].value));
+    if (fedFunds.obs[0]) readings.push(rateReading(fedFunds.obs[0].value));
+    if (unrate.obs[0]) readings.push(unemploymentReading(unrate.obs[0].value));
 
-    if (readings.length === 0) return null;
+    if (readings.length === 0) {
+      // 400 ⇒ bad/invalid key; 0 ⇒ network/timeout; 200 with no rows ⇒ unexpected.
+      logger.warn("macro.fred.empty", {
+        cpiStatus: cpi.status,
+        fedFundsStatus: fedFunds.status,
+        unrateStatus: unrate.status,
+        hint: cpi.status === 400 ? "FRED rejected the key (must be 32 lowercase alphanumeric, no quotes/spaces)" : undefined,
+      });
+      return null;
+    }
     return { asOf: new Date().toISOString(), readings, source: "FRED (St. Louis Fed)" };
-  } catch {
+  } catch (err) {
+    logger.warn("macro.fred.failed", { error: err instanceof Error ? err.message : "unknown" });
     return null;
   }
 }

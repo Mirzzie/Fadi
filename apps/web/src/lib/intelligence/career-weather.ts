@@ -37,7 +37,10 @@ export type CareerWeather = {
   asOf: string;
   forces: CareerWeatherCard[];
   macro: CareerWeatherCard[];
+  /** A live macro snapshot came back. */
   macroAvailable: boolean;
+  /** A FRED key IS configured (so empty macro ⇒ a fetch/key problem, not "add a key"). */
+  macroConfigured: boolean;
   currentAffairs: CareerWeatherCard[];
 };
 
@@ -80,13 +83,14 @@ export function signalToCard(signal: ScoredSignal): CareerWeatherCard {
 
 /** Build the personalized career-weather read for a user. */
 export async function getCareerWeather(userId: string): Promise<CareerWeather> {
-  const [{ getDashboardProfileSummary }, { relevantShiftsFor }, { getMacroSnapshot }, { getMarketIntelligence }] =
+  const [{ getDashboardProfileSummary }, { relevantShiftsFor }, macroMod, { getMarketIntelligence }] =
     await Promise.all([
       import("@/lib/career-report/data"),
       import("@/lib/intelligence/world-shifts"),
       import("@/lib/data-sources/macro"),
       import("@/lib/data-sources/service"),
     ]);
+  const { getMacroSnapshot, isMacroConfigured } = macroMod;
 
   const profile = await getDashboardProfileSummary(userId);
   const targetRole = profile?.targetRole ?? "";
@@ -94,7 +98,7 @@ export async function getCareerWeather(userId: string): Promise<CareerWeather> {
 
   const forces = relevantShiftsFor(targetRole, domain).slice(0, 4).map(shiftToCard);
 
-  const snapshot = await getMacroSnapshot();
+  const [snapshot, macroConfigured] = await Promise.all([getMacroSnapshot(), isMacroConfigured()]);
   const macro = snapshot ? snapshot.readings.map(macroToCard) : [];
 
   let currentAffairs: CareerWeatherCard[] = [];
@@ -116,6 +120,7 @@ export async function getCareerWeather(userId: string): Promise<CareerWeather> {
     forces,
     macro,
     macroAvailable: snapshot !== null,
+    macroConfigured,
     currentAffairs,
   };
 }

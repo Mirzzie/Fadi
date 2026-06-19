@@ -41,13 +41,30 @@ export function CareerWeatherView({ weather }: { weather: CareerWeather }) {
       <Section icon={Landmark} title="The economy right now">
         {weather.macroAvailable ? (
           weather.macro.map((card, i) => <WeatherCard key={i} card={card} />)
+        ) : weather.macroConfigured ? (
+          <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
+            A <code className="rounded bg-muted px-1">FRED_API_KEY</code> is set, but the live fetch
+            came back empty. Usually the key needs a restart to load, or it has stray quotes/spaces —
+            it must be 32 lowercase letters/numbers. Restart the dev server and check the log line{" "}
+            <code className="rounded bg-muted px-1">macro.fred.empty</code> (a <code>400</code> means
+            the key was rejected). Get or check your key{" "}
+            <a
+              href="https://fredaccount.stlouisfed.org/apikeys"
+              target="_blank"
+              rel="noreferrer noopener"
+              className="text-primary underline"
+            >
+              here
+            </a>
+            .
+          </p>
         ) : (
           <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">
             Live inflation, interest rates and unemployment aren&apos;t connected yet. Add a free{" "}
             <a
               href="https://fredaccount.stlouisfed.org/apikeys"
               target="_blank"
-              rel="noreferrer"
+              rel="noreferrer noopener"
               className="text-primary underline"
             >
               FRED API key
@@ -127,7 +144,7 @@ function WeatherCard({ card }: { card: CareerWeatherCard }) {
           <a
             href={card.url}
             target="_blank"
-            rel="noreferrer"
+            rel="noreferrer noopener"
             className="inline-flex items-center gap-1 text-primary hover:underline"
           >
             Source <ArrowUpRight className="size-3" aria-hidden="true" />
