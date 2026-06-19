@@ -13,6 +13,7 @@ import {
 } from "@/lib/resilience/service";
 import type { RejectionInsight } from "@/lib/resilience/autopsy";
 import { evaluateFit, type FitResult } from "@/lib/jobs/fit";
+import { prepareInterviewForJob, type PrepResult } from "@/lib/interview/jd-prep";
 
 export type RejectionStage = "keyword" | "screen" | "interview" | "final";
 
@@ -72,6 +73,24 @@ export async function evaluateJobFit(input: {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, reason: "error", message: "Please sign in again." };
   return evaluateFit(user.id, {
+    jobDescription: input.jobDescription,
+    jobTitle: input.jobTitle,
+    company: input.company,
+  });
+}
+
+/**
+ * JD-tailored STAR interview prep — Fadi infers the likely behavioral questions
+ * for this role and drafts answers from the user's REAL LinkedIn/career evidence.
+ */
+export async function prepareInterview(input: {
+  jobTitle: string;
+  company: string;
+  jobDescription: string;
+}): Promise<PrepResult> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, reason: "error", message: "Please sign in again." };
+  return prepareInterviewForJob(user.id, {
     jobDescription: input.jobDescription,
     jobTitle: input.jobTitle,
     company: input.company,

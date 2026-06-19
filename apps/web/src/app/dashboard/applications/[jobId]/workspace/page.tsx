@@ -14,6 +14,7 @@ import { ExternalLink } from "lucide-react";
 
 import { ApplicationOutcomePanel } from "@/components/workspace/application-outcome-panel";
 import { FitGatePanel } from "@/components/workspace/fit-gate-panel";
+import { InterviewPrepPanel } from "@/components/workspace/interview-prep-panel";
 import { AutoPrepRunner } from "@/components/workspace/auto-prep-runner";
 import { JobLivenessBanner } from "@/components/workspace/job-liveness-banner";
 import { WorkspaceDocActions } from "@/components/workspace/workspace-doc-actions";
@@ -105,6 +106,15 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
         {/* Fit gate — should you even apply? (anti-spray, before you invest time) */}
         <div className="shrink-0">
           <FitGatePanel
+            jobTitle={job.title}
+            jobCompany={job.company}
+            jobDescription={job.description ?? undefined}
+          />
+        </div>
+
+        {/* JD-tailored STAR interview prep, drawn from the user's real LinkedIn/career */}
+        <div className="shrink-0">
+          <InterviewPrepPanel
             jobTitle={job.title}
             jobCompany={job.company}
             jobDescription={job.description ?? undefined}

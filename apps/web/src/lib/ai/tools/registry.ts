@@ -4,6 +4,8 @@ import { getRecommendedJobsForUser } from "@/lib/jobs/data";
 import { parseLocation, getCountry } from "@/lib/jobs/locations";
 import { getMomentumReflection, getMomentumSummary, summarizeRejectionPatterns } from "@/lib/resilience/service";
 import { answerBehavioral } from "@/lib/interview/story-bank";
+import { prepareInterviewForJob } from "@/lib/interview/jd-prep";
+import { formatPrepQuestion } from "@/lib/interview/jd-prep";
 import { fetchCompanyAtsJobs } from "@/lib/data-sources/ats-boards";
 import { getCareerWeather } from "@/lib/intelligence/career-weather";
 import { evaluateFit } from "@/lib/jobs/fit";
@@ -346,11 +348,41 @@ const getMomentumReflectionTool: FadiTool = {
   },
 };
 
+const prepInterviewTool: FadiTool = {
+  name: "prep_interview",
+  description:
+    "Prepare the user for a behavioral interview for a SPECIFIC job: infer the likely STAR questions from the job description and answer each from their REAL LinkedIn/career history. Use when they paste a JD and ask to 'prep me', 'interview prep', 'what will they ask', 'help me practice for this role'.",
+  parameters: {
+    type: "object",
+    properties: {
+      jobDescription: { type: "string", description: "The job description to prep against." },
+      jobTitle: { type: "string", description: "Role title, if known." },
+      company: { type: "string", description: "Company, if known." },
+    },
+    required: ["jobDescription"],
+  },
+  async execute(args, ctx): Promise<FadiToolResult> {
+    const res = await prepareInterviewForJob(ctx.userId, {
+      jobDescription: typeof args.jobDescription === "string" ? args.jobDescription : "",
+      jobTitle: typeof args.jobTitle === "string" ? args.jobTitle : undefined,
+      company: typeof args.company === "string" ? args.company : undefined,
+    });
+    if (!res.ok) return { summary: res.message, view: "none" };
+    const body = res.prep.questions.slice(0, 4).map(formatPrepQuestion).join("\n\n");
+    return {
+      summary: `Likely questions for this role, answered from your real experience:\n\n${body}\n\nDeliver them in your own words — they're your stories, shaped to this job.`,
+      view: "none",
+      data: { questions: res.prep.questions },
+    };
+  },
+};
+
 const TOOLS: FadiTool[] = [
   searchJobs,
   getPerformance,
   getMomentumReflectionTool,
   getRejectionPatterns,
+  prepInterviewTool,
   draftReferralOutreachTool,
   answerBehavioralTool,
   scanCompanyJobsTool,
