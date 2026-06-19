@@ -75,7 +75,7 @@ export class ReedSource implements JobSource {
           Authorization: `Basic ${auth}`,
           "User-Agent": "FadiOS/1.0 (career intelligence)",
         },
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(6000),
       });
       if (!res.ok) return [];
 

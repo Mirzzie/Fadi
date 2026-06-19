@@ -57,7 +57,7 @@ export class JoobleSource implements JobSource {
           "User-Agent": "FadiOS/1.0 (career intelligence)",
         },
         body: JSON.stringify({ keywords, location }),
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(6000),
       });
       if (!res.ok) return [];
 

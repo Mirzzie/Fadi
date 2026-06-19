@@ -65,7 +65,7 @@ export class LightcastSkillsSource implements SignalSource {
         grant_type: "client_credentials",
         scope: "emsi_open",
       }),
-      signal: AbortSignal.timeout(8000),
+      signal: AbortSignal.timeout(6000),
     });
     if (!res.ok) return null;
 
@@ -95,7 +95,7 @@ export class LightcastSkillsSource implements SignalSource {
             const params = new URLSearchParams({ q: term, limit: "5", fields: "id,name" });
             const res = await fetch(`${SKILLS_API}?${params}`, {
               headers: { Authorization: `Bearer ${token}` },
-              signal: AbortSignal.timeout(8000),
+              signal: AbortSignal.timeout(6000),
             });
             if (!res.ok) return [];
             const data = (await res.json()) as { data?: Array<{ name?: string }> };

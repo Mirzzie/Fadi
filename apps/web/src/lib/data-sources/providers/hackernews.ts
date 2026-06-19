@@ -39,7 +39,7 @@ export class HackerNewsSource implements SignalSource {
 
     try {
       const res = await fetch(`${HN_SEARCH_API}?${params}`, {
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(6000),
       });
       if (!res.ok) return [];
 

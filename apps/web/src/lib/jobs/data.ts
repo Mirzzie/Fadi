@@ -22,7 +22,10 @@ const MIN_RELEVANCE = 30;
 export async function getRecommendedJobsForUser(
   userId: string,
   limit?: number,
-  filters?: JobFilters
+  filters?: JobFilters,
+  /** skipSync: read stored jobs only (don't block render on a live external pull).
+   *  Used by the dashboard preview — the full Jobs page does the live refresh. */
+  opts: { skipSync?: boolean } = {}
 ): Promise<RecommendedJob[]> {
   const db = getDatabase();
   const jobsRepository = createJobsRepository(db);
@@ -63,7 +66,7 @@ export async function getRecommendedJobsForUser(
   // Pull fresh live postings (Remotive, Arbeitnow, …) into the jobs table,
   // personalized to the user's target role, before we read+score. TTL-guarded,
   // best-effort: if every source is down we just score whatever is stored.
-  if (careerProfile?.targetRole) {
+  if (careerProfile?.targetRole && !opts.skipSync) {
     await ensureFreshLiveJobs(
       {
         targetRole: careerProfile.targetRole,

@@ -14,6 +14,7 @@ import { getSetupState } from "@/lib/guidance/setup";
 import { getOnboardingStatus } from "@/lib/onboarding/status";
 import { getMomentumReflection, getMomentumSummary } from "@/lib/resilience/service";
 import { getMarketIntelligence } from "@/lib/data-sources/service";
+import type { ScoredSignal } from "@/lib/data-sources/relevance";
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -38,7 +39,7 @@ export default async function DashboardPage() {
     await Promise.all([
       getDashboardProfileSummary(user.id),
       getLatestCareerReport(user.id),
-      getRecommendedJobsForUser(user.id, 3),
+      getRecommendedJobsForUser(user.id, 3, undefined, { skipSync: true }),
       getMomentumSummary(user.id),
       getMomentumReflection(user.id),
       getSetupState(user.id),
@@ -55,9 +56,12 @@ export default async function DashboardPage() {
 
   // Live market signals scored against this user's role + report findings —
   // the real-world relevance check for their career report (cached, 15m).
-  const marketSignals = profileSummary?.targetRole
-    ? (
-        await getMarketIntelligence(
+  // Never block the home page on a slow signal API. Wait at most ~2.5s; the
+  // underlying fetch still completes and warms the 15m cache for the next load.
+  const EMPTY_SIGNALS: ScoredSignal[] = [];
+  const signalIntel = profileSummary?.targetRole
+    ? await Promise.race([
+        getMarketIntelligence(
           {
             targetRole: profileSummary.targetRole,
             skills: (latestReport?.strengths ?? []).map((s) => s.title),
@@ -67,15 +71,17 @@ export default async function DashboardPage() {
           // Permissive "market pulse": always surface live activity, ranked —
           // so the data pipeline is visible even before a report exists.
           { threshold: 0, limit: 6 },
-        )
-      ).signals.map((s) => ({
-        kind: s.kind,
-        title: s.title,
-        url: s.url ?? null,
-        relevance: s.relevance,
-        reason: s.reasons[0] ?? "recent activity in your space",
-      }))
-    : [];
+        ).then((r) => r.signals),
+        new Promise<typeof EMPTY_SIGNALS>((resolve) => setTimeout(() => resolve(EMPTY_SIGNALS), 2500)),
+      ])
+    : EMPTY_SIGNALS;
+  const marketSignals = signalIntel.map((s) => ({
+    kind: s.kind,
+    title: s.title,
+    url: s.url ?? null,
+    relevance: s.relevance,
+    reason: s.reasons[0] ?? "recent activity in your space",
+  }));
 
   const firstName = profileSummary?.fullName?.trim().split(/\s+/)[0] || "there";
   const jobsCount = recommendedJobsPreview.length;
