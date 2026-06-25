@@ -112,8 +112,10 @@ export function McpTokens({ tokens: initial }: { tokens: McpTokenView[] }) {
                   ) : null}
                 </div>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  {t.lastUsedAt ? `Last used ${new Date(t.lastUsedAt).toLocaleDateString()}` : "Never used"} ·
-                  Created {new Date(t.createdAt).toLocaleDateString()}
+                  {/* Slice the ISO date (deterministic across server/client — locale
+                      formatting caused a hydration mismatch). */}
+                  {t.lastUsedAt ? `Last used ${t.lastUsedAt.slice(0, 10)}` : "Never used"} · Created{" "}
+                  {t.createdAt.slice(0, 10)}
                 </p>
               </div>
               {!t.revokedAt ? (
