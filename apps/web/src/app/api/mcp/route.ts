@@ -10,32 +10,35 @@ import {
   type JsonRpcResponse,
   type McpDeps,
 } from "@/lib/mcp/server";
+import { envTokenMatches, resolveMcpToken } from "@/lib/mcp/tokens";
 
 /**
  * FadiOS MCP endpoint — exposes FadiOS's career tools to any MCP client
  * (Claude Code, OpenClaw, Cursor, …) over Streamable HTTP (JSON-RPC POST).
  *
- * Auth (self-host v1): a single Bearer token mapped to one user via
- * FADIOS_MCP_TOKEN + FADIOS_MCP_USER_ID. This is the local-first "Claude Code with
- * FadiOS" path; hosted multi-tenant (per-user tokens in the DB) layers on later
- * without changing the protocol core.
+ * Auth accepts either:
+ *  - a per-user personal access token minted in the app (multi-user / hosted), or
+ *  - the single self-host env token (FADIOS_MCP_TOKEN + FADIOS_MCP_USER_ID).
+ * Both resolve to the user the tools act as. MCP is off until at least one is set.
  */
 
 export const dynamic = "force-dynamic";
 
-/** Resolve the caller's user id from the Bearer token. Null = unauthorized. */
-function resolveUserId(req: Request): string | null {
-  const expected = serverEnv.FADIOS_MCP_TOKEN;
-  const userId = serverEnv.FADIOS_MCP_USER_ID;
-  if (!expected || !userId) return null; // MCP not configured on this instance
+function bearer(req: Request): string {
+  return (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+}
 
-  const header = req.headers.get("authorization") ?? "";
-  const token = header.replace(/^Bearer\s+/i, "").trim();
-  // length check first so a constant-time-ish compare doesn't leak via length only
-  if (!token || token.length !== expected.length) return null;
-  let diff = 0;
-  for (let i = 0; i < token.length; i++) diff |= token.charCodeAt(i) ^ expected.charCodeAt(i);
-  return diff === 0 ? userId : null;
+/** Resolve the caller's user id from the Bearer token. Null = unauthorized. */
+async function resolveUserId(req: Request): Promise<string | null> {
+  const token = bearer(req);
+  if (!token) return null;
+
+  // Self-host single env token (fast path).
+  if (serverEnv.FADIOS_MCP_USER_ID && envTokenMatches(token, serverEnv.FADIOS_MCP_TOKEN)) {
+    return serverEnv.FADIOS_MCP_USER_ID;
+  }
+  // Per-user personal access token (multi-user).
+  return resolveMcpToken(token);
 }
 
 function json(body: unknown, status = 200): Response {
@@ -46,7 +49,7 @@ function json(body: unknown, status = 200): Response {
 }
 
 export async function POST(req: Request): Promise<Response> {
-  const userId = resolveUserId(req);
+  const userId = await resolveUserId(req);
   if (!userId) {
     return json({ jsonrpc: "2.0", id: null, error: { code: -32001, message: "Unauthorized" } }, 401);
   }

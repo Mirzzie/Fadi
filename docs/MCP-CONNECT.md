@@ -19,7 +19,14 @@ Every FadiOS agent tool, including:
 
 Tools are grounded in the user's real data and never fabricate. The same user-level honesty and provenance rules apply whether a tool is called from the FadiOS UI or from an external agent.
 
-## Enable it (self-host, single user)
+## Enable it — option A: a personal token (multi-user / hosted)
+
+In FadiOS, go to **Settings → Integrations & agents (MCP)**, create a named token,
+and copy it once. Use it as the Bearer token below. Each token is scoped to your
+user; revoke it anytime from the same screen. Only a hash is stored — the raw token
+is shown once and never again.
+
+## Enable it — option B: self-host env token (single user)
 
 Set two environment variables on your FadiOS instance:
 

@@ -7,6 +7,7 @@ export * from "./documents.repository";
 export * from "./interview-stories.repository";
 export * from "./jobs.repository";
 export * from "./linkedin-profiles.repository";
+export * from "./mcp-tokens.repository";
 export * from "./profiles.repository";
 export * from "./referrals.repository";
 export * from "./resilience.repository";

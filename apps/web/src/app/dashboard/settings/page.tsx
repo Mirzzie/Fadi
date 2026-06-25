@@ -8,7 +8,9 @@ import { AppShell } from "@/components/layout/app-shell";
 import { AiProviderForm } from "@/components/settings/ai-provider-form";
 import { AutoPrepToggle } from "@/components/settings/auto-prep-toggle";
 import { ConnectedAccounts } from "@/components/settings/connected-accounts";
+import { McpTokens } from "@/components/settings/mcp-tokens";
 import { NotionIntegration } from "@/components/settings/notion-integration";
+import { listMcpTokens } from "@/lib/mcp/tokens";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getEnabledSocialProviders } from "@/lib/auth/social";
 import { getUserAiSettingsView } from "@/lib/ai/user-settings";
@@ -24,6 +26,7 @@ export default async function SettingsPage() {
 
   const settings = await getUserAiSettingsView(user.id);
   const profile = await createProfilesRepository(getDatabase()).getByUserId(user.id);
+  const mcpTokens = await listMcpTokens(user.id);
 
   return (
     <AppShell>
@@ -60,6 +63,8 @@ export default async function SettingsPage() {
         <ConnectedAccounts providers={getEnabledSocialProviders()} />
 
         <NotionIntegration connected={Boolean(profile?.notionDatabaseId)} />
+
+        <McpTokens tokens={mcpTokens} />
       </div>
     </AppShell>
   );

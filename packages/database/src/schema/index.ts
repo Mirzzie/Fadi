@@ -699,6 +699,30 @@ export const interviewStories = pgTable(
   (table) => [index("interview_stories_user_id_idx").on(table.userId)]
 );
 
+// ── MCP integration tokens (FadiOS-as-Lego, multi-user) ───────────────────────
+// Personal access tokens that let an external agentic client (Claude Code, OpenClaw)
+// call this user's FadiOS tools over MCP. We store only a hash of the token; the
+// raw value is shown once at creation and never persisted.
+export const mcpTokens = pgTable(
+  "mcp_tokens",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(), // user label, e.g. "Claude Code — laptop"
+    tokenHash: text("token_hash").notNull(), // sha256 hex of the raw token
+    prefix: text("prefix").notNull(), // first chars, for display (e.g. "fos_ab12cd")
+    lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index("mcp_tokens_user_id_idx").on(table.userId),
+    uniqueIndex("mcp_tokens_token_hash_idx").on(table.tokenHash),
+  ]
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type AuthIdentity = typeof authIdentities.$inferSelect;
@@ -730,3 +754,5 @@ export type ReferralTarget = typeof referralTargets.$inferSelect;
 export type NewReferralTarget = typeof referralTargets.$inferInsert;
 export type InterviewStory = typeof interviewStories.$inferSelect;
 export type NewInterviewStory = typeof interviewStories.$inferInsert;
+export type McpToken = typeof mcpTokens.$inferSelect;
+export type NewMcpToken = typeof mcpTokens.$inferInsert;
