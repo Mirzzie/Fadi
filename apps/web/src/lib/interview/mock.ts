@@ -102,17 +102,25 @@ export function deliveryNote(d: DeliveryStats): string {
 // ── Question generation (AI) ────────────────────────────────────────────────────
 export type MockQuestion = { question: string; kind: "opener" | "behavioral" | "role" | "situational"; competency?: string };
 
+// `kind` is a plain string here (not a strict enum) on purpose: several providers'
+// structured-output modes reject enum constraints and the whole call fails. We
+// normalize it ourselves after.
 const questionsSchema = z.object({
   questions: z
     .array(
       z.object({
         question: z.string(),
-        kind: z.enum(["opener", "behavioral", "role", "situational"]),
+        kind: z.string().optional(),
         competency: z.string().optional(),
       }),
     )
-    .max(8),
+    .max(10),
 });
+
+function toKind(s?: string): MockQuestion["kind"] {
+  const k = (s ?? "").toLowerCase().trim();
+  return k === "opener" || k === "role" || k === "situational" ? k : "behavioral";
+}
 
 export type MockConfig = { role: string; country?: string | null; seniority?: string | null; jobDescription?: string | null };
 
@@ -145,11 +153,18 @@ Rules:
 
   try {
     const raw = await generate.structured(system, user, questionsSchema, "mock_questions");
-    const questions = (raw.questions ?? []).filter((q) => q.question.trim());
-    if (questions.length === 0) return { ok: false, message: "Couldn't draft questions — please try again." };
+    const questions: MockQuestion[] = (raw.questions ?? [])
+      .filter((q) => q.question?.trim())
+      .map((q) => ({ question: q.question.trim(), kind: toKind(q.kind), competency: q.competency?.trim() || undefined }));
+    if (questions.length === 0) {
+      return { ok: false, message: "Your AI provider returned no questions. Try a simpler role, or check the model in Settings supports structured output." };
+    }
     return { ok: true, questions };
-  } catch {
-    return { ok: false, message: "Couldn't draft questions — please try again." };
+  } catch (err) {
+    const { logger } = await import("@/lib/observability/logger");
+    const reason = err instanceof Error ? err.message : "the provider call failed";
+    logger.warn("interview.mock_questions_failed", { userId, role: config.role, error: reason });
+    return { ok: false, message: `Couldn't draft questions: ${reason.slice(0, 160)}. Check your AI provider in Settings, then try again.` };
   }
 }
 
@@ -164,15 +179,18 @@ export type AnswerScore = {
   strongerVersion: string; // reshapes ONLY what the candidate said; never invents
 };
 
+// Coerce + tolerate: providers sometimes return numbers as strings or omit arrays.
 const scoreSchema = z.object({
-  structure: z.number().min(0).max(5),
-  specificity: z.number().min(0).max(5),
-  relevance: z.number().min(0).max(5),
-  concision: z.number().min(0).max(5),
-  strengths: z.array(z.string()).max(4),
-  improvements: z.array(z.string()).max(4),
-  strongerVersion: z.string(),
+  structure: z.coerce.number(),
+  specificity: z.coerce.number(),
+  relevance: z.coerce.number(),
+  concision: z.coerce.number(),
+  strengths: z.array(z.string()).default([]),
+  improvements: z.array(z.string()).default([]),
+  strongerVersion: z.string().default(""),
 });
+
+const clamp5 = (n: number) => Math.max(0, Math.min(5, Number.isFinite(n) ? n : 0));
 
 export function overallFromScores(s: { structure: number; specificity: number; relevance: number; concision: number }): number {
   // Structure and specificity matter most in behavioral answers.
@@ -225,10 +243,10 @@ HARD RULE: the strongerVersion must only reshape what the candidate actually sai
   try {
     const raw = await generate.structured(system, user, scoreSchema, "answer_score");
     const scores = {
-      structure: raw.structure,
-      specificity: raw.specificity,
-      relevance: raw.relevance,
-      concision: raw.concision,
+      structure: clamp5(raw.structure),
+      specificity: clamp5(raw.specificity),
+      relevance: clamp5(raw.relevance),
+      concision: clamp5(raw.concision),
     };
     return {
       ok: true,
@@ -242,7 +260,10 @@ HARD RULE: the strongerVersion must only reshape what the candidate actually sai
         strongerVersion: raw.strongerVersion.trim(),
       },
     };
-  } catch {
-    return { ok: false, message: "Couldn't score that answer — please try again." };
+  } catch (err) {
+    const { logger } = await import("@/lib/observability/logger");
+    const reason = err instanceof Error ? err.message : "the provider call failed";
+    logger.warn("interview.score_answer_failed", { userId, error: reason });
+    return { ok: false, message: `Couldn't score that answer: ${reason.slice(0, 160)}.` };
   }
 }
