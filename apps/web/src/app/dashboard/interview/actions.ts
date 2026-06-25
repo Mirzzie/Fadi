@@ -11,8 +11,37 @@ import {
   toStoryView,
   type StoryView,
 } from "@/lib/interview/story-bank";
+import {
+  generateMockQuestions,
+  scoreInterviewAnswer,
+  type AnswerScore,
+  type MockQuestion,
+} from "@/lib/interview/mock";
 
 const PATH = "/dashboard/interview";
+
+/** Start a mock interview — country-aware questions for a role + seniority. */
+export async function startMockInterview(input: {
+  role: string;
+  country?: string;
+  seniority?: string;
+  jobDescription?: string;
+}): Promise<{ ok: true; questions: MockQuestion[] } | { ok: false; message: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  return generateMockQuestions(user.id, input);
+}
+
+/** Score one practice answer (delivery + content), grounded in what they said. */
+export async function scoreMockAnswer(input: {
+  question: string;
+  answer: string;
+  role?: string;
+}): Promise<{ ok: true; score: AnswerScore } | { ok: false; message: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  return scoreInterviewAnswer(user.id, input);
+}
 
 export async function generateStoryBank(): Promise<
   | { ok: true; stories: StoryView[] }

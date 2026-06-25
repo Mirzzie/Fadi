@@ -6,6 +6,8 @@ import { getMomentumReflection, getMomentumSummary, summarizeRejectionPatterns }
 import { answerBehavioral } from "@/lib/interview/story-bank";
 import { prepareInterviewForJob } from "@/lib/interview/jd-prep";
 import { formatPrepQuestion } from "@/lib/interview/jd-prep";
+import { generateMockQuestions, scoreInterviewAnswer } from "@/lib/interview/mock";
+import { getDashboardProfileSummary } from "@/lib/career-report/data";
 import { fetchCompanyAtsJobs } from "@/lib/data-sources/ats-boards";
 import { getCareerWeather } from "@/lib/intelligence/career-weather";
 import { evaluateFit } from "@/lib/jobs/fit";
@@ -377,12 +379,74 @@ const prepInterviewTool: FadiTool = {
   },
 };
 
+const mockQuestionsTool: FadiTool = {
+  name: "mock_interview_questions",
+  description:
+    "Generate a realistic mock-interview question set tailored to a role, seniority, and country's interview norms (and an optional job description). Use for 'give me mock interview questions', 'interview me for X', 'practice interview'. Defaults role/country/seniority from the user's active direction if not given.",
+  parameters: {
+    type: "object",
+    properties: {
+      role: { type: "string", description: "Role to interview for (defaults to the active direction)." },
+      country: { type: "string", description: "Country/region for interview norms." },
+      seniority: { type: "string", description: "Seniority level." },
+      jobDescription: { type: "string", description: "Optional job description to tailor against." },
+    },
+  },
+  async execute(args, ctx): Promise<FadiToolResult> {
+    const profile = await getDashboardProfileSummary(ctx.userId);
+    const role = (typeof args.role === "string" && args.role.trim()) || profile?.targetRole || "";
+    const res = await generateMockQuestions(ctx.userId, {
+      role,
+      country: typeof args.country === "string" ? args.country : profile?.locationPreference,
+      seniority: typeof args.seniority === "string" ? args.seniority : profile?.experienceLevel,
+      jobDescription: typeof args.jobDescription === "string" ? args.jobDescription : undefined,
+    });
+    if (!res.ok) return { summary: res.message, view: "none" };
+    const list = res.questions.map((q, i) => `${i + 1}. ${q.question}`).join("\n");
+    return {
+      summary: `Mock interview for ${role || "your role"} — answer each out loud, then ask me to score it:\n${list}`,
+      view: "none",
+      data: { role, questions: res.questions },
+    };
+  },
+};
+
+const scoreAnswerTool: FadiTool = {
+  name: "score_interview_answer",
+  description:
+    "Score the user's answer to an interview question: a delivery read (length, pacing, filler words) plus structure/specificity/relevance/concision, with improvements and a stronger version that reshapes ONLY what they said (never invents). Use after they give a practice answer.",
+  parameters: {
+    type: "object",
+    properties: {
+      question: { type: "string", description: "The interview question that was asked." },
+      answer: { type: "string", description: "The user's answer (their spoken answer, transcribed, or typed)." },
+      role: { type: "string", description: "The role, for relevance scoring." },
+    },
+    required: ["question", "answer"],
+  },
+  async execute(args, ctx): Promise<FadiToolResult> {
+    const res = await scoreInterviewAnswer(ctx.userId, {
+      question: typeof args.question === "string" ? args.question : "",
+      answer: typeof args.answer === "string" ? args.answer : "",
+      role: typeof args.role === "string" ? args.role : undefined,
+    });
+    if (!res.ok) return { summary: res.message, view: "none" };
+    const s = res.score;
+    const head = `Overall ${s.overall.toFixed(1)}/5 — structure ${s.scores.structure}, specifics ${s.scores.specificity}, relevance ${s.scores.relevance}, concision ${s.scores.concision}. ${s.deliveryNote}`;
+    const fixes = s.improvements.length ? `\nTo improve: ${s.improvements.join("; ")}.` : "";
+    const stronger = s.strongerVersion ? `\n\nStronger version (your content, tightened):\n${s.strongerVersion}` : "";
+    return { summary: `${head}${fixes}${stronger}`, view: "none", data: { score: s } };
+  },
+};
+
 const TOOLS: FadiTool[] = [
   searchJobs,
   getPerformance,
   getMomentumReflectionTool,
   getRejectionPatterns,
   prepInterviewTool,
+  mockQuestionsTool,
+  scoreAnswerTool,
   draftReferralOutreachTool,
   answerBehavioralTool,
   scanCompanyJobsTool,
