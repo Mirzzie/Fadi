@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useGroqVoice } from "@/lib/voice/use-groq-voice";
 import { useSpeechOutput } from "@/lib/voice/use-speech-output";
+import { isFadiSpeaking, subscribeFadiSpeaking } from "@/lib/voice/fadi-speech";
 import { cn } from "@/lib/utils";
 
 export type FadiToolResultView = { name: string; view: string; data: unknown };
@@ -110,7 +111,41 @@ export function FadiChat({
 
   const isListening = voiceState === "recording";
   const isTranscribing = voiceState === "transcribing";
-  const isSpeaking = speechOutputState === "speaking";
+
+  // ── Half-duplex voice: Fadi never listens while it talks ──────────────────────
+  // `fadiSpeaking` is the gate. We set it optimistically the instant we ask Fadi to
+  // speak — because the neural-TTS fetch has a gap before audio actually plays, and
+  // without this the conversation loop opens the mic into Fadi's own voice (the echo
+  // / duplicate-turn bug). The global speaking signal then keeps it accurate and
+  // clears it when the audio truly ends.
+  const [fadiSpeaking, setFadiSpeaking] = useState(false);
+  const listeningRef = useRef(false);
+  listeningRef.current = isListening;
+  const speakSafetyRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isSpeaking = fadiSpeaking || speechOutputState === "speaking";
+
+  useEffect(
+    () =>
+      subscribeFadiSpeaking((speaking) => {
+        setFadiSpeaking(speaking);
+        if (speaking && listeningRef.current) stopListening(); // stop the mic the moment Fadi starts
+      }),
+    [stopListening],
+  );
+
+  const startSpeaking = useCallback(
+    (text: string) => {
+      setFadiSpeaking(true); // optimistic — covers the fetch gap before audio plays
+      if (listeningRef.current) stopListening();
+      speak(text);
+      if (speakSafetyRef.current) clearTimeout(speakSafetyRef.current);
+      // If audio never starts (TTS failed/blocked), don't get stuck "speaking".
+      speakSafetyRef.current = setTimeout(() => {
+        if (!isFadiSpeaking()) setFadiSpeaking(false);
+      }, 4000);
+    },
+    [speak, stopListening],
+  );
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -149,7 +184,7 @@ export function FadiChat({
         const isFresh =
           last.createdAt && Date.now() - new Date(last.createdAt).getTime() < 10 * 60 * 1000;
         if (last.isDigest && isFresh && localStorage.getItem(VOICE_PREF_KEY) === "1") {
-          speak(toSpeakable(last.content));
+          startSpeaking(toSpeakable(last.content));
         }
       } catch {
         /* keep the default greeting on failure */
@@ -164,7 +199,7 @@ export function FadiChat({
 
   // Summoned by "Hey Fadi": start listening for the user's question immediately.
   useEffect(() => {
-    if (autoListenNonce && autoListenNonce > 0) {
+    if (autoListenNonce && autoListenNonce > 0 && !isFadiSpeaking()) {
       startListening();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -267,7 +302,7 @@ export function FadiChat({
         }
 
         if (voiceEnabled && fullResponse) {
-          speak(fullResponse);
+          startSpeaking(fullResponse);
         }
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") return;
@@ -289,7 +324,7 @@ export function FadiChat({
         abortRef.current = null;
       }
     },
-    [isStreaming, messages, voiceEnabled, speak],
+    [isStreaming, messages, voiceEnabled, startSpeaking],
   );
 
   // Keep the speech callback's reference to sendMessage current.

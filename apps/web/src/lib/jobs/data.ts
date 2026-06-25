@@ -67,7 +67,10 @@ export async function getRecommendedJobsForUser(
   // personalized to the user's target role, before we read+score. TTL-guarded,
   // best-effort: if every source is down we just score whatever is stored.
   if (careerProfile?.targetRole && !opts.skipSync) {
-    await ensureFreshLiveJobs(
+    // Bound the live pull so the page never blocks more than a few seconds on slow
+    // external sources. The sync keeps running and populates for the next load; we
+    // render with whatever's stored now.
+    const sync = ensureFreshLiveJobs(
       {
         targetRole: careerProfile.targetRole,
         skills: [],
@@ -77,6 +80,7 @@ export async function getRecommendedJobsForUser(
       },
       { country: filters?.country, city: filters?.city },
     );
+    await Promise.race([sync, new Promise((resolve) => setTimeout(resolve, 3500))]);
   }
 
   const jobs = await jobsRepository.listActive();
