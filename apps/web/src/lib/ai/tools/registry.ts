@@ -8,6 +8,7 @@ import { prepareInterviewForJob } from "@/lib/interview/jd-prep";
 import { formatPrepQuestion } from "@/lib/interview/jd-prep";
 import { generateMockQuestions, scoreInterviewAnswer } from "@/lib/interview/mock";
 import { getDashboardProfileSummary } from "@/lib/career-report/data";
+import { rankedEvidenceForActiveTrack } from "@/lib/evidence/pool";
 import { fetchCompanyAtsJobs } from "@/lib/data-sources/ats-boards";
 import { getCareerWeather } from "@/lib/intelligence/career-weather";
 import { evaluateFit } from "@/lib/jobs/fit";
@@ -439,6 +440,30 @@ const scoreAnswerTool: FadiTool = {
   },
 };
 
+const relevantEvidenceTool: FadiTool = {
+  name: "get_relevant_evidence",
+  description:
+    "Return the user's strongest evidence (real roles, projects, achievements, skills) ranked for their ACTIVE career direction — the shared evidence pool framed for this path. Use for 'what's my best evidence for this direction', 'what should I highlight', or to ground a resume/answer. Grounded only in their real history.",
+  parameters: { type: "object", properties: {} },
+  async execute(_args, ctx): Promise<FadiToolResult> {
+    const { track, ranked } = await rankedEvidenceForActiveTrack(ctx.userId);
+    if (ranked.length === 0) {
+      return { summary: "Your evidence pool is empty. Build it from your LinkedIn/résumé on the Evidence page, then I can frame it for any direction.", view: "none" };
+    }
+    const top = ranked
+      .filter((r) => r.score > 0)
+      .slice(0, 6)
+      .map((r) => `• ${r.item.title}${r.item.organization ? ` (${r.item.organization})` : ""}${r.item.metrics ? ` — ${r.item.metrics}` : ""}`)
+      .join("\n");
+    const head = track ? `Your strongest evidence for ${track.role}:` : "Your evidence (set a direction to rank it):";
+    return {
+      summary: top ? `${head}\n${top}` : `${head}\nNothing in your pool maps cleanly to this direction yet — add evidence or tags that fit it.`,
+      view: "none",
+      data: { track, count: ranked.length },
+    };
+  },
+};
+
 const TOOLS: FadiTool[] = [
   searchJobs,
   getPerformance,
@@ -447,6 +472,7 @@ const TOOLS: FadiTool[] = [
   prepInterviewTool,
   mockQuestionsTool,
   scoreAnswerTool,
+  relevantEvidenceTool,
   draftReferralOutreachTool,
   answerBehavioralTool,
   scanCompanyJobsTool,

@@ -723,6 +723,31 @@ export const mcpTokens = pgTable(
   ]
 );
 
+// ── Shared evidence pool (multi-track "who I am" layer) ───────────────────────
+// The user's real experience lives ONCE here — discrete items (a role, a project,
+// an achievement, a skill, education). Every career track frames/ranks the same
+// pool differently, so "this project" exists once but surfaces in three resumes in
+// three ways. This is the graph the multi-track product is built on.
+export const evidenceItems = pgTable(
+  "evidence_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(), // experience | project | achievement | skill | education
+    title: text("title").notNull(),
+    organization: text("organization"), // company / school / client
+    period: text("period"), // e.g. "2021–2023"
+    detail: text("detail").notNull().default(""), // what they actually did
+    metrics: text("metrics"), // real numbers/outcomes, when present
+    tags: jsonb("tags").$type<string[]>().notNull().default([]), // skills/domains keywords
+    origin: text("origin").notNull().default("manual"), // ai | manual
+    ...timestamps,
+  },
+  (table) => [index("evidence_items_user_id_idx").on(table.userId)]
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type AuthIdentity = typeof authIdentities.$inferSelect;
@@ -756,3 +781,5 @@ export type InterviewStory = typeof interviewStories.$inferSelect;
 export type NewInterviewStory = typeof interviewStories.$inferInsert;
 export type McpToken = typeof mcpTokens.$inferSelect;
 export type NewMcpToken = typeof mcpTokens.$inferInsert;
+export type EvidenceItem = typeof evidenceItems.$inferSelect;
+export type NewEvidenceItem = typeof evidenceItems.$inferInsert;

@@ -120,6 +120,13 @@
       "when": 1782378192570,
       "tag": "0016_reflective_supernaut",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1782378834949,
+      "tag": "0017_daffy_vindicator",
+      "breakpoints": true
     }
   ]
 }

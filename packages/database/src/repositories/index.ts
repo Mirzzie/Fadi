@@ -4,6 +4,7 @@ export * from "./applications.repository";
 export * from "./career-profiles.repository";
 export * from "./career-reports.repository";
 export * from "./documents.repository";
+export * from "./evidence.repository";
 export * from "./interview-stories.repository";
 export * from "./jobs.repository";
 export * from "./linkedin-profiles.repository";
