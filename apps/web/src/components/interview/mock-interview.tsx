@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { speakFadi } from "@/lib/voice/fadi-speech";
 import { useGroqVoice } from "@/lib/voice/use-groq-voice";
+import { INTERVIEWER_PERSONAS } from "@/lib/interview/personas";
 import type { AnswerScore, MockQuestion } from "@/lib/interview/mock";
 import { scoreMockAnswer, startMockInterview } from "@/app/dashboard/interview/actions";
 
@@ -18,6 +19,7 @@ type Defaults = { role: string; country: string; seniority: string };
 export function MockInterview({ defaults }: { defaults: Defaults }) {
   const [config, setConfig] = useState(defaults);
   const [jd, setJd] = useState("");
+  const [persona, setPersona] = useState<string>("hiring_manager");
   const [questions, setQuestions] = useState<MockQuestion[] | null>(null);
   const [idx, setIdx] = useState(0);
   const [answer, setAnswer] = useState("");
@@ -32,7 +34,7 @@ export function MockInterview({ defaults }: { defaults: Defaults }) {
   function start() {
     setError(null);
     startTransition(async () => {
-      const res = await startMockInterview({ ...config, jobDescription: jd || undefined });
+      const res = await startMockInterview({ ...config, persona, jobDescription: jd || undefined });
       if (!res.ok) return setError(res.message);
       setQuestions(res.questions);
       setIdx(0);
@@ -79,6 +81,30 @@ export function MockInterview({ defaults }: { defaults: Defaults }) {
           <Field label="Seniority">
             <Input value={config.seniority} onChange={(e) => setConfig((c) => ({ ...c, seniority: e.target.value }))} placeholder="e.g. mid" />
           </Field>
+        </div>
+        <div className="space-y-1.5">
+          <span className="text-xs text-muted-foreground">Interviewer style</span>
+          <div className="flex flex-wrap gap-2">
+            {INTERVIEWER_PERSONAS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setPersona(p.id)}
+                title={p.blurb}
+                className={cn(
+                  "rounded-full border px-3 py-1 text-xs transition-colors",
+                  persona === p.id
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border text-muted-foreground hover:border-primary/50",
+                )}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[0.7rem] text-muted-foreground">
+            {INTERVIEWER_PERSONAS.find((p) => p.id === persona)?.blurb}
+          </p>
         </div>
         <Field label="Paste a job description (optional, sharpens the questions)">
           <Textarea rows={3} value={jd} onChange={(e) => setJd(e.target.value)} />

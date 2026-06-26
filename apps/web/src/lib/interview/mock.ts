@@ -99,6 +99,11 @@ export function deliveryNote(d: DeliveryStats): string {
   return parts.join(" ");
 }
 
+// Interviewer personas live in ./personas (pure) so client code can import the list
+// without pulling this module's server-only AI imports into the browser bundle.
+export { INTERVIEWER_PERSONAS, personaStyle, type InterviewerPersona } from "./personas";
+import { personaStyle } from "./personas";
+
 // ── Question generation (AI) ────────────────────────────────────────────────────
 export type MockQuestion = { question: string; kind: "opener" | "behavioral" | "role" | "situational"; competency?: string };
 
@@ -122,7 +127,7 @@ function toKind(s?: string): MockQuestion["kind"] {
   return k === "opener" || k === "role" || k === "situational" ? k : "behavioral";
 }
 
-export type MockConfig = { role: string; country?: string | null; seniority?: string | null; jobDescription?: string | null };
+export type MockConfig = { role: string; country?: string | null; seniority?: string | null; jobDescription?: string | null; persona?: string | null };
 
 export async function generateMockQuestions(
   userId: string,
@@ -135,7 +140,7 @@ export async function generateMockQuestions(
   if (!generate) return { ok: false, message: "Connect an AI provider in Settings to run a mock interview." };
 
   const system = `You are an experienced interviewer running a realistic MOCK INTERVIEW. Produce 5–7 questions for this specific role, seniority, and country's interview norms.
-${countryInterviewNorms(config.country)}
+${countryInterviewNorms(config.country)}${personaStyle(config.persona)}
 Rules:
 - Start with one opener appropriate to the country's norms.
 - Mix behavioral ("tell me about a time…"), role-specific, and one situational question.

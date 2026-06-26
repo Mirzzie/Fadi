@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { analyzeDelivery, countryInterviewNorms, deliveryNote, overallFromScores } from "./mock";
+import {
+  analyzeDelivery,
+  countryInterviewNorms,
+  deliveryNote,
+  INTERVIEWER_PERSONAS,
+  overallFromScores,
+  personaStyle,
+} from "./mock";
 
 describe("countryInterviewNorms", () => {
   it("returns country-specific guidance", () => {
@@ -38,6 +45,22 @@ describe("analyzeDelivery", () => {
   it("deliveryNote calls out length and heavy filler", () => {
     const note = deliveryNote(analyzeDelivery("So um like uh you know basically I mean kind of."));
     expect(note).toMatch(/short|filler/i);
+  });
+});
+
+describe("interviewer personas (style, not impersonation)", () => {
+  it("injects a known persona's style and the 'visionary' never impersonates a real person", () => {
+    expect(personaStyle("recruiter")).toMatch(/friendly recruiter/i);
+    expect(personaStyle("visionary")).toMatch(/WITHOUT impersonating any real person/i);
+  });
+  it("returns nothing for an unknown/missing persona (graceful)", () => {
+    expect(personaStyle("elon_musk")).toBe("");
+    expect(personaStyle(null)).toBe("");
+  });
+  it("every persona is domain-agnostic (no named real people or tech-only roles)", () => {
+    for (const p of INTERVIEWER_PERSONAS) {
+      expect(p.style.toLowerCase()).not.toMatch(/musk|jobs|bezos|software engineer/);
+    }
   });
 });
 

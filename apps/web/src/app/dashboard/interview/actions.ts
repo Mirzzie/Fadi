@@ -26,6 +26,7 @@ export async function startMockInterview(input: {
   country?: string;
   seniority?: string;
   jobDescription?: string;
+  persona?: string;
 }): Promise<{ ok: true; questions: MockQuestion[] } | { ok: false; message: string }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
