@@ -74,6 +74,10 @@ export async function generateCareerDocument(
     linkedInText: linkedin?.rawText ?? linkedin?.profileUrl,
   });
 
+  // The shared evidence pool, ranked for the ACTIVE track — so the same history
+  // produces a differently-framed document per direction (the multi-track payoff).
+  const topEvidence = await import("@/lib/evidence/pool").then((m) => m.topEvidenceForPrompt(userId));
+
   const jobDescription = (opts.jobDescription ?? "").slice(0, 5000).trim();
   const candidateContext = [
     `Candidate: ${profile?.fullName ?? "the candidate"}`,
@@ -85,6 +89,7 @@ export async function generateCareerDocument(
       : "",
     "",
     evidence.block,
+    topEvidence ? `\n${topEvidence}` : "",
   ].join("\n");
 
   const docsRepo = createDocumentsRepository(db);

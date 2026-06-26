@@ -117,12 +117,16 @@ export async function prepareInterviewForJob(
     return { ok: false, reason: "no_provider", message: "Connect an AI provider in Settings and I'll prep you for this role." };
   }
 
-  const stories = await listStories(userId);
+  const [stories, topEvidence] = await Promise.all([
+    listStories(userId),
+    import("@/lib/evidence/pool").then((m) => m.topEvidenceForPrompt(userId)),
+  ]);
   const user = [
     `JOB — ${input.jobTitle ?? "(title n/a)"}${input.company ? ` at ${input.company}` : ""}:`,
     jd.slice(0, 6000),
     "",
     evidence.block,
+    topEvidence ? `\n${topEvidence}` : "",
     "",
     "The candidate's existing story bank (reuse where it fits):",
     summarizeStoriesForPrep(stories),

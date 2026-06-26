@@ -98,21 +98,24 @@ export async function getCareerWeather(userId: string): Promise<CareerWeather> {
 
   const forces = relevantShiftsFor(targetRole, domain).slice(0, 4).map(shiftToCard);
 
-  const [snapshot, macroConfigured] = await Promise.all([getMacroSnapshot(), isMacroConfigured()]);
-  const macro = snapshot ? snapshot.readings.map(macroToCard) : [];
+  // Macro (FRED) and signals (GDELT) are independent external calls — run them in
+  // PARALLEL and bound each, so this page renders in ~6s worst case instead of
+  // ~12s sequential. Each falls back to "unavailable" on timeout/failure.
+  const withTimeout = <T>(p: Promise<T>, ms: number, fallback: T): Promise<T> =>
+    Promise.race([p, new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms))]);
 
-  let currentAffairs: CareerWeatherCard[] = [];
-  if (targetRole) {
-    try {
-      const intel = await getMarketIntelligence(
-        { targetRole, skills: [], skillGaps: [], domain },
-        { limit: 3 },
-      );
-      currentAffairs = intel.signals.slice(0, 3).map(signalToCard);
-    } catch {
-      currentAffairs = [];
-    }
-  }
+  const signalsP = targetRole
+    ? getMarketIntelligence({ targetRole, skills: [], skillGaps: [], domain }, { limit: 3 })
+        .then((intel) => intel.signals.slice(0, 3).map(signalToCard))
+        .catch(() => [] as CareerWeatherCard[])
+    : Promise.resolve([] as CareerWeatherCard[]);
+
+  const [snapshot, macroConfigured, currentAffairs] = await Promise.all([
+    withTimeout(getMacroSnapshot(), 6000, null),
+    isMacroConfigured(),
+    withTimeout(signalsP, 6000, [] as CareerWeatherCard[]),
+  ]);
+  const macro = snapshot ? snapshot.readings.map(macroToCard) : [];
 
   return {
     track: { targetRole: profile?.targetRole ?? null, domain },

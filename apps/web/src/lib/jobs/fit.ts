@@ -148,6 +148,7 @@ export async function evaluateFit(
     linkedInText: ctx?.linkedInProfileText,
   });
 
+  const topEvidence = await import("@/lib/evidence/pool").then((m) => m.topEvidenceForPrompt(userId));
   const user = [
     `Candidate's goal/target role: ${ctx?.targetRole ?? "not specified"}`,
     `Field/industry: ${ctx?.domain ?? "not specified"}`,
@@ -155,6 +156,7 @@ export async function evaluateFit(
     `Location preference: ${ctx?.locationPreference ?? "not specified"}`,
     "",
     evidence.block,
+    topEvidence ? `\n${topEvidence}` : "",
     "",
     `JOB — ${input.jobTitle ?? "(title n/a)"}${input.company ? ` at ${input.company}` : ""}:`,
     jd.slice(0, 6000),

@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { evidenceRelevance, normKind, rankEvidenceForTrack, type EvidenceView } from "./pool";
+import {
+  evidenceRelevance,
+  formatTopEvidence,
+  normKind,
+  rankEvidenceForTrack,
+  type EvidenceView,
+} from "./pool";
 
 const item = (over: Partial<EvidenceView>): EvidenceView => ({
   id: Math.random().toString(36).slice(2),
@@ -52,6 +58,22 @@ describe("evidenceRelevance — the same item is weighted differently per track"
 
   it("scores 0 when the track has no terms", () => {
     expect(evidenceRelevance(nursing, { role: "" }).score).toBe(0);
+  });
+});
+
+describe("formatTopEvidence — the pool→prompt bridge", () => {
+  it("returns an empty string when nothing is relevant (so callers can append unconditionally)", () => {
+    const ranked = rankEvidenceForTrack([nursing], { role: "Software Engineer", domain: "Tech" });
+    expect(formatTopEvidence(ranked)).toBe("");
+  });
+
+  it("formats only the relevant items, leading with a clear instruction and no fabrication", () => {
+    const ranked = rankEvidenceForTrack([nursing, coding], { role: "Registered Nurse", domain: "Healthcare", synonyms: ["staff nurse"] });
+    const block = formatTopEvidence(ranked);
+    expect(block).toMatch(/MOST RELEVANT EVIDENCE/);
+    expect(block).toMatch(/never invent/i);
+    expect(block).toContain("Staff Nurse");
+    expect(block).not.toContain("scheduling app"); // the coding item scored 0 → excluded
   });
 });
 

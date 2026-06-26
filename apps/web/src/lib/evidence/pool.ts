@@ -99,6 +99,23 @@ export function evidenceRelevance(item: EvidenceView, track: TrackTerms): { scor
 
 export type RankedEvidence = { item: EvidenceView; score: number; matched: string[] };
 
+/**
+ * A prompt block of the candidate's TOP evidence for the active track — the bridge
+ * that makes the pool actually power generation (documents, interview prep, fit).
+ * "Lead with these, framed for this role." Empty string when the pool has nothing
+ * relevant, so callers can append unconditionally. Pure + testable.
+ */
+export function formatTopEvidence(ranked: RankedEvidence[], max = 8): string {
+  const top = ranked.filter((r) => r.score > 0).slice(0, max);
+  if (top.length === 0) return "";
+  const lines = top.map(({ item }) => {
+    const head = `- [${item.kind}] ${item.title}${item.organization ? ` @ ${item.organization}` : ""}${item.period ? ` (${item.period})` : ""}`;
+    const body = [item.detail, item.metrics].filter(Boolean).join(" — ");
+    return body ? `${head}: ${body}` : head;
+  });
+  return `MOST RELEVANT EVIDENCE FOR THIS DIRECTION (the candidate's own, ranked for this role — lead with these and frame them for the target role; never invent beyond them):\n${lines.join("\n")}`;
+}
+
 /** Rank the whole pool for a track — most relevant first; everything stays in the pool. */
 export function rankEvidenceForTrack(items: EvidenceView[], track: TrackTerms): RankedEvidence[] {
   return items
@@ -212,4 +229,10 @@ export async function rankedEvidenceForActiveTrack(
     synonyms: active.roleSynonyms ?? [],
   });
   return { track: { role: active.targetRole, domain: active.domain }, ranked };
+}
+
+/** Top-evidence prompt block for the active track — "" when the pool is empty/irrelevant. */
+export async function topEvidenceForPrompt(userId: string, max = 8): Promise<string> {
+  const { ranked } = await rankedEvidenceForActiveTrack(userId);
+  return formatTopEvidence(ranked, max);
 }
