@@ -18,6 +18,7 @@
  * best-effort I/O and never throw.
  */
 
+import { htmlToText } from "./sanitize";
 import type { JobPosting } from "./types";
 
 export type AtsProvider = "greenhouse" | "lever" | "ashby";
@@ -50,22 +51,6 @@ export const atsUrl: Record<AtsProvider, (slug: string) => string> = {
   ashby: (slug) => `https://api.ashbyhq.com/posting-api/job-board/${slug}?includeCompensation=true`,
 };
 
-/** Minimal, dependency-free HTML→text for Greenhouse's escaped `content` field. */
-function stripHtml(html?: string | null): string | undefined {
-  if (!html) return undefined;
-  const text = html
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&#39;|&apos;/g, "'")
-    .replace(/&quot;/g, '"')
-    .replace(/&nbsp;/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-  return text || undefined;
-}
-
 // ── Pure response mappers (testable with sample payloads) ───────────────────────
 
 export function mapGreenhouse(json: unknown, company: string): JobPosting[] {
@@ -79,7 +64,7 @@ export function mapGreenhouse(json: unknown, company: string): JobPosting[] {
       company,
       location: (j.location as { name?: string } | undefined)?.name || undefined,
       url: String(j.absolute_url),
-      description: stripHtml(j.content as string | undefined),
+      description: htmlToText(j.content as string | undefined) || undefined,
       tags: [],
       postedAt: (j.first_published as string) || (j.updated_at as string) || undefined,
     }));
