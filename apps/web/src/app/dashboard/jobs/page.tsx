@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { createProfilesRepository } from "@careeros/database";
+
 import { AppShell } from "@/components/layout/app-shell";
 import { JobsShell } from "@/components/jobs/jobs-shell";
+import { JobPreferencesPanel } from "@/components/jobs/job-preferences-panel";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDashboardProfileSummary } from "@/lib/career-report/data";
+import { getDatabase } from "@/lib/database/client";
 import { getJobSourceCoverage } from "@/lib/data-sources/service";
 import { getRecommendedJobsForUser } from "@/lib/jobs/data";
 import type { EmploymentType, VisaFilter, WorkMode } from "@/lib/jobs/filters";
@@ -46,13 +50,19 @@ export default async function JobsPage({
   if (onboardingStatus !== "completed") redirect("/onboarding");
 
   const params = await searchParams;
-  const profile = await getDashboardProfileSummary(user.id);
+  const db = getDatabase();
+  const [profile, profileRow] = await Promise.all([
+    getDashboardProfileSummary(user.id),
+    createProfilesRepository(db).getByUserId(user.id),
+  ]);
+  const prefs = profileRow?.jobPreferences ?? {};
 
   const fromProfile = parseLocation(profile?.locationPreference);
   const country = (params.country ?? fromProfile.country)?.toLowerCase();
   const city = params.city?.trim() || fromProfile.city;
-  const modes = parseList(params.modes, MODES);
-  const types = parseList(params.types, TYPES);
+  // Saved preferences are the defaults; an explicit URL filter overrides them.
+  const modes = parseList(params.modes ?? (prefs.modes ?? []).join(","), MODES);
+  const types = parseList(params.types ?? (prefs.types ?? []).join(","), TYPES);
   const visa: VisaFilter =
     params.visa === "sponsored" || params.visa === "none" ? params.visa : "any";
 
@@ -70,6 +80,11 @@ export default async function JobsPage({
 
   return (
     <AppShell>
+      <div className="mx-auto mb-4 max-w-shell">
+        <JobPreferencesPanel
+          initial={{ modes: prefs.modes ?? [], types: prefs.types ?? [], autoSearch: Boolean(prefs.autoSearch) }}
+        />
+      </div>
       <JobsShell
         jobs={jobs}
         activeRole={profile?.targetRole ?? null}

@@ -71,6 +71,19 @@ export function createProfilesRepository(db: Database) {
       return profile ?? null;
     },
 
+    /** Persist the user's job-search preferences (used as discovery defaults). */
+    async setJobPreferences(
+      userId: string,
+      prefs: { modes?: string[]; types?: string[]; autoSearch?: boolean },
+    ): Promise<Profile | null> {
+      const [profile] = await db
+        .update(profiles)
+        .set({ jobPreferences: prefs, updatedAt: new Date() })
+        .where(eq(profiles.userId, userId))
+        .returning();
+      return profile ?? null;
+    },
+
     /** Store (or clear) the user's BYO Notion integration credentials. */
     async setNotionIntegration(
       userId: string,

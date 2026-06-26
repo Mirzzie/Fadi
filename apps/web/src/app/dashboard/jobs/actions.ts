@@ -4,6 +4,7 @@ import {
   createApplicationsRepository,
   createCareerProfilesRepository,
   createJobsRepository,
+  createProfilesRepository,
   createResumesRepository,
   createSavedJobsRepository,
 } from "@careeros/database";
@@ -246,4 +247,21 @@ export async function updateApplicationStatusAction(
       message: "Could not update application status right now. Please try again later.",
     };
   }
+}
+
+/** Persist the user's job-search preferences (work modes, types, auto-search). */
+export async function saveJobPreferences(input: {
+  modes: string[];
+  types: string[];
+  autoSearch: boolean;
+}): Promise<{ ok: boolean }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false };
+  await createProfilesRepository(getDatabase()).setJobPreferences(user.id, {
+    modes: input.modes,
+    types: input.types,
+    autoSearch: input.autoSearch,
+  });
+  revalidatePath("/dashboard/jobs");
+  return { ok: true };
 }

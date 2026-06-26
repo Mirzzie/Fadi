@@ -152,6 +152,12 @@ export const profiles = pgTable(
     // (AES-GCM encrypted) + the target database id they shared with it.
     notionTokenCiphertext: text("notion_token_ciphertext"),
     notionDatabaseId: text("notion_database_id"),
+    // Persistent job-search preferences — set once, used as defaults for discovery
+    // and (eventually) the background "find jobs while you sleep" agent.
+    jobPreferences: jsonb("job_preferences")
+      .$type<{ modes?: string[]; types?: string[]; autoSearch?: boolean }>()
+      .notNull()
+      .default({}),
     ...timestamps,
   },
   (table) => [
