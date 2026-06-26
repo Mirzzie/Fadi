@@ -18,27 +18,37 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Fragment } from "react";
 
 import { cn } from "@/lib/utils";
 import { useOsMode } from "./os-mode";
 import { useWindows, type WindowApp } from "./window-manager";
 
-export type DockApp = { href: string; label: string; icon: LucideIcon; app: WindowApp };
+/** Groups order the dock by the career journey so co-dependent surfaces sit
+ *  together: Start → Orient → You → Pursue → Prepare → System. */
+type DockGroup = "start" | "orient" | "you" | "pursue" | "prepare" | "system";
+export type DockApp = { href: string; label: string; icon: LucideIcon; app: WindowApp; group: DockGroup };
 
 export const DOCK_APPS: DockApp[] = [
-  { href: "/dashboard", label: "Home", icon: LayoutDashboard, app: "home" },
-  { href: "/dashboard/jobs", label: "Jobs", icon: BriefcaseBusiness, app: "jobs" },
-  { href: "/dashboard/niche-finder", label: "Niche Finder", icon: Compass, app: "niche" },
-  { href: "/dashboard/applications", label: "Applications", icon: KanbanSquare, app: "applications" },
-  { href: "/dashboard/network", label: "Network", icon: Users, app: "network" },
-  { href: "/dashboard/interview", label: "Interview", icon: MessageSquareQuote, app: "interview" },
-  { href: "/dashboard/evidence", label: "Evidence", icon: Layers, app: "evidence" },
-  { href: "/dashboard/intelligence", label: "Career Weather", icon: CloudSun, app: "intelligence" },
-  { href: "/dashboard/documents", label: "Documents", icon: FileText, app: "documents" },
-  { href: "/dashboard/learning", label: "Learning", icon: GraduationCap, app: "learning" },
-  { href: "/dashboard/fadi", label: "Fadi", icon: Sparkles, app: "fadi" },
-  { href: "/dashboard/profile", label: "Profile", icon: UserRoundCog, app: "profile" },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings, app: "settings" },
+  // Start
+  { href: "/dashboard", label: "Home", icon: LayoutDashboard, app: "home", group: "start" },
+  // Orient — where to aim, and what the world is doing
+  { href: "/dashboard/intelligence", label: "Career Weather", icon: CloudSun, app: "intelligence", group: "orient" },
+  { href: "/dashboard/niche-finder", label: "Niche Finder", icon: Compass, app: "niche", group: "orient" },
+  // You — who you are + what you send
+  { href: "/dashboard/evidence", label: "Evidence", icon: Layers, app: "evidence", group: "you" },
+  { href: "/dashboard/documents", label: "Documents", icon: FileText, app: "documents", group: "you" },
+  // Pursue — the pipeline
+  { href: "/dashboard/jobs", label: "Jobs", icon: BriefcaseBusiness, app: "jobs", group: "pursue" },
+  { href: "/dashboard/applications", label: "Applications", icon: KanbanSquare, app: "applications", group: "pursue" },
+  { href: "/dashboard/network", label: "Network", icon: Users, app: "network", group: "pursue" },
+  // Prepare & grow
+  { href: "/dashboard/interview", label: "Interview", icon: MessageSquareQuote, app: "interview", group: "prepare" },
+  { href: "/dashboard/learning", label: "Learning", icon: GraduationCap, app: "learning", group: "prepare" },
+  // System
+  { href: "/dashboard/fadi", label: "Fadi", icon: Sparkles, app: "fadi", group: "system" },
+  { href: "/dashboard/profile", label: "Profile", icon: UserRoundCog, app: "profile", group: "system" },
+  { href: "/dashboard/settings", label: "Settings", icon: Settings, app: "settings", group: "system" },
 ];
 
 /** The OS dock — in ambient mode it navigates; in desktop mode it opens windows. */
@@ -54,7 +64,8 @@ export function Dock() {
         aria-label="Apps"
         className="glass-holo pointer-events-auto flex items-end gap-1.5 rounded-2xl px-2.5 py-2 duration-500 animate-in fade-in slide-in-from-bottom-4"
       >
-        {DOCK_APPS.map((app) => {
+        {DOCK_APPS.map((app, i) => {
+          const newGroup = i > 0 && app.group !== DOCK_APPS[i - 1].group;
           const active =
             !desktop && (app.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(app.href));
           const cls =
@@ -82,14 +93,22 @@ export function Dock() {
               </span>
             </>
           );
-          return desktop ? (
-            <button key={app.href} type="button" onClick={() => open(app.app)} title={app.label} aria-label={app.label} className={cls}>
+          const item = desktop ? (
+            <button type="button" onClick={() => open(app.app)} title={app.label} aria-label={app.label} className={cls}>
               {inner}
             </button>
           ) : (
-            <Link key={app.href} href={app.href} title={app.label} aria-label={app.label} className={cls}>
+            <Link href={app.href} title={app.label} aria-label={app.label} className={cls}>
               {inner}
             </Link>
+          );
+          return (
+            <Fragment key={app.href}>
+              {newGroup ? (
+                <span className="mx-1 h-7 w-px self-center bg-border/60" aria-hidden="true" />
+              ) : null}
+              {item}
+            </Fragment>
           );
         })}
       </nav>
