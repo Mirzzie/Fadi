@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull, or } from "drizzle-orm";
 
 import type { Database } from "../client";
 import { documents, type Document } from "../schema";
@@ -6,6 +6,7 @@ import { documents, type Document } from "../schema";
 export type DocumentKind = "resume" | "cover_letter" | "email" | "value_proposition" | "note";
 
 export type CreateDocumentInput = {
+  careerProfileId?: string | null;
   jobId?: string | null;
   applicationId?: string | null;
   kind: DocumentKind | string;
@@ -28,12 +29,16 @@ export type UpdateDocumentInput = Partial<{
 
 export function createDocumentsRepository(db: Database) {
   return {
-    async listForUser(userId: string): Promise<Document[]> {
-      return db
-        .select()
-        .from(documents)
-        .where(eq(documents.userId, userId))
-        .orderBy(desc(documents.updatedAt));
+    /** All of a user's documents. Pass a track to scope to that career path
+     *  (plus legacy/untagged docs, so nothing disappears after the migration). */
+    async listForUser(userId: string, careerProfileId?: string | null): Promise<Document[]> {
+      const scope = careerProfileId
+        ? and(
+            eq(documents.userId, userId),
+            or(eq(documents.careerProfileId, careerProfileId), isNull(documents.careerProfileId)),
+          )
+        : eq(documents.userId, userId);
+      return db.select().from(documents).where(scope).orderBy(desc(documents.updatedAt));
     },
 
     async listForJob(userId: string, jobId: string): Promise<Document[]> {
@@ -58,6 +63,7 @@ export function createDocumentsRepository(db: Database) {
         .insert(documents)
         .values({
           userId,
+          careerProfileId: input.careerProfileId ?? null,
           jobId: input.jobId ?? null,
           applicationId: input.applicationId ?? null,
           kind: input.kind,

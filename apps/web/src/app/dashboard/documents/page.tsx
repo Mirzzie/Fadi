@@ -7,7 +7,7 @@ import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
 import { isProseKind, letterSnippet } from "@/lib/documents/letter";
 import { parseResume } from "@/lib/documents/resume";
-import { createDocumentsRepository } from "@careeros/database";
+import { createCareerProfilesRepository, createDocumentsRepository } from "@careeros/database";
 
 /** A readable card snippet — content is JSON for structured kinds, so unpack it. */
 function previewFor(kind: string, content: string): string {
@@ -26,7 +26,10 @@ export default async function DocumentsPage() {
   const user = await getCurrentAuthUser();
   if (!user) redirect("/auth/sign-in?next=/dashboard/documents");
 
-  const docs = await createDocumentsRepository(getDatabase()).listForUser(user.id);
+  // Scope to the active career path — each direction owns its own documents.
+  const db = getDatabase();
+  const activeTrack = await createCareerProfilesRepository(db).getActiveForUser(user.id);
+  const docs = await createDocumentsRepository(db).listForUser(user.id, activeTrack?.id ?? null);
 
   return (
     <AppShell>

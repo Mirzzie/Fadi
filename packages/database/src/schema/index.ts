@@ -554,6 +554,11 @@ export const documents = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    // The career track (direction) this document belongs to — so each path has its
+    // own résumé/documents. Null = legacy/untagged (shown in every track).
+    careerProfileId: uuid("career_profile_id").references(() => careerProfiles.id, {
+      onDelete: "set null",
+    }),
     jobId: uuid("job_id").references(() => jobs.id, { onDelete: "set null" }),
     applicationId: uuid("application_id").references(() => applications.id, {
       onDelete: "set null",

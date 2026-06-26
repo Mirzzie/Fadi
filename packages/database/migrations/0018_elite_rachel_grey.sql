@@ -1,0 +1,2 @@
+ALTER TABLE "documents" ADD COLUMN "career_profile_id" uuid;--> statement-breakpoint
+ALTER TABLE "documents" ADD CONSTRAINT "documents_career_profile_id_career_profiles_id_fk" FOREIGN KEY ("career_profile_id") REFERENCES "public"."career_profiles"("id") ON DELETE set null ON UPDATE no action;

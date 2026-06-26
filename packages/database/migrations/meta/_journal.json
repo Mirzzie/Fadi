@@ -127,6 +127,13 @@
       "when": 1782378834949,
       "tag": "0017_daffy_vindicator",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1782512183729,
+      "tag": "0018_elite_rachel_grey",
+      "breakpoints": true
     }
   ]
 }

@@ -94,7 +94,12 @@ export async function generateCareerDocument(
 
   const docsRepo = createDocumentsRepository(db);
   const titleSuffix = [role, company].filter(Boolean).join(" · ");
-  const link = { jobId: opts.jobId ?? null, applicationId: opts.applicationId ?? null };
+  // Tag the document with the active career track so each path owns its documents.
+  const link = {
+    careerProfileId: careerProfile?.id ?? null,
+    jobId: opts.jobId ?? null,
+    applicationId: opts.applicationId ?? null,
+  };
   const jobContext = { jobTitle: role, company };
 
   if (opts.kind === "resume") {
