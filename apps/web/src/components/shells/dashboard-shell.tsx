@@ -87,7 +87,7 @@ export function DashboardShell({
   setup,
 }: DashboardShellProps) {
   return (
-    <div className="mx-auto max-w-shell space-y-6">
+    <div className="mx-auto max-w-shell space-y-8">
       {/* Fadi greets you first — his proactive, spoken briefing. */}
       {briefing ? <FadiBriefing briefing={briefing} /> : null}
 
@@ -160,8 +160,10 @@ export function DashboardShell({
           Hidden once everything's done so power users get a clean dashboard. */}
       {setup && !setup.allDone ? <GuidedSetup setup={setup} /> : null}
 
-      {/* Stat row */}
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {/* Zone: At a glance */}
+      <section className="space-y-3">
+        <ZoneHeading>At a glance</ZoneHeading>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           icon={TrendingUp}
           label="Career readiness"
@@ -190,13 +192,20 @@ export function DashboardShell({
           value={String(Math.round(momentum.momentum))}
           sub={momentum.band}
         />
+        </div>
       </section>
 
-      <MomentumPanel momentum={toMomentumView(momentum)} />
+      {/* Zone: Your momentum — the anti-give-up core, all in one place */}
+      <section className="space-y-3">
+        <ZoneHeading>Your momentum</ZoneHeading>
+        <MomentumPanel momentum={toMomentumView(momentum)} />
+        {reflection ? <MomentumReflectionCard reflection={reflection} /> : null}
+      </section>
 
-      {reflection ? <MomentumReflectionCard reflection={reflection} /> : null}
-
-      <section className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+      {/* Zone: Your profile & report */}
+      <section className="space-y-3">
+        <ZoneHeading>Your profile &amp; report</ZoneHeading>
+        <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
         <Card id="career-report">
           <CardHeader className="flex flex-row items-start gap-4 space-y-0">
             <div className="grid size-10 place-items-center rounded-md bg-primary/10 text-primary">
@@ -263,9 +272,13 @@ export function DashboardShell({
             )}
           </CardContent>
         </Card>
+        </div>
       </section>
 
-      <Card id="recommended-jobs">
+      {/* Zone: What's out there */}
+      <section className="space-y-3">
+        <ZoneHeading>What&apos;s out there</ZoneHeading>
+        <Card id="recommended-jobs">
         <CardHeader className="flex flex-row items-start gap-4 space-y-0">
           <div className="grid size-10 place-items-center rounded-md bg-primary/10 text-primary">
             <BriefcaseBusiness className="size-5" aria-hidden="true" />
@@ -312,8 +325,18 @@ export function DashboardShell({
         </CardContent>
       </Card>
 
-      <MarketSignalsCard signals={marketSignals} />
+        <MarketSignalsCard signals={marketSignals} />
+      </section>
     </div>
+  );
+}
+
+/** A small, quiet zone label so the dashboard reads as grouped sections, not a wall. */
+function ZoneHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="px-0.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+      {children}
+    </h2>
   );
 }
 
