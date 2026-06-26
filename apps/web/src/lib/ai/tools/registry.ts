@@ -6,6 +6,7 @@ import { getMomentumReflection, getMomentumSummary, summarizeRejectionPatterns }
 import { answerBehavioral } from "@/lib/interview/story-bank";
 import { prepareInterviewForJob } from "@/lib/interview/jd-prep";
 import { formatPrepQuestion } from "@/lib/interview/jd-prep";
+import { prepareCompanyBrief, formatBrief } from "@/lib/interview/company-brief";
 import { generateMockQuestions, scoreInterviewAnswer } from "@/lib/interview/mock";
 import { getDashboardProfileSummary } from "@/lib/career-report/data";
 import { rankedEvidenceForActiveTrack } from "@/lib/evidence/pool";
@@ -464,12 +465,37 @@ const relevantEvidenceTool: FadiTool = {
   },
 };
 
+const companyBriefTool: FadiTool = {
+  name: "company_interview_brief",
+  description:
+    "Build an honest interview prep brief for a company: what they do, the role's focus, the industry's durable dynamics, smart questions to ASK the interviewer, and talking points connecting the user's REAL evidence to the role. Use for 'help me research <company>', 'prep me for my interview at <company>', 'what should I ask them'. Never fabricates recent news — it tells the user to verify live.",
+  parameters: {
+    type: "object",
+    properties: {
+      company: { type: "string", description: "The company the user is interviewing with." },
+      role: { type: "string", description: "The role, if known." },
+      jobDescription: { type: "string", description: "The job description, if available." },
+    },
+    required: ["company"],
+  },
+  async execute(args, ctx): Promise<FadiToolResult> {
+    const res = await prepareCompanyBrief(ctx.userId, {
+      company: typeof args.company === "string" ? args.company : "",
+      role: typeof args.role === "string" ? args.role : undefined,
+      jobDescription: typeof args.jobDescription === "string" ? args.jobDescription : undefined,
+    });
+    if (!res.ok) return { summary: res.message, view: "none" };
+    return { summary: formatBrief(res.brief), view: "none", data: { brief: res.brief } };
+  },
+};
+
 const TOOLS: FadiTool[] = [
   searchJobs,
   getPerformance,
   getMomentumReflectionTool,
   getRejectionPatterns,
   prepInterviewTool,
+  companyBriefTool,
   mockQuestionsTool,
   scoreAnswerTool,
   relevantEvidenceTool,

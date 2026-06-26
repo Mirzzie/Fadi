@@ -14,6 +14,7 @@ import {
 import type { RejectionInsight } from "@/lib/resilience/autopsy";
 import { evaluateFit, type FitResult } from "@/lib/jobs/fit";
 import { prepareInterviewForJob, type PrepResult } from "@/lib/interview/jd-prep";
+import { prepareCompanyBrief, type BriefResult } from "@/lib/interview/company-brief";
 
 export type RejectionStage = "keyword" | "screen" | "interview" | "final";
 
@@ -77,6 +78,17 @@ export async function evaluateJobFit(input: {
     jobTitle: input.jobTitle,
     company: input.company,
   });
+}
+
+/** An honest company prep brief — understand the business + smart questions to ask. */
+export async function getCompanyBrief(input: {
+  company: string;
+  role?: string;
+  jobDescription?: string;
+}): Promise<BriefResult> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, reason: "error", message: "Please sign in again." };
+  return prepareCompanyBrief(user.id, input);
 }
 
 /**

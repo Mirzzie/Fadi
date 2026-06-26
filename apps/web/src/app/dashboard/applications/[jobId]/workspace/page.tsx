@@ -15,6 +15,7 @@ import { ExternalLink } from "lucide-react";
 import { ApplicationOutcomePanel } from "@/components/workspace/application-outcome-panel";
 import { FitGatePanel } from "@/components/workspace/fit-gate-panel";
 import { InterviewPrepPanel } from "@/components/workspace/interview-prep-panel";
+import { CompanyBriefPanel } from "@/components/workspace/company-brief-panel";
 import { AutoPrepRunner } from "@/components/workspace/auto-prep-runner";
 import { JobLivenessBanner } from "@/components/workspace/job-liveness-banner";
 import { WorkspaceDocActions } from "@/components/workspace/workspace-doc-actions";
@@ -115,6 +116,15 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
         {/* JD-tailored STAR interview prep, drawn from the user's real LinkedIn/career */}
         <div className="shrink-0">
           <InterviewPrepPanel
+            jobTitle={job.title}
+            jobCompany={job.company}
+            jobDescription={job.description ?? undefined}
+          />
+        </div>
+
+        {/* Honest company prep brief — understand the business + smart questions to ask */}
+        <div className="shrink-0">
+          <CompanyBriefPanel
             jobTitle={job.title}
             jobCompany={job.company}
             jobDescription={job.description ?? undefined}
