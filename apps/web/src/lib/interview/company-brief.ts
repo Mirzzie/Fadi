@@ -22,6 +22,10 @@ export type CompanyBrief = {
   smartQuestions: string[];
   /** How the candidate's real evidence connects to this role. */
   talkingPoints: string[];
+  /** Scam / ghost-job / "too good to be true" signals to watch — from the posting, not fabricated. */
+  redFlags: string[];
+  /** Where to verify the real story (reviews, work-life, reputation) and what to look for. */
+  whereToVerify: string[];
   /** Honest reminder to verify current developments before the interview. */
   recencyCaveat: string;
 };
@@ -32,6 +36,8 @@ const briefSchema = z.object({
   industryContext: z.string(),
   smartQuestions: z.array(z.string()).max(6).default([]),
   talkingPoints: z.array(z.string()).max(6).default([]),
+  redFlags: z.array(z.string()).max(6).default([]),
+  whereToVerify: z.array(z.string()).max(6).default([]),
 });
 
 const DEFAULT_CAVEAT =
@@ -45,9 +51,12 @@ Use the job description and general knowledge to produce:
 - industryContext: the durable dynamics of their industry (general, not dated).
 - smartQuestions: 3–5 genuinely good questions the candidate can ASK the interviewer.
 - talkingPoints: 3–5 ways the candidate's REAL evidence (provided) connects to this role.
+- redFlags: 0–4 scam / ghost-job / "too good to be true" signals visible IN THE POSTING ITSELF (e.g. asks for payment or bank details up front, vague company with no real description, salary wildly above market, generic free-email contact, pressure to act fast, no named hiring contact). Only flag what the posting evidences — do NOT accuse a real, known company of fraud.
+- whereToVerify: 2–4 specific places to check the REAL story (Glassdoor / Indeed / Blind for reviews and work-life; LinkedIn for who works there and tenure; the company's own site/newsroom; the registry/Companies House for legitimacy) and WHAT to look for in each.
 
 HARD HONESTY RULES:
 - NEVER state specific recent news, announcements, funding, leadership changes, or numbers as fact — you can't see current data and must not fabricate it. Keep to durable understanding.
+- NEVER invent employee reviews, ratings, glassdoor scores, or "people say…" claims — you don't have them. Point the user to where to read them instead (whereToVerify).
 - talkingPoints must use only the candidate's real evidence; never invent achievements.
 - Be concrete and useful, not generic.`;
 
@@ -60,6 +69,8 @@ export function formatBrief(brief: CompanyBrief): string {
   ];
   if (brief.smartQuestions.length) lines.push(`\nSmart questions to ask:\n${brief.smartQuestions.map((q) => `• ${q}`).join("\n")}`);
   if (brief.talkingPoints.length) lines.push(`\nYour talking points:\n${brief.talkingPoints.map((p) => `• ${p}`).join("\n")}`);
+  if (brief.redFlags.length) lines.push(`\n⚠ Red flags to watch:\n${brief.redFlags.map((p) => `• ${p}`).join("\n")}`);
+  if (brief.whereToVerify.length) lines.push(`\nVerify the real story:\n${brief.whereToVerify.map((p) => `• ${p}`).join("\n")}`);
   lines.push(`\n${brief.recencyCaveat}`);
   return lines.join("\n");
 }
@@ -102,6 +113,8 @@ export async function prepareCompanyBrief(
         industryContext: raw.industryContext.trim(),
         smartQuestions: raw.smartQuestions.map((s) => s.trim()).filter(Boolean),
         talkingPoints: raw.talkingPoints.map((s) => s.trim()).filter(Boolean),
+        redFlags: raw.redFlags.map((s) => s.trim()).filter(Boolean),
+        whereToVerify: raw.whereToVerify.map((s) => s.trim()).filter(Boolean),
         recencyCaveat: DEFAULT_CAVEAT,
       },
     };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Building2, HelpCircle, Info, MessageCircle } from "lucide-react";
+import { AlertTriangle, Building2, HelpCircle, Info, MessageCircle, ShieldCheck } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { getCompanyBrief } from "@/app/dashboard/applications/actions";
@@ -62,6 +62,24 @@ export function CompanyBriefPanel({
           ) : null}
           {brief.talkingPoints.length > 0 ? (
             <List icon={MessageCircle} title="Your talking points (from your real experience)" items={brief.talkingPoints} />
+          ) : null}
+
+          {/* Due diligence — scam/red-flag signals from the posting + where to verify. */}
+          {brief.redFlags.length > 0 ? (
+            <div className="space-y-1 rounded-md border border-amber-500/40 bg-amber-500/10 p-2">
+              <p className="flex items-center gap-1.5 text-xs font-medium text-amber-200/90">
+                <AlertTriangle className="size-3.5" aria-hidden="true" />
+                Red flags to watch (from this posting)
+              </p>
+              <ul className="space-y-0.5">
+                {brief.redFlags.map((f, i) => (
+                  <li key={i} className="text-foreground/90">• {f}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+          {brief.whereToVerify.length > 0 ? (
+            <List icon={ShieldCheck} title="Verify the real story (work-life, reputation, legitimacy)" items={brief.whereToVerify} />
           ) : null}
 
           {/* Honesty: never present stale facts as current. */}

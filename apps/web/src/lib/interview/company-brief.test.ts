@@ -8,6 +8,8 @@ const brief: CompanyBrief = {
   industryContext: "Fintech is consolidating around platform players.",
   smartQuestions: ["How do you measure on-call health?", "What's the biggest reliability risk this year?"],
   talkingPoints: ["Your migration cut incidents 40% — maps to their reliability focus."],
+  redFlags: ["Posting asks for a 'training fee' up front — a classic scam signal."],
+  whereToVerify: ["Glassdoor for work-life and management reviews; LinkedIn for who works there and tenure."],
   recencyCaveat: "I can't see today's news — verify recent announcements before you go.",
 };
 
@@ -19,6 +21,9 @@ describe("formatBrief", () => {
     expect(out).toContain("Smart questions to ask:");
     expect(out).toContain("How do you measure on-call health?");
     expect(out).toContain("Your talking points:");
+    expect(out).toMatch(/Red flags to watch/i);
+    expect(out).toContain("training fee");
+    expect(out).toMatch(/Verify the real story/i);
     expect(out).toMatch(/can't see today's news/i); // never presents stale facts as current
   });
 });
