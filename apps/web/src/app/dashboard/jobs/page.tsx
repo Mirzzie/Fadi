@@ -13,7 +13,7 @@ import { getJobSourceCoverage } from "@/lib/data-sources/service";
 import { getRecommendedJobsForUser } from "@/lib/jobs/data";
 import type { EmploymentType, VisaFilter, WorkMode } from "@/lib/jobs/filters";
 import { getCountry, parseLocation } from "@/lib/jobs/locations";
-import { getOnboardingStatus } from "@/lib/onboarding/status";
+import { onboardingStatusOf } from "@/lib/onboarding/status";
 
 export const metadata: Metadata = {
   title: "Jobs",
@@ -46,15 +46,16 @@ export default async function JobsPage({
   const user = await getCurrentAuthUser();
   if (!user) redirect("/auth/sign-in?next=/dashboard/jobs");
 
-  const onboardingStatus = await getOnboardingStatus(user.id);
-  if (onboardingStatus !== "completed") redirect("/onboarding");
-
   const params = await searchParams;
   const db = getDatabase();
   const [profile, profileRow] = await Promise.all([
     getDashboardProfileSummary(user.id),
     createProfilesRepository(db).getByUserId(user.id),
   ]);
+
+  // Gate on the profiles row we already loaded — no separate onboarding round-trip.
+  if (onboardingStatusOf(profileRow) !== "completed") redirect("/onboarding");
+
   const prefs = profileRow?.jobPreferences ?? {};
 
   const fromProfile = parseLocation(profile?.locationPreference);

@@ -42,6 +42,8 @@ export type StoredCareerReport = {
 };
 
 export type DashboardProfileSummary = {
+  /** Surfaced so pages that already load the summary can gate onboarding without a 2nd profiles query. */
+  onboardingCompleted: boolean;
   fullName: string | null;
   email?: string;
   targetRole: string | null;

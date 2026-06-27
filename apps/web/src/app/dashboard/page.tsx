@@ -11,7 +11,7 @@ import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDashboardProfileSummary, getLatestCareerReport } from "@/lib/career-report/data";
 import { getRecommendedJobsForUser } from "@/lib/jobs/data";
 import { getSetupState } from "@/lib/guidance/setup";
-import { getOnboardingStatus } from "@/lib/onboarding/status";
+import { onboardingStatusOf } from "@/lib/onboarding/status";
 import { getMomentumReflection, getMomentumSummary } from "@/lib/resilience/service";
 import { getMarketIntelligence } from "@/lib/data-sources/service";
 import type { ScoredSignal } from "@/lib/data-sources/relevance";
@@ -29,12 +29,6 @@ export default async function DashboardPage() {
     redirect("/auth/sign-in");
   }
 
-  const onboardingStatus = await getOnboardingStatus(user.id);
-
-  if (onboardingStatus !== "completed") {
-    redirect("/onboarding");
-  }
-
   const [profileSummary, latestReport, recommendedJobsPreview, momentum, reflection, setup, digest] =
     await Promise.all([
       getDashboardProfileSummary(user.id),
@@ -45,6 +39,11 @@ export default async function DashboardPage() {
       getSetupState(user.id),
       getAgencyDigest(user.id),
     ]);
+
+  // Gate on the summary we already loaded — no separate profiles round-trip.
+  if (onboardingStatusOf(profileSummary) !== "completed") {
+    redirect("/onboarding");
+  }
 
   // Deliver the background-agency digest into Fadi's chat (once per finding),
   // and kick off the next agency pass after the response is sent — this keeps

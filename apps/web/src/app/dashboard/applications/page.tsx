@@ -8,8 +8,9 @@ import { getDatabase } from "@/lib/database/client";
 import {
   createApplicationsRepository,
   createDocumentsRepository,
+  createProfilesRepository,
 } from "@careeros/database";
-import { getOnboardingStatus } from "@/lib/onboarding/status";
+import { onboardingStatusOf } from "@/lib/onboarding/status";
 
 export const metadata: Metadata = { title: "Applications" };
 export const dynamic = "force-dynamic";
@@ -18,14 +19,15 @@ export default async function ApplicationsPage() {
   const user = await getCurrentAuthUser();
   if (!user) redirect("/auth/sign-in?next=/dashboard/applications");
 
-  const onboardingStatus = await getOnboardingStatus(user.id);
-  if (onboardingStatus !== "completed") redirect("/onboarding");
-
   const db = getDatabase();
-  const [apps, docs] = await Promise.all([
+  const [apps, docs, profile] = await Promise.all([
     createApplicationsRepository(db).listForUser(user.id),
     createDocumentsRepository(db).listForUser(user.id),
+    createProfilesRepository(db).getByUserId(user.id),
   ]);
+
+  // Gate on the profile we loaded in-batch — parallelized, not a serial round-trip.
+  if (onboardingStatusOf(profile) !== "completed") redirect("/onboarding");
 
   return (
     <AppShell>

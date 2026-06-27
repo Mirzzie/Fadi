@@ -15,6 +15,7 @@ type CareerReportContext = {
   careerProfileId: string;
   resumeId: string | null;
   linkedInProfileId: string | null;
+  onboardingCompleted: boolean;
   fullName: string | null;
   email?: string;
   targetRole: string | null;
@@ -67,6 +68,7 @@ export async function getCareerReportContext(userId: string): Promise<CareerRepo
     careerProfileId: careerProfile.id,
     resumeId: resume?.id ?? null,
     linkedInProfileId: linkedInProfile?.id ?? null,
+    onboardingCompleted: profile?.onboardingCompleted ?? false,
     fullName: profile?.fullName ?? null,
     email: profile?.email ?? undefined,
     targetRole: careerProfile.targetRole,
@@ -89,6 +91,7 @@ export async function getDashboardProfileSummary(
   }
 
   return {
+    onboardingCompleted: context.onboardingCompleted,
     fullName: context.fullName,
     email: context.email,
     targetRole: context.targetRole,
