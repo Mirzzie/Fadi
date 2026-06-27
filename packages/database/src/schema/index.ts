@@ -340,6 +340,8 @@ export const jobs = pgTable(
     index("jobs_status_idx").on(table.status),
     index("jobs_title_idx").on(table.title),
     index("jobs_company_idx").on(table.company),
+    // The jobs board's hottest read: filter status='active' + sort by (company, title).
+    index("jobs_status_company_title_idx").on(table.status, table.company, table.title),
   ]
 );
 
@@ -584,6 +586,8 @@ export const documents = pgTable(
     index("documents_job_id_idx").on(table.jobId),
     index("documents_kind_idx").on(table.kind),
     index("documents_user_updated_at_idx").on(table.userId, table.updatedAt),
+    // The Documents library filters by the active track on every load.
+    index("documents_user_career_profile_idx").on(table.userId, table.careerProfileId),
   ]
 );
 

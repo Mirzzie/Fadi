@@ -8,7 +8,7 @@ import { ChangePasswordForm } from "@/components/profile/change-password-form";
 import { ProfileForm } from "@/components/profile/profile-form";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
-import { getOnboardingStatus } from "@/lib/onboarding/status";
+import { onboardingStatusOf } from "@/lib/onboarding/status";
 import {
   createCareerProfilesRepository,
   createLinkedInProfilesRepository,
@@ -23,9 +23,6 @@ export default async function ProfilePage() {
   const user = await getCurrentAuthUser();
   if (!user) redirect("/auth/sign-in");
 
-  const onboardingStatus = await getOnboardingStatus(user.id);
-  if (onboardingStatus !== "completed") redirect("/onboarding");
-
   const db = getDatabase();
   const [profile, careerProfile, linkedIn, resume] = await Promise.all([
     createProfilesRepository(db).getByUserId(user.id),
@@ -33,6 +30,8 @@ export default async function ProfilePage() {
     createLinkedInProfilesRepository(db).getLatestForUser(user.id),
     createResumesRepository(db).getLatestForUser(user.id),
   ]);
+  // Gate on the profile we already loaded — no second profiles round-trip.
+  if (onboardingStatusOf(profile) !== "completed") redirect("/onboarding");
 
   return (
     <AppShell>

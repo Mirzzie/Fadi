@@ -21,7 +21,7 @@ import { JobLivenessBanner } from "@/components/workspace/job-liveness-banner";
 import { WorkspaceDocActions } from "@/components/workspace/workspace-doc-actions";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
-import { getOnboardingStatus } from "@/lib/onboarding/status";
+import { onboardingStatusOf } from "@/lib/onboarding/status";
 import { REJECTION_AUTOPSY_PROMPTS } from "@/lib/resilience/framing";
 
 export const dynamic = "force-dynamic";
@@ -43,10 +43,6 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
 
   if (!user) redirect("/auth/sign-in");
 
-  const onboardingStatus = await getOnboardingStatus(user.id);
-
-  if (onboardingStatus !== "completed") redirect("/onboarding");
-
   const db = getDatabase();
 
   const [job, savedJob, applications, jobDocs, profile] = await Promise.all([
@@ -57,6 +53,8 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
     createProfilesRepository(db).getByUserId(user.id),
   ]);
 
+  // Gate on the profile already loaded above — no second profiles round-trip.
+  if (onboardingStatusOf(profile) !== "completed") redirect("/onboarding");
   if (!job) notFound();
 
   const application = applications[0]

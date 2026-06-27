@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 
 import type { Database } from "../client";
 import { interviewStories, type InterviewStory, type NewInterviewStory } from "../schema";
@@ -76,11 +76,11 @@ export function createInterviewStoriesRepository(db: Database) {
     },
 
     async count(userId: string): Promise<number> {
-      const rows = await db
-        .select({ id: interviewStories.id })
+      const [row] = await db
+        .select({ value: count() })
         .from(interviewStories)
         .where(eq(interviewStories.userId, userId));
-      return rows.length;
+      return row?.value ?? 0;
     },
   };
 }

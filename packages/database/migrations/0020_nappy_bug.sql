@@ -1,0 +1,2 @@
+CREATE INDEX "documents_user_career_profile_idx" ON "documents" USING btree ("user_id","career_profile_id");--> statement-breakpoint
+CREATE INDEX "jobs_status_company_title_idx" ON "jobs" USING btree ("status","company","title");

@@ -141,6 +141,13 @@
       "when": 1782513040712,
       "tag": "0019_crazy_swarm",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1782577330482,
+      "tag": "0020_nappy_bug",
+      "breakpoints": true
     }
   ]
 }
