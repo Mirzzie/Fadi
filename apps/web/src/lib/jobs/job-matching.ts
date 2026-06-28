@@ -128,6 +128,94 @@ function roleFamilyTerms(
   return [...terms];
 }
 
+// Words too generic ACROSS fields to signal that a job is in the user's FIELD —
+// used only for the "related role in your field" fallback (NOT the exact-role
+// match). Distinctive field words (security, cyber, nurse, audit…) survive.
+const fieldGenericWords = new Set([
+  ...genericRoleWords,
+  "information",
+  "operations",
+  "operation",
+  "center",
+  "centre",
+  "systems",
+  "system",
+  "services",
+  "service",
+  "management",
+  "business",
+  "support",
+  "general",
+  "global",
+  "national",
+  "digital",
+  "online",
+  "technology",
+  "solutions",
+  "group",
+  "company",
+  "response",
+  "project",
+  "product",
+  "program",
+  "programme",
+  "corporate",
+]);
+
+// Job FUNCTIONS that are a different line of work even inside the same field — a
+// SOC seeker doesn't want "Cybersecurity Sales" or "Professor of Security", a
+// nurse doesn't want "Nurse Recruiter". Keeps the field fallback honest.
+const differentFunctionTerms = [
+  "sales",
+  "account executive",
+  "account manager",
+  "business development",
+  "recruiter",
+  "recruiting",
+  "recruitment",
+  "talent acquisition",
+  "sourcer",
+  "professor",
+  "lecturer",
+  "faculty",
+  "dean",
+  "teacher",
+  "tutor",
+  "instructor",
+  "marketing",
+  "copywriter",
+  "content",
+  "social media",
+  "designer",
+  "journalist",
+];
+
+/** Distinctive FIELD vocabulary from the user's domain + role(s) + synonyms. */
+function fieldTermsFor(
+  domain: string | null,
+  targetRole: string | null,
+  roleCluster: string[] | null,
+  roleSynonyms: string[] | null,
+): string[] {
+  const terms = new Set<string>();
+  const add = (v: string | null | undefined) =>
+    distinctiveTokens(v).forEach((t) => {
+      if (t.length >= 3 && !fieldGenericWords.has(t)) terms.add(t);
+    });
+  add(domain);
+  add(targetRole);
+  for (const r of roleCluster ?? []) add(r);
+  for (const s of roleSynonyms ?? []) add(s);
+  return [...terms];
+}
+
+/** Same FIELD, but possibly a different role — used only when nothing is on-role. */
+function isFieldRelated(jobTitle: string, fieldTerms: string[]): boolean {
+  const title = normalize(jobTitle);
+  if (differentFunctionTerms.some((w) => containsTerm(title, w))) return false;
+  return fieldTerms.some((t) => containsTerm(title, t));
+}
+
 /** Role fit + whether this job is even the right KIND of role for the user. */
 function roleScore(
   targetRole: string | null,
@@ -246,6 +334,22 @@ export function scoreJobForUser({
     careerProfile?.roleSynonyms ?? null,
     job.title,
   );
+
+  // Not the exact role, but the SAME field (e.g. a Security Engineer for a SOC
+  // Analyst) — a useful fallback when no exact-role postings exist, instead of a
+  // blank board. Excludes different functions in the field (sales, academia).
+  const fieldRelated =
+    !role.onRole &&
+    isFieldRelated(
+      job.title,
+      fieldTermsFor(
+        careerProfile?.domain ?? null,
+        careerProfile?.targetRole ?? null,
+        careerProfile?.roleCluster ?? null,
+        careerProfile?.roleSynonyms ?? null,
+      ),
+    );
+
   // Low floor: an unrelated role should score low, not inherit a generous base.
   const score =
     5 +
@@ -253,11 +357,14 @@ export function scoreJobForUser({
     locationScore(locationPref, job) +
     experienceScore(careerProfile?.experienceLevel ?? null, job) +
     keywordMatch.score;
-  // Off-role jobs are capped hard so location + keyword noise can't promote a
-  // "Materials Engineer" to an IT-support seeker.
+  // On-role can climb high; same-field-different-role sits in a middle band so it
+  // never out-ranks a real match; off-role noise is capped hard so location +
+  // keyword overlap can't promote a "Materials Engineer" to an IT-support seeker.
   const matchScore = role.onRole
     ? Math.min(98, Math.max(5, score))
-    : Math.min(28, Math.max(5, score));
+    : fieldRelated
+      ? Math.min(49, Math.max(18, score))
+      : Math.min(28, Math.max(5, score));
 
   const reasonParts = [
     role.onRole && careerProfile?.targetRole
@@ -269,13 +376,21 @@ export function scoreJobForUser({
       : null,
   ].filter(Boolean);
 
+  const matchReason = role.onRole
+    ? reasonParts.length > 0
+      ? `Matched on ${reasonParts.join("; ")}.`
+      : "Limited overlap with your profile. Review the job description before applying."
+    : fieldRelated
+      ? `Related role in your field${careerProfile?.domain ? ` (${careerProfile.domain})` : ""} — not an exact ${careerProfile?.targetRole ?? "role"} match, but in the same field. Review before applying.`
+      : reasonParts.length > 0
+        ? `Matched on ${reasonParts.join("; ")}.`
+        : "Limited overlap with your profile. Review the job description before applying.";
+
   return {
     matchScore,
     onRole: role.onRole,
+    fieldRelated,
     matchedKeywords: keywordMatch.matchedKeywords,
-    matchReason:
-      reasonParts.length > 0
-        ? `Matched on ${reasonParts.join("; ")}.`
-        : "Limited overlap with your profile. Review the job description before applying.",
+    matchReason,
   };
 }

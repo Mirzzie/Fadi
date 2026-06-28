@@ -26,6 +26,8 @@ export type RecommendedJob = {
   matchedKeywords: string[];
   /** Whether the job is the right KIND of role for the user (drives relevance filtering). */
   onRole: boolean;
+  /** Same field as the user but a different role — shown only when nothing is on-role. */
+  fieldRelated: boolean;
   isSaved: boolean;
   applicationStatus: ApplicationStatus | null;
 };

@@ -59,6 +59,68 @@ describe("scoreJobForUser — domain-agnostic role matching", () => {
     expect(run(soc, "Cybersecurity Analyst").onRole).toBe(true);
   });
 
+  it("flags same-field roles as fieldRelated (fallback), excluding other functions in the field", () => {
+    // Real data: a SOC Analyst seeker whose store has security ENGINEERS but no
+    // literal SOC/Security ANALYST postings. We'd rather show the adjacent security
+    // roles (labelled) than a blank board — but never sales/academia in the field.
+    const soc = {
+      targetRole: "SOC Analyst",
+      careerGoal: "grow",
+      domain: "Cybersecurity",
+      roleCluster: ["SOC Analyst"],
+      roleSynonyms: [
+        "security operations center analyst",
+        "information security analyst",
+        "cyber security analyst",
+        "incident response analyst",
+        "threat analyst",
+        "network security analyst",
+        "soc analyst",
+      ],
+      location: "Remote",
+      experienceLevel: "mid",
+    } as unknown as CareerProfile;
+
+    // Same field, different role → shown as related (not on-role).
+    for (const title of ["Staff Security Engineer, SOAR", "Security Automation Engineer", "Network Security Engineer"]) {
+      const r = run(soc, title);
+      expect(r.onRole, title).toBe(false);
+      expect(r.fieldRelated, title).toBe(true);
+    }
+
+    // In the field but a different FUNCTION, or not the field at all → NOT shown.
+    for (const title of [
+      "Solution Sales Principal - Cyber Security", // sales
+      "Associate Professor in Cybersecurity", // academia
+      "Social Media Manager",
+      "Senior Software Engineer (TypeScript, NestJS/Node.js)",
+    ]) {
+      const r = run(soc, title);
+      expect(r.onRole, title).toBe(false);
+      expect(r.fieldRelated, title).toBe(false);
+    }
+
+    // Exact role still on-role (and not merely "related").
+    const exact = run(soc, "SOC Analyst - Tier 2");
+    expect(exact.onRole).toBe(true);
+    expect(exact.fieldRelated).toBe(false);
+  });
+
+  it("does not leak field-related across domains (a nurse never sees security roles)", () => {
+    const nurse = {
+      targetRole: "Registered Nurse",
+      careerGoal: "grow",
+      domain: "Healthcare",
+      roleCluster: null,
+      roleSynonyms: ["staff nurse", "rn", "charge nurse"],
+      location: "Remote",
+      experienceLevel: "mid",
+    } as unknown as CareerProfile;
+    const r = run(nurse, "Staff Security Engineer, SOAR");
+    expect(r.onRole).toBe(false);
+    expect(r.fieldRelated).toBe(false);
+  });
+
   it("does not let the career goal's domain word make any same-domain job on-role", () => {
     // careerGoal mentions the domain; a Professor *of* that domain must stay off-role.
     const p = {

@@ -126,6 +126,7 @@ export async function getRecommendedJobsForUser(
         matchReason: savedJob?.matchSummary ?? match.matchReason,
         matchedKeywords: savedJob?.matchedSkills ?? match.matchedKeywords,
         onRole: match.onRole,
+        fieldRelated: match.fieldRelated,
         isSaved: Boolean(savedJob),
         applicationStatus: (application?.status as ApplicationStatus | undefined) ?? null,
       };
@@ -149,7 +150,17 @@ export async function getRecommendedJobsForUser(
   // 2) Fallback: on-role at any score — the right KIND of role, just weaker —
   //    but still never off-role.
   const onRoleAny = hardFiltered.filter((j) => j.onRole || tracked(j));
-  let shown = strong.length > 0 ? strong : onRoleAny.slice(0, 10);
+  // 3) Last resort: SAME FIELD, different role (e.g. a Security Engineer for a SOC
+  //    Analyst seeker). Only when there are NO exact-role matches — so an empty
+  //    board becomes honest, labelled adjacent roles instead of nothing. Still
+  //    never off-field noise (sales/academia in the field are excluded upstream).
+  const fieldRelated = hardFiltered.filter((j) => j.fieldRelated || tracked(j));
+  let shown =
+    strong.length > 0
+      ? strong
+      : onRoleAny.length > 0
+        ? onRoleAny.slice(0, 10)
+        : fieldRelated.slice(0, 12);
 
   // Drop postings the source has already CLOSED ("no longer accepting
   // applications" / 404). Bounded, DB-cached probe of just the jobs we're about to
