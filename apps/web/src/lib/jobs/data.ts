@@ -1,3 +1,5 @@
+import { after } from "next/server";
+
 import {
   createApplicationsRepository,
   createCareerProfilesRepository,
@@ -16,7 +18,12 @@ import { getCountry } from "@/lib/jobs/locations";
 import { checkPostingLiveness } from "@/lib/jobs/liveness";
 import { sweepJobsLiveness } from "@/lib/jobs/liveness-sweep";
 import { cosine, embedText, embedTexts, EMBEDDING_MODEL, fuseScore } from "@/lib/ai/embeddings";
-import { isSemanticRescue, jobEmbeddingText, resolveTrackEmbedding } from "@/lib/jobs/semantic";
+import {
+  freshTrackVector,
+  isSemanticRescue,
+  jobEmbeddingText,
+  resolveTrackEmbedding,
+} from "@/lib/jobs/semantic";
 import type { ApplicationStatus, RecommendedJob } from "@/lib/jobs/types";
 
 // Below this match score a role is noise for this user — hide it rather than
@@ -175,94 +182,95 @@ export async function getRecommendedJobsForUser(
 
   // ── Semantic layer (hybrid search) ── re-rank the board by MEANING and, when no
   // exact role matched, rescue close-by-meaning roles the keyword pass missed
-  // (e.g. "Threat Detection Analyst" for a SOC Analyst). Entirely additive: with no
-  // embeddings provider the track vector is null and this whole block is skipped,
-  // leaving the lexical board exactly as it was. Live page only (skipSync = the
-  // fast dashboard read), and every rescue still respects the seniority + function
-  // gates — the vector decides field fit, never the gates.
+  // (e.g. "Threat Detection Analyst" for a SOC Analyst). Entirely additive AND off
+  // the hot path: ranking uses ONLY already-cached vectors (zero embedding calls
+  // during render); the track vector + any missing job vectors are filled in the
+  // BACKGROUND so the next load is fully semantic. With no embeddings provider /
+  // cold cache, the board is exactly the lexical one. Every rescue still respects
+  // the seniority + function gates — the vector decides field fit, never the gates.
   if (!opts.skipSync && careerProfile) {
-    try {
-      const trackVec = await resolveTrackEmbedding(careerProfile, {
-        embed: embedText,
-        persist: (vec, basis) =>
-          careerProfilesRepository.setEmbedding(careerProfile.id, vec, EMBEDDING_MODEL, basis),
-      });
+    const inFallback = strong.length === 0 && onRoleAny.length === 0;
+    // In-area jobs the lexical pass dropped, kept realistic (right level/function);
+    // the vector judges field fit. Used for both rescue and background backfill.
+    const rescuePool = inFallback
+      ? hardFiltered
+          .filter((j) => {
+            const m = metaById.get(j.id);
+            return !j.onRole && !j.fieldRelated && !j.overLevel && !(m?.differentFunction ?? true);
+          })
+          .slice(0, 40)
+      : [];
 
-      if (trackVec) {
-        const inFallback = strong.length === 0 && onRoleAny.length === 0;
-        // Rescue pool (fallback only): in-area jobs the lexical pass dropped, kept
-        // realistic — right level, right function. The vector judges field fit.
-        const rescuePool = inFallback
-          ? hardFiltered
-              .filter((j) => {
-                const m = metaById.get(j.id);
-                return !j.onRole && !j.fieldRelated && !j.overLevel && !(m?.differentFunction ?? true);
-              })
-              .slice(0, 40)
-          : [];
+    const trackVec = freshTrackVector(careerProfile);
+    if (trackVec) {
+      const cosOf = (j: { id: string }): number | null => {
+        const v = byId.get(j.id)?.embedding;
+        return v && v.length > 0 ? cosine(trackVec, v) : null;
+      };
 
-        const working = [...shown, ...rescuePool];
-        const vecById = new Map<string, number[]>();
-        const toEmbed: typeof working = [];
-        for (const j of working) {
-          const stored = byId.get(j.id)?.embedding;
-          if (stored && stored.length > 0) vecById.set(j.id, stored);
-          else toEmbed.push(j);
-        }
-        // Bound how many we embed live; the rest get embedded on later loads.
-        const batch = toEmbed.slice(0, 24);
-        if (batch.length > 0) {
-          const vecs = await embedTexts(batch.map((j) => jobEmbeddingText(j)));
-          await Promise.all(
-            batch.map(async (j, i) => {
-              const v = vecs[i];
-              if (!v) return;
-              vecById.set(j.id, v);
-              try {
-                await jobsRepository.setEmbedding(j.id, v, EMBEDDING_MODEL);
-              } catch {
-                // best-effort persistence
-              }
-            }),
-          );
-        }
-
-        const cosOf = (id: string): number | null => {
-          const v = vecById.get(id);
-          return v ? cosine(trackVec, v) : null;
-        };
-
-        // Re-rank what we're showing by the fused lexical+semantic score.
-        for (const j of shown) {
-          j.matchScore = fuseScore(metaById.get(j.id)?.lex ?? j.matchScore, cosOf(j.id));
-        }
-        shown.sort((a, b) => b.matchScore - a.matchScore);
-
-        // Fallback: fold in semantic rescues the lexical tiers couldn't see.
-        if (inFallback) {
-          const shownIds = new Set(shown.map((j) => j.id));
-          const rescues = rescuePool
-            .filter((j) => {
-              if (shownIds.has(j.id)) return false;
-              const m = metaById.get(j.id);
-              return isSemanticRescue(cosOf(j.id), {
-                onRole: j.onRole,
-                fieldRelated: j.fieldRelated,
-                overLevel: j.overLevel,
-                differentFunction: m?.differentFunction ?? true,
-              });
-            })
-            .map((j) => {
-              j.matchScore = fuseScore(metaById.get(j.id)?.lex ?? j.matchScore, cosOf(j.id));
-              j.matchReason = `Close match by meaning to your ${careerProfile.targetRole ?? "role"} — not an exact title match. Review before applying.`;
-              return j;
-            })
-            .sort((a, b) => b.matchScore - a.matchScore);
-          if (rescues.length > 0) shown = [...shown, ...rescues].slice(0, 12);
-        }
+      // Re-rank what we're showing by the fused lexical+semantic score.
+      for (const j of shown) {
+        j.matchScore = fuseScore(metaById.get(j.id)?.lex ?? j.matchScore, cosOf(j));
       }
-    } catch {
-      // Best-effort — the semantic layer never blocks the board.
+      shown.sort((a, b) => b.matchScore - a.matchScore);
+
+      // Fallback: fold in semantic rescues the lexical tiers couldn't see.
+      if (inFallback) {
+        const shownIds = new Set(shown.map((j) => j.id));
+        const rescues = rescuePool
+          .filter((j) => {
+            if (shownIds.has(j.id)) return false;
+            const m = metaById.get(j.id);
+            return isSemanticRescue(cosOf(j), {
+              onRole: j.onRole,
+              fieldRelated: j.fieldRelated,
+              overLevel: j.overLevel,
+              differentFunction: m?.differentFunction ?? true,
+            });
+          })
+          .map((j) => {
+            j.matchScore = fuseScore(metaById.get(j.id)?.lex ?? j.matchScore, cosOf(j));
+            j.matchReason = `Close match by meaning to your ${careerProfile.targetRole ?? "role"} — not an exact title match. Review before applying.`;
+            return j;
+          })
+          .sort((a, b) => b.matchScore - a.matchScore);
+        if (rescues.length > 0) shown = [...shown, ...rescues].slice(0, 12);
+      }
+    }
+
+    // Background: refresh the track vector (if stale) and embed any candidate jobs
+    // that lack a vector — so the NEXT load ranks semantically. Never blocks this
+    // response. after() runs post-response in request scope (live page / action).
+    const needVectors = [...shown, ...rescuePool].filter((j) => {
+      const v = byId.get(j.id)?.embedding;
+      return !(v && v.length > 0);
+    });
+    if (!trackVec || needVectors.length > 0) {
+      try {
+        after(async () => {
+          try {
+            await resolveTrackEmbedding(careerProfile, {
+              embed: embedText,
+              persist: (vec, basis) =>
+                careerProfilesRepository.setEmbedding(careerProfile.id, vec, EMBEDDING_MODEL, basis),
+            });
+            const batch = needVectors.slice(0, 24);
+            if (batch.length > 0) {
+              const vecs = await embedTexts(batch.map((j) => jobEmbeddingText(j)));
+              await Promise.all(
+                batch.map(async (j, i) => {
+                  const v = vecs[i];
+                  if (v) await jobsRepository.setEmbedding(j.id, v, EMBEDDING_MODEL);
+                }),
+              );
+            }
+          } catch {
+            // best-effort background work
+          }
+        });
+      } catch {
+        // not in a request scope (e.g. a background caller) — skip the deferral
+      }
     }
   }
 

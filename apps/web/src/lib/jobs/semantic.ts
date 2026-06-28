@@ -55,6 +55,15 @@ export function jobEmbeddingText(job: {
     .join("\n");
 }
 
+/** The track's vector ONLY if it's already cached and still fresh — no network.
+ *  Lets the hot render path rank with what's available and defer embedding. */
+export function freshTrackVector(track: TrackLike | null | undefined): number[] | null {
+  if (!track?.embedding || track.embedding.length === 0) return null;
+  if (track.embeddingModel !== EMBEDDING_MODEL) return null;
+  if (track.embeddingBasis !== basisHash(trackEmbeddingBasis(track))) return null;
+  return track.embedding;
+}
+
 export interface TrackEmbeddingDeps {
   embed: (text: string) => Promise<number[] | null>;
   persist: (vec: number[], basis: string) => Promise<void>;
