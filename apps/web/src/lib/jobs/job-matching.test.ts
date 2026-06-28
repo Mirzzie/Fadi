@@ -104,6 +104,11 @@ describe("scoreJobForUser — domain-agnostic role matching", () => {
     const exact = run(soc, "SOC Analyst - Tier 2");
     expect(exact.onRole).toBe(true);
     expect(exact.fieldRelated).toBe(false);
+
+    // A "Staff" (senior) field role is flagged over-level for a mid profile — the
+    // data layer drops it from the related tier so we don't suggest an unreachable role.
+    expect(run(soc, "Staff Security Engineer, SOAR").overLevel).toBe(true);
+    expect(run(soc, "Security Automation Engineer").overLevel).toBe(false);
   });
 
   it("does not leak field-related across domains (a nurse never sees security roles)", () => {

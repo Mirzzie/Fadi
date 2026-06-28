@@ -28,6 +28,8 @@ export type RecommendedJob = {
   onRole: boolean;
   /** Same field as the user but a different role — shown only when nothing is on-role. */
   fieldRelated: boolean;
+  /** The role needs well above the user's experience level (e.g. 8–10 yrs for an early-career profile). */
+  overLevel: boolean;
   isSaved: boolean;
   applicationStatus: ApplicationStatus | null;
 };

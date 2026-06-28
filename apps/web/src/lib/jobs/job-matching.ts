@@ -1,5 +1,7 @@
 import type { CareerProfile, Job, Resume } from "@careeros/database";
 
+import { seniorityFit } from "@/lib/jobs/seniority";
+
 const keywordStopWords = new Set([
   "and",
   "the",
@@ -357,14 +359,23 @@ export function scoreJobForUser({
     locationScore(locationPref, job) +
     experienceScore(careerProfile?.experienceLevel ?? null, job) +
     keywordMatch.score;
+  // Consider the candidate's career stage: a role needing ~2+ levels more than
+  // them (an 8–10-year "Staff" role for an early-career profile) is not a real
+  // match — demote it and say so, rather than sending them to apply for it.
+  const seniority = seniorityFit(job.title, job.description, careerProfile?.experienceLevel ?? null);
+
   // On-role can climb high; same-field-different-role sits in a middle band so it
   // never out-ranks a real match; off-role noise is capped hard so location +
   // keyword overlap can't promote a "Materials Engineer" to an IT-support seeker.
-  const matchScore = role.onRole
+  let matchScore = role.onRole
     ? Math.min(98, Math.max(5, score))
     : fieldRelated
       ? Math.min(49, Math.max(18, score))
       : Math.min(28, Math.max(5, score));
+  if (seniority.overReach) {
+    // Cap an out-of-reach role low so it can't sit at the top of the board.
+    matchScore = Math.min(matchScore, 35);
+  }
 
   const reasonParts = [
     role.onRole && careerProfile?.targetRole
@@ -376,7 +387,7 @@ export function scoreJobForUser({
       : null,
   ].filter(Boolean);
 
-  const matchReason = role.onRole
+  const baseReason = role.onRole
     ? reasonParts.length > 0
       ? `Matched on ${reasonParts.join("; ")}.`
       : "Limited overlap with your profile. Review the job description before applying."
@@ -385,11 +396,13 @@ export function scoreJobForUser({
       : reasonParts.length > 0
         ? `Matched on ${reasonParts.join("; ")}.`
         : "Limited overlap with your profile. Review the job description before applying.";
+  const matchReason = seniority.note ? `${baseReason} ${seniority.note}` : baseReason;
 
   return {
     matchScore,
     onRole: role.onRole,
     fieldRelated,
+    overLevel: seniority.overReach,
     matchedKeywords: keywordMatch.matchedKeywords,
     matchReason,
   };

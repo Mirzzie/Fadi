@@ -127,6 +127,7 @@ export async function getRecommendedJobsForUser(
         matchedKeywords: savedJob?.matchedSkills ?? match.matchedKeywords,
         onRole: match.onRole,
         fieldRelated: match.fieldRelated,
+        overLevel: match.overLevel,
         isSaved: Boolean(savedJob),
         applicationStatus: (application?.status as ApplicationStatus | undefined) ?? null,
       };
@@ -153,8 +154,10 @@ export async function getRecommendedJobsForUser(
   // 3) Last resort: SAME FIELD, different role (e.g. a Security Engineer for a SOC
   //    Analyst seeker). Only when there are NO exact-role matches — so an empty
   //    board becomes honest, labelled adjacent roles instead of nothing. Still
-  //    never off-field noise (sales/academia in the field are excluded upstream).
-  const fieldRelated = hardFiltered.filter((j) => j.fieldRelated || tracked(j));
+  //    never off-field noise (sales/academia in the field are excluded upstream),
+  //    and never a role far above the user's experience (an 8–10-yr Staff role for
+  //    an early-career profile is not a realistic "related" suggestion).
+  const fieldRelated = hardFiltered.filter((j) => (j.fieldRelated && !j.overLevel) || tracked(j));
   let shown =
     strong.length > 0
       ? strong
