@@ -1,7 +1,9 @@
-import { and, asc, eq, inArray, lt } from "drizzle-orm";
+import { and, asc, eq, inArray, lt, sql } from "drizzle-orm";
 
 import type { Database } from "../client";
 import { jobs, type Job } from "../schema";
+
+export type LivenessState = "live" | "closed" | "unknown";
 
 export type SeedJobInput = {
   source: string;
@@ -78,6 +80,24 @@ export function createJobsRepository(db: Database) {
       return updated.length;
     },
 
+    /**
+     * Record a posting-liveness probe result. "closed" also flips status to
+     * "closed" so the role drops out of `listActive` immediately and STAYS out
+     * across re-syncs (a job can be closed on the employer site yet linger in an
+     * aggregator feed). "live"/"unknown" only stamp the cache so we don't re-probe.
+     */
+    async setJobLiveness(id: string, state: LivenessState): Promise<void> {
+      await db
+        .update(jobs)
+        .set({
+          livenessState: state,
+          livenessCheckedAt: new Date(),
+          ...(state === "closed" ? { status: "closed" } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(jobs.id, id));
+    },
+
     async upsertSeedJob(input: SeedJobInput): Promise<Job> {
       const [job] = await db
         .insert(jobs)
@@ -109,7 +129,9 @@ export function createJobsRepository(db: Database) {
             description: input.description ?? null,
             url: input.url ?? null,
             salaryText: input.salaryText ?? null,
-            status: input.status ?? "active",
+            // Never resurrect a liveness-confirmed "closed" role when the source
+            // re-lists it — keep it closed; otherwise take the incoming status.
+            status: sql`CASE WHEN ${jobs.status} = 'closed' THEN 'closed' ELSE ${input.status ?? "active"} END`,
             postedAt: input.postedAt ?? null,
             rawPayload: input.rawPayload ?? {},
             updatedAt: new Date(),

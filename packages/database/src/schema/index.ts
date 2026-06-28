@@ -330,6 +330,12 @@ export const jobs = pgTable(
     url: text("url"),
     salaryText: text("salary_text"),
     status: text("status").notNull().default("active"),
+    // Posting-liveness cache (see lib/jobs/liveness): "live" | "closed" | "unknown".
+    // When "closed" (e.g. "no longer accepting applications"), status is set to
+    // "closed" so it drops from listActive AND survives re-sync. checkedAt gates
+    // re-probing so we don't hammer source pages on every render.
+    livenessState: text("liveness_state"),
+    livenessCheckedAt: timestamp("liveness_checked_at", { withTimezone: true }),
     postedAt: timestamp("posted_at", { withTimezone: true }),
     discoveredAt: timestamp("discovered_at", { withTimezone: true }).notNull().defaultNow(),
     rawPayload: jsonb("raw_payload").$type<Record<string, unknown>>().notNull().default({}),

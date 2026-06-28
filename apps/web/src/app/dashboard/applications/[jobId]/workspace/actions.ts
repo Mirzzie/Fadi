@@ -30,14 +30,22 @@ export async function checkJobLivenessAction(jobId: string): Promise<PostingLive
   const job = await createJobsRepository(getDatabase()).findById(jobId);
   if (!job) return { state: "unknown", reason: "Job not found", checkedAt };
 
-  if (job.status !== "active") {
+  if (job.status === "closed" || job.status === "expired" || job.status === "archived") {
     return { state: "closed", reason: "No longer listed in FadiOS", checkedAt };
   }
   if (!job.url) {
     return { state: "unknown", reason: "No source link to verify", checkedAt };
   }
 
-  return checkPostingLiveness(job.url);
+  const result = await checkPostingLiveness(job.url);
+  // Persist so a confirmed-closed role leaves the board for EVERYONE (and survives
+  // re-sync), and so we don't re-probe the same URL on the next render.
+  try {
+    await createJobsRepository(getDatabase()).setJobLiveness(job.id, result.state);
+  } catch {
+    // Best-effort — the banner still shows the live result.
+  }
+  return result;
 }
 
 /**

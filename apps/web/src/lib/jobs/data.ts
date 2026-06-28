@@ -13,6 +13,8 @@ import { scoreJobForUser } from "@/lib/jobs/job-matching";
 import { expandRoleSynonyms } from "@/lib/jobs/role-synonyms";
 import { passesFilters, type JobFilters } from "@/lib/jobs/filters";
 import { getCountry } from "@/lib/jobs/locations";
+import { checkPostingLiveness } from "@/lib/jobs/liveness";
+import { sweepJobsLiveness } from "@/lib/jobs/liveness-sweep";
 import type { ApplicationStatus, RecommendedJob } from "@/lib/jobs/types";
 
 // Below this match score a role is noise for this user — hide it rather than
@@ -147,7 +149,31 @@ export async function getRecommendedJobsForUser(
   // 2) Fallback: on-role at any score — the right KIND of role, just weaker —
   //    but still never off-role.
   const onRoleAny = hardFiltered.filter((j) => j.onRole || tracked(j));
-  const shown = strong.length > 0 ? strong : onRoleAny.slice(0, 10);
+  let shown = strong.length > 0 ? strong : onRoleAny.slice(0, 10);
+
+  // Drop postings the source has already CLOSED ("no longer accepting
+  // applications" / 404). Bounded, DB-cached probe of just the jobs we're about to
+  // show — only on the live page (skipSync = the fast dashboard read). Confirmed-
+  // closed roles are persisted (status → "closed") so they leave the board for
+  // everyone and never come back on a re-sync. Tracked (saved/applied) roles are
+  // never hidden — the workspace shows their liveness banner instead.
+  if (!opts.skipSync && shown.length > 0) {
+    try {
+      const byId = new Map(jobs.map((j) => [j.id, j]));
+      const closed = await sweepJobsLiveness(
+        shown
+          .filter((j) => !tracked(j))
+          .map((j) => ({ id: j.id, url: j.url, livenessCheckedAt: byId.get(j.id)?.livenessCheckedAt ?? null })),
+        {
+          check: checkPostingLiveness,
+          persist: (id, state) => jobsRepository.setJobLiveness(id, state),
+        },
+      );
+      if (closed.size > 0) shown = shown.filter((j) => !closed.has(j.id));
+    } catch {
+      // Best-effort — a flaky probe never blocks the board.
+    }
+  }
 
   return typeof limit === "number" ? shown.slice(0, limit) : shown;
 }
