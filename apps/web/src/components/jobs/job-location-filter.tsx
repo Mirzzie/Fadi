@@ -35,7 +35,7 @@ export function JobLocationFilter({
 }: Props) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [country, setCountry] = useState(selectedCountry ?? "");
+  const [country, setCountry] = useState(selectedCountry ?? "any");
   const [city, setCity] = useState(selectedCity ?? "");
 
   function navigate(next: {
@@ -92,8 +92,11 @@ export function JobLocationFilter({
         <select
           value={country}
           onChange={(e) => {
-            setCountry(e.target.value);
-            navigate({ ...base(), country: e.target.value });
+            const next = e.target.value;
+            setCountry(next);
+            // "Any country" is worldwide — a city would contradict it, so clear it.
+            if (next === "any") setCity("");
+            navigate({ ...base(), country: next, city: next === "any" ? "" : city });
           }}
           aria-label="Country"
           className={cn(
@@ -102,7 +105,7 @@ export function JobLocationFilter({
             "sm:w-52",
           )}
         >
-          <option value="">🌍 Any country</option>
+          <option value="any">🌍 Any country (search worldwide)</option>
           {COUNTRIES.map((c) => (
             <option key={c.code} value={c.code}>
               {c.flag} {c.name}

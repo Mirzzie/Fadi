@@ -16,6 +16,9 @@ import type { JobPosting, JobSource, SignalQuery } from "./types";
 export interface LocationFilter {
   country?: string; // ISO-3166 alpha-2, lowercase
   city?: string;
+  /** User explicitly chose "Any country" — search worldwide; do NOT fall back to
+   *  the profile region (which is why a Dublin profile only ever saw Irish jobs). */
+  worldwide?: boolean;
 }
 
 /**
@@ -60,13 +63,16 @@ function queryFromProfile(
   }
 
   // Explicit UI filter wins; otherwise derive country/city from the profile region.
+  // "Any country" (worldwide) deliberately skips the profile fallback AND the region
+  // pin, so sources return postings from anywhere instead of only the home market.
+  const worldwide = location?.worldwide === true;
   const parsed = parseLocation(profile.region);
-  const country = location?.country ?? parsed.country;
-  const city = location?.city ?? parsed.city;
+  const country = worldwide ? undefined : (location?.country ?? parsed.country);
+  const city = worldwide ? undefined : (location?.city ?? parsed.city);
 
   return {
     keywords: keywords.slice(0, 5),
-    regions: profile.region ? [profile.region] : undefined,
+    regions: worldwide || !profile.region ? undefined : [profile.region],
     country,
     city,
     limit,

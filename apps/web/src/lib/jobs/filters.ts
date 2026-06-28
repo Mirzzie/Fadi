@@ -15,6 +15,8 @@ export type VisaFilter = "any" | "sponsored" | "none";
 export type JobFilters = {
   country?: string;
   city?: string;
+  /** User explicitly chose "Any country" — broaden the live fetch worldwide. */
+  worldwide?: boolean;
   modes?: WorkMode[];
   types?: EmploymentType[];
   visa?: VisaFilter;

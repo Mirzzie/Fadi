@@ -128,9 +128,11 @@ export function JobsShell({
           <CardHeader>
             <CardTitle>No live jobs for this search</CardTitle>
             <CardDescription>
-              {selectedCity || selectedCountry
-                ? "No postings matched this location yet. Try a different city or country, or broaden to “Any country”."
-                : "No postings came back from the live sources yet. Add a country/city above, or check back shortly as sources refresh."}
+              {selectedCountry === "any"
+                ? "No postings came back worldwide for this role yet — the live sources are sparse for some fields/regions. Check back shortly as sources refresh, or set a specific country."
+                : selectedCity || selectedCountry
+                  ? "No postings matched this location yet. Try a different city or country, or broaden to “Any country”."
+                  : "No postings came back from the live sources yet. Add a country/city above, or check back shortly as sources refresh."}
             </CardDescription>
           </CardHeader>
         </Card>

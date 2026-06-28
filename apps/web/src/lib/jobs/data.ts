@@ -80,7 +80,7 @@ export async function getRecommendedJobsForUser(
         region: careerProfile.location,
         domain: careerProfile.domain,
       },
-      { country: filters?.country, city: filters?.city },
+      { country: filters?.country, city: filters?.city, worldwide: filters?.worldwide },
     );
     await Promise.race([sync, new Promise((resolve) => setTimeout(resolve, 3500))]);
   }

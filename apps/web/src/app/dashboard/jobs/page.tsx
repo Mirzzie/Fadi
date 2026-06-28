@@ -59,8 +59,11 @@ export default async function JobsPage({
   const prefs = profileRow?.jobPreferences ?? {};
 
   const fromProfile = parseLocation(profile?.locationPreference);
-  const country = (params.country ?? fromProfile.country)?.toLowerCase();
-  const city = params.city?.trim() || fromProfile.city;
+  // "any" = the user explicitly chose "Any country": search worldwide and don't
+  // fall back to their profile region (that fallback is why only Ireland showed).
+  const worldwide = params.country === "any";
+  const country = worldwide ? undefined : (params.country ?? fromProfile.country)?.toLowerCase();
+  const city = worldwide ? undefined : (params.city?.trim() || fromProfile.city);
   // Saved preferences are the defaults; an explicit URL filter overrides them.
   const modes = parseList(params.modes ?? (prefs.modes ?? []).join(","), MODES);
   const types = parseList(params.types ?? (prefs.types ?? []).join(","), TYPES);
@@ -70,6 +73,7 @@ export default async function JobsPage({
   const jobs = await getRecommendedJobsForUser(user.id, undefined, {
     country,
     city,
+    worldwide,
     modes,
     types,
     visa,
@@ -91,7 +95,7 @@ export default async function JobsPage({
       <JobsShell
         jobs={jobs}
         activeRole={profile?.targetRole ?? null}
-        selectedCountry={getCountry(country)?.code ?? null}
+        selectedCountry={worldwide ? "any" : (getCountry(country)?.code ?? null)}
         selectedCity={city ?? null}
         selectedModes={modes}
         selectedTypes={types}
