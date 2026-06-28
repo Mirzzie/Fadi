@@ -15,6 +15,8 @@ import { passesFilters, type JobFilters } from "@/lib/jobs/filters";
 import { getCountry } from "@/lib/jobs/locations";
 import { checkPostingLiveness } from "@/lib/jobs/liveness";
 import { sweepJobsLiveness } from "@/lib/jobs/liveness-sweep";
+import { cosine, embedText, embedTexts, EMBEDDING_MODEL, fuseScore } from "@/lib/ai/embeddings";
+import { isSemanticRescue, jobEmbeddingText, resolveTrackEmbedding } from "@/lib/jobs/semantic";
 import type { ApplicationStatus, RecommendedJob } from "@/lib/jobs/types";
 
 // Below this match score a role is noise for this user — hide it rather than
@@ -103,11 +105,17 @@ export async function getRecommendedJobsForUser(
       ? [filters?.city, getCountry(filters?.country)?.name].filter(Boolean).join(", ")
       : null;
 
+  const byId = new Map(jobs.map((j) => [j.id, j]));
+  // Carry the lexical score + the different-function flag per job for the semantic
+  // layer (re-ranking + rescue gating) without bloating the public RecommendedJob.
+  const metaById = new Map<string, { lex: number; differentFunction: boolean }>();
   const recommendedJobs = jobs
     .map((job) => {
       const match = scoreJobForUser({ careerProfile, resume, job, locationOverride });
       const savedJob = savedByJobId.get(job.id);
       const application = applicationByJobId.get(job.id);
+      const lex = savedJob?.matchScore ?? match.matchScore;
+      metaById.set(job.id, { lex, differentFunction: match.differentFunction });
 
       return {
         id: job.id,
@@ -122,7 +130,7 @@ export async function getRecommendedJobsForUser(
         url: job.url,
         postedAt: job.postedAt ?? null,
         firstSeenAt: job.createdAt,
-        matchScore: savedJob?.matchScore ?? match.matchScore,
+        matchScore: lex,
         matchReason: savedJob?.matchSummary ?? match.matchReason,
         matchedKeywords: savedJob?.matchedSkills ?? match.matchedKeywords,
         onRole: match.onRole,
@@ -165,6 +173,99 @@ export async function getRecommendedJobsForUser(
         ? onRoleAny.slice(0, 10)
         : fieldRelated.slice(0, 12);
 
+  // ── Semantic layer (hybrid search) ── re-rank the board by MEANING and, when no
+  // exact role matched, rescue close-by-meaning roles the keyword pass missed
+  // (e.g. "Threat Detection Analyst" for a SOC Analyst). Entirely additive: with no
+  // embeddings provider the track vector is null and this whole block is skipped,
+  // leaving the lexical board exactly as it was. Live page only (skipSync = the
+  // fast dashboard read), and every rescue still respects the seniority + function
+  // gates — the vector decides field fit, never the gates.
+  if (!opts.skipSync && careerProfile) {
+    try {
+      const trackVec = await resolveTrackEmbedding(careerProfile, {
+        embed: embedText,
+        persist: (vec, basis) =>
+          careerProfilesRepository.setEmbedding(careerProfile.id, vec, EMBEDDING_MODEL, basis),
+      });
+
+      if (trackVec) {
+        const inFallback = strong.length === 0 && onRoleAny.length === 0;
+        // Rescue pool (fallback only): in-area jobs the lexical pass dropped, kept
+        // realistic — right level, right function. The vector judges field fit.
+        const rescuePool = inFallback
+          ? hardFiltered
+              .filter((j) => {
+                const m = metaById.get(j.id);
+                return !j.onRole && !j.fieldRelated && !j.overLevel && !(m?.differentFunction ?? true);
+              })
+              .slice(0, 40)
+          : [];
+
+        const working = [...shown, ...rescuePool];
+        const vecById = new Map<string, number[]>();
+        const toEmbed: typeof working = [];
+        for (const j of working) {
+          const stored = byId.get(j.id)?.embedding;
+          if (stored && stored.length > 0) vecById.set(j.id, stored);
+          else toEmbed.push(j);
+        }
+        // Bound how many we embed live; the rest get embedded on later loads.
+        const batch = toEmbed.slice(0, 24);
+        if (batch.length > 0) {
+          const vecs = await embedTexts(batch.map((j) => jobEmbeddingText(j)));
+          await Promise.all(
+            batch.map(async (j, i) => {
+              const v = vecs[i];
+              if (!v) return;
+              vecById.set(j.id, v);
+              try {
+                await jobsRepository.setEmbedding(j.id, v, EMBEDDING_MODEL);
+              } catch {
+                // best-effort persistence
+              }
+            }),
+          );
+        }
+
+        const cosOf = (id: string): number | null => {
+          const v = vecById.get(id);
+          return v ? cosine(trackVec, v) : null;
+        };
+
+        // Re-rank what we're showing by the fused lexical+semantic score.
+        for (const j of shown) {
+          j.matchScore = fuseScore(metaById.get(j.id)?.lex ?? j.matchScore, cosOf(j.id));
+        }
+        shown.sort((a, b) => b.matchScore - a.matchScore);
+
+        // Fallback: fold in semantic rescues the lexical tiers couldn't see.
+        if (inFallback) {
+          const shownIds = new Set(shown.map((j) => j.id));
+          const rescues = rescuePool
+            .filter((j) => {
+              if (shownIds.has(j.id)) return false;
+              const m = metaById.get(j.id);
+              return isSemanticRescue(cosOf(j.id), {
+                onRole: j.onRole,
+                fieldRelated: j.fieldRelated,
+                overLevel: j.overLevel,
+                differentFunction: m?.differentFunction ?? true,
+              });
+            })
+            .map((j) => {
+              j.matchScore = fuseScore(metaById.get(j.id)?.lex ?? j.matchScore, cosOf(j.id));
+              j.matchReason = `Close match by meaning to your ${careerProfile.targetRole ?? "role"} — not an exact title match. Review before applying.`;
+              return j;
+            })
+            .sort((a, b) => b.matchScore - a.matchScore);
+          if (rescues.length > 0) shown = [...shown, ...rescues].slice(0, 12);
+        }
+      }
+    } catch {
+      // Best-effort — the semantic layer never blocks the board.
+    }
+  }
+
   // Drop postings the source has already CLOSED ("no longer accepting
   // applications" / 404). Bounded, DB-cached probe of just the jobs we're about to
   // show — only on the live page (skipSync = the fast dashboard read). Confirmed-
@@ -173,7 +274,6 @@ export async function getRecommendedJobsForUser(
   // never hidden — the workspace shows their liveness banner instead.
   if (!opts.skipSync && shown.length > 0) {
     try {
-      const byId = new Map(jobs.map((j) => [j.id, j]));
       const closed = await sweepJobsLiveness(
         shown
           .filter((j) => !tracked(j))

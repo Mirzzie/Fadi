@@ -211,10 +211,16 @@ function fieldTermsFor(
   return [...terms];
 }
 
+/** A title whose FUNCTION is a different line of work (sales/academia/recruiting…). */
+function hasDifferentFunction(jobTitle: string): boolean {
+  const title = normalize(jobTitle);
+  return differentFunctionTerms.some((w) => containsTerm(title, w));
+}
+
 /** Same FIELD, but possibly a different role — used only when nothing is on-role. */
 function isFieldRelated(jobTitle: string, fieldTerms: string[]): boolean {
+  if (hasDifferentFunction(jobTitle)) return false;
   const title = normalize(jobTitle);
-  if (differentFunctionTerms.some((w) => containsTerm(title, w))) return false;
   return fieldTerms.some((t) => containsTerm(title, t));
 }
 
@@ -403,6 +409,8 @@ export function scoreJobForUser({
     onRole: role.onRole,
     fieldRelated,
     overLevel: seniority.overReach,
+    /** A different line of work (sales/academia/…) — gates the semantic-rescue tier. */
+    differentFunction: hasDifferentFunction(job.title),
     matchedKeywords: keywordMatch.matchedKeywords,
     matchReason,
   };

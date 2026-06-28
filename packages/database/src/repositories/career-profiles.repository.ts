@@ -184,5 +184,18 @@ export function createCareerProfilesRepository(db: Database) {
         .set({ roleSynonyms, updatedAt: new Date() })
         .where(eq(careerProfiles.id, id));
     },
+
+    /** Store this track's semantic vector + the basis hash that produced it. */
+    async setEmbedding(
+      id: string,
+      embedding: number[],
+      model: string,
+      basis: string,
+    ): Promise<void> {
+      await db
+        .update(careerProfiles)
+        .set({ embedding, embeddingModel: model, embeddingBasis: basis, updatedAt: new Date() })
+        .where(eq(careerProfiles.id, id));
+    },
   };
 }

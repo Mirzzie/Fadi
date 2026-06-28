@@ -86,6 +86,14 @@ export function createJobsRepository(db: Database) {
      * across re-syncs (a job can be closed on the employer site yet linger in an
      * aggregator feed). "live"/"unknown" only stamp the cache so we don't re-probe.
      */
+    /** Store a job's semantic vector (hybrid search). Best-effort, additive. */
+    async setEmbedding(id: string, embedding: number[], model: string): Promise<void> {
+      await db
+        .update(jobs)
+        .set({ embedding, embeddingModel: model, updatedAt: new Date() })
+        .where(eq(jobs.id, id));
+    },
+
     async setJobLiveness(id: string, state: LivenessState): Promise<void> {
       await db
         .update(jobs)

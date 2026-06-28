@@ -199,6 +199,12 @@ export const careerProfiles = pgTable(
     roleSynonyms: jsonb("role_synonyms").$type<string[]>(),
     /** The one track currently driving jobs/report/documents/Fadi for this user. */
     isActive: boolean("is_active").notNull().default(false),
+    // Semantic vector for THIS track (role + goal + synonyms), used to rank jobs by
+    // meaning. embedding_basis is a hash of the embedded text so we re-embed only
+    // when the track's role/goal/synonyms actually change.
+    embedding: jsonb("embedding").$type<number[]>(),
+    embeddingModel: text("embedding_model"),
+    embeddingBasis: text("embedding_basis"),
     ...timestamps,
   },
   (table) => [
@@ -336,6 +342,10 @@ export const jobs = pgTable(
     // re-probing so we don't hammer source pages on every render.
     livenessState: text("liveness_state"),
     livenessCheckedAt: timestamp("liveness_checked_at", { withTimezone: true }),
+    // Semantic-search vector (hybrid search). jsonb number[] so no pgvector
+    // dependency at this scale; embedding_model tracks provenance for re-embeds.
+    embedding: jsonb("embedding").$type<number[]>(),
+    embeddingModel: text("embedding_model"),
     postedAt: timestamp("posted_at", { withTimezone: true }),
     discoveredAt: timestamp("discovered_at", { withTimezone: true }).notNull().defaultNow(),
     rawPayload: jsonb("raw_payload").$type<Record<string, unknown>>().notNull().default({}),
