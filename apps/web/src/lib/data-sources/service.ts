@@ -8,9 +8,46 @@ import {
   type JobSourceCoverage,
   type SourceCoverage,
 } from "./coverage";
-import { getConfiguredJobSources, getConfiguredSignalSources } from "./registry";
+import { getConfiguredJobSources, getConfiguredSignalSources, listSourceStatus } from "./registry";
 import { rankSignals, type RelevanceProfile, type ScoredSignal } from "./relevance";
 import type { JobPosting, JobSource, SignalQuery } from "./types";
+
+/** Last real per-source pull — in-memory (per process), reset on deploy. */
+type JobSourceRun = {
+  at: number;
+  query: string;
+  sources: Array<{ id: string; status: "ok" | "error"; count: number }>;
+};
+let _lastJobSourceRun: JobSourceRun | null = null;
+
+export type JobSourceHealth = {
+  id: string;
+  name: string;
+  configured: boolean;
+  /** Last pull's outcome for this source, when we've run one this process. */
+  lastRun: { status: "ok" | "error"; count: number } | null;
+};
+
+/**
+ * Honest source health for the Jobs UI: every job-listing source, whether it's
+ * configured (key present), and what it returned on the last real pull — so a user
+ * can SEE which APIs are working vs merely wired, and spot a silently-failing one.
+ */
+export function getJobSourcesHealth(): { sources: JobSourceHealth[]; lastRunAt: number | null } {
+  const run = new Map((_lastJobSourceRun?.sources ?? []).map((s) => [s.id, s]));
+  const sources = listSourceStatus()
+    .filter((s) => s.capabilities.includes("job_listings"))
+    .map((s) => {
+      const r = run.get(s.id);
+      return {
+        id: s.id,
+        name: s.name,
+        configured: s.configured,
+        lastRun: r ? { status: r.status, count: r.count } : null,
+      };
+    });
+  return { sources, lastRunAt: _lastJobSourceRun?.at ?? null };
+}
 
 /** Explicit location filter from the UI switcher; overrides the profile's region. */
 export interface LocationFilter {
@@ -188,6 +225,18 @@ export async function discoverJobs(
 
   const settled = await Promise.allSettled(sources.map((s) => s.fetchJobs(query)));
   const perSource = settled.map((r) => (r.status === "fulfilled" ? r.value : []));
+
+  // Record what each source returned on this real pull, so the UI can show which
+  // APIs are actually live (vs merely configured) and surface a silently-failing one.
+  _lastJobSourceRun = {
+    at: Date.now(),
+    query: `${query.keywords.join("+")}|country=${query.country ?? "any"}|city=${query.city ?? ""}`,
+    sources: settled.map((r, i) => ({
+      id: sources[i]?.id ?? "?",
+      status: r.status === "fulfilled" ? ("ok" as const) : ("error" as const),
+      count: r.status === "fulfilled" ? r.value.length : 0,
+    })),
+  };
 
   // Round-robin across sources so EVERY source contributes to the limited set —
   // otherwise the first source (Remotive) fills the whole limit and location-

@@ -6,10 +6,11 @@ import { createProfilesRepository } from "@careeros/database";
 import { AppShell } from "@/components/layout/app-shell";
 import { JobsShell } from "@/components/jobs/jobs-shell";
 import { JobPreferencesPanel } from "@/components/jobs/job-preferences-panel";
+import { JobSourcesStatus } from "@/components/jobs/job-sources-status";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDashboardProfileSummary } from "@/lib/career-report/data";
 import { getDatabase } from "@/lib/database/client";
-import { getJobSourceCoverage } from "@/lib/data-sources/service";
+import { getJobSourceCoverage, getJobSourcesHealth } from "@/lib/data-sources/service";
 import { getRecommendedJobsForUser } from "@/lib/jobs/data";
 import type { EmploymentType, VisaFilter, WorkMode } from "@/lib/jobs/filters";
 import { getCountry, parseLocation } from "@/lib/jobs/locations";
@@ -82,15 +83,18 @@ export default async function JobsPage({
   // Honest, domain-agnostic: if the live sources don't cover this user's field,
   // say so (and how to fix it) rather than showing tech noise or a blank list.
   const coverage = getJobSourceCoverage(profile?.domain);
+  // Source health reflects THIS request's live pull (computed during the sync above).
+  const sourcesHealth = getJobSourcesHealth();
 
   return (
     <AppShell>
-      <div className="mx-auto mb-4 max-w-shell">
+      <div className="mx-auto mb-4 max-w-shell space-y-4">
         <JobPreferencesPanel
           activeModes={modes}
           activeTypes={types}
           autoSearch={Boolean(prefs.autoSearch)}
         />
+        <JobSourcesStatus sources={sourcesHealth.sources} lastRunAt={sourcesHealth.lastRunAt} />
       </div>
       <JobsShell
         jobs={jobs}
