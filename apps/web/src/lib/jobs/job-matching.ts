@@ -71,6 +71,19 @@ function distinctiveTokens(value: string | null | undefined) {
 }
 
 /**
+ * Word-boundary term test — so "soc" matches "SOC Analyst" but NOT "asSOCiate
+ * Professor", and "center" matches "Operations Center" but not a random
+ * substring. Substring `.includes` here was promoting unrelated roles (an
+ * "Associate Professor" reading as on-role for a "SOC Analyst"). Tokens can carry
+ * +/#/. (c++, c#, node.js), so we escape the term and bound on non-alphanumerics.
+ */
+function containsTerm(haystack: string, term: string): boolean {
+  if (term.length < 2) return false;
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`).test(haystack);
+}
+
+/**
  * The set of role-family phrases that signal a relevant title for this user —
  * genuinely DOMAIN-AGNOSTIC, with no field privileged over another:
  *  - distinctive tokens from the role(s) + goal, used as-is;
@@ -87,16 +100,18 @@ function distinctiveTokens(value: string | null | undefined) {
  */
 function roleFamilyTerms(
   targetRole: string | null,
-  careerGoal: string | null,
   roleCluster?: string[] | null,
   roleSynonyms?: string[] | null,
 ): string[] {
   const roles = [targetRole, ...(roleCluster ?? [])].filter(Boolean) as string[];
   const terms = new Set<string>();
 
-  // Distinctive tokens from the user's role(s) + goal — any field.
+  // Distinctive tokens from the user's role TITLE(s) — any field. careerGoal is
+  // deliberately excluded: it's aspiration prose ("move into cybersecurity"), and
+  // its tokens leak the DOMAIN into the role-kind decision, making any same-domain
+  // job (a Professor *of* cybersecurity) read as on-role. Role kind = titles, not
+  // goal text. careerGoal still feeds the soft keyword score below.
   for (const r of roles) distinctiveTokens(r).forEach((t) => terms.add(t));
-  distinctiveTokens(careerGoal).forEach((t) => terms.add(t));
 
   // Whole-role phrases — the domain-general path (finance, healthcare, trades…).
   for (const r of roles) {
@@ -116,16 +131,15 @@ function roleFamilyTerms(
 /** Role fit + whether this job is even the right KIND of role for the user. */
 function roleScore(
   targetRole: string | null,
-  careerGoal: string | null,
   roleCluster: string[] | null,
   roleSynonyms: string[] | null,
   jobTitle: string,
 ): { score: number; onRole: boolean } {
-  const terms = roleFamilyTerms(targetRole, careerGoal, roleCluster, roleSynonyms);
+  const terms = roleFamilyTerms(targetRole, roleCluster, roleSynonyms);
   const title = normalize(jobTitle);
   if (terms.length === 0) return { score: 8, onRole: true }; // no profile signal → don't penalise
 
-  const hits = terms.filter((term) => title.includes(term)).length;
+  const hits = terms.filter((term) => containsTerm(title, term)).length;
   if (hits === 0) return { score: 0, onRole: false }; // wrong kind of role
   return { score: Math.min(45, 25 + (hits - 1) * 12), onRole: true };
 }
@@ -228,7 +242,6 @@ export function scoreJobForUser({
   const locationPref = locationOverride ?? careerProfile?.location ?? null;
   const role = roleScore(
     careerProfile?.targetRole ?? null,
-    careerProfile?.careerGoal ?? null,
     careerProfile?.roleCluster ?? null,
     careerProfile?.roleSynonyms ?? null,
     job.title,

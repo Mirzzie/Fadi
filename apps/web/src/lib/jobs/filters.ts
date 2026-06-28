@@ -62,12 +62,15 @@ export function jobVisa(j: FilterableJob): "sponsored" | "none" | "unknown" {
 export function jobMatchesLocation(j: FilterableJob, country?: string, city?: string): boolean {
   if (!country && !city) return true;
   const loc = (j.location ?? "").toLowerCase();
-  const tokens: string[] = [];
-  if (city) tokens.push(city.toLowerCase());
+
+  // A CITY search must actually be that city — matching only the country lets a
+  // Carlow or Cork role through a "Dublin" search (the bug). The country token is
+  // a fallback ONLY when no city is given. (Work mode is filtered separately, so a
+  // city search stays geographic — "only Dublin roles, never remote-worldwide".)
+  if (city) return loc.includes(city.toLowerCase());
+
   const countryName = getCountry(country)?.name?.toLowerCase();
-  if (countryName) tokens.push(countryName);
-  if (tokens.length === 0) return true;
-  return tokens.some((t) => loc.includes(t));
+  return countryName ? loc.includes(countryName) : true;
 }
 
 /** All active filters must pass. */

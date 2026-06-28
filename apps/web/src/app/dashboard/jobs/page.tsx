@@ -83,7 +83,9 @@ export default async function JobsPage({
     <AppShell>
       <div className="mx-auto mb-4 max-w-shell">
         <JobPreferencesPanel
-          initial={{ modes: prefs.modes ?? [], types: prefs.types ?? [], autoSearch: Boolean(prefs.autoSearch) }}
+          activeModes={modes}
+          activeTypes={types}
+          autoSearch={Boolean(prefs.autoSearch)}
         />
       </div>
       <JobsShell

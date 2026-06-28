@@ -47,4 +47,28 @@ describe("scoreJobForUser — domain-agnostic role matching", () => {
     const nurse = profile("Registered Nurse", ["registered nurse"]);
     expect(run(nurse, "Software Engineer").matchScore).toBeLessThanOrEqual(28);
   });
+
+  it("does NOT match a short role token inside an unrelated word (soc ⊄ aSSOCiate)", () => {
+    // Real bug: "SOC Analyst" was matching "Associate Professor in Cybersecurity"
+    // because "associate" contains the substring "soc".
+    const soc = profile("SOC Analyst", ["soc analyst", "security operations center analyst", "cybersecurity analyst"]);
+    expect(run(soc, "Associate Professor in Cybersecurity").onRole).toBe(false);
+    expect(run(soc, "Data Center Technician").onRole).toBe(false);
+    // …but a genuine SOC role still matches.
+    expect(run(soc, "SOC Analyst - Tier 2").onRole).toBe(true);
+    expect(run(soc, "Cybersecurity Analyst").onRole).toBe(true);
+  });
+
+  it("does not let the career goal's domain word make any same-domain job on-role", () => {
+    // careerGoal mentions the domain; a Professor *of* that domain must stay off-role.
+    const p = {
+      targetRole: "SOC Analyst",
+      careerGoal: "break into cybersecurity and work in a security operations center",
+      roleCluster: null,
+      roleSynonyms: ["soc analyst"],
+      location: "Remote",
+      experienceLevel: "mid",
+    } as unknown as CareerProfile;
+    expect(run(p, "Associate Professor in Cybersecurity").onRole).toBe(false);
+  });
 });
