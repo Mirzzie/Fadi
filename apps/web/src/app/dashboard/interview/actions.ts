@@ -8,6 +8,7 @@ import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
 import {
   generateStoriesFromEvidence,
+  storyFromMockAnswer,
   toStoryView,
   type StoryView,
 } from "@/lib/interview/story-bank";
@@ -42,6 +43,30 @@ export async function scoreMockAnswer(input: {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
   return scoreInterviewAnswer(user.id, input);
+}
+
+/** Save a practiced mock answer into the story bank as a reusable STAR+R story. */
+export async function saveMockAnswerAsStory(input: {
+  question: string;
+  answer: string;
+  role?: string;
+  competency?: string;
+}): Promise<{ ok: true; story: StoryView } | { ok: false; message: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  try {
+    const res = await storyFromMockAnswer(user.id, input);
+    if (!res.ok) return { ok: false, message: res.message };
+    revalidatePath(PATH);
+    return { ok: true, story: res.story };
+  } catch (error) {
+    logger.error("interview.save_mock_answer_failed", {
+      userId: user.id,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return { ok: false, message: "Something went wrong saving that answer. Please try again." };
+  }
 }
 
 export async function generateStoryBank(): Promise<

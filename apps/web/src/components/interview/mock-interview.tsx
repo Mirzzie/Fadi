@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { ChevronRight, Mic, Square, Volume2, Wand2 } from "lucide-react";
+import { BookmarkPlus, Check, ChevronRight, Mic, Square, Volume2, Wand2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -12,7 +12,9 @@ import { speakFadi } from "@/lib/voice/fadi-speech";
 import { useGroqVoice } from "@/lib/voice/use-groq-voice";
 import { INTERVIEWER_PERSONAS } from "@/lib/interview/personas";
 import type { AnswerScore, MockQuestion } from "@/lib/interview/mock";
-import { scoreMockAnswer, startMockInterview } from "@/app/dashboard/interview/actions";
+import { saveMockAnswerAsStory, scoreMockAnswer, startMockInterview } from "@/app/dashboard/interview/actions";
+
+type SaveState = "idle" | "saving" | "saved";
 
 type Defaults = { role: string; country: string; seniority: string };
 
@@ -24,6 +26,7 @@ export function MockInterview({ defaults }: { defaults: Defaults }) {
   const [idx, setIdx] = useState(0);
   const [answer, setAnswer] = useState("");
   const [score, setScore] = useState<AnswerScore | null>(null);
+  const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -46,10 +49,30 @@ export function MockInterview({ defaults }: { defaults: Defaults }) {
   function scoreCurrent() {
     if (!questions) return;
     setError(null);
+    setSaveState("idle");
     startTransition(async () => {
       const res = await scoreMockAnswer({ question: questions[idx].question, answer, role: config.role });
       if (!res.ok) return setError(res.message);
       setScore(res.score);
+    });
+  }
+
+  function saveAnswerAsStory() {
+    if (!questions || saveState !== "idle") return;
+    setError(null);
+    setSaveState("saving");
+    void saveMockAnswerAsStory({
+      question: questions[idx].question,
+      answer,
+      role: config.role,
+      competency: questions[idx].competency,
+    }).then((res) => {
+      if (!res.ok) {
+        setError(res.message);
+        setSaveState("idle");
+        return;
+      }
+      setSaveState("saved");
     });
   }
 
@@ -58,6 +81,7 @@ export function MockInterview({ defaults }: { defaults: Defaults }) {
     setIdx((i) => Math.min(i + 1, questions.length - 1));
     setAnswer("");
     setScore(null);
+    setSaveState("idle");
   }
 
   // ── Setup screen ──
@@ -181,12 +205,20 @@ export function MockInterview({ defaults }: { defaults: Defaults }) {
         ) : null}
       </div>
 
-      {score ? <ScoreCard score={score} /> : null}
+      {score ? <ScoreCard score={score} saveState={saveState} onSave={saveAnswerAsStory} /> : null}
     </section>
   );
 }
 
-function ScoreCard({ score }: { score: AnswerScore }) {
+function ScoreCard({
+  score,
+  saveState,
+  onSave,
+}: {
+  score: AnswerScore;
+  saveState: SaveState;
+  onSave: () => void;
+}) {
   const rows: Array<[string, number]> = [
     ["Structure (STAR)", score.scores.structure],
     ["Specificity", score.scores.specificity],
@@ -224,6 +256,21 @@ function ScoreCard({ score }: { score: AnswerScore }) {
           <p className="mt-1 whitespace-pre-wrap text-sm text-foreground/90">{score.strongerVersion}</p>
         </div>
       ) : null}
+
+      {/* Close the loop — a practiced answer becomes a reusable story (your words, never invented). */}
+      <div className="flex items-center gap-2 border-t pt-2">
+        {saveState === "saved" ? (
+          <span className="flex items-center gap-1.5 text-xs text-emerald-400">
+            <Check className="size-3.5" aria-hidden="true" /> Saved to your story bank
+          </span>
+        ) : (
+          <Button size="sm" variant="outline" onClick={onSave} disabled={saveState === "saving"}>
+            <BookmarkPlus className="size-3.5" aria-hidden="true" />
+            {saveState === "saving" ? "Saving…" : "Save to story bank"}
+          </Button>
+        )}
+        <span className="text-[0.7rem] text-muted-foreground">Reuse this in real interviews, prep, and documents.</span>
+      </div>
     </div>
   );
 }

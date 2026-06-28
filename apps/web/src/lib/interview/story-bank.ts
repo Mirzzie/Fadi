@@ -131,6 +131,92 @@ export async function generateStoriesFromEvidence(userId: string): Promise<Extra
   return { ok: true, stories: created.map(toStoryView) };
 }
 
+const ONE_STORY_SCHEMA = z.object({
+  title: z.string(),
+  competencies: z.array(z.string()),
+  situation: z.string(),
+  task: z.string(),
+  action: z.string(),
+  result: z.string(),
+  reflection: z.string(),
+});
+
+const ANSWER_TO_STORY_SYSTEM = `You convert ONE interview answer the candidate just gave (in a practice round) into a reusable STAR+Reflection story for their story bank.
+
+Hard rules:
+- Use ONLY what the candidate said in their answer. Never invent achievements, metrics, employers, dates, or outcomes. If a detail isn't in their answer, describe what they did in words rather than fabricating specifics.
+- Restructure their answer into: a short title; competencies (lowercase tags this story answers); situation; task; action (what THEY specifically did); result; reflection (what they learned or would do differently).
+- Keep each field tight and concrete — a real moment, not a generic summary. If the answer is genuinely too thin for a story, extract honestly what's there; never pad.`;
+
+export type StoryFromAnswerResult =
+  | { ok: true; story: StoryView }
+  | { ok: false; reason: "empty_answer" | "no_provider" | "empty"; message: string };
+
+/**
+ * Turn ONE practiced mock-interview answer into a saved STAR+R story. Grounded
+ * strictly in the candidate's own words — never invents — so practice compounds
+ * into a reusable asset that feeds JD prep, document generation, and future mocks.
+ */
+export async function storyFromMockAnswer(
+  userId: string,
+  input: { question: string; answer: string; role?: string | null; competency?: string | null },
+): Promise<StoryFromAnswerResult> {
+  const answer = input.answer?.trim() ?? "";
+  if (!answer) return { ok: false, reason: "empty_answer", message: "There's no answer to save yet." };
+
+  const [{ getUserDocGenerate }, { createInterviewStoriesRepository }, { getDatabase }] =
+    await Promise.all([
+      import("@/lib/ai/user-generate"),
+      import("@careeros/database"),
+      import("@/lib/database/client"),
+    ]);
+
+  const generate = await getUserDocGenerate(userId);
+  if (!generate) {
+    return {
+      ok: false,
+      reason: "no_provider",
+      message: "Connect an AI provider in Settings to save practiced answers as stories.",
+    };
+  }
+
+  const user = [
+    input.role ? `Role: ${input.role}` : "",
+    input.competency ? `Competency this question targets: ${input.competency}` : "",
+    `Question: ${input.question}`,
+    `Candidate's answer:\n${answer.slice(0, 4000)}`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  let s: z.infer<typeof ONE_STORY_SCHEMA>;
+  try {
+    s = await generate.structured(ANSWER_TO_STORY_SYSTEM, user, ONE_STORY_SCHEMA, "interview_story_from_answer");
+  } catch {
+    return { ok: false, reason: "empty", message: "I couldn't shape that into a story just now — please try again." };
+  }
+  if (!s.title.trim() || !s.action.trim()) {
+    return {
+      ok: false,
+      reason: "empty",
+      message: "That answer didn't have enough to form a story yet. Add more specifics and re-answer.",
+    };
+  }
+
+  const repo = createInterviewStoriesRepository(getDatabase());
+  const row = await repo.create(userId, {
+    title: s.title.trim(),
+    competencies: s.competencies.map(normCompetency).filter(Boolean).slice(0, 6),
+    situation: s.situation.trim(),
+    task: s.task.trim(),
+    action: s.action.trim(),
+    result: s.result.trim(),
+    reflection: s.reflection.trim(),
+    origin: "practice",
+  });
+  return { ok: true, story: toStoryView(row) };
+}
+
 /** List a user's stories as views. */
 export async function listStories(userId: string): Promise<StoryView[]> {
   const { createInterviewStoriesRepository } = await import("@careeros/database");
