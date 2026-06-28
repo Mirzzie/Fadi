@@ -15,6 +15,13 @@ import type { RejectionInsight } from "@/lib/resilience/autopsy";
 import { evaluateFit, type FitResult } from "@/lib/jobs/fit";
 import { prepareInterviewForJob, type PrepResult } from "@/lib/interview/jd-prep";
 import { prepareCompanyBrief, type BriefResult } from "@/lib/interview/company-brief";
+import {
+  scoreApplication,
+  type ApplicationQualityResult,
+} from "@/lib/intelligence/application-quality";
+import { getCareerReportContext } from "@/lib/career-report/data";
+import { createDocumentsRepository } from "@careeros/database";
+import { parseResume, resumeToPlainText } from "@/lib/documents/resume";
 
 export type RejectionStage = "keyword" | "screen" | "interview" | "final";
 
@@ -78,6 +85,79 @@ export async function evaluateJobFit(input: {
     jobTitle: input.jobTitle,
     company: input.company,
   });
+}
+
+export type ScoreApplicationResult =
+  | { ok: true; result: ApplicationQualityResult }
+  | { ok: false; message: string };
+
+/**
+ * Score the resume you're about to send AGAINST this specific job — keyword
+ * coverage, formatting/ATS risk, specificity, AI-dismiss risk, and the concrete
+ * fixes that would move the needle. Scores the resume tailored for THIS job when
+ * one exists, else the base resume. The honest "is it ready to send?" gate that
+ * the fit check points you toward.
+ */
+export async function scoreApplicationDraft(input: {
+  jobId: string;
+  jobTitle: string;
+  company: string;
+  jobDescription: string;
+}): Promise<ScoreApplicationResult> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  const jd = (input.jobDescription ?? "").trim();
+  if (!jd) {
+    return {
+      ok: false,
+      message:
+        "Add the job description in the workspace first — I score your resume against the real posting, not a guess.",
+    };
+  }
+
+  try {
+    const db = getDatabase();
+    const [ctx, jobDocs] = await Promise.all([
+      getCareerReportContext(user.id),
+      createDocumentsRepository(db).listForJob(user.id, input.jobId),
+    ]);
+
+    // Prefer the resume tailored for THIS job; fall back to the base resume.
+    const resumeDoc = jobDocs.find((d) => d.kind === "resume");
+    let resumeText = resumeDoc ? resumeToPlainText(parseResume(resumeDoc.content)).trim() : "";
+    if (!resumeText) resumeText = (ctx?.resumeText ?? "").trim();
+
+    if (!resumeText) {
+      return {
+        ok: false,
+        message:
+          "I couldn't find a resume to score. Add yours in Profile, or draft one in this workspace, then run the check.",
+      };
+    }
+
+    const result = await scoreApplication(
+      {
+        jobTitle: input.jobTitle,
+        jobCompany: input.company,
+        jobDescription: jd,
+        resumeText,
+        targetRole: ctx?.targetRole ?? undefined,
+        experienceLevel: ctx?.experienceLevel ?? undefined,
+        careerGoals: ctx?.careerGoals ?? undefined,
+      },
+      user.id,
+    );
+
+    return { ok: true, result };
+  } catch (error) {
+    logger.error("applications.score_failed", {
+      userId: user.id,
+      jobId: input.jobId,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return { ok: false, message: "Something went wrong scoring this application. Please try again." };
+  }
 }
 
 /** An honest company prep brief — understand the business + smart questions to ask. */

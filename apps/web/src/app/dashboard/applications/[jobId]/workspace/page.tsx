@@ -14,6 +14,7 @@ import { ExternalLink } from "lucide-react";
 
 import { ApplicationOutcomePanel } from "@/components/workspace/application-outcome-panel";
 import { FitGatePanel } from "@/components/workspace/fit-gate-panel";
+import { ApplicationQualityPanel } from "@/components/workspace/application-quality-panel";
 import { InterviewPrepPanel } from "@/components/workspace/interview-prep-panel";
 import { CompanyBriefPanel } from "@/components/workspace/company-brief-panel";
 import { AutoPrepRunner } from "@/components/workspace/auto-prep-runner";
@@ -145,6 +146,16 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
           <WorkspaceDocActions
             jobId={job.id}
             documents={jobDocs.map((d) => ({ id: d.id, kind: d.kind, title: d.title }))}
+          />
+        </div>
+
+        {/* Quality gate — score the tailored resume against THIS job before sending */}
+        <div className="shrink-0">
+          <ApplicationQualityPanel
+            jobId={job.id}
+            jobTitle={job.title}
+            jobCompany={job.company}
+            jobDescription={job.description ?? undefined}
           />
         </div>
 

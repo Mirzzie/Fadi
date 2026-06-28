@@ -1,6 +1,6 @@
 import "server-only";
 
-import { getAIProvider } from "@/lib/ai/registry";
+import { getUserDocGenerate } from "@/lib/ai/user-generate";
 import { logger } from "@/lib/observability/logger";
 import { z } from "zod";
 
@@ -76,13 +76,22 @@ const aqsSchema = z.object({
 
 // ─── Main function ─────────────────────────────────────────────────────────────
 
+const AQS_SYSTEM = `You are FadiOS's Application Quality Scorer. You evaluate how well a candidate's resume matches a specific job description, scoring from 0 to 100. You are calibrated against real hiring data:
+
+- 11.2 seconds average recruiter scan time
+- 70% of resumes rejected for formatting issues
+- 40% more likely to be selected when JD keywords are present
+- 49% of hiring managers auto-dismiss suspected AI-generated resumes
+
+Be accurate and honest. A score of 70+ means viable; 85+ means strong. Do not inflate scores — a 90/100 should actually be exceptional and competitive. For keywordMatch, draw matched/missing terms ONLY from the actual job description — never invent requirements. Judge against the resume text as given; do not assume experience that isn't written.`;
+
 export async function scoreApplication(
   input: ApplicationQualityInput,
   userId?: string,
 ): Promise<ApplicationQualityResult> {
-  const provider = getAIProvider();
-
-  if (!provider.isConfigured) {
+  // Use the candidate's own provider chain (BYO key) — same path as fit/prep/brief.
+  const generate = userId ? await getUserDocGenerate(userId) : null;
+  if (!generate) {
     logger.warn("aqs.provider_not_configured", { userId });
     return buildFallbackScore();
   }
@@ -90,23 +99,7 @@ export async function scoreApplication(
   const truncatedJD = input.jobDescription.slice(0, 6000);
   const truncatedResume = input.resumeText.slice(0, 8000);
 
-  try {
-    const result = await provider.parseStructured(
-      [
-        {
-          role: "system",
-          content: `You are FadiOS's Application Quality Scorer. You evaluate how well a candidate's resume matches a specific job description, scoring from 0 to 100. You are calibrated against real hiring data:
-
-- 11.2 seconds average recruiter scan time
-- 70% of resumes rejected for formatting issues
-- 40% more likely to be selected when JD keywords are present
-- 49% of hiring managers auto-dismiss suspected AI-generated resumes
-
-Be accurate and honest. A score of 70+ means viable; 85+ means strong. Do not inflate scores — a 90/100 should actually be exceptional and competitive.`,
-        },
-        {
-          role: "user",
-          content: `Score this application.
+  const user = `Score this application.
 
 **Job**: ${input.jobTitle} at ${input.jobCompany}
 **Candidate experience level**: ${input.experienceLevel ?? "not specified"}
@@ -118,13 +111,10 @@ ${truncatedJD}
 **Candidate Resume**:
 ${truncatedResume}
 
-Produce an honest, specific assessment. The topImprovements should be concrete, actionable changes — not generic advice like "tailor your resume". Name specific skills, specific sections, specific keyword gaps.`,
-        },
-      ],
-      aqsSchema,
-      "application_quality_score",
-      { temperature: 0.2, userId },
-    );
+Produce an honest, specific assessment. The topImprovements should be concrete, actionable changes — not generic advice like "tailor your resume". Name specific skills, specific sections, specific keyword gaps.`;
+
+  try {
+    const result = await generate.structured(AQS_SYSTEM, user, aqsSchema, "application_quality_score");
 
     logger.info("aqs.scored", {
       userId,
@@ -158,14 +148,14 @@ function buildFallbackScore(): ApplicationQualityResult {
     topImprovements: [
       {
         priority: "critical",
-        action: "Configure an AI provider (OPENAI_API_KEY or ANTHROPIC_API_KEY)",
-        impact: "Required for application quality scoring to function",
+        action: "Connect an AI provider in Settings (your own Groq / OpenAI / Anthropic key)",
+        impact: "Required for application quality scoring to run",
       },
     ],
     estimatedRecruiterReadTime: "unknown",
     atsRisk: "high",
     aiGeneratedRisk: "low",
-    summary: "Application quality scoring requires an AI provider. Add your API key in settings.",
+    summary: "Application quality scoring needs an AI provider. Add your key in Settings.",
   };
 }
 

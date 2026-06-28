@@ -161,3 +161,33 @@ export function parseResume(content: string): ResumeData {
 export function serializeResume(data: ResumeData): string {
   return JSON.stringify(data);
 }
+
+/**
+ * Flatten structured resume data into plain text — for keyword/quality scoring
+ * and other text analyzers that want the resume as a recruiter would read it.
+ */
+export function resumeToPlainText(data: ResumeData): string {
+  const parts: string[] = [];
+  const p = data.personal;
+  if (p.name) parts.push(p.name);
+  if (p.headline) parts.push(p.headline);
+  if (data.summary.trim()) parts.push(data.summary.trim());
+
+  for (const exp of data.experiences) {
+    const header = [exp.title, exp.company, exp.location, exp.period].filter(Boolean).join(" · ");
+    if (header) parts.push(header);
+    if (exp.bullets.trim()) parts.push(exp.bullets.trim());
+  }
+  for (const proj of data.projects) {
+    const header = [proj.title, proj.url].filter(Boolean).join(" · ");
+    if (header) parts.push(header);
+    if (proj.description.trim()) parts.push(proj.description.trim());
+  }
+  for (const edu of data.education) {
+    const line = [edu.degree, edu.school, edu.location, edu.period].filter(Boolean).join(" · ");
+    if (line) parts.push(line);
+  }
+  if (data.skills.trim()) parts.push(data.skills.trim());
+
+  return parts.join("\n");
+}
