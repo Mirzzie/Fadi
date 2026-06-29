@@ -9,7 +9,6 @@
  */
 
 export const EMBEDDING_MODEL = "text-embedding-3-small";
-export const EMBEDDING_DIMS = 1536;
 
 const ENDPOINT = "https://api.openai.com/v1/embeddings";
 const FETCH_TIMEOUT_MS = 8000;
@@ -77,11 +76,6 @@ export function fuseScore(
 function openaiKey(): string | null {
   const k = process.env.OPENAI_API_KEY?.trim();
   return k ? k : null;
-}
-
-/** Whether semantic features can run at all (an embeddings key is present). */
-export function hasEmbeddingsProvider(): boolean {
-  return openaiKey() != null;
 }
 
 /** Embed many texts; element is null where that input couldn't be embedded. */
