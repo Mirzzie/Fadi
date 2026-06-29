@@ -19,6 +19,17 @@ type Props = {
   selectedVisa: VisaFilter;
 };
 
+/** Country code from the browser locale (e.g. "en-IE" → "ie"). No coords, no network. */
+function regionFromBrowser(): string | null {
+  if (typeof navigator === "undefined") return null;
+  const langs = navigator.languages?.length ? navigator.languages : [navigator.language];
+  for (const l of langs) {
+    const code = /[-_]([A-Za-z]{2})(?:[-_]|$)/.exec(l ?? "")?.[1]?.toLowerCase();
+    if (code && COUNTRIES.some((c) => c.code === code)) return code;
+  }
+  return null;
+}
+
 const MODE_LABELS: Record<WorkMode, string> = { remote: "Remote", hybrid: "Hybrid", onsite: "On-site" };
 const TYPE_LABELS: Record<EmploymentType, string> = {
   "full-time": "Full-time",
@@ -38,7 +49,6 @@ export function JobLocationFilter({
   const [isPending, startTransition] = useTransition();
   const [country, setCountry] = useState(selectedCountry ?? "any");
   const [city, setCity] = useState(selectedCity ?? "");
-  const [locating, setLocating] = useState(false);
   const [geoError, setGeoError] = useState<string | null>(null);
 
   function navigate(next: {
@@ -66,61 +76,19 @@ export function JobLocationFilter({
     visa: selectedVisa,
   });
 
-  // Detect the user's area from their device, convert it to a city/country, set it
-  // as the search, and save it as their default. Consent-first: the browser prompts,
-  // and the privacy note below says exactly what happens before they click.
-  function useMyLocation() {
+  // Privacy-first region detection: derives your country from the browser's own
+  // locale/timezone — NO location permission, NO GPS coordinates, and nothing sent
+  // to any third party. Sets it as your default search country; you type the city.
+  function detectMyRegion() {
     setGeoError(null);
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      setGeoError("Your browser can't share location — type your city instead.");
+    const code = regionFromBrowser();
+    if (!code) {
+      setGeoError("Couldn't read your region from the browser — just pick a country or type your city.");
       return;
     }
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const { latitude, longitude } = pos.coords;
-          const res = await fetch(
-            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`,
-          );
-          if (!res.ok) throw new Error("geocode failed");
-          const data = (await res.json()) as { city?: string; locality?: string; countryCode?: string };
-          const detectedCity = (data.city || data.locality || "").trim();
-          const detectedCountry = (data.countryCode || "").toLowerCase();
-          if (!detectedCountry && !detectedCity) throw new Error("empty");
-          setCountry(detectedCountry || "any");
-          setCity(detectedCity);
-          // Persist as the default search location for the board AND the background agent.
-          void saveJobPreferences({
-            location: {
-              country: detectedCountry || undefined,
-              city: detectedCity || undefined,
-              precise: true,
-            },
-          });
-          navigate({
-            country: detectedCountry || undefined,
-            city: detectedCity,
-            modes: selectedModes,
-            types: selectedTypes,
-            visa: selectedVisa,
-          });
-        } catch {
-          setGeoError("Couldn't pin your area — type your city instead.");
-        } finally {
-          setLocating(false);
-        }
-      },
-      (err) => {
-        setLocating(false);
-        setGeoError(
-          err.code === err.PERMISSION_DENIED
-            ? "Location permission declined — no problem, just type your city."
-            : "Couldn't get your location — type your city instead.",
-        );
-      },
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 10 * 60 * 1000 },
-    );
+    setCountry(code);
+    void saveJobPreferences({ location: { country: code, precise: false } });
+    navigate({ country: code, city, modes: selectedModes, types: selectedTypes, visa: selectedVisa });
   }
 
   function toggleMode(m: WorkMode) {
@@ -193,17 +161,16 @@ export function JobLocationFilter({
         </Button>
       </form>
 
-      {/* Precise location — consent-first, with an honest privacy note. */}
+      {/* Region detection — fully private: locale only, no permission, no third party. */}
       <div className="space-y-1">
-        <Button type="button" variant="outline" size="sm" onClick={useMyLocation} disabled={locating}>
+        <Button type="button" variant="outline" size="sm" onClick={detectMyRegion}>
           <LocateFixed className="size-3.5" aria-hidden="true" />
-          {locating ? "Locating…" : "Use my precise location"}
+          Detect my region
         </Button>
         <p className="text-[0.7rem] leading-snug text-muted-foreground">
-          Your browser will ask permission, then your device location is sent to a geocoding service
-          (BigDataCloud) to turn it into a city/country and saved as your default job-search area — used
-          only for that, and for Fadi&apos;s background search. No coordinates are stored; clear it anytime
-          by editing the city or picking a country.
+          Reads your country from your browser&apos;s language/region setting — no location permission, no
+          GPS coordinates, nothing sent to anyone. Sets your default search country (and Fadi&apos;s
+          background search); type the city yourself. Less precise than GPS, fully private.
         </p>
         {geoError ? <p className="text-xs text-amber-500">{geoError}</p> : null}
       </div>

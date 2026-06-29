@@ -60,7 +60,7 @@ export default async function JobsPage({
   const prefs = profileRow?.jobPreferences ?? {};
 
   // Default search location: an explicit URL filter wins; then the user's saved
-  // default (e.g. from precise geolocation); then their profile region.
+  // default (e.g. from private browser-region detection); then their profile region.
   const fromProfile = parseLocation(profile?.locationPreference);
   const savedLoc = prefs.location;
   // "any" = the user explicitly chose "Any country": search worldwide and don't
