@@ -13,6 +13,8 @@ import { getDatabase } from "@/lib/database/client";
 import { getMarketIntelligence } from "@/lib/data-sources/service";
 import { ensureFreshLiveJobs } from "@/lib/jobs/sync";
 import { getRecommendedJobsForUser } from "@/lib/jobs/data";
+import { createJobScorer } from "@/lib/jobs/job-matching";
+import { offTrackPatternFinding } from "@/lib/guardian/patterns";
 import type { EmploymentType, WorkMode } from "@/lib/jobs/filters";
 import { parseLocation } from "@/lib/jobs/locations";
 import { logger } from "@/lib/observability/logger";
@@ -151,6 +153,32 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
           href: "/dashboard/applications",
           data: { jobId: job.id },
         });
+      }
+
+      // Pattern guardian (proactive): are the roles being saved drifting from the
+      // active direction? One supportive nudge per window (deduped on the kind),
+      // grounded in the user's REAL saved roles — never a guess.
+      if (!recent.some((f) => f.kind === "off_track")) {
+        const scoreJob = createJobScorer({ careerProfile: track, resume: null });
+        const active = jobRows.filter((j) => j.status === "active");
+        const offTrack = active.filter((j) => {
+          const m = scoreJob(j);
+          return !m.onRole || m.overLevel;
+        }).length;
+        const pattern = offTrackPatternFinding({
+          offTrackCount: offTrack,
+          savedTotal: active.length,
+          targetRole: track.targetRole,
+        });
+        if (pattern) {
+          findings.push({
+            kind: "off_track",
+            title: pattern.title,
+            detail: pattern.detail,
+            href: "/dashboard/jobs",
+            data: {},
+          });
+        }
       }
     }
 

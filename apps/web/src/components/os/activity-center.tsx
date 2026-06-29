@@ -22,6 +22,7 @@ const KIND_LABEL: Record<string, string> = {
   expired_saved_role: "Heads up",
   market_signal: "Market signal",
   world_shift: "World shift",
+  off_track: "A pattern Fadi noticed",
 };
 
 /**
