@@ -10,6 +10,8 @@ import {
   Sparkles,
   Star,
   Target,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -292,6 +294,21 @@ export function ApplicationWorkspace({
               className="flex-1 resize-none text-sm"
             />
             <div className="flex flex-col gap-1.5">
+              <Button
+                size="icon"
+                variant={voiceEnabled ? "default" : "outline"}
+                className="size-8 shrink-0"
+                onClick={() => {
+                  setVoiceEnabled((on) => {
+                    if (on) stopSpeaking(); // turning off — cut any current speech
+                    return !on;
+                  });
+                }}
+                aria-label={voiceEnabled ? "Mute Fadi's voice" : "Have Fadi speak replies"}
+                title={voiceEnabled ? "Fadi speaks replies — click to mute" : "Click to have Fadi speak replies"}
+              >
+                {voiceEnabled ? <Volume2 className="size-3.5" /> : <VolumeX className="size-3.5" />}
+              </Button>
               <Button
                 size="icon"
                 variant={isListening ? "default" : "outline"}

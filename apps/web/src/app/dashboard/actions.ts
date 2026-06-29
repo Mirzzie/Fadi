@@ -104,14 +104,6 @@ function getUserFacingProviderErrorMessage(details: ProviderErrorDetails) {
   return "FadiOS could not generate the report right now. Please try again later.";
 }
 
-function shouldRefundProviderFailure(details: ProviderErrorDetails) {
-  return (
-    details.status === 401 ||
-    details.status === 404 ||
-    details.code === "invalid_api_key" ||
-    details.code === "insufficient_quota"
-  );
-}
 
 export async function generateCareerReportAction(
   input: GenerateCareerReportInput

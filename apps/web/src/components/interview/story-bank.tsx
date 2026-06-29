@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
 import { formatStoryAsAnswer, pickBestStory, type StoryView } from "@/lib/interview/story-format";
 import {
   deleteStory,
