@@ -27,11 +27,25 @@ export async function GET() {
       kind: f.kind,
       title: f.title,
       detail: f.detail,
-      href: f.href,
+      href: deepLink(f.kind, f.href, f.data),
       seen: f.seenAt != null,
       createdAt: f.createdAt,
     })),
   });
+}
+
+/**
+ * Resolve a finding's click target. A "new_role" finding carries its jobId, so we
+ * deep-link to that job's workspace — which loads the job by id and so always opens
+ * the actual role, even if the jobs board is filtered to a different location. Also
+ * repairs older findings stored with the generic "/dashboard/jobs" href.
+ */
+function deepLink(kind: string, href: string | null, data: unknown): string | null {
+  const jobId = (data as { jobId?: unknown } | null)?.jobId;
+  if (kind === "new_role" && typeof jobId === "string") {
+    return `/dashboard/applications/${jobId}/workspace`;
+  }
+  return href;
 }
 
 export async function POST() {

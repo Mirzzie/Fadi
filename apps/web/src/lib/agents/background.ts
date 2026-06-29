@@ -106,7 +106,10 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
         kind: "new_role",
         title: `${job.title} at ${job.company}`,
         detail: job.matchReason,
-        href: "/dashboard/jobs",
+        // Deep-link to THIS job's workspace — it loads the job by id regardless of
+        // the board's location filter, so clicking always opens the actual role
+        // (the generic /dashboard/jobs could be filtered to a city the job isn't in).
+        href: `/dashboard/applications/${job.id}/workspace`,
         data: { jobId: job.id, matchScore: job.matchScore },
       });
     }
