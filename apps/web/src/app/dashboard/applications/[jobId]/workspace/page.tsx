@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect, notFound } from "next/navigation";
 import {
   createApplicationsRepository,
+  createCareerProfilesRepository,
   createDocumentsRepository,
   createJobsRepository,
   createProfilesRepository,
@@ -20,6 +21,9 @@ import { CompanyBriefPanel } from "@/components/workspace/company-brief-panel";
 import { AutoPrepRunner } from "@/components/workspace/auto-prep-runner";
 import { JobLivenessBanner } from "@/components/workspace/job-liveness-banner";
 import { WorkspaceDocActions } from "@/components/workspace/workspace-doc-actions";
+import { FadiGuardianCallout } from "@/components/workspace/fadi-guardian-callout";
+import { scoreJobForUser } from "@/lib/jobs/job-matching";
+import { evaluateApply } from "@/lib/guardian/guardian";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
 import { onboardingStatusOf } from "@/lib/onboarding/status";
@@ -46,17 +50,29 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
 
   const db = getDatabase();
 
-  const [job, savedJob, applications, jobDocs, profile] = await Promise.all([
+  const [job, savedJob, applications, jobDocs, profile, track] = await Promise.all([
     createJobsRepository(db).findById(jobId),
     createSavedJobsRepository(db).listForUserByJobIds(user.id, [jobId]),
     createApplicationsRepository(db).listForUserByJobIds(user.id, [jobId]),
     createDocumentsRepository(db).listForJob(user.id, jobId),
     createProfilesRepository(db).getByUserId(user.id),
+    createCareerProfilesRepository(db).getActiveForUser(user.id),
   ]);
 
   // Gate on the profile already loaded above — no second profiles round-trip.
   if (onboardingStatusOf(profile) !== "completed") redirect("/onboarding");
   if (!job) notFound();
+
+  // The Action Guardian: Fadi checks this role against your active direction and
+  // speaks up (a nudge, never a block) if it's off-track or above your stage.
+  const match = scoreJobForUser({ careerProfile: track, resume: null, job });
+  const guardian = evaluateApply({
+    onRole: match.onRole,
+    fieldRelated: match.fieldRelated,
+    overLevel: match.overLevel,
+    targetRole: track?.targetRole ?? null,
+    jobTitle: job.title,
+  });
 
   const application = applications[0]
     ? {
@@ -90,6 +106,13 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
             </a>
           ) : null}
         </div>
+
+        {/* Fadi speaks up — guards this application against your career direction */}
+        {guardian.level !== "ok" ? (
+          <div className="shrink-0">
+            <FadiGuardianCallout verdict={guardian} />
+          </div>
+        ) : null}
 
         {/* Freshness guard — warn (don't block) if the posting looks closed */}
         <div className="shrink-0">
