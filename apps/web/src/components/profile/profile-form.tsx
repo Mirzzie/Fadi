@@ -5,6 +5,8 @@ import { CheckCircle2, Loader2, Trash2, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { CvUpload } from "@/components/profile/cv-upload";
+import { FadiGuardianCallout } from "@/components/workspace/fadi-guardian-callout";
+import { evaluateDeleteAllData } from "@/lib/guardian/guardian";
 import { cn } from "@/lib/utils";
 import {
   deleteAccountDataAction,
@@ -154,15 +156,18 @@ export function ProfileForm({
           settings, then signs you out. This can&apos;t be undone.
         </p>
         {confirmingDelete ? (
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="text-sm font-medium">Are you sure?</span>
-            <Button variant="destructive" size="sm" onClick={remove} disabled={pending}>
-              <Trash2 className="size-4" aria-hidden="true" />
-              Yes, delete everything
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)} disabled={pending}>
-              Cancel
-            </Button>
+          <div className="mt-3 space-y-3">
+            <FadiGuardianCallout verdict={evaluateDeleteAllData()} />
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium">Are you sure?</span>
+              <Button variant="destructive" size="sm" onClick={remove} disabled={pending}>
+                <Trash2 className="size-4" aria-hidden="true" />
+                Yes, delete everything
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)} disabled={pending}>
+                Cancel
+              </Button>
+            </div>
           </div>
         ) : (
           <Button

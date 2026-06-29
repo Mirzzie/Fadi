@@ -60,20 +60,12 @@ export function evaluateApply(input: {
   return OK;
 }
 
-/** Guard a destructive track deletion — the only irreversible case here. */
-export function evaluateDeleteTrack(input: { isOnlyTrack: boolean }): GuardianVerdict {
-  if (input.isOnlyTrack) {
-    return {
-      level: "confirm",
-      headline: "This is your only career direction",
-      detail:
-        "Deleting it removes the goal everything here is tuned to — recommended jobs, documents, and my guidance. This can't be undone. If you're pivoting, create the new direction first.",
-    };
-  }
+/** Guard the one irreversible action here: wiping all career data. */
+export function evaluateDeleteAllData(): GuardianVerdict {
   return {
     level: "confirm",
-    headline: "Delete this direction?",
+    headline: "This erases everything we've built",
     detail:
-      "I'll stop steering toward it. If you just want to focus elsewhere for now, switching active tracks keeps this one intact.",
+      "Your direction, saved roles, applications, documents, momentum, and my memory of your journey all go — permanently, and you'll be signed out. If you're starting fresh rather than leaving, changing your track or goal keeps the history intact.",
   };
 }

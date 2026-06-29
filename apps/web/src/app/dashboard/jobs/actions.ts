@@ -14,6 +14,7 @@ import { z } from "zod";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
 import { scoreJobForUser } from "@/lib/jobs/job-matching";
+import { evaluateApply, type GuardianVerdict } from "@/lib/guardian/guardian";
 import { logger } from "@/lib/observability/logger";
 
 const jobIdSchema = z.string().uuid();
@@ -30,6 +31,8 @@ const applicationStatusSchema = z.enum([
 export type JobActionResult = {
   ok: boolean;
   message: string;
+  /** Fadi speaking up — present when saving an off-direction role (a nudge, not a block). */
+  guardian?: GuardianVerdict;
 };
 
 async function getSignedInUser() {
@@ -104,9 +107,19 @@ export async function saveJobAction(jobId: string): Promise<JobActionResult> {
       jobId: job.id,
     });
 
+    // Fadi guards the action: saved either way, but speak up if it's off-direction.
+    const guardian = evaluateApply({
+      onRole: match.onRole,
+      fieldRelated: match.fieldRelated,
+      overLevel: match.overLevel,
+      targetRole: careerProfile?.targetRole ?? null,
+      jobTitle: job.title,
+    });
+
     return {
       ok: true,
       message: "Job saved.",
+      ...(guardian.level !== "ok" ? { guardian } : {}),
     };
   } catch (error) {
     logger.error("jobs.save.failed", {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { evaluateApply, evaluateDeleteTrack } from "./guardian";
+import { evaluateApply, evaluateDeleteAllData } from "./guardian";
 
 const base = { onRole: true, fieldRelated: false, overLevel: false, targetRole: "SOC Analyst", jobTitle: "SOC Analyst" };
 
@@ -34,13 +34,10 @@ describe("evaluateApply", () => {
   });
 });
 
-describe("evaluateDeleteTrack", () => {
-  it("confirms harder when it's the only direction", () => {
-    const v = evaluateDeleteTrack({ isOnlyTrack: true });
+describe("evaluateDeleteAllData", () => {
+  it("always confirms (irreversible) and names what's lost", () => {
+    const v = evaluateDeleteAllData();
     expect(v.level).toBe("confirm");
-    expect(v.detail.toLowerCase()).toContain("can't be undone");
-  });
-  it("still confirms for a non-only track, but softer", () => {
-    expect(evaluateDeleteTrack({ isOnlyTrack: false }).level).toBe("confirm");
+    expect(v.detail.toLowerCase()).toContain("permanently");
   });
 });
