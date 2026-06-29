@@ -74,7 +74,13 @@ export function createProfilesRepository(db: Database) {
     /** Persist the user's job-search preferences (used as discovery defaults). */
     async setJobPreferences(
       userId: string,
-      prefs: { modes?: string[]; types?: string[]; autoSearch?: boolean },
+      prefs: {
+        modes?: string[];
+        types?: string[];
+        autoSearch?: boolean;
+        agentScope?: "filters" | "broad";
+        location?: { country?: string; city?: string; precise?: boolean };
+      },
     ): Promise<Profile | null> {
       const [profile] = await db
         .update(profiles)

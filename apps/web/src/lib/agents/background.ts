@@ -4,6 +4,7 @@ import {
   createAgentRunsRepository,
   createCareerProfilesRepository,
   createJobsRepository,
+  createProfilesRepository,
   createSavedJobsRepository,
   type CreateFindingInput,
 } from "@careeros/database";
@@ -12,6 +13,8 @@ import { getDatabase } from "@/lib/database/client";
 import { getMarketIntelligence } from "@/lib/data-sources/service";
 import { ensureFreshLiveJobs } from "@/lib/jobs/sync";
 import { getRecommendedJobsForUser } from "@/lib/jobs/data";
+import type { EmploymentType, WorkMode } from "@/lib/jobs/filters";
+import { parseLocation } from "@/lib/jobs/locations";
 import { logger } from "@/lib/observability/logger";
 
 /**
@@ -89,8 +92,22 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
 
     // 2. New matched roles since the baseline — reuses the full recommendation
     //    pipeline (relevance gating included), so the agent's bar for "worth
-    //    telling you" is the same one the jobs page uses.
-    const recommended = await getRecommendedJobsForUser(userId, 30);
+    //    telling you" is the same one the jobs page uses. Scope (a user setting):
+    //    "filters" (default) searches their location + saved modes/types, so every
+    //    finding matches what they'd see on their board; "broad" surfaces on-role
+    //    roles anywhere.
+    const prefs = (await createProfilesRepository(db).getByUserId(userId))?.jobPreferences ?? {};
+    const scope = prefs.agentScope ?? "filters";
+    const loc = prefs.location ?? parseLocation(track.location);
+    const recommended =
+      scope === "broad"
+        ? await getRecommendedJobsForUser(userId, 30)
+        : await getRecommendedJobsForUser(userId, 30, {
+            country: loc.country?.toLowerCase(),
+            city: loc.city,
+            modes: (prefs.modes ?? []) as WorkMode[],
+            types: (prefs.types ?? []) as EmploymentType[],
+          });
     const newRoles = recommended
       .filter(
         (j) =>

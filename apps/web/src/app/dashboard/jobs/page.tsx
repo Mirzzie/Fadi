@@ -59,12 +59,17 @@ export default async function JobsPage({
 
   const prefs = profileRow?.jobPreferences ?? {};
 
+  // Default search location: an explicit URL filter wins; then the user's saved
+  // default (e.g. from precise geolocation); then their profile region.
   const fromProfile = parseLocation(profile?.locationPreference);
+  const savedLoc = prefs.location;
   // "any" = the user explicitly chose "Any country": search worldwide and don't
-  // fall back to their profile region (that fallback is why only Ireland showed).
+  // fall back to a default (that fallback is why only Ireland showed).
   const worldwide = params.country === "any";
-  const country = worldwide ? undefined : (params.country ?? fromProfile.country)?.toLowerCase();
-  const city = worldwide ? undefined : (params.city?.trim() || fromProfile.city);
+  const country = worldwide
+    ? undefined
+    : (params.country ?? savedLoc?.country ?? fromProfile.country)?.toLowerCase();
+  const city = worldwide ? undefined : (params.city?.trim() || savedLoc?.city || fromProfile.city);
   // Saved preferences are the defaults; an explicit URL filter overrides them.
   const modes = parseList(params.modes ?? (prefs.modes ?? []).join(","), MODES);
   const types = parseList(params.types ?? (prefs.types ?? []).join(","), TYPES);
@@ -93,6 +98,7 @@ export default async function JobsPage({
           activeModes={modes}
           activeTypes={types}
           autoSearch={Boolean(prefs.autoSearch)}
+          agentScope={prefs.agentScope ?? "filters"}
         />
         <JobSourcesStatus sources={sourcesHealth.sources} lastRunAt={sourcesHealth.lastRunAt} />
       </div>

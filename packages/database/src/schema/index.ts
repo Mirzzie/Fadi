@@ -155,7 +155,17 @@ export const profiles = pgTable(
     // Persistent job-search preferences — set once, used as defaults for discovery
     // and (eventually) the background "find jobs while you sleep" agent.
     jobPreferences: jsonb("job_preferences")
-      .$type<{ modes?: string[]; types?: string[]; autoSearch?: boolean }>()
+      .$type<{
+        modes?: string[];
+        types?: string[];
+        autoSearch?: boolean;
+        /** Background agency search scope: "filters" = the user's location + modes/types
+         *  (matches their board); "broad" = on-role roles anywhere. */
+        agentScope?: "filters" | "broad";
+        /** Default job-search location (e.g. from precise geolocation); overrides the
+         *  profile-derived default on the board + agency. precise = came from the device. */
+        location?: { country?: string; city?: string; precise?: boolean };
+      }>()
       .notNull()
       .default({}),
     ...timestamps,

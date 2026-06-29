@@ -249,18 +249,29 @@ export async function updateApplicationStatusAction(
   }
 }
 
-/** Persist the user's job-search preferences (work modes, types, auto-search). */
+/**
+ * Persist the user's job-search preferences (work modes, types, auto-search, the
+ * background-agency scope, and a default search location). PARTIAL + merging — only
+ * the provided fields change, so saving a location never wipes the saved filters.
+ */
 export async function saveJobPreferences(input: {
-  modes: string[];
-  types: string[];
-  autoSearch: boolean;
+  modes?: string[];
+  types?: string[];
+  autoSearch?: boolean;
+  agentScope?: "filters" | "broad";
+  location?: { country?: string; city?: string; precise?: boolean } | null;
 }): Promise<{ ok: boolean }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false };
-  await createProfilesRepository(getDatabase()).setJobPreferences(user.id, {
-    modes: input.modes,
-    types: input.types,
-    autoSearch: input.autoSearch,
+  const repo = createProfilesRepository(getDatabase());
+  const existing = (await repo.getByUserId(user.id))?.jobPreferences ?? {};
+  await repo.setJobPreferences(user.id, {
+    modes: input.modes ?? existing.modes,
+    types: input.types ?? existing.types,
+    autoSearch: input.autoSearch ?? existing.autoSearch,
+    agentScope: input.agentScope ?? existing.agentScope,
+    // location: explicit null clears it; undefined keeps the current value.
+    location: input.location === null ? undefined : (input.location ?? existing.location),
   });
   revalidatePath("/dashboard/jobs");
   return { ok: true };

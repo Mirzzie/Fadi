@@ -1,11 +1,12 @@
 "use client";
 
-import { MapPin, Search } from "lucide-react";
+import { LocateFixed, MapPin, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { saveJobPreferences } from "@/app/dashboard/jobs/actions";
 import type { EmploymentType, VisaFilter, WorkMode } from "@/lib/jobs/filters";
 import { COUNTRIES } from "@/lib/jobs/locations";
 import { cn } from "@/lib/utils";
@@ -37,6 +38,8 @@ export function JobLocationFilter({
   const [isPending, startTransition] = useTransition();
   const [country, setCountry] = useState(selectedCountry ?? "any");
   const [city, setCity] = useState(selectedCity ?? "");
+  const [locating, setLocating] = useState(false);
+  const [geoError, setGeoError] = useState<string | null>(null);
 
   function navigate(next: {
     country?: string;
@@ -62,6 +65,63 @@ export function JobLocationFilter({
     types: selectedTypes,
     visa: selectedVisa,
   });
+
+  // Detect the user's area from their device, convert it to a city/country, set it
+  // as the search, and save it as their default. Consent-first: the browser prompts,
+  // and the privacy note below says exactly what happens before they click.
+  function useMyLocation() {
+    setGeoError(null);
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setGeoError("Your browser can't share location — type your city instead.");
+      return;
+    }
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const res = await fetch(
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`,
+          );
+          if (!res.ok) throw new Error("geocode failed");
+          const data = (await res.json()) as { city?: string; locality?: string; countryCode?: string };
+          const detectedCity = (data.city || data.locality || "").trim();
+          const detectedCountry = (data.countryCode || "").toLowerCase();
+          if (!detectedCountry && !detectedCity) throw new Error("empty");
+          setCountry(detectedCountry || "any");
+          setCity(detectedCity);
+          // Persist as the default search location for the board AND the background agent.
+          void saveJobPreferences({
+            location: {
+              country: detectedCountry || undefined,
+              city: detectedCity || undefined,
+              precise: true,
+            },
+          });
+          navigate({
+            country: detectedCountry || undefined,
+            city: detectedCity,
+            modes: selectedModes,
+            types: selectedTypes,
+            visa: selectedVisa,
+          });
+        } catch {
+          setGeoError("Couldn't pin your area — type your city instead.");
+        } finally {
+          setLocating(false);
+        }
+      },
+      (err) => {
+        setLocating(false);
+        setGeoError(
+          err.code === err.PERMISSION_DENIED
+            ? "Location permission declined — no problem, just type your city."
+            : "Couldn't get your location — type your city instead.",
+        );
+      },
+      { enableHighAccuracy: false, timeout: 10000, maximumAge: 10 * 60 * 1000 },
+    );
+  }
 
   function toggleMode(m: WorkMode) {
     const modes = selectedModes.includes(m)
@@ -132,6 +192,21 @@ export function JobLocationFilter({
           {isPending ? "Searching…" : "Search"}
         </Button>
       </form>
+
+      {/* Precise location — consent-first, with an honest privacy note. */}
+      <div className="space-y-1">
+        <Button type="button" variant="outline" size="sm" onClick={useMyLocation} disabled={locating}>
+          <LocateFixed className="size-3.5" aria-hidden="true" />
+          {locating ? "Locating…" : "Use my precise location"}
+        </Button>
+        <p className="text-[0.7rem] leading-snug text-muted-foreground">
+          Your browser will ask permission, then your device location is sent to a geocoding service
+          (BigDataCloud) to turn it into a city/country and saved as your default job-search area — used
+          only for that, and for Fadi&apos;s background search. No coordinates are stored; clear it anytime
+          by editing the city or picking a country.
+        </p>
+        {geoError ? <p className="text-xs text-amber-500">{geoError}</p> : null}
+      </div>
 
       {/* Filter chips */}
       <div className="flex flex-wrap items-center gap-1.5">
