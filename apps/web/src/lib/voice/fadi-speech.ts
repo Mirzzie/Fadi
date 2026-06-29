@@ -31,6 +31,12 @@ export function isFadiSpeaking(): boolean {
   return speaking;
 }
 
+/** Whether the user has turned Fadi's voice on (the menu-bar / chat mute toggle). */
+export function isFadiVoiceEnabled(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem("fadi-voice-enabled") === "1";
+}
+
 export function stopFadiSpeech(): void {
   if (audioEl) {
     audioEl.pause();

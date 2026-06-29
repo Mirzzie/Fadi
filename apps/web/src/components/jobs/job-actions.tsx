@@ -12,6 +12,7 @@ import {
 } from "@/app/dashboard/jobs/actions";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { FadiGuardianCallout } from "@/components/workspace/fadi-guardian-callout";
+import { FadiGuardianVoice } from "@/components/os/fadi-guardian-voice";
 import type { ApplicationStatus } from "@/lib/jobs/types";
 
 const applicationStatuses: Array<{ value: ApplicationStatus; label: string }> = [
@@ -106,7 +107,12 @@ export function JobActions({ jobId, isSaved, applicationStatus, url }: JobAction
           {result.message}
         </p>
       ) : null}
-      {result?.guardian ? <FadiGuardianCallout verdict={result.guardian} /> : null}
+      {result?.guardian ? (
+        <>
+          <FadiGuardianCallout verdict={result.guardian} />
+          <FadiGuardianVoice verdict={result.guardian} />
+        </>
+      ) : null}
     </div>
   );
 }

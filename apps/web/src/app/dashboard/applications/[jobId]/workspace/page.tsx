@@ -22,6 +22,7 @@ import { AutoPrepRunner } from "@/components/workspace/auto-prep-runner";
 import { JobLivenessBanner } from "@/components/workspace/job-liveness-banner";
 import { WorkspaceDocActions } from "@/components/workspace/workspace-doc-actions";
 import { FadiGuardianCallout } from "@/components/workspace/fadi-guardian-callout";
+import { FadiGuardianVoice } from "@/components/os/fadi-guardian-voice";
 import { scoreJobForUser } from "@/lib/jobs/job-matching";
 import { evaluateApply } from "@/lib/guardian/guardian";
 import { getCurrentAuthUser } from "@/lib/auth/session";
@@ -111,6 +112,7 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
         {guardian.level !== "ok" ? (
           <div className="shrink-0">
             <FadiGuardianCallout verdict={guardian} />
+            <FadiGuardianVoice verdict={guardian} />
           </div>
         ) : null}
 
