@@ -1,6 +1,6 @@
 import type { CareerProfile, Job, Resume } from "@careeros/database";
 
-import { seniorityFit } from "@/lib/jobs/seniority";
+import { seniorityFitAt, userLevel } from "@/lib/jobs/seniority";
 
 const keywordStopWords = new Set([
   "and",
@@ -224,14 +224,9 @@ function isFieldRelated(jobTitle: string, fieldTerms: string[]): boolean {
   return fieldTerms.some((t) => containsTerm(title, t));
 }
 
-/** Role fit + whether this job is even the right KIND of role for the user. */
-function roleScore(
-  targetRole: string | null,
-  roleCluster: string[] | null,
-  roleSynonyms: string[] | null,
-  jobTitle: string,
-): { score: number; onRole: boolean } {
-  const terms = roleFamilyTerms(targetRole, roleCluster, roleSynonyms);
+/** Role fit + whether this job is even the right KIND of role for the user.
+ *  Takes pre-built role terms (profile-constant) so a list scan doesn't rebuild them per job. */
+function roleScore(terms: string[], jobTitle: string): { score: number; onRole: boolean } {
   const title = normalize(jobTitle);
   if (terms.length === 0) return { score: 8, onRole: true }; // no profile signal → don't penalise
 
@@ -296,16 +291,21 @@ function experienceScore(experienceLevel: string | null, job: Job) {
   return 6;
 }
 
-function keywordScore(careerProfile: CareerProfile | null, resume: Resume | null, job: Job) {
-  // Distinctive-only on both sides, so generic words ("engineer", "systems")
-  // don't manufacture a match between unrelated roles.
+/** The user's distinctive keyword set — profile-constant, so build it ONCE per scan
+ *  (tokenizing the full resume per job was the hot-path waste). */
+function buildProfileKeywords(careerProfile: CareerProfile | null, resume: Resume | null): Set<string> {
   const clusterTokens = (careerProfile?.roleCluster ?? []).flatMap((r) => distinctiveTokens(r));
-  const profileKeywords = new Set([
+  return new Set([
     ...distinctiveTokens(careerProfile?.targetRole),
     ...distinctiveTokens(careerProfile?.careerGoal),
     ...clusterTokens,
     ...distinctiveTokens(resume?.parsedText ?? resume?.rawText),
   ]);
+}
+
+function keywordScore(profileKeywords: Set<string>, job: Job) {
+  // Distinctive-only on both sides, so generic words ("engineer", "systems")
+  // don't manufacture a match between unrelated roles.
   const jobKeywords = new Set([
     ...distinctiveTokens(job.title),
     ...distinctiveTokens(job.description),
@@ -322,96 +322,101 @@ function keywordScore(careerProfile: CareerProfile | null, resume: Resume | null
   };
 }
 
-export function scoreJobForUser({
+export interface JobMatch {
+  matchScore: number;
+  onRole: boolean;
+  fieldRelated: boolean;
+  overLevel: boolean;
+  /** A different line of work (sales/academia/…) — gates the semantic-rescue tier. */
+  differentFunction: boolean;
+  matchedKeywords: string[];
+  matchReason: string;
+}
+
+/**
+ * Build a scorer for a profile ONCE, then score many jobs with it. Every
+ * profile-CONSTANT input (role terms, field terms, the keyword set incl. the full
+ * resume, the user's seniority level) is computed here — not per job — so scanning
+ * a few hundred jobs no longer re-tokenises the resume hundreds of times.
+ */
+export function createJobScorer({
   careerProfile,
   resume,
-  job,
   locationOverride,
 }: {
   careerProfile: CareerProfile | null;
   resume: Resume | null;
-  job: Job;
   /** When the user actively searches a location, score against THAT, not just the profile. */
   locationOverride?: string | null;
-}) {
-  const keywordMatch = keywordScore(careerProfile, resume, job);
+}): (job: Job) => JobMatch {
+  const targetRole = careerProfile?.targetRole ?? null;
+  const domain = careerProfile?.domain ?? null;
+  const experienceLevel = careerProfile?.experienceLevel ?? null;
   const locationPref = locationOverride ?? careerProfile?.location ?? null;
-  const role = roleScore(
-    careerProfile?.targetRole ?? null,
-    careerProfile?.roleCluster ?? null,
-    careerProfile?.roleSynonyms ?? null,
-    job.title,
-  );
 
-  // Not the exact role, but the SAME field (e.g. a Security Engineer for a SOC
-  // Analyst) — a useful fallback when no exact-role postings exist, instead of a
-  // blank board. Excludes different functions in the field (sales, academia).
-  const fieldRelated =
-    !role.onRole &&
-    isFieldRelated(
-      job.title,
-      fieldTermsFor(
-        careerProfile?.domain ?? null,
-        careerProfile?.targetRole ?? null,
-        careerProfile?.roleCluster ?? null,
-        careerProfile?.roleSynonyms ?? null,
-      ),
-    );
+  const roleTerms = roleFamilyTerms(targetRole, careerProfile?.roleCluster ?? null, careerProfile?.roleSynonyms ?? null);
+  const fieldTerms = fieldTermsFor(domain, targetRole, careerProfile?.roleCluster ?? null, careerProfile?.roleSynonyms ?? null);
+  const profileKeywords = buildProfileKeywords(careerProfile, resume);
+  const userLvl = userLevel(experienceLevel);
 
-  // Low floor: an unrelated role should score low, not inherit a generous base.
-  const score =
-    5 +
-    role.score +
-    locationScore(locationPref, job) +
-    experienceScore(careerProfile?.experienceLevel ?? null, job) +
-    keywordMatch.score;
-  // Consider the candidate's career stage: a role needing ~2+ levels more than
-  // them (an 8–10-year "Staff" role for an early-career profile) is not a real
-  // match — demote it and say so, rather than sending them to apply for it.
-  const seniority = seniorityFit(job.title, job.description, careerProfile?.experienceLevel ?? null);
+  return (job: Job): JobMatch => {
+    const keywordMatch = keywordScore(profileKeywords, job);
+    const role = roleScore(roleTerms, job.title);
+    // Not the exact role, but the SAME field (e.g. a Security Engineer for a SOC
+    // Analyst) — a useful fallback when no exact-role postings exist. Excludes
+    // different functions in the field (sales, academia).
+    const fieldRelated = !role.onRole && isFieldRelated(job.title, fieldTerms);
 
-  // On-role can climb high; same-field-different-role sits in a middle band so it
-  // never out-ranks a real match; off-role noise is capped hard so location +
-  // keyword overlap can't promote a "Materials Engineer" to an IT-support seeker.
-  let matchScore = role.onRole
-    ? Math.min(98, Math.max(5, score))
-    : fieldRelated
-      ? Math.min(49, Math.max(18, score))
-      : Math.min(28, Math.max(5, score));
-  if (seniority.overReach) {
-    // Cap an out-of-reach role low so it can't sit at the top of the board.
-    matchScore = Math.min(matchScore, 35);
-  }
+    // Low floor: an unrelated role should score low, not inherit a generous base.
+    const score =
+      5 + role.score + locationScore(locationPref, job) + experienceScore(experienceLevel, job) + keywordMatch.score;
+    // Career stage: a role ~2+ levels above the candidate isn't a real match — demote.
+    const seniority = seniorityFitAt(job.title, job.description, userLvl);
 
-  const reasonParts = [
-    role.onRole && careerProfile?.targetRole
-      ? `role fit with ${careerProfile.targetRole}`
-      : null,
-    locationPref ? `location: ${locationPref}` : null,
-    keywordMatch.matchedKeywords.length > 0
-      ? `keyword overlap: ${keywordMatch.matchedKeywords.slice(0, 4).join(", ")}`
-      : null,
-  ].filter(Boolean);
+    let matchScore = role.onRole
+      ? Math.min(98, Math.max(5, score))
+      : fieldRelated
+        ? Math.min(49, Math.max(18, score))
+        : Math.min(28, Math.max(5, score));
+    if (seniority.overReach) matchScore = Math.min(matchScore, 35);
 
-  const baseReason = role.onRole
-    ? reasonParts.length > 0
-      ? `Matched on ${reasonParts.join("; ")}.`
-      : "Limited overlap with your profile. Review the job description before applying."
-    : fieldRelated
-      ? `Related role in your field${careerProfile?.domain ? ` (${careerProfile.domain})` : ""} — not an exact ${careerProfile?.targetRole ?? "role"} match, but in the same field. Review before applying.`
-      : reasonParts.length > 0
+    const reasonParts = [
+      role.onRole && targetRole ? `role fit with ${targetRole}` : null,
+      locationPref ? `location: ${locationPref}` : null,
+      keywordMatch.matchedKeywords.length > 0
+        ? `keyword overlap: ${keywordMatch.matchedKeywords.slice(0, 4).join(", ")}`
+        : null,
+    ].filter(Boolean);
+
+    const baseReason = role.onRole
+      ? reasonParts.length > 0
         ? `Matched on ${reasonParts.join("; ")}.`
-        : "Limited overlap with your profile. Review the job description before applying.";
-  const matchReason = seniority.note ? `${baseReason} ${seniority.note}` : baseReason;
+        : "Limited overlap with your profile. Review the job description before applying."
+      : fieldRelated
+        ? `Related role in your field${domain ? ` (${domain})` : ""} — not an exact ${targetRole ?? "role"} match, but in the same field. Review before applying.`
+        : reasonParts.length > 0
+          ? `Matched on ${reasonParts.join("; ")}.`
+          : "Limited overlap with your profile. Review the job description before applying.";
+    const matchReason = seniority.note ? `${baseReason} ${seniority.note}` : baseReason;
 
-  return {
-    matchScore,
-    onRole: role.onRole,
-    fieldRelated,
-    overLevel: seniority.overReach,
-    /** A different line of work (sales/academia/…) — gates the semantic-rescue tier. */
-    differentFunction: hasDifferentFunction(job.title),
-    matchedKeywords: keywordMatch.matchedKeywords,
-    matchReason,
+    return {
+      matchScore,
+      onRole: role.onRole,
+      fieldRelated,
+      overLevel: seniority.overReach,
+      differentFunction: hasDifferentFunction(job.title),
+      matchedKeywords: keywordMatch.matchedKeywords,
+      matchReason,
+    };
   };
+}
+
+/** Score a single job — thin wrapper over createJobScorer for one-off callers. */
+export function scoreJobForUser(input: {
+  careerProfile: CareerProfile | null;
+  resume: Resume | null;
+  job: Job;
+  locationOverride?: string | null;
+}): JobMatch {
+  return createJobScorer(input)(input.job);
 }

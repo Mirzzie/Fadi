@@ -76,13 +76,14 @@ export interface SeniorityFit {
   note: string | null;
 }
 
-export function seniorityFit(
+/** Seniority fit against an ALREADY-resolved user level — so a list scan doesn't
+ *  re-parse the user's level for every job. */
+export function seniorityFitAt(
   title: string,
   description: string | null | undefined,
-  experienceLevel: string | null | undefined,
+  user: number | null,
 ): SeniorityFit {
   const required = requiredLevel(title, description);
-  const user = userLevel(experienceLevel);
   // Can't judge without both signals — never penalise on a guess.
   if (required == null || user == null) {
     return { required, user, gap: 0, overReach: false, note: null };
@@ -93,4 +94,12 @@ export function seniorityFit(
     ? "This role looks more senior than your current profile — check the years/level it asks for before investing time."
     : null;
   return { required, user, gap, overReach, note };
+}
+
+export function seniorityFit(
+  title: string,
+  description: string | null | undefined,
+  experienceLevel: string | null | undefined,
+): SeniorityFit {
+  return seniorityFitAt(title, description, userLevel(experienceLevel));
 }

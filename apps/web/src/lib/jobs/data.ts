@@ -11,7 +11,7 @@ import {
 import { getDatabase } from "@/lib/database/client";
 import { getUserDocGenerate } from "@/lib/ai/user-generate";
 import { ensureFreshLiveJobs } from "@/lib/jobs/sync";
-import { scoreJobForUser } from "@/lib/jobs/job-matching";
+import { createJobScorer } from "@/lib/jobs/job-matching";
 import { expandRoleSynonyms } from "@/lib/jobs/role-synonyms";
 import { passesFilters, type JobFilters } from "@/lib/jobs/filters";
 import { getCountry } from "@/lib/jobs/locations";
@@ -113,12 +113,15 @@ export async function getRecommendedJobsForUser(
       : null;
 
   const byId = new Map(jobs.map((j) => [j.id, j]));
+  // Build the scorer ONCE (profile-constant work incl. the full resume tokenisation)
+  // then reuse it across every job — instead of rebuilding it per job in the map.
+  const scoreJob = createJobScorer({ careerProfile, resume, locationOverride });
   // Carry the lexical score + the different-function flag per job for the semantic
   // layer (re-ranking + rescue gating) without bloating the public RecommendedJob.
   const metaById = new Map<string, { lex: number; differentFunction: boolean }>();
   const recommendedJobs = jobs
     .map((job) => {
-      const match = scoreJobForUser({ careerProfile, resume, job, locationOverride });
+      const match = scoreJob(job);
       const savedJob = savedByJobId.get(job.id);
       const application = applicationByJobId.get(job.id);
       const lex = savedJob?.matchScore ?? match.matchScore;
