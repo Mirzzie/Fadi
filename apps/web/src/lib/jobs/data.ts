@@ -17,7 +17,7 @@ import { passesFilters, type JobFilters } from "@/lib/jobs/filters";
 import { getCountry } from "@/lib/jobs/locations";
 import { checkPostingLiveness } from "@/lib/jobs/liveness";
 import { sweepJobsLiveness } from "@/lib/jobs/liveness-sweep";
-import { cosine, embedText, embedTexts, EMBEDDING_MODEL, fuseScore } from "@/lib/ai/embeddings";
+import { cosine, embedText, embedTexts, EMBEDDING_MODEL, fuseScore, meanVector } from "@/lib/ai/embeddings";
 import {
   freshTrackVector,
   isSemanticRescue,
@@ -202,26 +202,47 @@ export async function getRecommendedJobsForUser(
       : [];
 
     const trackVec = freshTrackVector(careerProfile);
-    if (trackVec) {
-      const cosOf = (j: { id: string }): number | null => {
-        const v = byId.get(j.id)?.embedding;
-        return v && v.length > 0 ? cosine(trackVec, v) : null;
-      };
+    // Personalization (Phase 2): a "taste" vector from the roles the user has SAVED /
+    // APPLIED to, so the board leans toward what they've actually engaged with. Cold
+    // start (no history, or those jobs not embedded yet) → null → zero effect.
+    const engagedIds = new Set<string>(
+      [...savedByJobId.keys(), ...applicationByJobId.keys()].filter((id): id is string => id != null),
+    );
+    const prefVec = meanVector(
+      [...engagedIds]
+        .map((id) => byId.get(id)?.embedding)
+        .filter((v): v is number[] => Array.isArray(v) && v.length > 0),
+    );
 
-      // Re-rank what we're showing by the fused lexical+semantic score.
+    if (trackVec || prefVec) {
+      const cosTo = (vec: number[] | null, id: string): number | null => {
+        if (!vec) return null;
+        const v = byId.get(id)?.embedding;
+        return v && v.length > 0 ? cosine(vec, v) : null;
+      };
+      const trackCosOf = (j: { id: string }) => cosTo(trackVec, j.id);
+      // Don't let an engaged job boost itself; only NEW jobs get a taste nudge.
+      const prefCosOf = (j: { id: string }) => (engagedIds.has(j.id) ? null : cosTo(prefVec, j.id));
+
+      // Re-rank what we're showing by the fused lexical + role + taste score.
       for (const j of shown) {
-        j.matchScore = fuseScore(metaById.get(j.id)?.lex ?? j.matchScore, cosOf(j));
+        const pc = prefCosOf(j);
+        j.matchScore = fuseScore(metaById.get(j.id)?.lex ?? j.matchScore, trackCosOf(j), pc);
+        if (pc != null && pc >= 0.5 && !tracked(j)) {
+          j.matchReason = `${j.matchReason} · Similar to roles you've saved.`;
+        }
       }
       shown.sort((a, b) => b.matchScore - a.matchScore);
 
-      // Fallback: fold in semantic rescues the lexical tiers couldn't see.
-      if (inFallback) {
+      // Fallback: fold in semantic rescues the lexical tiers couldn't see (needs the
+      // role vector to judge field fit; taste only re-orders).
+      if (inFallback && trackVec) {
         const shownIds = new Set(shown.map((j) => j.id));
         const rescues = rescuePool
           .filter((j) => {
             if (shownIds.has(j.id)) return false;
             const m = metaById.get(j.id);
-            return isSemanticRescue(cosOf(j), {
+            return isSemanticRescue(trackCosOf(j), {
               onRole: j.onRole,
               fieldRelated: j.fieldRelated,
               overLevel: j.overLevel,
@@ -229,7 +250,7 @@ export async function getRecommendedJobsForUser(
             });
           })
           .map((j) => {
-            j.matchScore = fuseScore(metaById.get(j.id)?.lex ?? j.matchScore, cosOf(j));
+            j.matchScore = fuseScore(metaById.get(j.id)?.lex ?? j.matchScore, trackCosOf(j), prefCosOf(j));
             j.matchReason = `Close match by meaning to your ${careerProfile.targetRole ?? "role"} — not an exact title match. Review before applying.`;
             return j;
           })
@@ -239,9 +260,11 @@ export async function getRecommendedJobsForUser(
     }
 
     // Background: refresh the track vector (if stale) and embed any candidate jobs
-    // that lack a vector — so the NEXT load ranks semantically. Never blocks this
-    // response. after() runs post-response in request scope (live page / action).
-    const needVectors = [...shown, ...rescuePool].filter((j) => {
+    // that lack a vector — including the user's engaged (saved/applied) roles, so the
+    // taste vector enriches over time. So the NEXT load ranks semantically. Never
+    // blocks this response. after() runs post-response in request scope.
+    const engagedActive = [...engagedIds].map((id) => byId.get(id)).filter((j): j is NonNullable<typeof j> => Boolean(j));
+    const needVectors = [...shown, ...rescuePool, ...engagedActive].filter((j) => {
       const v = byId.get(j.id)?.embedding;
       return !(v && v.length > 0);
     });

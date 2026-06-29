@@ -32,17 +32,46 @@ export function cosine(a: number[], b: number[]): number {
   return dot / (Math.sqrt(na) * Math.sqrt(nb));
 }
 
+/** Mean (centroid) of vectors — the "taste" vector for personalization. Null if none. */
+export function meanVector(vectors: number[][]): number[] | null {
+  const valid = vectors.filter((v) => v.length > 0);
+  if (valid.length === 0) return null;
+  const dims = valid[0].length;
+  const sum = new Array<number>(dims).fill(0);
+  for (const v of valid) {
+    for (let i = 0; i < dims && i < v.length; i++) sum[i] += v[i];
+  }
+  for (let i = 0; i < dims; i++) sum[i] /= valid.length;
+  return sum;
+}
+
+const clamp01 = (n: number) => Math.max(0, Math.min(1, n));
+const cosNorm = (cos: number) => clamp01((cos + 1) / 2);
+
 /**
- * Blend a 0–100 lexical score with a cosine (−1..1) into a 0–100 final score.
- * With no vector (cos == null) the lexical score passes through unchanged, so
- * ranking is identical to today wherever embeddings are missing.
+ * Blend a 0–100 lexical score with up to two cosine signals into a 0–100 score:
+ *  - `cos`     — similarity to the user's TARGET ROLE (semantic relevance)
+ *  - `prefCos` — similarity to roles they've SAVED/APPLIED to (personalization)
+ * Any signal may be null. With only the lexical score (both null) it passes through
+ * unchanged, so ranking is identical wherever vectors are missing.
  */
-export function fuseScore(lexScore: number, cos: number | null, lexWeight = 0.55): number {
-  if (cos == null) return Math.round(lexScore);
-  const lexNorm = Math.max(0, Math.min(1, lexScore / 100));
-  const cosNorm = Math.max(0, Math.min(1, (cos + 1) / 2));
-  const semWeight = 1 - lexWeight;
-  return Math.round(100 * (lexWeight * lexNorm + semWeight * cosNorm));
+export function fuseScore(
+  lexScore: number,
+  cos: number | null,
+  prefCos: number | null = null,
+  lexWeight = 0.55,
+): number {
+  if (cos == null && prefCos == null) return Math.round(lexScore);
+  const lexNorm = clamp01(lexScore / 100);
+  if (cos != null && prefCos != null) {
+    // 3-signal: relevance leads, taste nudges. (0.45 lex · 0.35 role · 0.20 taste)
+    return Math.round(100 * (0.45 * lexNorm + 0.35 * cosNorm(cos) + 0.2 * cosNorm(prefCos)));
+  }
+  if (cos != null) {
+    return Math.round(100 * (lexWeight * lexNorm + (1 - lexWeight) * cosNorm(cos)));
+  }
+  // Only a taste signal (no role vector yet).
+  return Math.round(100 * (0.6 * lexNorm + 0.4 * cosNorm(prefCos as number)));
 }
 
 function openaiKey(): string | null {
