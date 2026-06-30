@@ -21,42 +21,37 @@ import { usePathname } from "next/navigation";
 import { Fragment } from "react";
 
 import { cn } from "@/lib/utils";
-import { useOsMode } from "./os-mode";
-import { useWindows, type WindowApp } from "./window-manager";
 
 /** Groups order the dock by the career journey so co-dependent surfaces sit
  *  together: Start → Orient → You → Pursue → Prepare → System. */
 type DockGroup = "start" | "orient" | "you" | "pursue" | "prepare" | "system";
-export type DockApp = { href: string; label: string; icon: LucideIcon; app: WindowApp; group: DockGroup };
+export type DockApp = { href: string; label: string; icon: LucideIcon; group: DockGroup };
 
 export const DOCK_APPS: DockApp[] = [
   // Start
-  { href: "/dashboard", label: "Home", icon: LayoutDashboard, app: "home", group: "start" },
+  { href: "/dashboard", label: "Home", icon: LayoutDashboard, group: "start" },
   // Orient — where to aim, and what the world is doing
-  { href: "/dashboard/intelligence", label: "Career Weather", icon: CloudSun, app: "intelligence", group: "orient" },
-  { href: "/dashboard/niche-finder", label: "Niche Finder", icon: Compass, app: "niche", group: "orient" },
+  { href: "/dashboard/intelligence", label: "Career Weather", icon: CloudSun, group: "orient" },
+  { href: "/dashboard/niche-finder", label: "Niche Finder", icon: Compass, group: "orient" },
   // You — who you are + what you send
-  { href: "/dashboard/evidence", label: "Evidence", icon: Layers, app: "evidence", group: "you" },
-  { href: "/dashboard/documents", label: "Documents", icon: FileText, app: "documents", group: "you" },
+  { href: "/dashboard/evidence", label: "Evidence", icon: Layers, group: "you" },
+  { href: "/dashboard/documents", label: "Documents", icon: FileText, group: "you" },
   // Pursue — the pipeline
-  { href: "/dashboard/jobs", label: "Jobs", icon: BriefcaseBusiness, app: "jobs", group: "pursue" },
-  { href: "/dashboard/applications", label: "Applications", icon: KanbanSquare, app: "applications", group: "pursue" },
-  { href: "/dashboard/network", label: "Network", icon: Users, app: "network", group: "pursue" },
+  { href: "/dashboard/jobs", label: "Jobs", icon: BriefcaseBusiness, group: "pursue" },
+  { href: "/dashboard/applications", label: "Applications", icon: KanbanSquare, group: "pursue" },
+  { href: "/dashboard/network", label: "Network", icon: Users, group: "pursue" },
   // Prepare & grow
-  { href: "/dashboard/interview", label: "Interview", icon: MessageSquareQuote, app: "interview", group: "prepare" },
-  { href: "/dashboard/learning", label: "Learning", icon: GraduationCap, app: "learning", group: "prepare" },
+  { href: "/dashboard/interview", label: "Interview", icon: MessageSquareQuote, group: "prepare" },
+  { href: "/dashboard/learning", label: "Learning", icon: GraduationCap, group: "prepare" },
   // System
-  { href: "/dashboard/fadi", label: "Fadi", icon: Sparkles, app: "fadi", group: "system" },
-  { href: "/dashboard/profile", label: "Profile", icon: UserRoundCog, app: "profile", group: "system" },
-  { href: "/dashboard/settings", label: "Settings", icon: Settings, app: "settings", group: "system" },
+  { href: "/dashboard/fadi", label: "Fadi", icon: Sparkles, group: "system" },
+  { href: "/dashboard/profile", label: "Profile", icon: UserRoundCog, group: "system" },
+  { href: "/dashboard/settings", label: "Settings", icon: Settings, group: "system" },
 ];
 
-/** The OS dock — in ambient mode it navigates; in desktop mode it opens windows. */
+/** The OS dock — quick navigation across the whole journey. */
 export function Dock() {
   const pathname = usePathname();
-  const { mode } = useOsMode();
-  const { open } = useWindows();
-  const desktop = mode === "desktop";
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-3 z-40 flex justify-center px-3">
@@ -67,47 +62,38 @@ export function Dock() {
         {DOCK_APPS.map((app, i) => {
           const newGroup = i > 0 && app.group !== DOCK_APPS[i - 1].group;
           const active =
-            !desktop && (app.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(app.href));
-          const cls =
-            "group relative grid size-11 place-items-center rounded-xl transition-transform duration-150 hover:-translate-y-1.5";
-          const inner = (
-            <>
-              <span
-                className={cn(
-                  "grid size-11 place-items-center rounded-xl border transition-colors",
-                  active
-                    ? "border-primary/40 bg-gradient-to-br from-primary/25 to-[oklch(0.66_0.22_285)]/20 text-primary"
-                    : "border-border/60 bg-muted/50 text-muted-foreground group-hover:text-foreground",
-                )}
-              >
-                <app.icon className="size-5" aria-hidden="true" />
-              </span>
-              <span
-                className={cn(
-                  "absolute -bottom-0.5 size-1 rounded-full bg-primary transition-opacity",
-                  active ? "opacity-100" : "opacity-0",
-                )}
-              />
-              <span className="pointer-events-none absolute -top-8 scale-90 rounded-md border border-border/60 bg-popover px-2 py-0.5 text-xs font-medium opacity-0 shadow-md transition-all group-hover:scale-100 group-hover:opacity-100">
-                {app.label}
-              </span>
-            </>
-          );
-          const item = desktop ? (
-            <button type="button" onClick={() => open(app.app)} title={app.label} aria-label={app.label} className={cls}>
-              {inner}
-            </button>
-          ) : (
-            <Link href={app.href} title={app.label} aria-label={app.label} className={cls}>
-              {inner}
-            </Link>
-          );
+            app.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(app.href);
           return (
             <Fragment key={app.href}>
               {newGroup ? (
                 <span className="mx-1 h-7 w-px self-center bg-border/60" aria-hidden="true" />
               ) : null}
-              {item}
+              <Link
+                href={app.href}
+                title={app.label}
+                aria-label={app.label}
+                className="group relative grid size-11 place-items-center rounded-xl transition-transform duration-150 hover:-translate-y-1.5"
+              >
+                <span
+                  className={cn(
+                    "grid size-11 place-items-center rounded-xl border transition-colors",
+                    active
+                      ? "border-primary/40 bg-gradient-to-br from-primary/25 to-[oklch(0.66_0.22_285)]/20 text-primary"
+                      : "border-border/60 bg-muted/50 text-muted-foreground group-hover:text-foreground",
+                  )}
+                >
+                  <app.icon className="size-5" aria-hidden="true" />
+                </span>
+                <span
+                  className={cn(
+                    "absolute -bottom-0.5 size-1 rounded-full bg-primary transition-opacity",
+                    active ? "opacity-100" : "opacity-0",
+                  )}
+                />
+                <span className="pointer-events-none absolute -top-8 scale-90 rounded-md border border-border/60 bg-popover px-2 py-0.5 text-xs font-medium opacity-0 shadow-md transition-all group-hover:scale-100 group-hover:opacity-100">
+                  {app.label}
+                </span>
+              </Link>
             </Fragment>
           );
         })}

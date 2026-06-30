@@ -1,6 +1,6 @@
 "use client";
 
-import { LayoutGrid, Mic, MicOff, Monitor, Search, Volume2, VolumeX } from "lucide-react";
+import { Mic, MicOff, Search, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { FadiLogo } from "@/components/brand/fadi-logo";
@@ -9,7 +9,6 @@ import { useWakeWord } from "@/lib/voice/use-wake-word";
 import { cn } from "@/lib/utils";
 import { ActivityCenter } from "./activity-center";
 import { summonFadi, useFadi, type FadiState } from "./fadi-presence";
-import { useOsMode } from "./os-mode";
 import { TrackSwitcher } from "./track-switcher";
 import { UserMenu } from "./user-menu";
 
@@ -84,7 +83,6 @@ export function MenuBar() {
         ) : null}
 
         <VoiceToggle />
-        <ModeToggle />
         <ActivityCenter />
         <span className="tabular-nums text-muted-foreground">{clock}</span>
         <UserMenu />
@@ -93,27 +91,6 @@ export function MenuBar() {
   );
 }
 
-/** Ambient living shell ⇄ windowed desktop. */
-function ModeToggle() {
-  const { mode, toggle, ready } = useOsMode();
-  if (!ready) return null; // avoid SSR/first-render mismatch on the persisted mode
-  const desktop = mode === "desktop";
-  return (
-    <button
-      type="button"
-      onClick={toggle}
-      aria-pressed={desktop}
-      title={desktop ? "Switch to ambient shell" : "Switch to desktop (windows)"}
-      className={cn(
-        "flex items-center gap-1.5 rounded-full border border-border/70 px-2.5 py-1 font-medium transition-colors",
-        desktop ? "bg-primary/15 text-primary ring-1 ring-inset ring-primary/30" : "text-muted-foreground hover:text-foreground",
-      )}
-    >
-      {desktop ? <Monitor className="size-3" aria-hidden="true" /> : <LayoutGrid className="size-3" aria-hidden="true" />}
-      <span className="hidden sm:inline">{desktop ? "Desktop" : "Ambient"}</span>
-    </button>
-  );
-}
 
 /** Mute / unmute Fadi's voice (talk-by-default). */
 function VoiceToggle() {
