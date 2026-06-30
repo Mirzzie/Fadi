@@ -1,6 +1,7 @@
 import "server-only";
 
 import { logger } from "@/lib/observability/logger";
+import { isSafeFetchUrl } from "@/lib/security/url-guard";
 import { detectClosedSignal, type PostingLiveness } from "./liveness-detect";
 
 export type { LivenessState, PostingLiveness } from "./liveness-detect";
@@ -19,6 +20,19 @@ const livenessCache = new Map<string, { at: number; result: PostingLiveness }>()
 export async function checkPostingLiveness(url: string): Promise<PostingLiveness> {
   const cached = livenessCache.get(url);
   if (cached && Date.now() - cached.at < LIVENESS_TTL_MS) return cached.result;
+
+  // SSRF guard: job URLs come from external aggregators/scrapers, so never let the
+  // server fetch an internal target (cloud metadata, localhost, private ranges).
+  if (!(await isSafeFetchUrl(url))) {
+    logger.warn("jobs.liveness.blocked_url", { reason: "ssrf_guard" });
+    const result: PostingLiveness = {
+      state: "unknown",
+      reason: "Couldn't safely verify this link",
+      checkedAt: new Date().toISOString(),
+    };
+    livenessCache.set(url, { at: Date.now(), result });
+    return result;
+  }
 
   let result: PostingLiveness;
   const controller = new AbortController();
