@@ -17,8 +17,7 @@ import { useFadi, type FadiState } from "./fadi-presence";
  * only reflects Fadi's live state and hands off seeded questions from ⌘K.
  */
 export function FadiOrb() {
-  const { open, openFadi, closeFadi, displayState, setState, voiceNonce, seed, nudge, dismissNudge } =
-    useFadi();
+  const { open, openFadi, closeFadi, displayState, setState, seed, nudge, dismissNudge } = useFadi();
 
   return (
     <>
@@ -83,11 +82,7 @@ export function FadiOrb() {
               </button>
             </div>
             <div className="min-h-0 flex-1">
-              <FadiChat
-                autoListenNonce={voiceNonce}
-                seed={seed}
-                onStateChange={setState}
-              />
+              <FadiChat seed={seed} onStateChange={setState} />
             </div>
           </div>
         </div>

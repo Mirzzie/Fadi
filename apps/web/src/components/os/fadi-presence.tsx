@@ -31,8 +31,6 @@ type FadiPresenceValue = {
   /** Open the panel pre-seeded with a question (from ⌘K spotlight). */
   openWithQuery: (text: string) => void;
   seed: FadiSeed | null;
-  /** Bumped each time Fadi is summoned by voice, so the chat auto-starts listening. */
-  voiceNonce: number;
   /** Fadi's live state — drives the ambient orb's animation + the menu-bar chip. */
   state: FadiState;
   setState: (state: FadiState) => void;
@@ -51,7 +49,6 @@ const FadiPresenceContext = createContext<FadiPresenceValue | null>(null);
 export function FadiPresenceProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [seed, setSeed] = useState<FadiSeed | null>(null);
-  const [voiceNonce, setVoiceNonce] = useState(0);
   const [state, setState] = useState<FadiState>("idle");
   const [nudge, setNudge] = useState<FadiNudge | null>(null);
   const [speaking, setSpeaking] = useState(false);
@@ -84,15 +81,6 @@ export function FadiPresenceProvider({ children }: { children: React.ReactNode }
   const dismissNudge = useCallback(() => setNudge(null), []);
 
   // "Hey Fadi" wake word → open the panel and trigger listening.
-  useEffect(() => {
-    function onSummon() {
-      setOpen(true);
-      setVoiceNonce((n) => n + 1);
-    }
-    window.addEventListener("fadi:summon", onSummon);
-    return () => window.removeEventListener("fadi:summon", onSummon);
-  }, []);
-
   // Speech wins the visuals: while Fadi talks, show "speaking" regardless of the
   // underlying chat state.
   const displayState: FadiState = speaking ? "speaking" : state;
@@ -104,7 +92,6 @@ export function FadiPresenceProvider({ children }: { children: React.ReactNode }
       closeFadi,
       openWithQuery,
       seed,
-      voiceNonce,
       state,
       setState,
       speaking,
@@ -113,15 +100,10 @@ export function FadiPresenceProvider({ children }: { children: React.ReactNode }
       showNudge,
       dismissNudge,
     }),
-    [open, openFadi, closeFadi, openWithQuery, seed, voiceNonce, state, speaking, displayState, nudge, showNudge, dismissNudge],
+    [open, openFadi, closeFadi, openWithQuery, seed, state, speaking, displayState, nudge, showNudge, dismissNudge],
   );
 
   return <FadiPresenceContext.Provider value={value}>{children}</FadiPresenceContext.Provider>;
-}
-
-/** Fire from anywhere to summon Fadi by voice (opens panel + triggers listening). */
-export function summonFadi() {
-  window.dispatchEvent(new Event("fadi:summon"));
 }
 
 export function useFadi(): FadiPresenceValue {

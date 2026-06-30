@@ -15,6 +15,22 @@ import { createAgentMessagesRepository } from "@careeros/database";
 import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
 
+/** A one-shot SSE response carrying a single message — so the client always gets a
+ *  readable stream (no opaque "Failed to reach Fadi") even on the unhappy paths. */
+function sseMessage(text: string): Response {
+  const enc = new TextEncoder();
+  const stream = new ReadableStream({
+    start(controller) {
+      controller.enqueue(enc.encode(`data: ${JSON.stringify(text)}\n\n`));
+      controller.enqueue(enc.encode("data: [DONE]\n\n"));
+      controller.close();
+    },
+  });
+  return new Response(stream, {
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform" },
+  });
+}
+
 const chatRequestSchema = z.object({
   message: z.string().min(1).max(4000),
   history: z
@@ -62,12 +78,22 @@ export async function POST(req: NextRequest) {
   // Build context
   // Live market signals (GDELT/HN/Remotive) are cached, so Fadi's answers stay
   // grounded in real data without per-message fetch latency.
-  const context = await buildFadiContext(user.id, { includeLiveMarket: true });
+  // Context build touches live market data + several reads — never let a hiccup
+  // there turn into an opaque 500 / "Failed to reach Fadi" on the client.
+  let context: Awaited<ReturnType<typeof buildFadiContext>>;
+  try {
+    context = await buildFadiContext(user.id, { includeLiveMarket: true });
+  } catch (err) {
+    logger.error("fadi.chat.context_failed", {
+      userId: user.id,
+      error: err instanceof Error ? err.message : "unknown",
+    });
+    return sseMessage("I hit a snag gathering your context just now — give me a moment and try again.");
+  }
 
   if (!context) {
-    return new Response(
-      JSON.stringify({ error: "Complete onboarding before talking to Fadi." }),
-      { status: 422, headers: { "Content-Type": "application/json" } },
+    return sseMessage(
+      "Let's finish your setup first — add your target role, goal, and career history, and I'll be ready to help.",
     );
   }
 
@@ -77,6 +103,13 @@ export async function POST(req: NextRequest) {
   // Resolve the user's provider chain (primary → fallback) and stream resiliently:
   // retry transient rate limits, switch providers when one is exhausted.
   const chain = buildProviderChain(await getUserProviderConfigs(user.id));
+
+  // No usable provider → say so honestly (BYO-key model) instead of failing opaquely.
+  if (chain.length === 0) {
+    return sseMessage(
+      "I run on your own AI key for privacy — add one in Settings → AI provider and I'll be right here with you.",
+    );
+  }
 
   logger.info("fadi.chat.started", {
     userId: user.id,

@@ -53,11 +53,9 @@ function toSpeakable(markdown: string): string {
 const VOICE_PREF_KEY = "fadi-voice-enabled";
 
 export function FadiChat({
-  autoListenNonce,
   seed,
   onStateChange,
 }: {
-  autoListenNonce?: number;
   /** A question handed off from the ⌘K spotlight; fired once per nonce. */
   seed?: { text: string; nonce: number } | null;
   /** Publish Fadi's live state to the ambient orb (only the orb panel passes this). */
@@ -197,13 +195,6 @@ export function FadiChat({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Summoned by "Hey Fadi": start listening for the user's question immediately.
-  useEffect(() => {
-    if (autoListenNonce && autoListenNonce > 0 && !isFadiSpeaking()) {
-      startListening();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoListenNonce]);
 
   // Conversation loop: whenever Fadi is idle in hands-free mode (not thinking,
   // speaking, or already listening), resume listening for the next turn. Back

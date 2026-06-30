@@ -1,14 +1,13 @@
 "use client";
 
-import { Mic, MicOff, Search, Volume2, VolumeX } from "lucide-react";
+import { Search, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { FadiLogo } from "@/components/brand/fadi-logo";
 import { stopFadiSpeech } from "@/lib/voice/fadi-speech";
-import { useWakeWord } from "@/lib/voice/use-wake-word";
 import { cn } from "@/lib/utils";
 import { ActivityCenter } from "./activity-center";
-import { summonFadi, useFadi, type FadiState } from "./fadi-presence";
+import { useFadi, type FadiState } from "./fadi-presence";
 import { TrackSwitcher } from "./track-switcher";
 import { UserMenu } from "./user-menu";
 
@@ -19,7 +18,6 @@ const VOICE_PREF_KEY = "fadi-voice-enabled";
  *  ambient now, so there's no Desk/Fadi mode toggle. */
 export function MenuBar() {
   const { displayState } = useFadi();
-  const wake = useWakeWord(summonFadi);
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -58,29 +56,6 @@ export function MenuBar() {
             ⌘K
           </kbd>
         </button>
-
-        {/* "Hey Fadi" wake word */}
-        {wake.supported ? (
-          <button
-            type="button"
-            onClick={wake.toggle}
-            aria-pressed={wake.enabled}
-            title={wake.enabled ? 'Listening for "Hey Fadi" — click to stop' : 'Enable "Hey Fadi" voice'}
-            className={cn(
-              "flex items-center gap-1.5 rounded-full px-2.5 py-1 font-medium transition-colors",
-              wake.enabled
-                ? "bg-emerald-400/15 text-emerald-300 ring-1 ring-inset ring-emerald-400/30"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {wake.enabled ? (
-              <Mic className="size-3 animate-pulse" aria-hidden="true" />
-            ) : (
-              <MicOff className="size-3" aria-hidden="true" />
-            )}
-            <span className="hidden sm:inline">Hey Fadi</span>
-          </button>
-        ) : null}
 
         <VoiceToggle />
         <ActivityCenter />
