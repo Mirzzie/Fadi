@@ -1,0 +1,3 @@
+ALTER TABLE "resumes" ADD COLUMN "career_profile_id" uuid;--> statement-breakpoint
+ALTER TABLE "resumes" ADD CONSTRAINT "resumes_career_profile_id_career_profiles_id_fk" FOREIGN KEY ("career_profile_id") REFERENCES "public"."career_profiles"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "resumes_user_career_profile_idx" ON "resumes" USING btree ("user_id","career_profile_id");

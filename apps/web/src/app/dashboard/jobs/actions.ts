@@ -75,11 +75,12 @@ export async function saveJobAction(jobId: string): Promise<JobActionResult> {
     const resumesRepository = createResumesRepository(db);
     const savedJobsRepository = createSavedJobsRepository(db);
 
-    const [job, careerProfile, resume] = await Promise.all([
+    const [job, careerProfile] = await Promise.all([
       jobsRepository.findById(parsedJobId.data),
       careerProfilesRepository.getActiveForUser(user.id),
-      resumesRepository.getLatestForUser(user.id),
     ]);
+    // Score against THIS direction's resume (falls back to the shared one).
+    const resume = await resumesRepository.getLatestForTrack(user.id, careerProfile?.id ?? null);
 
     if (!job || job.status !== "active") {
       logger.warn("jobs.save.job_not_found", {

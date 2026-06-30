@@ -58,10 +58,11 @@ export async function generateCareerDocument(
   generate: DocGenerate,
 ): Promise<GeneratedDoc> {
   const db = getDatabase();
-  const [profile, careerProfile, resume, linkedin] = await Promise.all([
+  const careerProfile = await createCareerProfilesRepository(db).getActiveForUser(userId);
+  const [profile, resume, linkedin] = await Promise.all([
     createProfilesRepository(db).getByUserId(userId),
-    createCareerProfilesRepository(db).getActiveForUser(userId),
-    createResumesRepository(db).getLatestForUser(userId),
+    // Tailor from THIS direction's resume (falls back to the shared one).
+    createResumesRepository(db).getLatestForTrack(userId, careerProfile?.id ?? null),
     createLinkedInProfilesRepository(db).getLatestForUser(userId),
   ]);
 

@@ -45,10 +45,9 @@ export async function getRecommendedJobsForUser(
   const savedJobsRepository = createSavedJobsRepository(db);
   const applicationsRepository = createApplicationsRepository(db);
 
-  const [careerProfile, resume] = await Promise.all([
-    careerProfilesRepository.getActiveForUser(userId),
-    resumesRepository.getLatestForUser(userId),
-  ]);
+  // Active direction first, then ITS resume (scoring uses the per-direction resume).
+  const careerProfile = await careerProfilesRepository.getActiveForUser(userId);
+  const resume = await resumesRepository.getLatestForTrack(userId, careerProfile?.id ?? null);
 
   // First time we score this track, have Fadi generate domain-agnostic role
   // synonyms (nurse → "staff nurse", "rn"; finance → "fp&a analyst") and store

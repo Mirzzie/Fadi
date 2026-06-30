@@ -234,6 +234,12 @@ export const resumes = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     profileId: uuid("profile_id").references(() => profiles.id, { onDelete: "set null" }),
+    // The career direction this resume belongs to. Resumes are PER-TRACK (a tailored
+    // base resume per direction); null = a legacy/shared resume that any track falls
+    // back to until it has its own. (Career history/LinkedIn stays shared per-user.)
+    careerProfileId: uuid("career_profile_id").references(() => careerProfiles.id, {
+      onDelete: "set null",
+    }),
     fileName: text("file_name"),
     filePath: text("file_path"),
     fileMimeType: text("file_mime_type"),
@@ -247,6 +253,7 @@ export const resumes = pgTable(
     index("resumes_profile_id_idx").on(table.profileId),
     index("resumes_parse_status_idx").on(table.parseStatus),
     index("resumes_user_created_at_idx").on(table.userId, table.createdAt),
+    index("resumes_user_career_profile_idx").on(table.userId, table.careerProfileId),
   ]
 );
 

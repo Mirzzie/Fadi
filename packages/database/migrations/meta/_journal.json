@@ -162,6 +162,13 @@
       "when": 1782688382617,
       "tag": "0022_nosy_pyro",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1782830342898,
+      "tag": "0023_simple_meltdown",
+      "breakpoints": true
     }
   ]
 }

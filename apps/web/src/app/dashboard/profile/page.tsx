@@ -24,11 +24,13 @@ export default async function ProfilePage() {
   if (!user) redirect("/auth/sign-in");
 
   const db = getDatabase();
-  const [profile, careerProfile, linkedIn, resume] = await Promise.all([
+  // Active direction first, so the form shows THIS direction's resume (LinkedIn
+  // history stays shared across directions).
+  const careerProfile = await createCareerProfilesRepository(db).getActiveForUser(user.id);
+  const [profile, linkedIn, resume] = await Promise.all([
     createProfilesRepository(db).getByUserId(user.id),
-    createCareerProfilesRepository(db).getActiveForUser(user.id),
     createLinkedInProfilesRepository(db).getLatestForUser(user.id),
-    createResumesRepository(db).getLatestForUser(user.id),
+    createResumesRepository(db).getLatestForTrack(user.id, careerProfile?.id ?? null),
   ]);
   // Gate on the profile we already loaded — no second profiles round-trip.
   if (onboardingStatusOf(profile) !== "completed") redirect("/onboarding");

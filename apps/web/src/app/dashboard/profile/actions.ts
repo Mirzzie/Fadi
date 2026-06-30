@@ -94,6 +94,9 @@ export async function updateProfileAction(input: UpdateProfileInput): Promise<Re
       experienceLevel: input.experienceLevel.trim() || null,
       careerGoal: input.careerGoal.trim(),
     });
+    // The resume is PER-DIRECTION — tag edits to the active track. (LinkedIn history
+    // below stays user-wide: it's your one real record, shared across directions.)
+    const activeTrack = await createCareerProfilesRepository(db).getActiveForUser(user.id);
 
     // LinkedIn URL + context and resume text are the richest AI inputs — keep
     // them editable here too. Only touch them when the user provided something,
@@ -109,7 +112,7 @@ export async function updateProfileAction(input: UpdateProfileInput): Promise<Re
 
     const resumeText = input.resumeText.trim();
     if (resumeText) {
-      await createResumesRepository(db).upsertLatestForUser(user.id, resumeText);
+      await createResumesRepository(db).upsertLatestForTrack(user.id, activeTrack?.id ?? null, resumeText);
     }
 
     revalidatePath("/dashboard/profile");

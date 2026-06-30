@@ -58,7 +58,8 @@ export async function getCareerReportContext(userId: string): Promise<CareerRepo
 
   const [profile, resume, linkedInProfile] = await Promise.all([
     profilesRepository.getByUserId(userId),
-    resumesRepository.getLatestForUser(userId),
+    // Per-direction resume (falls back to the shared one); LinkedIn history is shared.
+    resumesRepository.getLatestForTrack(userId, careerProfile.id),
     linkedInProfilesRepository.getLatestForUser(userId),
   ]);
 

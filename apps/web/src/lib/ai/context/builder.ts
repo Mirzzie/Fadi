@@ -43,7 +43,7 @@ export async function buildFadiContext(
 
   const [profile, resume, linkedIn, report, savedJobsList, momentum, findings] = await Promise.all([
     createProfilesRepository(db).getByUserId(userId),
-    createResumesRepository(db).getLatestForUser(userId),
+    createResumesRepository(db).getLatestForTrack(userId, careerProfile.id),
     createLinkedInProfilesRepository(db).getLatestForUser(userId),
     createCareerReportsRepository(db).getLatestReadyForUser(userId, careerProfile.id),
     createSavedJobsRepository(db).listForUser(userId),
