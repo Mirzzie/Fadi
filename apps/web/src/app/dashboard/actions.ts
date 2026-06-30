@@ -197,7 +197,11 @@ export async function generateCareerReportAction(
 
   const model = provider.model;
   const careerReportsRepository = createCareerReportsRepository(getDatabase());
-  const latestReport = await careerReportsRepository.getLatestReadyForUser(user.id);
+  // Per-track cooldown: switching direction lets you generate a fresh report for it.
+  const latestReport = await careerReportsRepository.getLatestReadyForUser(
+    user.id,
+    context.careerProfileId,
+  );
   const cooldownEndsAt = getReportCooldown(
     latestReport?.generatedAt ?? latestReport?.createdAt ?? null
   );

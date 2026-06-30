@@ -105,8 +105,12 @@ export async function getDashboardProfileSummary(
 }
 
 export async function getLatestCareerReport(userId: string): Promise<StoredCareerReport | null> {
-  const careerReportsRepository = createCareerReportsRepository(getDatabase());
-  const report = await careerReportsRepository.getLatestReadyForUser(userId);
+  const db = getDatabase();
+  // Scope to the ACTIVE direction so each track shows its own report (and skill
+  // gaps / learning path) — not whichever track's report was generated last.
+  const activeTrack = await createCareerProfilesRepository(db).getActiveForUser(userId);
+  const careerReportsRepository = createCareerReportsRepository(db);
+  const report = await careerReportsRepository.getLatestReadyForUser(userId, activeTrack?.id ?? null);
 
   if (!report) {
     return null;

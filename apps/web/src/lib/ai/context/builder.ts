@@ -36,19 +36,20 @@ export async function buildFadiContext(
 ): Promise<FadiUserContext | null> {
   const db = getDatabase();
 
-  const [careerProfile, profile, resume, linkedIn, report, savedJobsList, momentum, findings] =
-    await Promise.all([
-      createCareerProfilesRepository(db).getActiveForUser(userId),
-      createProfilesRepository(db).getByUserId(userId),
-      createResumesRepository(db).getLatestForUser(userId),
-      createLinkedInProfilesRepository(db).getLatestForUser(userId),
-      createCareerReportsRepository(db).getLatestReadyForUser(userId),
-      createSavedJobsRepository(db).listForUser(userId),
-      getMomentumSummary(userId),
-      createAgentRunsRepository(db).listRecentForUser(userId, 8),
-    ]);
-
+  // Resolve the active direction first so the report (and Fadi's reasoning) is scoped
+  // to it — not whichever track generated a report last.
+  const careerProfile = await createCareerProfilesRepository(db).getActiveForUser(userId);
   if (!careerProfile) return null;
+
+  const [profile, resume, linkedIn, report, savedJobsList, momentum, findings] = await Promise.all([
+    createProfilesRepository(db).getByUserId(userId),
+    createResumesRepository(db).getLatestForUser(userId),
+    createLinkedInProfilesRepository(db).getLatestForUser(userId),
+    createCareerReportsRepository(db).getLatestReadyForUser(userId, careerProfile.id),
+    createSavedJobsRepository(db).listForUser(userId),
+    getMomentumSummary(userId),
+    createAgentRunsRepository(db).listRecentForUser(userId, 8),
+  ]);
 
   // Live, personalized market intelligence — opt-in (see options doc above).
   const skillGaps = (report?.missingSkills as Array<{ title: string; detail: string }>) ?? [];

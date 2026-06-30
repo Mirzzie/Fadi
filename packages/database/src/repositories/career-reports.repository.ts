@@ -34,11 +34,22 @@ export type CreateCareerReportInput = {
 
 export function createCareerReportsRepository(db: Database) {
   return {
-    async getLatestReadyForUser(userId: string): Promise<CareerReport | null> {
+    /**
+     * Latest ready report. Scope it to a career track (direction) when given, so
+     * switching directions shows THAT direction's report — not whichever was
+     * generated last. Reports are already tagged with careerProfileId on create.
+     */
+    async getLatestReadyForUser(
+      userId: string,
+      careerProfileId?: string | null,
+    ): Promise<CareerReport | null> {
+      const conditions = [eq(careerReports.userId, userId), eq(careerReports.status, "ready")];
+      if (careerProfileId) conditions.push(eq(careerReports.careerProfileId, careerProfileId));
+
       const [report] = await db
         .select()
         .from(careerReports)
-        .where(and(eq(careerReports.userId, userId), eq(careerReports.status, "ready")))
+        .where(and(...conditions))
         .orderBy(desc(careerReports.createdAt))
         .limit(1);
 

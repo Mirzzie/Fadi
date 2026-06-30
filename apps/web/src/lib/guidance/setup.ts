@@ -42,10 +42,11 @@ export type SetupState = {
 export async function getSetupState(userId: string): Promise<SetupState> {
   const db = getDatabase();
 
-  const [track, resume, report, savedJobs, applications, allTracks] = await Promise.all([
-    createCareerProfilesRepository(db).getActiveForUser(userId),
+  // Active direction first, so the report check below is for THIS track.
+  const track = await createCareerProfilesRepository(db).getActiveForUser(userId);
+  const [resume, report, savedJobs, applications, allTracks] = await Promise.all([
     createResumesRepository(db).getLatestForUser(userId),
-    createCareerReportsRepository(db).getLatestReadyForUser(userId),
+    createCareerReportsRepository(db).getLatestReadyForUser(userId, track?.id ?? null),
     createSavedJobsRepository(db).listForUser(userId),
     createApplicationsRepository(db).listForUser(userId),
     createCareerProfilesRepository(db).listForUser(userId),
