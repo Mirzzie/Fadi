@@ -12,13 +12,15 @@ export const targetRoleFitSchema = z.object({
 
 export const careerIntelligenceReportSchema = z.object({
   careerSummary: z.string(),
-  strengths: z.array(reportListItemSchema).min(3).max(6),
-  missingSkills: z.array(reportListItemSchema).min(2).max(6),
+  // Lower minimums than before ON PURPOSE: the report should be allowed to say fewer,
+  // sharper, evidence-anchored things rather than pad to a count with generic filler.
+  strengths: z.array(reportListItemSchema).min(2).max(6),
+  missingSkills: z.array(reportListItemSchema).min(1).max(6),
   targetRoleFit: targetRoleFitSchema,
   resumeQualityScore: z.number().int().min(0).max(100),
   careerReadinessScore: z.number().int().min(0).max(100),
-  recommendedNextSteps: z.array(reportListItemSchema).min(3).max(6),
-  learningRecommendations: z.array(reportListItemSchema).min(2).max(5),
+  recommendedNextSteps: z.array(reportListItemSchema).min(2).max(6),
+  learningRecommendations: z.array(reportListItemSchema).min(1).max(5),
 });
 
 export type CareerIntelligenceReport = z.infer<typeof careerIntelligenceReportSchema>;
