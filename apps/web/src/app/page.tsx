@@ -185,7 +185,7 @@ export default async function Home() {
             <nav className="flex items-center justify-between px-6 py-5 sm:px-10">
               <Link href="/" className="flex items-center gap-2.5">
                 <FadiLogo className="glow-primary size-8" />
-                <span className="font-semibold tracking-tight text-white">FadiOS</span>
+                <span className="font-semibold tracking-tight text-white">Fadi</span>
               </Link>
               <div className="hidden items-center gap-8 md:flex">
                 {navLinks.map((link) => (
@@ -222,13 +222,14 @@ export default async function Home() {
                   className="text-[2.9rem] font-extrabold leading-[0.95] tracking-tight text-white sm:text-6xl lg:text-7xl"
                   style={{ fontFamily: "var(--font-display)" }}
                 >
-                  Take Control
+                  The career mentor
                   <br />
-                  of Your Career
+                  that tells you the truth
                 </h1>
                 <p className="mt-6 max-w-md text-base leading-relaxed text-white/65">
-                  Stay ahead of your search with an AI agent that reads your profile, finds the roles
-                  that actually fit, and tracks every move — honestly.
+                  No ghost jobs. No spray-and-pray. No AI hype. Fadi surfaces roles you can actually
+                  get, tells you honestly whether each one fits, and keeps you sane through a brutal
+                  market — grounded in your real experience, never invented.
                 </p>
                 <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                   <Link
@@ -421,7 +422,7 @@ export default async function Home() {
         <div className="mx-auto flex max-w-shell items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-2">
             <FadiLogo className="size-6" />
-            <span className="text-sm font-medium">FadiOS</span>
+            <span className="text-sm font-medium">Fadi</span>
           </div>
           <p className="text-xs text-muted-foreground">
             Fadi is an AI assistant. Always review recommendations before acting.

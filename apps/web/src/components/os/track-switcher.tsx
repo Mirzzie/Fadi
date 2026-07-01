@@ -24,7 +24,7 @@ const INTENTS: Array<{ value: string; label: string; hint: string }> = [
   { value: "part_time", label: "Part-time / gig / side income", hint: "Non-mainstream, student-abroad, freelance." },
 ];
 
-// Domain-agnostic on purpose — FadiOS serves every industry, not just tech.
+// Domain-agnostic on purpose — Fadi serves every industry, not just tech.
 const DOMAINS = [
   "Information Technology", "Cybersecurity", "Software Development", "Data & Analytics",
   "Finance", "Accounting", "Banking", "Marketing", "Sales", "Healthcare", "Nursing",

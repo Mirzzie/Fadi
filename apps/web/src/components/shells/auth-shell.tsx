@@ -27,7 +27,7 @@ const signInFadiPoints = [
   "See what's changed in your target market",
 ];
 
-/** Holographic FadiOS sign-in / sign-up — entering the OS. Forced-dark so the
+/** Holographic Fadi sign-in / sign-up — entering the OS. Forced-dark so the
  *  JARVIS aesthetic reads regardless of the visitor's saved theme. */
 export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
   const isSignUp = mode === "sign-up";
@@ -48,7 +48,7 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
       <header className="relative z-10 px-4 py-5 sm:px-8">
         <Link href="/" className="inline-flex items-center gap-2.5">
           <FadiLogo className="size-8" />
-          <span className="font-semibold tracking-tight">FadiOS</span>
+          <span className="font-semibold tracking-tight">Fadi</span>
         </Link>
       </header>
 
@@ -59,7 +59,7 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
           <div className="hidden flex-col items-start gap-7 lg:flex">
             <FadiCore state="idle" size={132} />
             <div className="space-y-3">
-              <p className="text-xs uppercase tracking-[0.3em] text-primary/80">FadiOS · AI Operating System</p>
+              <p className="text-xs uppercase tracking-[0.3em] text-primary/80">Fadi · Honest Career Mentor</p>
               <h1 className="text-glow text-3xl font-semibold tracking-tight">
                 {isSignUp ? "Your career agent is ready." : "Welcome back. Fadi's been working."}
               </h1>
@@ -91,13 +91,13 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
           <div className="glass-holo glow-edge w-full rounded-2xl p-6">
             <div className="mb-4 flex items-center gap-3 lg:hidden">
               <FadiCore state="idle" size={44} />
-              <span className="font-semibold tracking-tight">FadiOS</span>
+              <span className="font-semibold tracking-tight">Fadi</span>
             </div>
             <h2 className="text-xl font-semibold tracking-tight">
               {isSignUp ? "Create your account" : "Welcome back"}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              {isSignUp ? "Boot up your first Career Intelligence Report." : "Return to your FadiOS workspace."}
+              {isSignUp ? "Boot up your first Career Intelligence Report." : "Return to your Fadi workspace."}
             </p>
             <div className="mt-5 space-y-5">
               <SocialButtons providers={socialProviders} />
@@ -109,7 +109,7 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
                 <AuthForm mode={mode} />
               </Suspense>
               <p className="text-center text-sm text-muted-foreground">
-                {isSignUp ? "Already have an account?" : "New to FadiOS?"}{" "}
+                {isSignUp ? "Already have an account?" : "New to Fadi?"}{" "}
                 <Link
                   href={isSignUp ? "/auth/sign-in" : "/auth/sign-up"}
                   className="font-medium text-primary underline-offset-4 hover:underline"

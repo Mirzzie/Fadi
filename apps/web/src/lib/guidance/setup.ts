@@ -12,7 +12,7 @@ import { getDatabase } from "@/lib/database/client";
 
 /**
  * The OS guidance layer — "what should I do next?" computed from the user's
- * REAL state, not a static tour. This is how FadiOS turns a login into a
+ * REAL state, not a static tour. This is how Fadi turns a login into a
  * guided path: personalize → analyze → discover → act. Each step is gated on a
  * concrete artifact existing, so completion is honest (no fake checkmarks).
  */

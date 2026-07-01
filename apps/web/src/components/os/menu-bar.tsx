@@ -35,7 +35,7 @@ export function MenuBar() {
       {/* Brand + live Fadi state */}
       <div className="flex items-center gap-2">
         <FadiLogo className="size-5" />
-        <span className="font-semibold tracking-tight">FadiOS</span>
+        <span className="font-semibold tracking-tight">Fadi</span>
         <FadiStateChip state={displayState} />
         <span className="text-muted-foreground/50">/</span>
         <TrackSwitcher />

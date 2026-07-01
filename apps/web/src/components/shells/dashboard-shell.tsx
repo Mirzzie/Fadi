@@ -214,7 +214,7 @@ export function DashboardShell({
             <div>
               <CardTitle>Onboarding profile summary</CardTitle>
               <CardDescription>
-                The data FadiOS AI will use for your first report.
+                The data Fadi will use for your first report.
               </CardDescription>
             </div>
             <Link

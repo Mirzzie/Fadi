@@ -1,7 +1,7 @@
 import type { FadiTool, FadiToolResult } from "./types";
 
 /**
- * create_career_track — the proof that you can DRIVE FadiOS by speaking. When the
+ * create_career_track — the proof that you can DRIVE Fadi by speaking. When the
  * user says "start a new direction as a data analyst", Fadi calls this; it creates
  * and activates a new career track (the same mutation as the Create-track dialog),
  * and the chat client refreshes so the menu-bar switcher + dashboard follow.

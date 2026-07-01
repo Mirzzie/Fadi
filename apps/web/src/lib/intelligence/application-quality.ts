@@ -76,7 +76,7 @@ const aqsSchema = z.object({
 
 // ─── Main function ─────────────────────────────────────────────────────────────
 
-const AQS_SYSTEM = `You are FadiOS's Application Quality Scorer. You evaluate how well a candidate's resume matches a specific job description, scoring from 0 to 100. You are calibrated against real hiring data:
+const AQS_SYSTEM = `You are Fadi's Application Quality Scorer. You evaluate how well a candidate's resume matches a specific job description, scoring from 0 to 100. You are calibrated against real hiring data:
 
 - 11.2 seconds average recruiter scan time
 - 70% of resumes rejected for formatting issues

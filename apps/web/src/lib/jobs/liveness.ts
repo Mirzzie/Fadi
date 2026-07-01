@@ -46,7 +46,7 @@ export async function checkPostingLiveness(url: string): Promise<PostingLiveness
       headers: {
         // A plausible UA — many boards 403 a bare fetch, which we treat as unknown.
         "User-Agent":
-          "Mozilla/5.0 (compatible; FadiOS/1.0; +https://careeros.app) freshness-check",
+          "Mozilla/5.0 (compatible; Fadi/1.0; +https://careeros.app) freshness-check",
         Accept: "text/html,application/xhtml+xml",
       },
     });

@@ -101,7 +101,7 @@ function getUserFacingProviderErrorMessage(details: ProviderErrorDetails) {
     return "The configured AI model is unavailable. Check OPENAI_MODEL and try again.";
   }
 
-  return "FadiOS could not generate the report right now. Please try again later.";
+  return "Fadi could not generate the report right now. Please try again later.";
 }
 
 
@@ -246,7 +246,7 @@ ${composeCareerEvidence({ resumeText: context.resumeText, linkedInText: context.
         {
           role: "system",
           content:
-            "You are Fadi, FadiOS's career operating intelligence. You are honest, strategic, and evidence-based. Produce specific career guidance grounded in the user's actual profile. Do not invent credentials, job data, salary facts, or market claims. If evidence is limited, say so explicitly.",
+            "You are Fadi, an honest, evidence-based career mentor. You are honest, strategic, and evidence-based. Produce specific career guidance grounded in the user's actual profile. Do not invent credentials, job data, salary facts, or market claims. If evidence is limited, say so explicitly.",
         },
         {
           role: "user",

@@ -57,7 +57,7 @@ export function McpTokens({ tokens: initial }: { tokens: McpTokenView[] }) {
         <div>
           <h2 className="text-base font-semibold">Integrations &amp; agents (MCP)</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Use FadiOS as a tool from any agentic AI client — Claude Code, OpenClaw, Cursor. Create a
+            Use Fadi as a tool from any agentic AI client — Claude Code, OpenClaw, Cursor. Create a
             token, point the client at your <code className="rounded bg-muted px-1">/api/mcp</code>{" "}
             endpoint, and it can run your fit-checks, mock interviews, referrals and more.
           </p>

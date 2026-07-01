@@ -31,7 +31,7 @@ export async function checkJobLivenessAction(jobId: string): Promise<PostingLive
   if (!job) return { state: "unknown", reason: "Job not found", checkedAt };
 
   if (job.status === "closed" || job.status === "expired" || job.status === "archived") {
-    return { state: "closed", reason: "No longer listed in FadiOS", checkedAt };
+    return { state: "closed", reason: "No longer listed in Fadi", checkedAt };
   }
   if (!job.url) {
     return { state: "unknown", reason: "No source link to verify", checkedAt };

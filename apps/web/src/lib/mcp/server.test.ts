@@ -20,7 +20,7 @@ const deps: McpDeps = {
 };
 
 describe("toMcpTool", () => {
-  it("maps a FadiOS tool to an MCP tool, keeping its JSON-schema params", () => {
+  it("maps a Fadi tool to an MCP tool, keeping its JSON-schema params", () => {
     const t = toMcpTool({
       name: "scan_company_jobs",
       description: "Pull a company's roles",

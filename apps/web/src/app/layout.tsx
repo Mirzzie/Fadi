@@ -30,10 +30,10 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: "FadiOS AI",
-    template: "%s | FadiOS AI",
+    default: "Fadi",
+    template: "%s | Fadi",
   },
-  description: "AI-first career operating system MVP foundation.",
+  description: "The career mentor that tells you the truth — honest job search, no ghost jobs, no hype.",
 };
 
 export default function RootLayout({

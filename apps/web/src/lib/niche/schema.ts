@@ -3,7 +3,7 @@ import { z } from "zod";
 /**
  * Niche Finder — the honest diagnostic for people paralyzed by choice (too many
  * branches in one field, or torn across fields). The user pours in their
- * situation; FadiOS gathers REAL data (live postings + BLS) and Fadi returns an
+ * situation; Fadi gathers REAL data (live postings + BLS) and Fadi returns an
  * un-sugar-coated reality per niche + a pathway, so they waste less time/money.
  */
 

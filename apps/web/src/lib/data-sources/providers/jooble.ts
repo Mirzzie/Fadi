@@ -54,7 +54,7 @@ export class JoobleSource implements JobSource {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "User-Agent": "FadiOS/1.0 (career intelligence)",
+          "User-Agent": "Fadi/1.0 (career intelligence)",
         },
         body: JSON.stringify({ keywords, location }),
         signal: AbortSignal.timeout(6000),

@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 
 /**
- * MCP personal access tokens (FadiOS-as-Lego, multi-user). The raw token is shown
+ * MCP personal access tokens (Fadi-as-Lego, multi-user). The raw token is shown
  * once at creation; we persist only its SHA-256 hash. A presented token is resolved
  * to its owning user by hashing and looking up the active record.
  *

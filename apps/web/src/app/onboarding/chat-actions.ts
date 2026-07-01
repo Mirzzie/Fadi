@@ -51,7 +51,7 @@ export type OnboardingChatResult =
     }
   | { ok: false; error: "provider" | "auth"; message: string };
 
-const SYSTEM = `You are Fadi, FadiOS's career operating system, welcoming a brand-new user on their first login. Run a warm, BRIEF conversation to set up their first career track.
+const SYSTEM = `You are Fadi, Fadi's career mentor, welcoming a brand-new user on their first login. Run a warm, BRIEF conversation to set up their first career track.
 
 Collect — conversationally, ONE topic at a time, reacting to each answer before moving on.
 
@@ -68,7 +68,7 @@ OPTIONAL bonuses (ask once, in passing — NEVER block finishing on them; if the
 
 Style: warm, sharp, concise (1-3 sentences). Never dump a list of questions. This serves ANY field — finance, healthcare, trades, tech — not just tech.
 
-Every turn, output: reply (your next message), collected (EVERYTHING gathered so far across the whole conversation — keep a field null until you truly have it), and complete. Set complete=true as soon as you have the five REQUIRED fields — do NOT keep the user waiting for the optional bonuses. NEVER invent, assume, or guess a field — only fill it from what the user actually told you. ONLY when complete is true, make reply a short warm closing line telling them you're setting up their FadiOS now; until then, NEVER say you're setting things up.`;
+Every turn, output: reply (your next message), collected (EVERYTHING gathered so far across the whole conversation — keep a field null until you truly have it), and complete. Set complete=true as soon as you have the five REQUIRED fields — do NOT keep the user waiting for the optional bonuses. NEVER invent, assume, or guess a field — only fill it from what the user actually told you. ONLY when complete is true, make reply a short warm closing line telling them you're setting up their Fadi now; until then, NEVER say you're setting things up.`;
 
 function normalizeExperience(value: string | null): OnboardingFormValues["experienceLevel"] {
   const s = (value ?? "").toLowerCase();
@@ -166,7 +166,7 @@ export async function onboardingChatAction(
   const firstName = (values.fullName.split(/\s+/)[0] ?? "").trim();
   const closing = turn.complete
     ? turn.reply
-    : `That's everything I need${firstName ? `, ${firstName}` : ""} — setting up your FadiOS now.`;
+    : `That's everything I need${firstName ? `, ${firstName}` : ""} — setting up your Fadi now.`;
   return {
     ok: true,
     reply: closing,

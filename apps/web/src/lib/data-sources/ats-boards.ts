@@ -128,7 +128,7 @@ const MAPPERS: Record<AtsProvider, (json: unknown, company: string) => JobPostin
 async function fetchBoard(provider: AtsProvider, slug: string, company: string): Promise<JobPosting[]> {
   try {
     const res = await fetch(atsUrl[provider](slug), {
-      headers: { "User-Agent": "FadiOS/1.0 (career intelligence)", Accept: "application/json" },
+      headers: { "User-Agent": "Fadi/1.0 (career intelligence)", Accept: "application/json" },
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return [];

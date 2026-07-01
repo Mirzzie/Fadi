@@ -1,8 +1,8 @@
 /**
- * FadiOS as an MCP server — the "Lego connector" that lets any agentic AI client
- * (Claude Code, OpenClaw, Cursor, …) use FadiOS's career capabilities as tools.
+ * Fadi as an MCP server — the "Lego connector" that lets any agentic AI client
+ * (Claude Code, OpenClaw, Cursor, …) use Fadi's career capabilities as tools.
  *
- * This is the protocol layer only: it maps FadiOS's existing agent tools to the
+ * This is the protocol layer only: it maps Fadi's existing agent tools to the
  * Model Context Protocol and dispatches JSON-RPC messages. It is transport- and
  * auth-agnostic on purpose — the route handler injects how to list/call tools (so
  * this stays pure and unit-testable, and the same core can later serve a hosted
@@ -15,7 +15,7 @@
 import type { FadiTool, FadiToolResult } from "@/lib/ai/tools/types";
 
 export const MCP_PROTOCOL_VERSION = "2025-06-18";
-export const MCP_SERVER_INFO = { name: "FadiOS", title: "FadiOS — your career operating system", version: "0.1.0" };
+export const MCP_SERVER_INFO = { name: "Fadi", title: "Fadi — your honest career mentor", version: "0.1.0" };
 
 /** An MCP tool definition (what tools/list returns). */
 export type McpTool = {
@@ -24,7 +24,7 @@ export type McpTool = {
   inputSchema: Record<string, unknown>;
 };
 
-/** Map a FadiOS tool to an MCP tool. Our `parameters` is already JSON Schema. */
+/** Map a Fadi tool to an MCP tool. Our `parameters` is already JSON Schema. */
 export function toMcpTool(tool: FadiTool): McpTool {
   const schema = (tool.parameters ?? { type: "object", properties: {} }) as Record<string, unknown>;
   return {
@@ -34,7 +34,7 @@ export function toMcpTool(tool: FadiTool): McpTool {
   };
 }
 
-/** Map a FadiOS tool result to an MCP tools/call result. */
+/** Map a Fadi tool result to an MCP tools/call result. */
 export function toMcpToolResult(result: FadiToolResult): {
   content: Array<{ type: "text"; text: string }>;
   structuredContent?: Record<string, unknown>;
@@ -90,7 +90,7 @@ export async function handleMcpMessage(
         capabilities: { tools: { listChanged: false } },
         serverInfo: MCP_SERVER_INFO,
         instructions:
-          "FadiOS exposes career-coaching tools: find and fit-check jobs, pull a company's live roles, draft referral outreach, run a rejection autopsy, prep STAR interview answers from the user's real history, and read their momentum and career-weather. Everything is grounded in the user's real data; tools never fabricate.",
+          "Fadi exposes career-coaching tools: find and fit-check jobs, pull a company's live roles, draft referral outreach, run a rejection autopsy, prep STAR interview answers from the user's real history, and read their momentum and career-weather. Everything is grounded in the user's real data; tools never fabricate.",
       });
 
     case "notifications/initialized":

@@ -129,7 +129,7 @@ export function createUserProvider(config: ProviderConfig): AIProvider | null {
         baseURL: "https://openrouter.ai/api/v1",
         headers: {
           "HTTP-Referer": serverEnv.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
-          "X-Title": "FadiOS",
+          "X-Title": "Fadi",
         },
       });
     case "anthropic":

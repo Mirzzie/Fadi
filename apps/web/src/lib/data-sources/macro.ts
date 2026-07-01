@@ -136,7 +136,7 @@ async function fredSeries(
   });
   try {
     const res = await fetch(`${FRED_BASE}?${params}`, {
-      headers: { "User-Agent": "FadiOS/1.0 (career intelligence)" },
+      headers: { "User-Agent": "Fadi/1.0 (career intelligence)" },
       signal: AbortSignal.timeout(6000),
     });
     if (!res.ok) return { obs: [], status: res.status };

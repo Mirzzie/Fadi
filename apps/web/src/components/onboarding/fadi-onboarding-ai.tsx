@@ -32,7 +32,7 @@ function toSpeakable(text: string): string {
  */
 
 const GREETING =
-  "Hey — I'm Fadi, your career operating system. I'll get you set up in a couple of minutes, then I'll take it from there. To start: what should I call you?";
+  "Hey — I'm Fadi, your honest career mentor. I'll get you set up in a couple of minutes, then I'll take it from there. To start: what should I call you?";
 
 const FIELD_LABELS: Array<[keyof CollectedFields, string]> = [
   ["fullName", "name"],
@@ -167,7 +167,7 @@ export function FadiOnboardingAI({
         <FadiOrb />
         <div className="flex-1">
           <p className="text-sm font-semibold tracking-tight">Fadi</p>
-          <p className="text-xs text-muted-foreground">Setting up your FadiOS · {capturedCount}/7 captured</p>
+          <p className="text-xs text-muted-foreground">Setting up your Fadi · {capturedCount}/7 captured</p>
         </div>
         <div className="hidden items-center gap-1 sm:flex">
           {FIELD_LABELS.map(([k, label]) => (

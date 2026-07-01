@@ -13,7 +13,7 @@ import {
 import { envTokenMatches, resolveMcpToken } from "@/lib/mcp/tokens";
 
 /**
- * FadiOS MCP endpoint — exposes FadiOS's career tools to any MCP client
+ * Fadi MCP endpoint — exposes Fadi's career tools to any MCP client
  * (Claude Code, OpenClaw, Cursor, …) over Streamable HTTP (JSON-RPC POST).
  *
  * Auth accepts either:

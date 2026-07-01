@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 /**
- * FadiOS logo — a calligraphic nod to فادي ("one who helps / saves"). The mark is
+ * Fadi logo — a calligraphic nod to فادي ("one who helps / saves"). The mark is
  * a flowing brush form of the Arabic letter ف (fā, the initial of فادي): an open
  * bowl that sweeps into a rising tail, crowned by the letter's single dot. Rendered
  * in the brand aurora gradient (teal → violet).
@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 export function FadiLogo({
   className,
   variant = "tile",
-  title = "FadiOS",
+  title = "Fadi",
 }: {
   className?: string;
   variant?: "tile" | "mark";

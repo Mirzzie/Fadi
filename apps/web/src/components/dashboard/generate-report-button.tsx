@@ -41,7 +41,7 @@ export function GenerateReportButton() {
           className="mt-1"
         />
         <span>
-          I understand FadiOS will send my onboarding profile, resume text, LinkedIn context, and
+          I understand Fadi will send my onboarding profile, resume text, LinkedIn context, and
           career goals to the AI provider to generate this report. I will review recommendations
           before acting on them.
         </span>

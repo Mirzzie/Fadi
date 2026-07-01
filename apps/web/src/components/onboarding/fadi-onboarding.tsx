@@ -35,7 +35,7 @@ type Step = {
 const STEPS: Step[] = [
   {
     key: "fullName",
-    fadi: "Hey — I'm Fadi, your career operating system. I'll get you set up in about two minutes, then I'll guide you from there. First: what should I call you?",
+    fadi: "Hey — I'm Fadi, your honest career mentor. I'll get you set up in about two minutes, then I'll guide you from there. First: what should I call you?",
     type: "text",
     placeholder: "Your name",
     min: 2,
@@ -145,7 +145,7 @@ export function FadiOnboarding({ onUseForm }: { onUseForm?: () => void }) {
     // All collected — confirm and create.
     transcript.push({
       from: "fadi",
-      text: `Perfect. Setting up your FadiOS around “${nextValues.targetRole}”…`,
+      text: `Perfect. Setting up your Fadi around “${nextValues.targetRole}”…`,
     });
     setBubbles(transcript);
     setStepIndex(nextIndex);
@@ -173,7 +173,7 @@ export function FadiOnboarding({ onUseForm }: { onUseForm?: () => void }) {
         <FadiOrb />
         <div className="flex-1">
           <p className="text-sm font-semibold tracking-tight">Fadi</p>
-          <p className="text-xs text-muted-foreground">Setting up your FadiOS</p>
+          <p className="text-xs text-muted-foreground">Setting up your Fadi</p>
         </div>
         <div className="flex items-center gap-1.5">
           {STEPS.map((s, i) => (

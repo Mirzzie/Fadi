@@ -21,7 +21,7 @@ import { trackApplication } from "./track-application";
 import type { FadiTool, FadiToolContext, FadiToolResult } from "./types";
 
 /**
- * Fadi's tool registry. Each tool wraps a real FadiOS service so Fadi can act on
+ * Fadi's tool registry. Each tool wraps a real Fadi service so Fadi can act on
  * live data and return something the chat can both speak and show. Add tools (and
  * external-source plugins) here — Fadi picks them up automatically.
  */

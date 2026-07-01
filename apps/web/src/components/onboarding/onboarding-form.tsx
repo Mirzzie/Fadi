@@ -34,7 +34,7 @@ const steps = [
   {
     title: "Career goals",
     aiCopy:
-      "Finally, describe what you want FadiOS AI to optimize for. Your goals will shape the first dashboard recommendations.",
+      "Finally, describe what you want Fadi to optimize for. Your goals will shape the first dashboard recommendations.",
   },
 ];
 
@@ -206,7 +206,7 @@ export function OnboardingForm() {
           <Label htmlFor="career-goals">Career goals</Label>
           <Textarea
             id="career-goals"
-            placeholder="Describe your target role, timeline, constraints, and what you want FadiOS AI to help with."
+            placeholder="Describe your target role, timeline, constraints, and what you want Fadi to help with."
             rows={8}
             {...form.register("careerGoals")}
           />
