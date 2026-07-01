@@ -77,9 +77,18 @@ export function jobMatchesLocation(j: FilterableJob, country?: string, city?: st
 
 /** All active filters must pass. */
 export function passesFilters(j: FilterableJob, f: JobFilters): boolean {
-  if (!jobMatchesLocation(j, f.country, f.city)) return false;
+  const mode = jobWorkMode(j);
 
-  if (f.modes && f.modes.length > 0 && !f.modes.includes(jobWorkMode(j))) return false;
+  // Work-mode filter first.
+  if (f.modes && f.modes.length > 0 && !f.modes.includes(mode)) return false;
+
+  // Location, mode-aware: a REMOTE role you'd accept isn't tied to the searched
+  // city — you can do it from there — so it bypasses the strict city match. Onsite
+  // /hybrid roles (and remote roles when you did NOT ask for remote) still must sit
+  // in the location. Fixes "Remote selected + Dublin typed → 0 jobs".
+  const remoteAccepted =
+    mode === "remote" && (!f.modes || f.modes.length === 0 || f.modes.includes("remote"));
+  if (!remoteAccepted && !jobMatchesLocation(j, f.country, f.city)) return false;
 
   if (f.types && f.types.length > 0) {
     const type = jobEmploymentType(j);

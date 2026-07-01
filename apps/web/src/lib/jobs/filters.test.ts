@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { jobMatchesLocation, type FilterableJob } from "./filters";
+import { jobMatchesLocation, passesFilters, type FilterableJob } from "./filters";
 
 const at = (location: string | null): FilterableJob => ({
   title: "SOC Analyst",
@@ -8,6 +8,15 @@ const at = (location: string | null): FilterableJob => ({
   remoteMode: null,
   employmentType: null,
   description: null,
+});
+
+const job = (over: Partial<FilterableJob>): FilterableJob => ({
+  title: "SOC Analyst",
+  location: null,
+  remoteMode: null,
+  employmentType: "full-time",
+  description: null,
+  ...over,
 });
 
 describe("jobMatchesLocation", () => {
@@ -31,5 +40,23 @@ describe("jobMatchesLocation", () => {
 
   it("city match is case-insensitive", () => {
     expect(jobMatchesLocation(at("DUBLIN, IE"), "ie", "dublin")).toBe(true);
+  });
+});
+
+describe("passesFilters — remote + city conflict", () => {
+  const remoteJob = job({ location: "Remote", remoteMode: "remote" });
+  const dublinOnsite = job({ location: "Dublin, Ireland", remoteMode: "onsite" });
+  const corkOnsite = job({ location: "Cork, Ireland", remoteMode: "onsite" });
+
+  it("shows a REMOTE role for a city search when Remote is an accepted mode", () => {
+    // The bug: Remote selected + Dublin typed dropped every remote job → 0 results.
+    const f = { country: "ie", city: "Dublin", modes: ["remote", "hybrid", "onsite"] as const };
+    expect(passesFilters(remoteJob, { ...f, modes: [...f.modes] })).toBe(true);
+    expect(passesFilters(dublinOnsite, { ...f, modes: [...f.modes] })).toBe(true);
+    expect(passesFilters(corkOnsite, { ...f, modes: [...f.modes] })).toBe(false); // wrong city, onsite
+  });
+
+  it("still excludes remote when the user only wants on-site", () => {
+    expect(passesFilters(remoteJob, { country: "ie", city: "Dublin", modes: ["onsite"] })).toBe(false);
   });
 });
