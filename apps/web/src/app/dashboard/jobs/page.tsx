@@ -98,7 +98,6 @@ export default async function JobsPage({
           activeModes={modes}
           activeTypes={types}
           autoSearch={Boolean(prefs.autoSearch)}
-          agentScope={prefs.agentScope ?? "filters"}
         />
         <JobSourcesStatus sources={sourcesHealth.sources} lastRunAt={sourcesHealth.lastRunAt} />
       </div>

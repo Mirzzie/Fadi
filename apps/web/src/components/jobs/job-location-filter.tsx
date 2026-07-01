@@ -161,19 +161,20 @@ export function JobLocationFilter({
         </Button>
       </form>
 
-      {/* Region detection — fully private: locale only, no permission, no third party. */}
-      <div className="space-y-1">
-        <Button type="button" variant="outline" size="sm" onClick={detectMyRegion}>
-          <LocateFixed className="size-3.5" aria-hidden="true" />
-          Detect my region
-        </Button>
-        <p className="text-[0.7rem] leading-snug text-muted-foreground">
-          Reads your country from your browser&apos;s language/region setting — no location permission, no
-          GPS coordinates, nothing sent to anyone. Sets your default search country (and Fadi&apos;s
-          background search); type the city yourself. Less precise than GPS, fully private.
-        </p>
-        {geoError ? <p className="text-xs text-amber-500">{geoError}</p> : null}
-      </div>
+      {/* Region detection — a quiet inline link, not a competing button. Fully private:
+          locale only, no permission, no GPS, nothing sent anywhere. */}
+      <p className="text-[0.7rem] leading-snug text-muted-foreground">
+        <button
+          type="button"
+          onClick={detectMyRegion}
+          className="inline-flex items-center gap-1 font-medium text-primary hover:underline"
+        >
+          <LocateFixed className="size-3" aria-hidden="true" /> Detect my region
+        </button>{" "}
+        — sets your country from your browser&apos;s language setting (no location permission, no GPS,
+        nothing sent anywhere); type the city yourself.
+        {geoError ? <span className="ml-1 text-amber-500">{geoError}</span> : null}
+      </p>
 
       {/* Filter chips */}
       <div className="flex flex-wrap items-center gap-1.5">
