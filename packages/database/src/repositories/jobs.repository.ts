@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, lt, sql } from "drizzle-orm";
 
 import type { Database } from "../client";
 import { jobs, type Job } from "../schema";
@@ -30,6 +30,16 @@ export function createJobsRepository(db: Database) {
         .from(jobs)
         .where(eq(jobs.status, "active"))
         .orderBy(asc(jobs.company), asc(jobs.title));
+    },
+
+    /** How many postings Fadi has taken off the board as closed/expired (proof surface). */
+    async countByStatuses(statuses: string[]): Promise<number> {
+      if (statuses.length === 0) return 0;
+      const [row] = await db
+        .select({ value: count() })
+        .from(jobs)
+        .where(inArray(jobs.status, statuses));
+      return row?.value ?? 0;
     },
 
     async findById(id: string): Promise<Job | null> {

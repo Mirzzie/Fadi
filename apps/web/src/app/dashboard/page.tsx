@@ -4,6 +4,8 @@ import { after } from "next/server";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { DashboardShell } from "@/components/shells/dashboard-shell";
+import { FadiImpactCard } from "@/components/dashboard/fadi-impact-card";
+import { getFadiImpact } from "@/lib/impact/fadi-impact";
 import { maybeRunAgentForUser } from "@/lib/agents/background";
 import { composeBriefing } from "@/lib/agents/briefing";
 import { deliverDigestToChat, digestSubline, getAgencyDigest } from "@/lib/agents/digest";
@@ -29,7 +31,7 @@ export default async function DashboardPage() {
     redirect("/auth/sign-in");
   }
 
-  const [profileSummary, latestReport, recommendedJobsPreview, momentum, reflection, setup, digest] =
+  const [profileSummary, latestReport, recommendedJobsPreview, momentum, reflection, setup, digest, impact] =
     await Promise.all([
       getDashboardProfileSummary(user.id),
       getLatestCareerReport(user.id),
@@ -38,6 +40,7 @@ export default async function DashboardPage() {
       getMomentumReflection(user.id),
       getSetupState(user.id),
       getAgencyDigest(user.id),
+      getFadiImpact(user.id),
     ]);
 
   // Gate on the summary we already loaded — no separate profiles round-trip.
@@ -151,6 +154,9 @@ export default async function DashboardPage() {
         marketSignals={marketSignals}
         setup={setup}
       />
+      <div className="mx-auto mt-4 max-w-shell">
+        <FadiImpactCard impact={impact} />
+      </div>
     </AppShell>
   );
 }
