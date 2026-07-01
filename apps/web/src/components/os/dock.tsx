@@ -11,7 +11,6 @@ import {
   LayoutDashboard,
   MessageSquareQuote,
   Settings,
-  Sparkles,
   UserRoundCog,
   Users,
   type LucideIcon,
@@ -44,7 +43,6 @@ export const DOCK_APPS: DockApp[] = [
   { href: "/dashboard/interview", label: "Interview", icon: MessageSquareQuote, group: "prepare" },
   { href: "/dashboard/learning", label: "Learning", icon: GraduationCap, group: "prepare" },
   // System
-  { href: "/dashboard/fadi", label: "Fadi", icon: Sparkles, group: "system" },
   { href: "/dashboard/profile", label: "Profile", icon: UserRoundCog, group: "system" },
   { href: "/dashboard/settings", label: "Settings", icon: Settings, group: "system" },
 ];
