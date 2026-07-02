@@ -22,7 +22,15 @@ import {
 import { getCareerReportContext } from "@/lib/career-report/data";
 import { createDocumentsRepository } from "@careeros/database";
 import { parseResume, resumeToPlainText } from "@/lib/documents/resume";
-import { runCvReview, type CvReviewResult } from "@/lib/documents/cv-review";
+import {
+  reviewToGuidance,
+  runDocReview,
+  type CvReview,
+  type CvReviewResult,
+  type ReviewableKind,
+} from "@/lib/documents/cv-review";
+import { generateCareerDocument } from "@/lib/documents/generate";
+import { isProseKind, letterToPlainText, parseLetter } from "@/lib/documents/letter";
 import { getUserDocGenerate } from "@/lib/ai/user-generate";
 
 export type RejectionStage = "keyword" | "screen" | "interview" | "final";
@@ -167,16 +175,29 @@ async function resolveResumeForJob(userId: string, jobId: string) {
   return { ctx, resumeText };
 }
 
+/** The document text the user would actually send for this job, per kind. */
+async function resolveDocForJob(userId: string, jobId: string, kind: ReviewableKind): Promise<string> {
+  if (kind === "resume") {
+    const { resumeText } = await resolveResumeForJob(userId, jobId);
+    return resumeText;
+  }
+  const jobDocs = await createDocumentsRepository(getDatabase()).listForJob(userId, jobId);
+  const doc = jobDocs.find((d) => d.kind === kind);
+  if (!doc) return "";
+  return isProseKind(doc.kind) ? letterToPlainText(parseLetter(doc.content, doc.kind)).trim() : doc.content.trim();
+}
+
 /**
  * The red-pen review — a brutally honest, section-by-section recruiter review of
- * the CV against THIS job, with before/after rewrites. Deep dive; the quality
- * scorer above stays the quick gate.
+ * the CV / cover letter / cold email / value proposition against THIS job, with
+ * before/after rewrites. Deep dive; the quality scorer above stays the quick gate.
  */
-export async function reviewCvForJob(input: {
+export async function reviewDocForJob(input: {
   jobId: string;
   jobTitle: string;
   company: string;
   jobDescription: string;
+  kind: ReviewableKind;
 }): Promise<CvReviewResult> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, reason: "error", message: "Please sign in again." };
@@ -187,33 +208,83 @@ export async function reviewCvForJob(input: {
       return {
         ok: false,
         reason: "no_provider",
-        message: "Connect an AI provider in Settings → AI provider and I'll review your CV like a recruiter.",
+        message: "Connect an AI provider in Settings → AI provider and I'll review your documents like a recruiter.",
       };
     }
 
-    const { resumeText } = await resolveResumeForJob(user.id, input.jobId);
-    const result = await runCvReview(generate, {
+    const docText = await resolveDocForJob(user.id, input.jobId, input.kind);
+    const result = await runDocReview(generate, {
+      kind: input.kind,
       jobTitle: input.jobTitle,
       company: input.company,
       jobDescription: input.jobDescription,
-      resumeText,
+      docText,
     });
     if (result.ok) {
-      logger.info("applications.cv_review.completed", {
+      logger.info("applications.doc_review.completed", {
         userId: user.id,
         jobId: input.jobId,
+        kind: input.kind,
         sections: result.review.sections.length,
         decision: result.review.hireProbability.decision,
       });
     }
     return result;
   } catch (error) {
-    logger.error("applications.cv_review_failed", {
+    logger.error("applications.doc_review_failed", {
       userId: user.id,
       jobId: input.jobId,
       error: error instanceof Error ? error.message : "unknown",
     });
-    return { ok: false, reason: "error", message: "Something went wrong reviewing your CV. Please try again." };
+    return { ok: false, reason: "error", message: "Something went wrong reviewing this document. Please try again." };
+  }
+}
+
+/**
+ * The review→redraft loop: regenerate the document with the red-pen fixes folded
+ * in — the reviewer's rewrites become the next draft (grounded in real evidence;
+ * [ADD REAL NUMBER] placeholders survive for the user to fill honestly).
+ */
+export async function applyReviewFixes(input: {
+  jobId: string;
+  jobTitle: string;
+  company: string;
+  jobDescription: string;
+  kind: ReviewableKind;
+  review: CvReview;
+}): Promise<{ ok: boolean; message: string; docId?: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  try {
+    const generate = await getUserDocGenerate(user.id);
+    if (!generate) {
+      return { ok: false, message: "Connect an AI provider in Settings → AI provider first." };
+    }
+
+    const doc = await generateCareerDocument(
+      user.id,
+      {
+        kind: input.kind,
+        jobTitle: input.jobTitle,
+        company: input.company,
+        jobDescription: input.jobDescription,
+        jobId: input.jobId,
+        guidance: reviewToGuidance(input.review),
+      },
+      generate,
+    );
+
+    revalidatePath(workspacePath(input.jobId));
+    logger.info("applications.review_fixes_applied", { userId: user.id, jobId: input.jobId, kind: input.kind });
+    return { ok: true, message: "Redrafted with the fixes — review it in the editor before sending.", docId: doc.id };
+  } catch (error) {
+    logger.error("applications.apply_fixes_failed", {
+      userId: user.id,
+      jobId: input.jobId,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return { ok: false, message: "Couldn't redraft just now. Check your AI provider and try again." };
   }
 }
 

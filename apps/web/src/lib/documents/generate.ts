@@ -54,6 +54,8 @@ export async function generateCareerDocument(
     jobDescription?: string | null;
     jobId?: string | null;
     applicationId?: string | null;
+    /** Red-pen review fixes to incorporate (the review→redraft loop). */
+    guidance?: string | null;
   },
   generate: DocGenerate,
 ): Promise<GeneratedDoc> {
@@ -91,6 +93,9 @@ export async function generateCareerDocument(
     "",
     evidence.block,
     topEvidence ? `\n${topEvidence}` : "",
+    opts.guidance?.trim()
+      ? `\nRED-PEN REVIEW OF THE PREVIOUS DRAFT — incorporate every fix below that is grounded in the candidate's REAL experience (keep any [ADD REAL NUMBER] placeholders literally; never invent the number):\n${opts.guidance.trim().slice(0, 4000)}`
+      : "",
   ].join("\n");
 
   const docsRepo = createDocumentsRepository(db);

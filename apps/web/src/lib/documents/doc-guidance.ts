@@ -10,7 +10,7 @@ import type { DocKind } from "@/lib/jobs/application-types";
  * the editor alerts the user that the advice changed. (A future scheduled job
  * could refresh this from the cited sources — see docs; for now it's curated.)
  */
-export const DOC_GUIDANCE_VERSION = "2026.06";
+export const DOC_GUIDANCE_VERSION = "2026.07";
 
 export type DocTip = { label: string; text: string };
 export type DocGuidance = {
@@ -27,25 +27,25 @@ export const DOC_GUIDANCE: Partial<Record<DocKind, DocGuidance>> = {
     label: "Cover letter",
     words: { min: 250, max: 400, note: "One page, 3–4 short paragraphs" },
     tips: [
-      { label: "Length", text: "250–400 words on one page. Recruiters spend under 30 seconds — every line must earn its place." },
-      { label: "Structure", text: "Hook → why you fit → one real proof point → a confident close." },
+      { label: "Length", text: "250–400 words attached (100–200 if pasted in an email body). Recruiters spend under 30 seconds — every line must earn its place." },
+      { label: "Structure", text: "Hook → why you fit → one real proof point → a confident close. 94% of hiring managers say cover letters influence interview decisions." },
       { label: "Opening", text: "First 40–60 words: name the role and lead with a specific result, not 'I am writing to apply'." },
       { label: "Format", text: "Clean font (Arial or Calibri), 11pt, one-inch margins." },
     ],
-    sources: "Resume.io, Microsoft, Kickresume (2026)",
-    reviewed: "2026-06-08",
+    sources: "Resume.io, Microsoft, Kickresume, ResumeGenius hiring-manager survey (2026)",
+    reviewed: "2026-07-04",
   },
   email: {
     label: "Cold email",
     words: { min: 50, max: 150, note: "Shorter wins — recruiters skim" },
     tips: [
-      { label: "Length", text: "50–150 words. Direct emails to hiring managers reply at ~15–25% vs 2–5% for online applications — but only if they're short." },
+      { label: "Length", text: "50–150 words — 101–150 is the engagement sweet spot (2024 analysis of 4M recruiting emails). Most people write 170–210: 20–40% over the ideal." },
       { label: "Subject", text: "6–10 words, specific: the role + your name, or a concrete result. No vague subjects." },
       { label: "The ask", text: "End with ONE low-friction call to action — a 15-minute call. Never 'Are you hiring?'." },
-      { label: "Personalize", text: "Reference something real about them — a product, a recent hire, a value. Show you chose them." },
+      { label: "Personalize", text: "Reference something real about them — a product, a recent hire, a value. Personalized outreach replies at ~7.5% vs 2–3% for mass blasts (Hunter.io 2026)." },
     ],
-    sources: "Juicebox, Jobply, ZeroBounce (2026)",
-    reviewed: "2026-06-08",
+    sources: "Juicebox, Jobply, ZeroBounce, Hunter.io State of Cold Email (2026)",
+    reviewed: "2026-07-04",
   },
   value_proposition: {
     label: "Value proposition",

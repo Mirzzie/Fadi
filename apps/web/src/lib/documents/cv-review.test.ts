@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 
-import { clampScore, runCvReview, toVerdict } from "./cv-review";
+import { clampScore, reviewToGuidance, runDocReview, toVerdict, type CvReview } from "./cv-review";
 
 describe("toVerdict", () => {
   it("normalises provider free-text onto the four verdicts", () => {
@@ -23,7 +23,31 @@ describe("clampScore", () => {
   });
 });
 
-describe("runCvReview", () => {
+describe("reviewToGuidance", () => {
+  const review: CvReview = {
+    sections: [
+      { name: "Summary", jdDemands: "", cvSays: "", diagnosis: "Generic.", verdict: "critical", rewrite: "SOC-focused… [ADD REAL NUMBER]" },
+      { name: "Skills", jdDemands: "", cvSays: "", diagnosis: "Fine.", verdict: "strength", rewrite: "unchanged" },
+    ],
+    atsScore: 60,
+    missingKeywords: [],
+    sixSecondImpression: "",
+    topCriticalFixes: ["Rewrite the summary"],
+    quickWins: ["Reorder sections"],
+    hireProbability: { decision: "maybe", reason: "" },
+  };
+
+  it("includes fixes + non-strength rewrites, skips strengths, and caps length", () => {
+    const g = reviewToGuidance(review);
+    expect(g).toContain("MUST FIX");
+    expect(g).toContain("Rewrite the summary");
+    expect(g).toContain("SUMMARY (critical)");
+    expect(g).not.toContain("SKILLS"); // strengths aren't re-litigated
+    expect(reviewToGuidance(review, 20).length).toBe(20); // hard cap
+  });
+});
+
+describe("runDocReview", () => {
   // A deliberately MESSY provider payload — string score, emoji verdicts, padded
   // keywords, an empty section — parsed through the real (tolerant) schema, exactly
   // like a live provider response would be.
@@ -49,28 +73,32 @@ describe("runCvReview", () => {
   };
 
   let calls = 0;
+  let lastSystem = "";
   const generate = {
-    structured: async <T,>(_system: string, _user: string, schema: z.ZodType<T>): Promise<T> => {
+    structured: async <T,>(system: string, _user: string, schema: z.ZodType<T>): Promise<T> => {
       calls += 1;
+      lastSystem = system;
       return schema.parse(rawPayload);
     },
   };
 
-  it("refuses honestly without a JD or resume (no provider call spent)", async () => {
+  it("refuses honestly without a JD or document (no provider call spent)", async () => {
     calls = 0;
-    const noJd = await runCvReview(generate, { jobTitle: "SOC Analyst", company: "X", jobDescription: " ", resumeText: "cv" });
+    const noJd = await runDocReview(generate, { kind: "resume", jobTitle: "SOC Analyst", company: "X", jobDescription: " ", docText: "cv" });
     expect(noJd.ok).toBe(false);
-    const noCv = await runCvReview(generate, { jobTitle: "SOC Analyst", company: "X", jobDescription: "jd", resumeText: "" });
-    expect(noCv.ok).toBe(false);
+    const noDoc = await runDocReview(generate, { kind: "cover_letter", jobTitle: "SOC Analyst", company: "X", jobDescription: "jd", docText: "" });
+    expect(noDoc.ok).toBe(false);
+    if (!noDoc.ok) expect(noDoc.message).toContain("cover letter"); // kind-aware message
     expect(calls).toBe(0);
   });
 
   it("normalises a messy provider payload into a clean review", async () => {
-    const res = await runCvReview(generate, {
+    const res = await runDocReview(generate, {
+      kind: "resume",
       jobTitle: "SOC Analyst",
       company: "X",
       jobDescription: "SIEM, incident response, Splunk",
-      resumeText: "IT professional…",
+      docText: "IT professional…",
     });
     expect(res.ok).toBe(true);
     if (!res.ok) return;
@@ -79,5 +107,28 @@ describe("runCvReview", () => {
     expect(res.review.atsScore).toBe(62); // "62" coerced
     expect(res.review.missingKeywords).toEqual(["SIEM", "Splunk"]); // trimmed
     expect(res.review.hireProbability.decision).toBe("maybe");
+  });
+
+  it("frames the prompt per kind with the recruiter rubric", async () => {
+    await runDocReview(generate, {
+      kind: "email",
+      jobTitle: "SOC Analyst",
+      company: "X",
+      jobDescription: "jd",
+      docText: "Hi — quick note…",
+    });
+    expect(lastSystem).toContain("cold email");
+    expect(lastSystem).toContain("subject line"); // kind-specific sections
+    expect(lastSystem).toContain("50–150"); // rubric from DOC_GUIDANCE
+
+    await runDocReview(generate, {
+      kind: "cover_letter",
+      jobTitle: "SOC Analyst",
+      company: "X",
+      jobDescription: "jd",
+      docText: "Dear team…",
+    });
+    expect(lastSystem).toContain("cover letter");
+    expect(lastSystem).toContain("250–400");
   });
 });
