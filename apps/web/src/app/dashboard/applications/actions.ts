@@ -22,6 +22,8 @@ import {
 import { getCareerReportContext } from "@/lib/career-report/data";
 import { createDocumentsRepository } from "@careeros/database";
 import { parseResume, resumeToPlainText } from "@/lib/documents/resume";
+import { runCvReview, type CvReviewResult } from "@/lib/documents/cv-review";
+import { getUserDocGenerate } from "@/lib/ai/user-generate";
 
 export type RejectionStage = "keyword" | "screen" | "interview" | "final";
 
@@ -117,16 +119,7 @@ export async function scoreApplicationDraft(input: {
   }
 
   try {
-    const db = getDatabase();
-    const [ctx, jobDocs] = await Promise.all([
-      getCareerReportContext(user.id),
-      createDocumentsRepository(db).listForJob(user.id, input.jobId),
-    ]);
-
-    // Prefer the resume tailored for THIS job; fall back to the base resume.
-    const resumeDoc = jobDocs.find((d) => d.kind === "resume");
-    let resumeText = resumeDoc ? resumeToPlainText(parseResume(resumeDoc.content)).trim() : "";
-    if (!resumeText) resumeText = (ctx?.resumeText ?? "").trim();
+    const { ctx, resumeText } = await resolveResumeForJob(user.id, input.jobId);
 
     if (!resumeText) {
       return {
@@ -157,6 +150,70 @@ export async function scoreApplicationDraft(input: {
       error: error instanceof Error ? error.message : "unknown",
     });
     return { ok: false, message: "Something went wrong scoring this application. Please try again." };
+  }
+}
+
+/** The CV the user would actually send for this job: the tailored resume doc when
+ *  one exists, else the active direction's base resume (shared by score + review). */
+async function resolveResumeForJob(userId: string, jobId: string) {
+  const db = getDatabase();
+  const [ctx, jobDocs] = await Promise.all([
+    getCareerReportContext(userId),
+    createDocumentsRepository(db).listForJob(userId, jobId),
+  ]);
+  const resumeDoc = jobDocs.find((d) => d.kind === "resume");
+  let resumeText = resumeDoc ? resumeToPlainText(parseResume(resumeDoc.content)).trim() : "";
+  if (!resumeText) resumeText = (ctx?.resumeText ?? "").trim();
+  return { ctx, resumeText };
+}
+
+/**
+ * The red-pen review — a brutally honest, section-by-section recruiter review of
+ * the CV against THIS job, with before/after rewrites. Deep dive; the quality
+ * scorer above stays the quick gate.
+ */
+export async function reviewCvForJob(input: {
+  jobId: string;
+  jobTitle: string;
+  company: string;
+  jobDescription: string;
+}): Promise<CvReviewResult> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, reason: "error", message: "Please sign in again." };
+
+  try {
+    const generate = await getUserDocGenerate(user.id);
+    if (!generate) {
+      return {
+        ok: false,
+        reason: "no_provider",
+        message: "Connect an AI provider in Settings → AI provider and I'll review your CV like a recruiter.",
+      };
+    }
+
+    const { resumeText } = await resolveResumeForJob(user.id, input.jobId);
+    const result = await runCvReview(generate, {
+      jobTitle: input.jobTitle,
+      company: input.company,
+      jobDescription: input.jobDescription,
+      resumeText,
+    });
+    if (result.ok) {
+      logger.info("applications.cv_review.completed", {
+        userId: user.id,
+        jobId: input.jobId,
+        sections: result.review.sections.length,
+        decision: result.review.hireProbability.decision,
+      });
+    }
+    return result;
+  } catch (error) {
+    logger.error("applications.cv_review_failed", {
+      userId: user.id,
+      jobId: input.jobId,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return { ok: false, reason: "error", message: "Something went wrong reviewing your CV. Please try again." };
   }
 }
 

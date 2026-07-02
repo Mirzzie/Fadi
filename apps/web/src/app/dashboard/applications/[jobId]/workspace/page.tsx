@@ -16,6 +16,7 @@ import { ExternalLink } from "lucide-react";
 import { ApplicationOutcomePanel } from "@/components/workspace/application-outcome-panel";
 import { FitGatePanel } from "@/components/workspace/fit-gate-panel";
 import { ApplicationQualityPanel } from "@/components/workspace/application-quality-panel";
+import { CvReviewPanel } from "@/components/workspace/cv-review-panel";
 import { InterviewPrepPanel } from "@/components/workspace/interview-prep-panel";
 import { CompanyBriefPanel } from "@/components/workspace/company-brief-panel";
 import { AutoPrepRunner } from "@/components/workspace/auto-prep-runner";
@@ -177,6 +178,16 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
         {/* Quality gate — score the tailored resume against THIS job before sending */}
         <div className="shrink-0">
           <ApplicationQualityPanel
+            jobId={job.id}
+            jobTitle={job.title}
+            jobCompany={job.company}
+            jobDescription={job.description ?? undefined}
+          />
+        </div>
+
+        {/* Deep dive — the recruiter's red-pen review, section by section with rewrites */}
+        <div className="shrink-0">
+          <CvReviewPanel
             jobId={job.id}
             jobTitle={job.title}
             jobCompany={job.company}
