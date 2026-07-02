@@ -2,8 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 
+import { randomUUID } from "node:crypto";
+
 import {
   createApplicationsRepository,
+  createJobsRepository,
   type ApplicationStatus,
 } from "@careeros/database";
 import { getCurrentAuthUser } from "@/lib/auth/session";
@@ -26,11 +29,31 @@ export async function createApplicationAction(input: {
     return { ok: false, message: "Company and role are required." };
   }
   try {
-    const app = await createApplicationsRepository(getDatabase()).createForUser(user.id, {
+    const db = getDatabase();
+    // Pasted jobs get a REAL jobs row, so they're first-class: the full workspace
+    // (fit gate, quality score, red-pen review, interview prep, docs) works for
+    // them via /applications/{jobId}/workspace — same as discovered jobs.
+    let jobId = input.jobId ?? null;
+    if (!jobId) {
+      const job = await createJobsRepository(db).upsertSeedJob({
+        source: "manual",
+        externalId: randomUUID(),
+        title: input.title.trim(),
+        company: input.company.trim(),
+        description: input.jobDescription?.trim() || null,
+        // NOT "active": the jobs table is a shared pool, and a user's pasted job
+        // must never surface on anyone else's board (privacy mandate). "manual"
+        // keeps it workspace-able (findById) but out of listActive entirely.
+        status: "manual",
+      });
+      jobId = job.id;
+    }
+
+    const app = await createApplicationsRepository(db).createForUser(user.id, {
       company: input.company.trim(),
       title: input.title.trim(),
       jobDescription: input.jobDescription?.trim() || null,
-      jobId: input.jobId ?? null,
+      jobId,
       status: "interested",
     });
     revalidatePath("/dashboard/applications");

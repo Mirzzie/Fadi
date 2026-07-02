@@ -1,6 +1,7 @@
 "use client";
 
 import { ExternalLink, FileText, Loader2, Plus, Sparkles, X } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
@@ -230,6 +231,15 @@ function DetailDialog({ app, docs, onClose }: { app: AppView; docs: DocView[]; o
         <div>
           <h3 className="font-semibold leading-tight">{app.title}</h3>
           <p className="text-sm text-muted-foreground">{app.company}</p>
+          {app.jobId ? (
+            <Link
+              href={`/dashboard/applications/${app.jobId}/workspace`}
+              className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+            >
+              Open full workspace — fit check, quality score, red-pen review, interview prep
+              <ExternalLink className="size-3" aria-hidden="true" />
+            </Link>
+          ) : null}
         </div>
         <button onClick={onClose} aria-label="Close" className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-accent">
           <X className="size-4" aria-hidden="true" />

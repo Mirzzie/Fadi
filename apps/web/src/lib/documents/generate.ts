@@ -18,6 +18,7 @@ import {
   stripAiTells,
 } from "@/lib/documents/humanize";
 import { composeCareerEvidence } from "@/lib/career/evidence";
+import { pivotFraming } from "@/lib/career/pivot";
 import { isProseKind, letterFromText, serializeLetter } from "@/lib/documents/letter";
 import { serializeResume, type ResumeData } from "@/lib/documents/resume";
 import { resumeGenerationSchema, toResumeData } from "@/lib/documents/resume-schema";
@@ -90,6 +91,15 @@ export async function generateCareerDocument(
     jobDescription
       ? `\nTARGET JOB DESCRIPTION (tailor specifically to this — mirror its language and address its requirements with the candidate's REAL experience):\n${jobDescription}`
       : "",
+    "",
+    // Direction-aware framing: same shared history, framed for THIS direction —
+    // adjacent-field experience adopted, transferable skills named with evidence.
+    pivotFraming({
+      targetRole: careerProfile?.targetRole ?? null,
+      domain: careerProfile?.domain ?? null,
+      intent: careerProfile?.intent ?? null,
+      careerGoal: careerProfile?.careerGoal ?? null,
+    }),
     "",
     evidence.block,
     topEvidence ? `\n${topEvidence}` : "",

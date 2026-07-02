@@ -2,9 +2,11 @@
 
 import { createCareerProfilesRepository } from "@careeros/database";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
+import { draftTrackBaseResume } from "@/lib/career/track-resume";
 import { getDatabase } from "@/lib/database/client";
 import { invalidateJobSync } from "@/lib/jobs/sync";
 import { logger } from "@/lib/observability/logger";
@@ -124,6 +126,13 @@ export async function createTrackAction(
 
   // A brand-new direction → pull its jobs fresh on the next load.
   invalidateJobSync(track.targetRole);
+
+  // The direction architecture: shared history stays the source of truth; this
+  // direction gets its OWN tailored base resume, drafted in the background from
+  // that truth with pivot framing (transferable skills, adjacent-field adoption).
+  // Best-effort — no provider/history → the shared resume remains the fallback.
+  after(() => draftTrackBaseResume(user.id, track));
+
   logger.info("tracks.created", {
     userId: user.id,
     trackId: track.id,
