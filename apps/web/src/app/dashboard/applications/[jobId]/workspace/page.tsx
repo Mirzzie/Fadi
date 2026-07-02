@@ -11,7 +11,15 @@ import {
 
 import { AppShell } from "@/components/layout/app-shell";
 import { ApplicationWorkspace } from "@/components/workspace/application-workspace";
-import { ExternalLink } from "lucide-react";
+import {
+  Building2,
+  ClipboardCheck,
+  ExternalLink,
+  Flag,
+  Gauge,
+  MessageSquareQuote,
+  PenLine,
+} from "lucide-react";
 
 import { ApplicationOutcomePanel } from "@/components/workspace/application-outcome-panel";
 import { FitGatePanel } from "@/components/workspace/fit-gate-panel";
@@ -22,6 +30,7 @@ import { CompanyBriefPanel } from "@/components/workspace/company-brief-panel";
 import { AutoPrepRunner } from "@/components/workspace/auto-prep-runner";
 import { JobLivenessBanner } from "@/components/workspace/job-liveness-banner";
 import { WorkspaceDocActions } from "@/components/workspace/workspace-doc-actions";
+import { WorkspaceSection } from "@/components/workspace/workspace-section";
 import { FadiGuardianCallout } from "@/components/workspace/fadi-guardian-callout";
 import { FadiGuardianVoice } from "@/components/os/fadi-guardian-voice";
 import { scoreJobForUser } from "@/lib/jobs/job-matching";
@@ -129,45 +138,7 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
           </div>
         ) : null}
 
-        {/* Fit gate — should you even apply? (anti-spray, before you invest time) */}
-        <div className="shrink-0">
-          <FitGatePanel
-            jobTitle={job.title}
-            jobCompany={job.company}
-            jobDescription={job.description ?? undefined}
-          />
-        </div>
-
-        {/* JD-tailored STAR interview prep, drawn from the user's real LinkedIn/career */}
-        <div className="shrink-0">
-          <InterviewPrepPanel
-            jobTitle={job.title}
-            jobCompany={job.company}
-            jobDescription={job.description ?? undefined}
-          />
-        </div>
-
-        {/* Honest company prep brief — understand the business + smart questions to ask */}
-        <div className="shrink-0">
-          <CompanyBriefPanel
-            jobTitle={job.title}
-            jobCompany={job.company}
-            jobDescription={job.description ?? undefined}
-          />
-        </div>
-
-        {/* Outcome + rejection-autopsy */}
-        <div className="shrink-0">
-          <ApplicationOutcomePanel
-            jobId={job.id}
-            jobCompany={job.company}
-            jobTitle={job.title}
-            application={application}
-            autopsyPrompts={[...REJECTION_AUTOPSY_PROMPTS]}
-          />
-        </div>
-
-        {/* Real, saved, JD-tailored documents for this job */}
+        {/* Real, saved, JD-tailored documents for this job — the core artifacts stay visible */}
         <div className="shrink-0">
           <WorkspaceDocActions
             jobId={job.id}
@@ -175,24 +146,33 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
           />
         </div>
 
-        {/* Quality gate — score the tailored resume against THIS job before sending */}
-        <div className="shrink-0">
-          <ApplicationQualityPanel
-            jobId={job.id}
-            jobTitle={job.title}
-            jobCompany={job.company}
-            jobDescription={job.description ?? undefined}
-          />
-        </div>
-
-        {/* Deep dive — the recruiter's red-pen review, section by section with rewrites */}
-        <div className="shrink-0">
-          <CvReviewPanel
-            jobId={job.id}
-            jobTitle={job.title}
-            jobCompany={job.company}
-            jobDescription={job.description ?? undefined}
-          />
+        {/* The tools, progressively disclosed (Hick's law): each is one self-describing
+            row, one click away — in journey order: decide → perfect → prep → learn. */}
+        <div className="shrink-0 space-y-2">
+          <WorkspaceSection icon={Gauge} title="Should you apply?" hint="An honest fit check before you invest time">
+            <FitGatePanel jobTitle={job.title} jobCompany={job.company} jobDescription={job.description ?? undefined} />
+          </WorkspaceSection>
+          <WorkspaceSection icon={ClipboardCheck} title="Is it ready to send?" hint="Score your resume against this exact posting">
+            <ApplicationQualityPanel jobId={job.id} jobTitle={job.title} jobCompany={job.company} jobDescription={job.description ?? undefined} />
+          </WorkspaceSection>
+          <WorkspaceSection icon={PenLine} title="Red-pen review" hint="Recruiter markup of any document, with rewrites">
+            <CvReviewPanel jobId={job.id} jobTitle={job.title} jobCompany={job.company} jobDescription={job.description ?? undefined} />
+          </WorkspaceSection>
+          <WorkspaceSection icon={MessageSquareQuote} title="Interview prep" hint="Likely questions + STAR answers from your real experience">
+            <InterviewPrepPanel jobTitle={job.title} jobCompany={job.company} jobDescription={job.description ?? undefined} />
+          </WorkspaceSection>
+          <WorkspaceSection icon={Building2} title="Company brief" hint="Understand the business + smart questions to ask">
+            <CompanyBriefPanel jobTitle={job.title} jobCompany={job.company} jobDescription={job.description ?? undefined} />
+          </WorkspaceSection>
+          <WorkspaceSection icon={Flag} title="Outcome & learning" hint="Log the result — rejections become data, not verdicts">
+            <ApplicationOutcomePanel
+              jobId={job.id}
+              jobCompany={job.company}
+              jobTitle={job.title}
+              application={application}
+              autopsyPrompts={[...REJECTION_AUTOPSY_PROMPTS]}
+            />
+          </WorkspaceSection>
         </div>
 
         {/* Workspace */}
