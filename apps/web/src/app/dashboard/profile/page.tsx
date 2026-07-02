@@ -64,6 +64,7 @@ export default async function ProfilePage() {
 
         <ProfileForm
           email={user.email ?? ""}
+          directionLabel={careerProfile?.label ?? careerProfile?.targetRole ?? null}
           initial={{
             fullName: profile?.fullName ?? "",
             targetRole: careerProfile?.targetRole ?? "",

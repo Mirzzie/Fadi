@@ -19,9 +19,12 @@ const EXPERIENCE_LEVELS = ["entry", "mid", "senior", "lead", "principal"];
 export function ProfileForm({
   email,
   initial,
+  directionLabel,
 }: {
   email: string;
   initial: UpdateProfileInput;
+  /** The active direction's name — the resume below belongs to IT. */
+  directionLabel?: string | null;
 }) {
   const [form, setForm] = useState<UpdateProfileInput>(initial);
   const [pending, startTransition] = useTransition();
@@ -109,10 +112,13 @@ export function ProfileForm({
             className={cn(inputCls, "h-auto py-2")}
           />
         </Field>
-        <Field label="Resume / CV (a role-tailored example — optional)">
+        <Field label={directionLabel ? `Base resume — your “${directionLabel}” direction` : "Base resume / CV"}>
           <p className="-mt-0.5 text-xs text-muted-foreground">
-            Used as supporting detail. A resume is often tailored to one role and may omit
-            experience, so your LinkedIn above stays the source of truth.
+            Each direction keeps its own base resume — every job document Fadi tailors in{" "}
+            {directionLabel ? `“${directionLabel}”` : "this direction"} starts from THIS text (your
+            words are preserved, not rewritten). Add direction-specific projects or certifications
+            here as you earn them. Your LinkedIn above stays the shared career history. Don&apos;t
+            paste the same LinkedIn text here — it needs to be an actual resume.
           </p>
           <CvUpload onExtracted={(text) => set("resumeText", text)} />
           <textarea

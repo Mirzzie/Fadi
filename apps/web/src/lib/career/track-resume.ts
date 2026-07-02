@@ -52,6 +52,11 @@ export async function draftTrackBaseResume(userId: string, track: CareerProfile)
       return false;
     }
 
+    // Direction-specific ADDITIONS: the evidence pool (projects, certs, activities)
+    // ranked for THIS direction — so a SOC lab project or an IT-support cert lands
+    // in the direction whose base resume it strengthens.
+    const topEvidence = await import("@/lib/evidence/pool").then((m) => m.topEvidenceForPrompt(userId));
+
     const system = `You are Fadi, an expert resume writer. From the candidate's REAL career history below, produce the BASE resume for their "${track.targetRole}" direction${track.domain ? ` (${track.domain})` : ""} — the tailored starting point every application in this direction builds on.
 - Keep their real roles, companies, dates, education and projects exactly.
 - Rewrite the summary and bullets to position them for this direction, using its vocabulary where genuinely accurate.
@@ -63,7 +68,8 @@ ${HUMANIZE_CORE}
 
 ${HUMANIZE_RESUME}`;
 
-    const gen = await generate.structured(system, evidence.block, resumeGenerationSchema, "track_base_resume");
+    const userPrompt = topEvidence ? `${evidence.block}\n\n${topEvidence}` : evidence.block;
+    const gen = await generate.structured(system, userPrompt, resumeGenerationSchema, "track_base_resume");
     const text = resumeToPlainText(
       toResumeData(gen, {
         name: profile?.fullName ?? "",
