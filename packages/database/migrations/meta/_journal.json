@@ -169,6 +169,13 @@
       "when": 1782830342898,
       "tag": "0023_simple_meltdown",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1783030587746,
+      "tag": "0024_real_sue_storm",
+      "breakpoints": true
     }
   ]
 }

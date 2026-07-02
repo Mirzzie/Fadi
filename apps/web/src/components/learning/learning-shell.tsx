@@ -3,6 +3,8 @@ import { BookOpen, GraduationCap, Hammer, Map, MonitorPlay, Target } from "lucid
 
 import { FadiBadge } from "@/components/ui/fadi-badge";
 import { buttonVariants } from "@/components/ui/button";
+import { CommitmentsList, GapGrowth } from "@/components/learning/gap-growth";
+import type { CommitmentView } from "@/lib/learning/commitments-view";
 import type { StoredCareerReport } from "@/lib/career-report/schema";
 import { learningResources } from "@/lib/learning/resources";
 import { cn } from "@/lib/utils";
@@ -34,9 +36,9 @@ function ResourceLinks({ skill }: { skill: string }) {
   );
 }
 
-type Props = { report: StoredCareerReport | null };
+type Props = { report: StoredCareerReport | null; commitments?: CommitmentView[] };
 
-export function LearningShell({ report }: Props) {
+export function LearningShell({ report, commitments = [] }: Props) {
   const skillGaps = report?.missing_skills ?? [];
   const learningPath = report?.recommended_learning_path ?? [];
   const hasContent = skillGaps.length > 0 || learningPath.length > 0;
@@ -79,6 +81,9 @@ export function LearningShell({ report }: Props) {
           ) : null}
         </div>
       </section>
+
+      {/* In-progress commitments — completing one feeds your Evidence + resume */}
+      <CommitmentsList commitments={commitments} />
 
       {!hasContent ? (
         <div className="gradient-border glass-card rounded-xl p-6">
@@ -124,6 +129,8 @@ export function LearningShell({ report }: Props) {
                         <h4 className="font-medium">{gap.title}</h4>
                         <p className="mt-1 text-sm text-muted-foreground">{gap.detail}</p>
                         <ResourceLinks skill={gap.title} />
+                        {/* Gap → smallest real project → commitment (the growth loop) */}
+                        <GapGrowth gapTitle={gap.title} gapDetail={gap.detail} />
                       </div>
                     </div>
                   </div>

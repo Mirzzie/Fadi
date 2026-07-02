@@ -790,10 +790,46 @@ export const evidenceItems = pgTable(
     detail: text("detail").notNull().default(""), // what they actually did
     metrics: text("metrics"), // real numbers/outcomes, when present
     tags: jsonb("tags").$type<string[]>().notNull().default([]), // skills/domains keywords
-    origin: text("origin").notNull().default("manual"), // ai | manual
+    origin: text("origin").notNull().default("manual"), // ai | manual | learning
     ...timestamps,
   },
   (table) => [index("evidence_items_user_id_idx").on(table.userId)]
+);
+
+/**
+ * Learning commitments — the gap→growth loop. A user commits to a concrete
+ * project/course/cert that closes a skill gap for a DIRECTION; on completion
+ * (with the user's own words about what they actually built) it becomes an
+ * evidence item, which flows into that direction's base resume and documents.
+ */
+export const learningCommitments = pgTable(
+  "learning_commitments",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    careerProfileId: uuid("career_profile_id").references(() => careerProfiles.id, {
+      onDelete: "set null",
+    }),
+    /** The skill gap this closes (from the direction's career report). */
+    gap: text("gap").notNull().default(""),
+    title: text("title").notNull(),
+    detail: text("detail").notNull().default(""),
+    kind: text("kind").notNull().default("project"), // project | course | certification
+    /** Honest search query (never an AI-invented URL) for finding materials. */
+    searchQuery: text("search_query"),
+    status: text("status").notNull().default("committed"), // committed | completed
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    evidenceItemId: uuid("evidence_item_id").references(() => evidenceItems.id, {
+      onDelete: "set null",
+    }),
+    ...timestamps,
+  },
+  (table) => [
+    index("learning_commitments_user_id_idx").on(table.userId),
+    index("learning_commitments_user_status_idx").on(table.userId, table.status),
+  ]
 );
 
 export type User = typeof users.$inferSelect;
@@ -831,3 +867,5 @@ export type McpToken = typeof mcpTokens.$inferSelect;
 export type NewMcpToken = typeof mcpTokens.$inferInsert;
 export type EvidenceItem = typeof evidenceItems.$inferSelect;
 export type NewEvidenceItem = typeof evidenceItems.$inferInsert;
+export type LearningCommitment = typeof learningCommitments.$inferSelect;
+export type NewLearningCommitment = typeof learningCommitments.$inferInsert;
