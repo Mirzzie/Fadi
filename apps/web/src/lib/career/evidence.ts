@@ -44,6 +44,27 @@ export function isSubstantialLinkedIn(text?: string | null): boolean {
   return t.length >= SUBSTANTIAL_MIN && !isUrlOnly(t);
 }
 
+const norm = (t: string) => t.replace(/\s+/g, " ").trim().toLowerCase();
+
+/**
+ * True when the "resume" is essentially a COPY of the LinkedIn text (a real
+ * failure mode: users paste the same history into both fields, or a track's
+ * resume slot gets filled with the LinkedIn paste). A copy adds no signal and
+ * makes the model invent structure/wording wholesale — the AI-slop root cause.
+ */
+export function isResumeJustLinkedInCopy(
+  resumeText?: string | null,
+  linkedInText?: string | null,
+): boolean {
+  const r = norm(resumeText ?? "");
+  const l = norm(linkedInText ?? "");
+  if (!r || !l) return false;
+  if (r === l) return true;
+  const shorter = Math.min(r.length, l.length);
+  const longer = Math.max(r.length, l.length);
+  return shorter / longer > 0.9 && (r.includes(l) || l.includes(r));
+}
+
 export function composeCareerEvidence(opts: {
   resumeText?: string | null;
   linkedInText?: string | null;
@@ -57,7 +78,8 @@ export function composeCareerEvidence(opts: {
       "CAREER HISTORY — the candidate's full professional record and the SOURCE OF TRUTH (ground every experience claim here):",
       clip(linkedIn, LINKEDIN_BUDGET),
     ];
-    if (resume) {
+    // A resume that's just a copy of the LinkedIn text is noise, not extra signal.
+    if (resume && !isResumeJustLinkedInCopy(resume, linkedIn)) {
       parts.push(
         "",
         "SUPPORTING RESUME — a role-tailored excerpt. It may deliberately omit relevant experience, so do NOT treat it as the complete history or infer gaps/weaknesses from what it leaves out; use it only as extra detail:",

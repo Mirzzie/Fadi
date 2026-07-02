@@ -9,7 +9,7 @@ import {
 } from "@careeros/database";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getUserDocGenerate } from "@/lib/ai/user-generate";
-import { generateCareerDocument, type DocKind } from "@/lib/documents/generate";
+import { generateCareerDocument, NoHistoryError, type DocKind } from "@/lib/documents/generate";
 import { getDatabase } from "@/lib/database/client";
 import { checkPostingLiveness, type PostingLiveness } from "@/lib/jobs/liveness";
 import { logger } from "@/lib/observability/logger";
@@ -96,6 +96,7 @@ export async function generateJobDocumentAction(jobId: string, kind: DocKind): P
     revalidatePath(`/dashboard/applications/${jobId}/workspace`);
     return { ok: true, message: "Drafted.", id: doc.id };
   } catch (error) {
+    if (error instanceof NoHistoryError) return { ok: false, message: error.message };
     logger.error("workspace.generate_doc_failed", {
       userId: user.id,
       error: error instanceof Error ? error.message : "unknown",
@@ -172,7 +173,11 @@ export async function autoPrepJobAction(jobId: string): Promise<AutoPrepResult> 
         );
         created += 1;
       } catch (err) {
-        // One weak/failed generation shouldn't sink the whole packet.
+        // No history means EVERY kind will fail identically — stop and say so.
+        if (err instanceof NoHistoryError) {
+          return { ok: false, message: err.message, created };
+        }
+        // Otherwise one weak/failed generation shouldn't sink the whole packet.
         logger.warn("workspace.auto_prep_doc_failed", {
           userId: user.id,
           kind,

@@ -11,7 +11,7 @@ import {
 } from "@careeros/database";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getUserDocGenerate } from "@/lib/ai/user-generate";
-import { generateCareerDocument, type DocKind } from "@/lib/documents/generate";
+import { generateCareerDocument, NoHistoryError, type DocKind } from "@/lib/documents/generate";
 import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
 
@@ -147,6 +147,7 @@ export async function generateApplicationDocumentAction(
     revalidatePath("/dashboard/applications");
     return { ok: true, message: "Drafted.", id: doc.id };
   } catch (error) {
+    if (error instanceof NoHistoryError) return { ok: false, message: error.message };
     logger.error("applications.generate_doc_failed", {
       userId: user.id,
       error: error instanceof Error ? error.message : "unknown",

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { composeCareerEvidence, isSubstantialLinkedIn } from "./evidence";
+import { composeCareerEvidence, isResumeJustLinkedInCopy, isSubstantialLinkedIn } from "./evidence";
 
 const FULL_LINKEDIN =
   "Experienced security analyst. ".repeat(20) +
@@ -59,5 +59,20 @@ describe("career evidence composer", () => {
     const huge = "x".repeat(20000);
     const { block } = composeCareerEvidence({ resumeText: null, linkedInText: huge });
     expect(block).toContain("[truncated]");
+  });
+
+  it("drops a 'resume' that is just a copy of the LinkedIn text (the slop root cause)", () => {
+    // The real-world failure: the resume field holds the LinkedIn paste — whitespace
+    // aside, the same text. The copy must be detected and omitted, not double-fed.
+    expect(isResumeJustLinkedInCopy(FULL_LINKEDIN, `  ${FULL_LINKEDIN}\n`)).toBe(true);
+    expect(isResumeJustLinkedInCopy(RESUME, FULL_LINKEDIN)).toBe(false);
+    expect(isResumeJustLinkedInCopy("", FULL_LINKEDIN)).toBe(false);
+
+    const { block, historySource } = composeCareerEvidence({
+      resumeText: FULL_LINKEDIN, // a copy, not a real resume
+      linkedInText: FULL_LINKEDIN,
+    });
+    expect(historySource).toBe("linkedin");
+    expect(block).not.toContain("SUPPORTING RESUME");
   });
 });

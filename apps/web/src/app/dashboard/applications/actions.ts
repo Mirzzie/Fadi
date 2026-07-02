@@ -29,7 +29,7 @@ import {
   type CvReviewResult,
   type ReviewableKind,
 } from "@/lib/documents/cv-review";
-import { generateCareerDocument } from "@/lib/documents/generate";
+import { generateCareerDocument, NoHistoryError } from "@/lib/documents/generate";
 import { isProseKind, letterToPlainText, parseLetter } from "@/lib/documents/letter";
 import { getUserDocGenerate } from "@/lib/ai/user-generate";
 
@@ -279,6 +279,7 @@ export async function applyReviewFixes(input: {
     logger.info("applications.review_fixes_applied", { userId: user.id, jobId: input.jobId, kind: input.kind });
     return { ok: true, message: "Redrafted with the fixes — review it in the editor before sending.", docId: doc.id };
   } catch (error) {
+    if (error instanceof NoHistoryError) return { ok: false, message: error.message };
     logger.error("applications.apply_fixes_failed", {
       userId: user.id,
       jobId: input.jobId,
