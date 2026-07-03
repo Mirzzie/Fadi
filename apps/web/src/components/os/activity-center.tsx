@@ -23,6 +23,7 @@ const KIND_LABEL: Record<string, string> = {
   market_signal: "Market signal",
   world_shift: "World shift",
   off_track: "A pattern Fadi noticed",
+  learning_pending: "Your commitment",
 };
 
 /**

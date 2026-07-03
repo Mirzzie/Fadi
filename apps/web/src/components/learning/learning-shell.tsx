@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpen, GraduationCap, Hammer, Map, MonitorPlay, Target } from "lucide-react";
+import { BookOpen, GraduationCap, Map, MonitorPlay, Target } from "lucide-react";
 
 import { FadiBadge } from "@/components/ui/fadi-badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -9,14 +9,14 @@ import type { StoredCareerReport } from "@/lib/career-report/schema";
 import { learningResources } from "@/lib/learning/resources";
 import { cn } from "@/lib/utils";
 
-/** Free, actionable resources for a skill — roadmap.sh, YouTube, courses, project. */
+/** Free reference links for a skill. ("Build a project" lives in the AI suggest
+ *  button below — one concept, one control, no duplicate.) */
 function ResourceLinks({ skill }: { skill: string }) {
   const r = learningResources(skill);
   const items = [
     { href: r.roadmap, label: "Roadmap", icon: Map },
     { href: r.youtube, label: "Tutorials", icon: MonitorPlay },
     { href: r.courses, label: "Free courses", icon: GraduationCap },
-    { href: r.project, label: "Build a project", icon: Hammer },
   ];
   return (
     <div className="mt-3 flex flex-wrap gap-1.5">

@@ -86,6 +86,49 @@ export async function switchTrackAction(
   return { ok: true };
 }
 
+/**
+ * Delete a direction — the edit/delete permission the user asked for, with the
+ * guardian's safety rules: never the ACTIVE direction (switch first, so the app
+ * never loses its frame of reference) and never the ONLY one (a pivot starts by
+ * creating the new direction, not by deleting the last). The direction's
+ * documents/reports/resumes survive — they just lose the tag (FKs are SET NULL).
+ */
+export async function deleteTrackAction(
+  trackId: string,
+): Promise<{ ok: boolean; message?: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Not signed in." };
+
+  const id = z.string().uuid().safeParse(trackId);
+  if (!id.success) return { ok: false, message: "Invalid track." };
+
+  const repo = createCareerProfilesRepository(getDatabase());
+  const [tracks, active] = await Promise.all([
+    repo.listForUser(user.id),
+    repo.getActiveForUser(user.id),
+  ]);
+
+  if (tracks.length <= 1) {
+    return {
+      ok: false,
+      message: "This is your only direction — create the new one first, then delete this.",
+    };
+  }
+  if (active?.id === id.data) {
+    return {
+      ok: false,
+      message: "This direction is active — switch to another one first, then delete it.",
+    };
+  }
+
+  const deleted = await repo.deleteForUser(user.id, id.data);
+  if (!deleted) return { ok: false, message: "That direction isn't yours." };
+
+  logger.info("tracks.deleted", { userId: user.id, trackId: id.data });
+  revalidatePath("/dashboard", "layout");
+  return { ok: true };
+}
+
 const createTrackSchema = z.object({
   label: z.string().trim().min(1).max(80),
   targetRole: z.string().trim().min(1).max(120),

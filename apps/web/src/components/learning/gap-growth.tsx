@@ -2,7 +2,18 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, CircleCheckBig, Hammer, Loader2, Search, Sparkles, Trash2 } from "lucide-react";
+import {
+  Check,
+  CircleCheckBig,
+  Hammer,
+  Loader2,
+  Maximize2,
+  Minimize2,
+  MonitorPlay,
+  Search,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -93,6 +104,63 @@ export function GapGrowth({ gapTitle, gapDetail }: { gapTitle: string; gapDetail
   );
 }
 
+/**
+ * In-window tutorial player — YouTube's search-playlist embed plays real results
+ * for the query inside the Learning hub (no API key, and no AI-invented URLs:
+ * YouTube does the search). Collapsible → watch inline → expandable to full-width
+ * → or pop out to YouTube.
+ */
+function TutorialPlayer({ query }: { query: string }) {
+  const [open, setOpen] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="mt-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="inline-flex items-center gap-1 rounded-md border border-border/60 px-2 py-1 text-xs font-medium text-primary transition-colors hover:border-primary/40"
+        >
+          <MonitorPlay className="size-3.5" aria-hidden="true" />
+          {open ? "Hide tutorials" : `Watch tutorials here: “${query}”`}
+        </button>
+        {open ? (
+          <>
+            <button
+              type="button"
+              onClick={() => setExpanded((e) => !e)}
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              {expanded ? <Minimize2 className="size-3" aria-hidden="true" /> : <Maximize2 className="size-3" aria-hidden="true" />}
+              {expanded ? "Smaller" : "Expand"}
+            </button>
+            <a
+              href={`https://www.youtube.com/results?search_query=${encodeURIComponent(query)}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <Search className="size-3" aria-hidden="true" /> Open on YouTube
+            </a>
+          </>
+        ) : null}
+      </div>
+      {open ? (
+        <div className={expanded ? "mt-2 aspect-video w-full" : "mt-2 h-52 max-w-md"}>
+          <iframe
+            src={`https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(query)}`}
+            title={`Tutorials: ${query}`}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            className="size-full rounded-lg border border-border/60"
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 /** In-progress + completed commitments; completing feeds the resume data. */
 export function CommitmentsList({ commitments }: { commitments: CommitmentView[] }) {
   const router = useRouter();
@@ -143,16 +211,7 @@ export function CommitmentsList({ commitments }: { commitments: CommitmentView[]
                   closes: {c.gap} · {c.kind}
                 </p>
                 {c.detail ? <p className="mt-1 text-sm text-muted-foreground">{c.detail}</p> : null}
-                {c.searchQuery ? (
-                  <a
-                    href={`https://www.youtube.com/results?search_query=${encodeURIComponent(c.searchQuery)}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-1.5 inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                  >
-                    <Search className="size-3" aria-hidden="true" /> Find tutorials: “{c.searchQuery}”
-                  </a>
-                ) : null}
+                {c.searchQuery ? <TutorialPlayer query={c.searchQuery} /> : null}
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
                 <Button

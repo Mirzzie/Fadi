@@ -4,6 +4,7 @@ import {
   createAgentRunsRepository,
   createCareerProfilesRepository,
   createJobsRepository,
+  createLearningCommitmentsRepository,
   createProfilesRepository,
   createSavedJobsRepository,
   type CreateFindingInput,
@@ -179,6 +180,25 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
             data: {},
           });
         }
+      }
+    }
+
+    // 3.5 Learning commitments going stale — a gentle mentor nudge, not a nag:
+    //     one reminder per window for the oldest in-progress commitment > 3 days.
+    {
+      const commitments = await createLearningCommitmentsRepository(db).listForUser(userId, 10);
+      const staleMs = 3 * 24 * 60 * 60 * 1000;
+      const stale = commitments
+        .filter((c) => c.status === "committed" && Date.now() - new Date(c.createdAt).getTime() > staleMs)
+        .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())[0];
+      if (stale && !seenTitles.has(`Still on “${stale.title}”?`)) {
+        findings.push({
+          kind: "learning_pending",
+          title: `Still on “${stale.title}”?`,
+          detail: `You committed to this${stale.gap ? ` to close “${stale.gap}”` : ""}. Finishing it puts it straight on your resume — or drop it guilt-free and pick a better one. Both are progress.`,
+          href: "/dashboard/learning",
+          data: { commitmentId: stale.id },
+        });
       }
     }
 

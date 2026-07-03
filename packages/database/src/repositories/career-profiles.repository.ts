@@ -185,6 +185,20 @@ export function createCareerProfilesRepository(db: Database) {
         .where(eq(careerProfiles.id, id));
     },
 
+    /**
+     * Delete a track. Every referencing table (documents, reports, resumes,
+     * learning commitments) has ON DELETE SET NULL, so the user's work survives —
+     * it just loses the direction tag. Guard rules (not active / not the only
+     * track) live in the action layer.
+     */
+    async deleteForUser(userId: string, id: string): Promise<boolean> {
+      const deleted = await db
+        .delete(careerProfiles)
+        .where(and(eq(careerProfiles.id, id), eq(careerProfiles.userId, userId)))
+        .returning({ id: careerProfiles.id });
+      return deleted.length > 0;
+    },
+
     /** Store this track's semantic vector + the basis hash that produced it. */
     async setEmbedding(
       id: string,

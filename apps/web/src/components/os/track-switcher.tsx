@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, Compass, Loader2, Plus, Target } from "lucide-react";
+import { Check, ChevronDown, Compass, Loader2, Plus, Target, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { createPortal } from "react-dom";
@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
   createTrackAction,
+  deleteTrackAction,
   listTracksAction,
   switchTrackAction,
   type TrackSummary,
@@ -43,6 +44,8 @@ export function TrackSwitcher() {
   const [tracks, setTracks] = useState<TrackSummary[]>([]);
   const [open, setOpen] = useState(false);
   const [showNew, setShowNew] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -76,6 +79,20 @@ export function TrackSwitcher() {
     });
   }
 
+  function remove(id: string) {
+    setDeleteError(null);
+    startTransition(async () => {
+      const res = await deleteTrackAction(id);
+      if (!res.ok) {
+        setDeleteError(res.message ?? "Couldn't delete it.");
+        return;
+      }
+      setConfirmDeleteId(null);
+      await reload();
+      router.refresh();
+    });
+  }
+
   // No tracks yet (pre-onboarding) → render nothing.
   if (tracks.length === 0 && !showNew) {
     return null;
@@ -106,29 +123,74 @@ export function TrackSwitcher() {
           <ul className="max-h-72 overflow-y-auto">
             {tracks.map((t) => (
               <li key={t.id}>
-                <button
-                  type="button"
-                  onClick={() => switchTo(t.id)}
+                <div
                   className={cn(
-                    "flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-muted",
+                    "group flex w-full items-start gap-2 rounded-lg px-2.5 py-2 transition-colors hover:bg-muted",
                     t.isActive && "bg-primary/10",
                   )}
                 >
-                  <span className="mt-0.5 shrink-0">
-                    {t.isActive ? (
-                      <Check className="size-3.5 text-primary" aria-hidden="true" />
-                    ) : (
-                      <Compass className="size-3.5 text-muted-foreground" aria-hidden="true" />
-                    )}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium">{t.label}</span>
-                    <span className="block truncate text-[0.7rem] text-muted-foreground">
-                      {[t.domain, intentMeta(t.intent)?.label].filter(Boolean).join(" · ") ||
-                        t.targetRole}
+                  <button
+                    type="button"
+                    onClick={() => switchTo(t.id)}
+                    className="flex min-w-0 flex-1 items-start gap-2 text-left"
+                  >
+                    <span className="mt-0.5 shrink-0">
+                      {t.isActive ? (
+                        <Check className="size-3.5 text-primary" aria-hidden="true" />
+                      ) : (
+                        <Compass className="size-3.5 text-muted-foreground" aria-hidden="true" />
+                      )}
                     </span>
-                  </span>
-                </button>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium">{t.label}</span>
+                      <span className="block truncate text-[0.7rem] text-muted-foreground">
+                        {[t.domain, intentMeta(t.intent)?.label].filter(Boolean).join(" · ") ||
+                          t.targetRole}
+                      </span>
+                    </span>
+                  </button>
+                  {/* Delete — only for non-active directions (switch first for the active one) */}
+                  {!t.isActive && tracks.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDeleteError(null);
+                        setConfirmDeleteId(confirmDeleteId === t.id ? null : t.id);
+                      }}
+                      aria-label={`Delete direction ${t.label}`}
+                      title="Delete this direction (its documents stay)"
+                      className="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-rose-400 group-hover:opacity-100"
+                    >
+                      <Trash2 className="size-3.5" aria-hidden="true" />
+                    </button>
+                  ) : null}
+                </div>
+                {confirmDeleteId === t.id ? (
+                  <div className="mx-2.5 mb-1.5 rounded-md border border-rose-500/40 bg-rose-500/10 p-2 text-xs">
+                    <p>
+                      Delete <span className="font-medium">{t.label}</span>? Its documents, report
+                      and resume stay in your account — they just lose this direction&apos;s tag.
+                    </p>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => remove(t.id)}
+                        disabled={pending}
+                        className="rounded bg-rose-500/20 px-2 py-0.5 font-medium text-rose-300 hover:bg-rose-500/30"
+                      >
+                        {pending ? "Deleting…" : "Delete"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                    {deleteError ? <p className="mt-1 text-amber-400">{deleteError}</p> : null}
+                  </div>
+                ) : null}
               </li>
             ))}
           </ul>
