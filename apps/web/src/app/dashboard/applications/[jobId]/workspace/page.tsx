@@ -11,15 +11,7 @@ import {
 
 import { AppShell } from "@/components/layout/app-shell";
 import { ApplicationWorkspace } from "@/components/workspace/application-workspace";
-import {
-  Building2,
-  ClipboardCheck,
-  ExternalLink,
-  Flag,
-  Gauge,
-  MessageSquareQuote,
-  PenLine,
-} from "lucide-react";
+import { ExternalLink } from "lucide-react";
 
 import { ApplicationOutcomePanel } from "@/components/workspace/application-outcome-panel";
 import { FitGatePanel } from "@/components/workspace/fit-gate-panel";
@@ -149,22 +141,22 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
         {/* The tools, progressively disclosed (Hick's law): each is one self-describing
             row, one click away — in journey order: decide → perfect → prep → learn. */}
         <div className="shrink-0 space-y-2">
-          <WorkspaceSection icon={Gauge} title="Should you apply?" hint="An honest fit check before you invest time">
+          <WorkspaceSection icon="fit" title="Should you apply?" hint="An honest fit check before you invest time">
             <FitGatePanel jobTitle={job.title} jobCompany={job.company} jobDescription={job.description ?? undefined} />
           </WorkspaceSection>
-          <WorkspaceSection icon={ClipboardCheck} title="Is it ready to send?" hint="Score your resume against this exact posting">
+          <WorkspaceSection icon="quality" title="Is it ready to send?" hint="Score your resume against this exact posting">
             <ApplicationQualityPanel jobId={job.id} jobTitle={job.title} jobCompany={job.company} jobDescription={job.description ?? undefined} />
           </WorkspaceSection>
-          <WorkspaceSection icon={PenLine} title="Red-pen review" hint="Recruiter markup of any document, with rewrites">
+          <WorkspaceSection icon="redpen" title="Red-pen review" hint="Recruiter markup of any document, with rewrites">
             <CvReviewPanel jobId={job.id} jobTitle={job.title} jobCompany={job.company} jobDescription={job.description ?? undefined} />
           </WorkspaceSection>
-          <WorkspaceSection icon={MessageSquareQuote} title="Interview prep" hint="Likely questions + STAR answers from your real experience">
+          <WorkspaceSection icon="interview" title="Interview prep" hint="Likely questions + STAR answers from your real experience">
             <InterviewPrepPanel jobTitle={job.title} jobCompany={job.company} jobDescription={job.description ?? undefined} />
           </WorkspaceSection>
-          <WorkspaceSection icon={Building2} title="Company brief" hint="Understand the business + smart questions to ask">
+          <WorkspaceSection icon="company" title="Company brief" hint="Understand the business + smart questions to ask">
             <CompanyBriefPanel jobTitle={job.title} jobCompany={job.company} jobDescription={job.description ?? undefined} />
           </WorkspaceSection>
-          <WorkspaceSection icon={Flag} title="Outcome & learning" hint="Log the result — rejections become data, not verdicts">
+          <WorkspaceSection icon="outcome" title="Outcome & learning" hint="Log the result — rejections become data, not verdicts">
             <ApplicationOutcomePanel
               jobId={job.id}
               jobCompany={job.company}

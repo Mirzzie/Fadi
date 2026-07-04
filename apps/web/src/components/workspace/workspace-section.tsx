@@ -1,9 +1,33 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, type LucideIcon } from "lucide-react";
+import {
+  Building2,
+  ChevronDown,
+  ClipboardCheck,
+  Flag,
+  Gauge,
+  MessageSquareQuote,
+  PenLine,
+  type LucideIcon,
+} from "lucide-react";
 
 import { cn } from "@/lib/utils";
+
+/**
+ * Icons are mapped from string keys INSIDE this client component — a component
+ * (function) can't be passed across the server→client boundary as a prop.
+ */
+const ICONS: Record<string, LucideIcon> = {
+  fit: Gauge,
+  quality: ClipboardCheck,
+  redpen: PenLine,
+  interview: MessageSquareQuote,
+  company: Building2,
+  outcome: Flag,
+};
+
+export type WorkspaceSectionIcon = keyof typeof ICONS;
 
 /**
  * Progressive disclosure for the workspace tools (Hick's law: every visible
@@ -12,13 +36,13 @@ import { cn } from "@/lib/utils";
  * document list stay outside this wrapper: information isn't a choice.
  */
 export function WorkspaceSection({
-  icon: Icon,
+  icon,
   title,
   hint,
   defaultOpen = false,
   children,
 }: {
-  icon: LucideIcon;
+  icon: WorkspaceSectionIcon;
   title: string;
   /** One honest line on what this tool does — shown in the collapsed row. */
   hint: string;
@@ -26,6 +50,7 @@ export function WorkspaceSection({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const Icon = ICONS[icon] ?? Gauge;
 
   return (
     <div className="overflow-hidden rounded-lg border bg-card">
