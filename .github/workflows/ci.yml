@@ -5,10 +5,8 @@ on:
     branches: [main]
   pull_request:
 
-# Typecheck + lint gate. These need no database or secrets, so they run
-# reliably on every push/PR. (A full `next build` and Playwright smokes need
-# env + a Postgres service — add behind secrets when ready.)
 jobs:
+  # Fast gate — no DB/secrets needed, runs on every push/PR.
   check:
     runs-on: ubuntu-latest
     steps:
@@ -25,3 +23,55 @@ jobs:
         run: npm run lint
       - name: Unit tests
         run: npm test
+
+  # Production gate — real build + real migrations + route smokes against a live
+  # server. Catches what tsc can't: runtime crashes (RSC serialization), broken
+  # migrations, dead routes, broken auth redirects.
+  smoke:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: careeros
+          POSTGRES_PASSWORD: careeros
+          POSTGRES_DB: careeros_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U careeros"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://careeros:careeros@localhost:5432/careeros_ci
+      BETTER_AUTH_SECRET: ci-only-secret-not-production-0123456789abcdef
+      BETTER_AUTH_URL: http://localhost:3000
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Apply migrations (fails CI if a migration is broken)
+        run: npm run db:migrate --workspace @careeros/database
+      - name: Build (fails CI on build-only breakage)
+        run: npm run build
+        env:
+          NODE_ENV: production
+      - name: Install Playwright browser
+        run: npx playwright install --with-deps chromium
+      - name: Route smokes (golden path + every dashboard route + workspace)
+        run: npx playwright test
+        env:
+          CI: "true"
+      - name: Upload traces on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7

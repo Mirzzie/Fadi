@@ -22,7 +22,8 @@
     "start": "npm --workspace @careeros/web run start",
     "typecheck": "npm --workspace @careeros/database run typecheck && npm --workspace @careeros/web run typecheck",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test:e2e": "playwright test"
   },
   "engines": {
     "node": ">=20.11.0",

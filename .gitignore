@@ -36,3 +36,7 @@ Thumbs.db
 
 # Local backup archive (not source)
 claude-backup.tar.gz
+
+# Playwright
+test-results/
+playwright-report/
