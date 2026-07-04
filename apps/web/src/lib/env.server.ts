@@ -24,6 +24,9 @@ const serverEnvSchema = z.object({
   // configured key in order: Groq → Google → Anthropic → OpenAI.
   AI_PROVIDER: z.enum(["openai", "anthropic", "groq", "google"]).optional(),
   OPENAI_API_KEY: z.string().optional(),
+  // Shared KV (multi-instance rate limits/caches). Optional — memory fallback.
+  UPSTASH_REDIS_REST_URL: z.string().url().optional(),
+  UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
   OPENAI_MODEL: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
   ANTHROPIC_MODEL: z.string().optional(),
@@ -71,6 +74,8 @@ export const serverEnv = {
     LINKEDIN_CLIENT_SECRET: process.env.LINKEDIN_CLIENT_SECRET,
     AI_PROVIDER: process.env.AI_PROVIDER,
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
+    UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
     OPENAI_MODEL: process.env.OPENAI_MODEL,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL,

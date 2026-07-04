@@ -150,7 +150,7 @@ export async function generateCareerReportAction(
   }
 
   const rateLimitKey = `career-report:${user.id}`;
-  const rateLimit = consumeRateLimit({
+  const rateLimit = await consumeRateLimit({
     key: rateLimitKey,
     limit: REPORT_GENERATION_LIMIT,
     windowMs: REPORT_GENERATION_WINDOW_MS,
@@ -316,7 +316,7 @@ ${composeCareerEvidence({ resumeText: context.resumeText, linkedInText: context.
       providerError.code === "insufficient_quota";
 
     if (isProviderConfig) {
-      refundRateLimit(rateLimitKey);
+      await refundRateLimit(rateLimitKey);
     }
 
     logger.error("career_report.generate.failed", {

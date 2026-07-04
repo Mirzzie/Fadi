@@ -1,7 +1,11 @@
-type RateLimitState = {
-  count: number;
-  resetAt: number;
-};
+import { getKv } from "@/lib/kv/store";
+
+/**
+ * Fixed-window rate limiting on the shared KV seam — correct across multiple
+ * instances (the old per-process Map effectively multiplied every limit by the
+ * instance count). Fails OPEN on KV errors: a broken cache must never lock users
+ * out of their own app.
+ */
 
 type RateLimitOptions = {
   key: string;
@@ -16,73 +20,27 @@ type RateLimitResult = {
   retryAfterSeconds: number;
 };
 
-const globalForRateLimit = globalThis as typeof globalThis & {
-  careerosRateLimits?: Map<string, RateLimitState>;
-};
-
-function getStore() {
-  if (!globalForRateLimit.careerosRateLimits) {
-    globalForRateLimit.careerosRateLimits = new Map();
+export async function consumeRateLimit({ key, limit, windowMs }: RateLimitOptions): Promise<RateLimitResult> {
+  const windowSeconds = Math.max(1, Math.ceil(windowMs / 1000));
+  try {
+    const { count, ttlSeconds } = await getKv().incr(`rl:${key}`, windowSeconds);
+    const ttl = ttlSeconds > 0 ? ttlSeconds : windowSeconds;
+    const resetAt = new Date(Date.now() + ttl * 1000);
+    if (count > limit) {
+      return { allowed: false, remaining: 0, resetAt, retryAfterSeconds: Math.max(1, ttl) };
+    }
+    return { allowed: true, remaining: Math.max(0, limit - count), resetAt, retryAfterSeconds: 0 };
+  } catch {
+    // Fail open — a cache outage should degrade to "no limit", not "no service".
+    return { allowed: true, remaining: limit, resetAt: new Date(Date.now() + windowMs), retryAfterSeconds: 0 };
   }
-
-  return globalForRateLimit.careerosRateLimits;
 }
 
-export function consumeRateLimit({ key, limit, windowMs }: RateLimitOptions): RateLimitResult {
-  const now = Date.now();
-  const store = getStore();
-  const existing = store.get(key);
-
-  if (!existing || existing.resetAt <= now) {
-    const resetAt = now + windowMs;
-    store.set(key, {
-      count: 1,
-      resetAt,
-    });
-
-    return {
-      allowed: true,
-      remaining: Math.max(0, limit - 1),
-      resetAt: new Date(resetAt),
-      retryAfterSeconds: 0,
-    };
+/** Give an attempt back (e.g. the provider failed through no fault of the user). */
+export async function refundRateLimit(key: string): Promise<void> {
+  try {
+    await getKv().decr(`rl:${key}`);
+  } catch {
+    // best-effort
   }
-
-  if (existing.count >= limit) {
-    return {
-      allowed: false,
-      remaining: 0,
-      resetAt: new Date(existing.resetAt),
-      retryAfterSeconds: Math.max(1, Math.ceil((existing.resetAt - now) / 1000)),
-    };
-  }
-
-  existing.count += 1;
-  store.set(key, existing);
-
-  return {
-    allowed: true,
-    remaining: Math.max(0, limit - existing.count),
-    resetAt: new Date(existing.resetAt),
-    retryAfterSeconds: 0,
-  };
-}
-
-export function refundRateLimit(key: string) {
-  const store = getStore();
-  const existing = store.get(key);
-
-  if (!existing) {
-    return;
-  }
-
-  if (existing.count <= 1) {
-    store.delete(key);
-    return;
-  }
-
-  store.set(key, {
-    ...existing,
-    count: existing.count - 1,
-  });
 }

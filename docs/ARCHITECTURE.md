@@ -68,7 +68,7 @@ behaviour and what Fadi actually did.
 
 ## Production-hardening order
 
-1. **Redis/Upstash seam** for rate-limit + liveness cache + sync TTL (multi-instance correctness) — critical
+1. ~~Redis/Upstash seam~~ ✅ DONE (2026-07-04): `lib/kv/store.ts` — Upstash REST when `UPSTASH_REDIS_REST_URL/TOKEN` set, memory fallback otherwise; rate-limit, liveness cache, and sync TTL (generation-counter invalidation) all ride it
 2. **Queue long AI work** out of request handlers — critical
 3. **Centralized scheduled source sync** (drop per-request fan-out) — high
 4. **CI: build + migrations + smoke; Sentry** — high

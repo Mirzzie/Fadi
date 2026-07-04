@@ -3,6 +3,7 @@ import "server-only";
 import { createJobsRepository } from "@careeros/database";
 
 import { getDatabase } from "@/lib/database/client";
+import { getKv } from "@/lib/kv/store";
 import { discoverJobs, type LocationFilter } from "@/lib/data-sources/service";
 import type { RelevanceProfile } from "@/lib/data-sources/relevance";
 import type { JobPosting } from "@/lib/data-sources/types";
@@ -29,26 +30,34 @@ const SYNC_TTL_MS = 30 * 60 * 1000;
 // "active" (a ghost job that wastes the user's time). Boards typically expire
 // postings within ~30 days; we're a bit more aggressive.
 const JOB_FRESHNESS_MS = 14 * 24 * 60 * 60 * 1000;
-const lastSyncByKey = new Map<string, number>();
+const SYNC_TTL_SECONDS = Math.ceil(SYNC_TTL_MS / 1000);
 
-function syncKey(profile: RelevanceProfile, location?: LocationFilter): string {
-  return `${profile.targetRole}::${profile.region ?? ""}::${location?.country ?? ""}::${location?.city ?? ""}`;
+// The sync window lives in the shared KV so multiple instances don't duplicate
+// external pulls. Invalidation uses GENERATION COUNTERS (a KV can't prefix-delete):
+// bumping the role or global generation changes every affected key, which is
+// equivalent to clearing those windows.
+async function syncKey(profile: RelevanceProfile, location?: LocationFilter): Promise<string> {
+  const kv = getKv();
+  const [roleGen, globalGen] = await Promise.all([
+    kv.get(`jobsync-gen:${profile.targetRole}`),
+    kv.get("jobsync-gen:*"),
+  ]);
+  return `jobsync:${globalGen ?? 0}:${roleGen ?? 0}:${profile.targetRole}::${profile.region ?? ""}::${location?.country ?? ""}::${location?.city ?? ""}`;
 }
 
 /**
  * Drop the cached sync window so the next jobs load re-pulls live postings. Called
  * when the user creates or switches their active direction, so the jobs they see
  * follow the NEW direction immediately instead of waiting out the TTL. Pass a role
- * to target just that direction; omit to clear all.
+ * to target just that direction; omit to clear all. Fire-and-forget by design.
  */
 export function invalidateJobSync(targetRole?: string): void {
-  if (!targetRole) {
-    lastSyncByKey.clear();
-    return;
-  }
-  for (const key of [...lastSyncByKey.keys()]) {
-    if (key.startsWith(`${targetRole}::`)) lastSyncByKey.delete(key);
-  }
+  const key = targetRole ? `jobsync-gen:${targetRole}` : "jobsync-gen:*";
+  void getKv()
+    .incr(key)
+    .catch(() => {
+      /* best-effort — worst case the old TTL window plays out */
+    });
 }
 
 function toRemoteMode(posting: JobPosting): string | null {
@@ -65,19 +74,19 @@ export async function ensureFreshLiveJobs(
   profile: RelevanceProfile,
   location?: LocationFilter,
 ): Promise<number> {
-  const key = syncKey(profile, location);
-  const last = lastSyncByKey.get(key) ?? 0;
-  if (Date.now() - last < SYNC_TTL_MS) return 0;
+  const kv = getKv();
+  const key = await syncKey(profile, location);
+  if (await kv.get(key)) return 0;
 
   // Reserve the window up front so concurrent requests don't all fan out.
-  lastSyncByKey.set(key, Date.now());
+  await kv.set(key, "1", SYNC_TTL_SECONDS);
 
   try {
     const postings = await discoverJobs(profile, 30, location);
     if (postings.length === 0) {
       // Nothing live came back — don't archive the seed, leave the user with
-      // *something*. Re-open the window so we retry sooner than the full TTL.
-      lastSyncByKey.set(key, Date.now() - (SYNC_TTL_MS - 60_000));
+      // *something*. Shrink the window so we retry sooner than the full TTL.
+      await kv.set(key, "1", 60);
       return 0;
     }
 

@@ -33,7 +33,7 @@ export async function findNichesAction(
     };
   }
 
-  const rate = consumeRateLimit({ key: `niche-finder:${user.id}`, limit: LIMIT, windowMs: WINDOW_MS });
+  const rate = await consumeRateLimit({ key: `niche-finder:${user.id}`, limit: LIMIT, windowMs: WINDOW_MS });
   if (!rate.allowed) {
     return {
       ok: false,
