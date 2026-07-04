@@ -64,14 +64,14 @@ behaviour and what Fadi actually did.
 | "One AI core, all strings through it" | ⚠️ drifted | Fadi is **federated** (orb/tools/guardian/agency seams), not one core; pragmatic — decide deliberately, don't drift further by accretion |
 | Jobs discovery as the center | ⚠️ shifted | Sources thin → center of gravity moved to the document workflow. **User-endorsed pivot**, not decay |
 | Narrow surface | ⚠️ drifted | Workspace fixed (11→6 disclosed); dock still 13 destinations; Learning/Niche/Weather overlap the report |
-| Production-grade reliability | ❌ gap | In-memory rate-limit/caches (break at 2+ instances), AI inline in requests, per-request source fan-out, no error tracking, CI lacks build/migration gates |
+| Production-grade reliability | ⚠️ closing | ~~In-memory state~~ (KV seam ✅), ~~CI gates~~ (build+migrations+browser smokes ✅ 2026-07-04). Remaining: AI inline in requests, per-request source fan-out, no error tracking |
 
 ## Production-hardening order
 
 1. ~~Redis/Upstash seam~~ ✅ DONE (2026-07-04): `lib/kv/store.ts` — Upstash REST when `UPSTASH_REDIS_REST_URL/TOKEN` set, memory fallback otherwise; rate-limit, liveness cache, and sync TTL (generation-counter invalidation) all ride it
 2. **Queue long AI work** out of request handlers — critical
 3. **Centralized scheduled source sync** (drop per-request fan-out) — high
-4. **CI: build + migrations + smoke; Sentry** — high
+4. ~~CI: build + migrations + smoke~~ ✅ DONE (2026-07-04, real-browser golden path); **Sentry/error tracking** still open — high
 5. **DB-side job filtering / pgvector** past ~50k jobs (hybrid-search P3) — later
 
 **Verdict:** the ideology survives in the product logic; the infrastructure hasn't caught
