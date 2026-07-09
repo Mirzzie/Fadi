@@ -13,6 +13,7 @@ import { getDatabase } from "@/lib/database/client";
 import { toCommitmentView, type CommitmentView } from "@/lib/learning/commitments-view";
 import { suggestProjectsForGap, type SuggestResult } from "@/lib/learning/suggest";
 import { logger } from "@/lib/observability/logger";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 
 const PATH = "/dashboard/learning";
 
@@ -23,6 +24,10 @@ export async function suggestForGapAction(input: {
 }): Promise<SuggestResult> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
+  const rate = await consumeRateLimit({ key: `gap-suggest:${user.id}`, limit: 15, windowMs: 60 * 60 * 1000 });
+  if (!rate.allowed) {
+    return { ok: false, message: "That's a lot of project ideas in one hour — pick one and build it. More suggestions unlock shortly." };
+  }
   return suggestProjectsForGap(user.id, input);
 }
 

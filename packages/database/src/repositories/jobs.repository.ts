@@ -1,4 +1,4 @@
-import { and, asc, count, eq, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, lt, sql } from "drizzle-orm";
 
 import type { Database } from "../client";
 import { jobs, type Job } from "../schema";
@@ -30,16 +30,6 @@ export function createJobsRepository(db: Database) {
         .from(jobs)
         .where(eq(jobs.status, "active"))
         .orderBy(asc(jobs.company), asc(jobs.title));
-    },
-
-    /** How many postings Fadi has taken off the board as closed/expired (proof surface). */
-    async countByStatuses(statuses: string[]): Promise<number> {
-      if (statuses.length === 0) return 0;
-      const [row] = await db
-        .select({ value: count() })
-        .from(jobs)
-        .where(inArray(jobs.status, statuses));
-      return row?.value ?? 0;
     },
 
     async findById(id: string): Promise<Job | null> {
@@ -90,12 +80,6 @@ export function createJobsRepository(db: Database) {
       return updated.length;
     },
 
-    /**
-     * Record a posting-liveness probe result. "closed" also flips status to
-     * "closed" so the role drops out of `listActive` immediately and STAYS out
-     * across re-syncs (a job can be closed on the employer site yet linger in an
-     * aggregator feed). "live"/"unknown" only stamp the cache so we don't re-probe.
-     */
     /** Store a job's semantic vector (hybrid search). Best-effort, additive. */
     async setEmbedding(id: string, embedding: number[], model: string): Promise<void> {
       await db
@@ -104,6 +88,12 @@ export function createJobsRepository(db: Database) {
         .where(eq(jobs.id, id));
     },
 
+    /**
+     * Record a posting-liveness probe result. "closed" also flips status to
+     * "closed" so the role drops out of `listActive` immediately and STAYS out
+     * across re-syncs (a job can be closed on the employer site yet linger in an
+     * aggregator feed). "live"/"unknown" only stamp the cache so we don't re-probe.
+     */
     async setJobLiveness(id: string, state: LivenessState): Promise<void> {
       await db
         .update(jobs)

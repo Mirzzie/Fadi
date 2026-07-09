@@ -56,6 +56,16 @@ export function createCareerReportsRepository(db: Database) {
       return report ?? null;
     },
 
+    /** Remove a deleted direction's reports — they're strictly track-scoped on read,
+     *  so orphaning them via SET NULL just leaves invisible rows behind. */
+    async deleteForTrack(userId: string, careerProfileId: string): Promise<number> {
+      const deleted = await db
+        .delete(careerReports)
+        .where(and(eq(careerReports.userId, userId), eq(careerReports.careerProfileId, careerProfileId)))
+        .returning({ id: careerReports.id });
+      return deleted.length;
+    },
+
     async createForUser(userId: string, input: CreateCareerReportInput): Promise<CareerReport> {
       const [report] = await db
         .insert(careerReports)

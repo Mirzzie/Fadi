@@ -52,6 +52,20 @@ export function createResumesRepository(db: Database) {
       return legacy ?? null;
     },
 
+    /**
+     * Delete a direction's tailored resumes when the direction itself is deleted.
+     * Without this, ON DELETE SET NULL turns the deleted track's resume into the
+     * NEWEST untagged row — which getLatestForTrack would then pick as the shared
+     * fallback for every other direction, silently poisoning their generation.
+     */
+    async deleteForTrack(userId: string, careerProfileId: string): Promise<number> {
+      const deleted = await db
+        .delete(resumes)
+        .where(and(eq(resumes.userId, userId), eq(resumes.careerProfileId, careerProfileId)))
+        .returning({ id: resumes.id });
+      return deleted.length;
+    },
+
     async createForUser(userId: string, input: CreateResumeInput): Promise<Resume> {
       const [resume] = await db
         .insert(resumes)

@@ -168,8 +168,9 @@ export function TrackSwitcher() {
                 {confirmDeleteId === t.id ? (
                   <div className="mx-2.5 mb-1.5 rounded-md border border-rose-500/40 bg-rose-500/10 p-2 text-xs">
                     <p>
-                      Delete <span className="font-medium">{t.label}</span>? Its documents, report
-                      and resume stay in your account — they just lose this direction&apos;s tag.
+                      Delete <span className="font-medium">{t.label}</span>? Your documents stay in
+                      your account (untagged). Its tailored base resume and report go with it —
+                      they&apos;re direction-specific and regenerable.
                     </p>
                     <div className="mt-1.5 flex items-center gap-2">
                       <button

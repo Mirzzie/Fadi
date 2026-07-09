@@ -1,6 +1,10 @@
 "use server";
 
-import { createCareerProfilesRepository } from "@careeros/database";
+import {
+  createCareerProfilesRepository,
+  createCareerReportsRepository,
+  createResumesRepository,
+} from "@careeros/database";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
@@ -90,8 +94,9 @@ export async function switchTrackAction(
  * Delete a direction — the edit/delete permission the user asked for, with the
  * guardian's safety rules: never the ACTIVE direction (switch first, so the app
  * never loses its frame of reference) and never the ONLY one (a pivot starts by
- * creating the new direction, not by deleting the last). The direction's
- * documents/reports/resumes survive — they just lose the tag (FKs are SET NULL).
+ * creating the new direction, not by deleting the last). Documents survive
+ * untagged; the direction's DERIVED artifacts (tailored base resume, report) are
+ * deleted with it — regenerable, and dangerous as orphans (see below).
  */
 export async function deleteTrackAction(
   trackId: string,
@@ -120,6 +125,15 @@ export async function deleteTrackAction(
       message: "This direction is active — switch to another one first, then delete it.",
     };
   }
+
+  // Delete the direction's DERIVED artifacts first (tailored base resume, report):
+  // left to ON DELETE SET NULL they'd become untagged rows — and the newest untagged
+  // resume is the shared fallback, so a deleted direction would silently poison
+  // every other direction's generation. Documents (user artifacts) stay, untagged.
+  await Promise.all([
+    createResumesRepository(getDatabase()).deleteForTrack(user.id, id.data),
+    createCareerReportsRepository(getDatabase()).deleteForTrack(user.id, id.data),
+  ]);
 
   const deleted = await repo.deleteForUser(user.id, id.data);
   if (!deleted) return { ok: false, message: "That direction isn't yours." };

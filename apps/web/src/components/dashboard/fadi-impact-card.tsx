@@ -13,8 +13,8 @@ export function FadiImpactCard({ impact }: { impact: FadiImpact }) {
     {
       icon: ShieldCheck,
       value: impact.deadPostingsHidden,
-      label: "dead postings kept off the board",
-      hint: "closed/expired roles you never wasted an application on",
+      label: "of your tracked roles turned out closed",
+      hint: "caught by the liveness check before more time went in",
     },
     {
       icon: Compass,

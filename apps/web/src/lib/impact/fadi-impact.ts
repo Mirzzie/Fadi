@@ -21,7 +21,7 @@ import { createJobScorer } from "@/lib/jobs/job-matching";
 const MINUTES_PER_APPLICATION = 45;
 
 export interface FadiImpact {
-  /** Postings Fadi has taken off the board as closed/expired — ghosts you never apply to. */
+  /** YOUR tracked roles (saved/applied) whose postings closed — caught before more time went in. */
   deadPostingsHidden: number;
   /** Roles you saved that are off your active direction / above your level — flagged, not hidden. */
   offDirectionFlagged: number;
@@ -37,24 +37,37 @@ export interface FadiImpact {
 
 export async function getFadiImpact(userId: string): Promise<FadiImpact> {
   const db = getDatabase();
-  const [track, saved, applications, deadPostingsHidden] = await Promise.all([
+  const [track, saved, applications] = await Promise.all([
     createCareerProfilesRepository(db).getActiveForUser(userId),
     createSavedJobsRepository(db).listForUser(userId),
     createApplicationsRepository(db).listForUser(userId),
-    createJobsRepository(db).countByStatuses(["closed", "expired"]),
   ]);
 
   const applicationsSent = applications.filter(
     (a) => a.appliedAt != null || a.status === "applied" || a.status === "interviewing" || a.status === "offer",
   ).length;
 
+  // ONE fetch of every job THIS user tracked (saved ∪ applied) powers both metrics.
+  const savedIds = saved.map((s) => s.jobId);
+  const trackedIds = [
+    ...new Set([...savedIds, ...applications.map((a) => a.jobId).filter((id): id is string => id != null)]),
+  ];
+  const jobRows = trackedIds.length > 0 ? await createJobsRepository(db).listByIds(trackedIds) : [];
+
+  // Honesty rule: this is the USER's number, not a platform-wide one — only roles
+  // they actually tracked whose postings then closed.
+  const deadPostingsHidden = jobRows.filter(
+    (j) => j.status === "closed" || j.status === "expired",
+  ).length;
+
   // Off-direction saves: score the user's saved roles against the ACTIVE track and
   // count the ones Fadi flagged as off-role or above their level. Real, grounded.
   let offDirectionFlagged = 0;
-  if (track?.targetRole && saved.length > 0) {
-    const jobRows = await createJobsRepository(db).listByIds(saved.map((s) => s.jobId));
+  if (track?.targetRole && savedIds.length > 0) {
+    const savedSet = new Set(savedIds);
     const scoreJob = createJobScorer({ careerProfile: track, resume: null });
     offDirectionFlagged = jobRows.filter((j) => {
+      if (!savedSet.has(j.id)) return false;
       const m = scoreJob(j);
       return !m.onRole || m.overLevel;
     }).length;
