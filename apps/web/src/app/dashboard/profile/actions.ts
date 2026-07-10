@@ -12,6 +12,7 @@ import { revalidatePath } from "next/cache";
 import { signOutAction } from "@/app/auth/actions";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
+import { invalidateJobSync } from "@/lib/jobs/sync";
 import { detectDocType, extractDocumentText } from "@/lib/documents/extract-text";
 import { logger } from "@/lib/observability/logger";
 
@@ -88,7 +89,7 @@ export async function updateProfileAction(input: UpdateProfileInput): Promise<Re
       email: user.email ?? "",
       onboardingCompleted: true,
     });
-    await createCareerProfilesRepository(db).updateLatestForUser(user.id, {
+    await createCareerProfilesRepository(db).updateActiveForUser(user.id, {
       targetRole: input.targetRole.trim(),
       location: input.location.trim() || null,
       experienceLevel: input.experienceLevel.trim() || null,
@@ -97,6 +98,9 @@ export async function updateProfileAction(input: UpdateProfileInput): Promise<Re
     // The resume is PER-DIRECTION — tag edits to the active track. (LinkedIn history
     // below stays user-wide: it's your one real record, shared across directions.)
     const activeTrack = await createCareerProfilesRepository(db).getActiveForUser(user.id);
+    // The role may have just changed — re-pull jobs for it instead of serving the
+    // stale sync window (synonyms were cleared in the repo when it changed).
+    invalidateJobSync(input.targetRole.trim());
 
     // LinkedIn URL + context and resume text are the richest AI inputs — keep
     // them editable here too. Only touch them when the user provided something,

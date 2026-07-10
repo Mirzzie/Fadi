@@ -138,7 +138,7 @@ export function createCareerProfilesRepository(db: Database) {
     },
 
     /** Update the user's ACTIVE track in place; create one (active) if none. */
-    async updateLatestForUser(
+    async updateActiveForUser(
       userId: string,
       patch: Partial<CreateCareerProfileInput>,
     ): Promise<CareerProfile> {
@@ -158,10 +158,17 @@ export function createCareerProfilesRepository(db: Database) {
         });
       }
 
+      // A changed target role invalidates the AI-generated role synonyms — keeping
+      // them would make the renamed direction match jobs for the OLD role. Clearing
+      // triggers fresh generation on the next board load.
+      const roleChanged =
+        patch.targetRole !== undefined && patch.targetRole !== existing.targetRole;
+
       const [updated] = await db
         .update(careerProfiles)
         .set({
           targetRole: patch.targetRole ?? existing.targetRole,
+          ...(roleChanged ? { roleSynonyms: null } : {}),
           location: patch.location ?? existing.location,
           experienceLevel: patch.experienceLevel ?? existing.experienceLevel,
           careerGoal: patch.careerGoal ?? existing.careerGoal,
@@ -186,10 +193,11 @@ export function createCareerProfilesRepository(db: Database) {
     },
 
     /**
-     * Delete a track. Every referencing table (documents, reports, resumes,
-     * learning commitments) has ON DELETE SET NULL, so the user's work survives —
-     * it just loses the direction tag. Guard rules (not active / not the only
-     * track) live in the action layer.
+     * Delete a track ROW. The action layer first removes the track's DERIVED
+     * artifacts (tailored base resume, reports) — see deleteTrackAction for why.
+     * Remaining references (documents, learning commitments) are ON DELETE SET
+     * NULL, so user-authored work survives untagged. Guard rules (not active /
+     * not the only track) also live in the action layer.
      */
     async deleteForUser(userId: string, id: string): Promise<boolean> {
       const deleted = await db
