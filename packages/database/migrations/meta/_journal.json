@@ -176,6 +176,34 @@
       "when": 1783030587746,
       "tag": "0024_real_sue_storm",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1783966980523,
+      "tag": "0025_talented_psynapse",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1783972599800,
+      "tag": "0026_cuddly_the_captain",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1784151065203,
+      "tag": "0027_brown_robbie_robertson",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1784236929400,
+      "tag": "0028_bored_trish_tilby",
+      "breakpoints": true
     }
   ]
 }

@@ -90,7 +90,7 @@ export async function handleMcpMessage(
         capabilities: { tools: { listChanged: false } },
         serverInfo: MCP_SERVER_INFO,
         instructions:
-          "Fadi exposes career-coaching tools: find and fit-check jobs, pull a company's live roles, draft referral outreach, run a rejection autopsy, prep STAR interview answers from the user's real history, and read their momentum and career-weather. Everything is grounded in the user's real data; tools never fabricate.",
+          "Fadi exposes career-coaching tools: find and fit-check jobs, pull a company's live roles, draft referral outreach, run a rejection autopsy, prep STAR interview answers from the user's real history, and read their momentum. Everything is grounded in the user's real data; tools never fabricate.",
       });
 
     case "notifications/initialized":

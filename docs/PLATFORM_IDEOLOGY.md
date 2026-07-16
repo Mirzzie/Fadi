@@ -1,12 +1,84 @@
 # CareerOS Platform Ideology
 
+> **This document is the spine.** Every feature is measured against it. If a feature
+> contradicts a principle here, the feature is wrong — not the principle. If reality
+> contradicts a principle here, we change the principle **and say so, with a date and
+> a source.**
+
+---
+
+## The Evidence Standard (read this first)
+
+This doc previously carried claims that turned out to be **folklore**. They were not
+malicious — they are simply what the résumé-advice industry repeats. But a product
+built on a myth optimises for a myth.
+
+**The rule, from now on:**
+
+1. **Every market claim carries a source and a date.** No source → we don't say it.
+2. **Tiers of evidence, and we label them:**
+   - **Verified** — peer-reviewed research, government statistics, court records.
+   - **Survey** — industry/vendor surveys. Directional only. Never load-bearing.
+   - **Folklore** — repeated everywhere, traceable to nothing. **Banned.**
+3. **Data is automated. Doctrine is curated.** Live market data (postings, skills,
+   salaries, macro) refreshes automatically from authenticated sources. *Claims about
+   how hiring works* are reviewed by a human, quarterly. Research needs epistemics,
+   not a cron job — auto-ingesting "the latest" from the open web makes us a folklore
+   amplifier on a schedule.
+4. **Volatile in data, durable in code.** Which keywords matter this month is data.
+   *That people cannot name their own experience in market vocabulary* is a human
+   constant — that goes in the product. Hardcode the volatile and you become an
+   obsolete phone.
+
+See **Retired Claims** at the bottom: things we used to believe, and why we stopped.
+
+---
+
 ## Why This Platform Exists
 
-The hiring market in 2026 is structurally broken — for everyone in it.
+The hiring market is structurally broken — for everyone in it.
 
-The average job posting receives **242 applications**. The average application has a **0.4% chance of resulting in a hire**. Job seekers spend **45 minutes per application**, which means applying to 100 jobs costs two full work weeks of unpaid labor — with a 97–98% non-response rate. **75% of applications receive zero feedback**. **79% of job seekers report anxiety**. **66% burn out**. Only **30.4% feel hopeful**.
+Job seekers spend **~45 minutes per application** *(survey)*, face heavy competition
+per posting, and most applications receive no feedback at all. Anxiety and burnout in
+job search are widespread and well documented *(survey)*. Meanwhile many "entry-level"
+postings demand years of experience, and graduate routes have narrowed *(survey)*.
 
-Meanwhile, **35% of "entry-level" jobs now require 3+ years of experience**. Internship openings dropped **52%**. Only **30% of 2025 graduates secured field-relevant work**. And the tools meant to help — ATS systems, job boards, resume generators — have made the problem worse by training candidates to play a broken numbers game.
+But the deepest problem is not effort, and it is not the applicant's quality. It is
+**structural**, and as of 2026 it is measured:
+
+### Algorithmic monoculture — the finding that reframes everything
+
+**Verified.** *Algorithmic Monocultures in Hiring* — Bommasani, Bana, Creel, Jurafsky,
+Liang (Stanford Digital Economy Lab, Chapman, Northeastern), **ACM FAccT 2026**. The
+largest empirical study of algorithmic hiring to date: **3.4M applicants, 4M
+applications, 156 employers, 11 sectors.**
+
+- Employers screen with tools from **the same few vendors**. Rejections are therefore
+  **correlated, not independent**.
+- Measured racial disparity: **25.87%** of Black applicants' and **14.74%** of Asian
+  applicants' applications go to positions that **adversely impact** them under US
+  discrimination standards.
+- **Kleinberg & Raghavan (PNAS, 2021)**: firms sharing a common algorithm may hire
+  **weaker** applicants than firms each using an independent, individually *less*
+  accurate method. **Monoculture is bad for employers too** — good candidates are
+  systematically missed as a structural artifact.
+- **Verified (court record).** *Mobley v. Workday* — a candidate rejected **150+ times,
+  often within minutes**; now a nationwide collective action; a court held an AI vendor
+  can be **directly liable as an "agent"** of employers. The court **denied** access to
+  customers' applicant data — confirming there is **no shared blacklist**. The mechanism
+  is not memory. It is **the same judge at every door.**
+
+**What this means, and it is the core of our product thesis:**
+
+> A candidate rejected 40 times has not received 40 verdicts. They have received
+> **one verdict, 40 times.** Their evidence about themselves has a sample size of
+> roughly **one** — not forty.
+>
+> Therefore: **volume through a single filter has near-zero marginal value.** Five
+> applications through the same ATS is one draw, copy-pasted five times.
+>
+> Therefore: **the escape is decorrelation** — a different channel (referral, direct
+> contact, a different ATS), or evidence the filter cannot reduce to a keyword.
 
 CareerOS exists because the job search does not have to work this way.
 
@@ -14,164 +86,267 @@ CareerOS exists because the job search does not have to work this way.
 
 ## The Real Problem
 
-The problem is not that job seekers are bad at applying. The problem is that they are playing the wrong game.
+**What job seekers are told:** apply to more jobs, beat the ATS, stuff in keywords.
 
-**What job seekers are told**: Apply to as many jobs as possible. Tailor your CV for each one. Write a cover letter. Follow up. Repeat.
+**What the evidence says:**
 
-**What the data says**:
-- Volume does not work. More applications means more fatigue, not proportionally more offers.
-- **1 referral is worth 40 cold applications.** Referred candidates are 2.5× more likely to be hired.
-- **70% of resumes are rejected for formatting**, not qualifications.
-- **11.2 seconds** is how long a recruiter spends on initial resume review.
-- **49% of hiring managers auto-dismiss** resumes they suspect are AI-generated — meaning mass AI-assisted applications are becoming a liability, not an advantage.
-- **73% of employers have shifted to skills-based hiring.** Credentials matter less. Demonstrated capability matters more.
+- **The ATS is not the villain, and it rarely auto-rejects.** ~92% of recruiters rely
+  primarily on human review; only a small minority enable content-based auto-rejection.
+  Modern systems rank and organise for a human, using semantic embeddings — not keyword
+  counting. **"The T stands for Tracking, not Terminator."** *(industry research, 2026)*
+- **The real failure is translation.** The most common cause of a qualified candidate
+  being passed over is *"missing keywords that are **already in the candidate's work
+  history but phrased differently**."* They are not unqualified. They are
+  **untranslated**.
+- **Volume is structurally defeated** by monoculture (above).
+- **Fabrication is a depreciating asset.** AI-assisted applications are now ubiquitous,
+  output looks alike, and hiring managers have learned to discount it. Of people who lie
+  on a résumé, **~31% are caught — and ~65% of those are fired or not hired**; ~41% have
+  offers rescinded post-hire *(survey)*. Most lies are about **experience and skills** —
+  exactly what an interview surfaces.
 
-The winning strategy is not more applications. It is **targeted, high-quality applications backed by evidence of real skills, delivered to the right people, with a network behind you**.
-
-That is what CareerOS is built to do.
+**The winning strategy is therefore not more applications.** It is: **claim your real
+work accurately, in today's vocabulary, prove it verifiably, and reach humans through
+channels the monoculture doesn't control.**
 
 ---
 
 ## What CareerOS Is
 
-CareerOS is not a CV generator. It is not a job board. It is not yet another AI wrapper around the same broken process.
+CareerOS is not a CV generator. It is not a job board. It is not an AI wrapper around a
+broken process.
 
-**CareerOS is a career operating system** — an intelligent system that takes on the heavy lifting of the job search so that the user can focus on what only a human can do: build real skills, make real connections, and show genuine expertise.
+**CareerOS is a career operating system** — one truthful record of a person's real work,
+projected into whatever the moment requires: a résumé, a portfolio, an interview answer.
 
-The goal is to reduce a 45-minute application process to **under 5 minutes for a targeted, high-quality application** — while simultaneously improving the quality of every touchpoint in that application.
+Its central mechanism is a **translation layer**:
 
-Fadi, CareerOS's operating intelligence, works on the user's behalf:
-- Before the user wakes up
-- While the user is in their current role
-- While the user is studying or building
-- While the user is sleeping
+> *"You ran Wazuh and Suricata on Proxmox and triaged 200 attacks. Every SOC Analyst
+> posting in Dublin this month calls that **SIEM monitoring** and **incident triage**.
+> Your CV says neither. You are not unqualified — you are untranslated."*
 
-Fadi is not a tool the user picks up and puts down. Fadi is an ongoing agent that continuously improves the user's competitive position.
+This is the thing no one else can do, because it requires **both** halves: your real
+history *and* today's live market vocabulary. A generic chatbot has neither.
+
+Fadi — the intelligence at the centre — does the research and the structural work so the
+user can spend their scarce hours on the only things that actually move the needle:
+building real skills, making real contact, and showing genuine proof.
+
+**The target: a targeted, high-quality application in under 5 minutes.** Not by lowering
+quality — by never re-deriving the same translation twice.
 
 ---
 
-## The Core Ideology in Five Principles
+## The Core Principles
 
-### 1. Quality over volume
+### 1. Quality over volume — because volume is *mathematically* defeated
 
-The job search is not a numbers game. It is a targeting game. One well-matched, well-prepared application to the right company, sent at the right time, backed by a referral or a genuine connection, is worth more than 100 generic applications.
+Not a philosophy. **Monoculture makes rejections correlated**, so applications through
+one filter don't compound. Twenty applications into the same algorithm is one draw.
 
-CareerOS does not help users apply to more jobs. It helps users **apply to the right jobs, better, in less time**.
+CareerOS does not help users apply to more jobs. It helps them **apply to the right
+jobs, better, through more channels, in less time.**
 
-### 2. Proof of work beats credentials
+**Corollary — decorrelate:** five applications through five different channels beats
+twenty-five through one. Fadi tracks *which* filter each application enters and says so
+plainly: *"That's not 12 rejections. That's 1 rejection, 12 times. Change the channel."*
 
-In 2026, 73% of employers are skills-based. Degrees matter less. GitHub commits, portfolio projects, published writing, and demonstrated ability matter more.
+### 2. Proof of work beats assertion
 
-CareerOS actively helps users build **evidence of capability** — not just document experience. Fadi identifies the gaps between where the user is and where they need to be, then helps build proof of work that fills those gaps.
+Employers must verify claims. Assertions are cheap and now infinitely generatable;
+**verifiable proof is the scarce signal**. This is doubly true for candidates with thin
+formal experience, for whom proof-of-work is not a bonus — it is the *only* signal they
+have.
 
-### 3. Authenticity as competitive advantage
+Because AI can fabricate a portfolio, **provenance is the product**: real repositories
+with real history, live URLs, issued credentials. Not polish — **verifiability**.
 
-AI has flooded the market with generic, indistinguishable applications. **74% of U.S. job seekers use AI** in their applications. The result: everything looks alike, and hiring managers have learned to detect and dismiss it.
+CareerOS actively helps users *build* evidence (gap → learning commitment → completed
+work → evidence → résumé + portfolio), not merely document it.
 
-The users who stand out in 2026 are the ones who sound genuinely human — specific, confident, evidence-based, and real.
+> *We do not claim "73% of employers are skills-based." That is a vendor PR figure; the
+> actual share of hires where degree requirements changed is negligible. The honest
+> argument is stronger and needs no inflation.*
 
-CareerOS uses AI to **do the research and structural work**, but every document it produces must be grounded in the user's actual experience, voice, and goals. The output must never sound generated. It must sound like the best, most prepared version of the person it represents.
+### 3. Never invent. Always claim.
+
+This principle replaces "authenticity as competitive advantage," which was true but too
+vague — vague enough that honest users read it as *"undersell yourself."*
+
+**Never invent.** Fadi will not add an employer, a date, a qualification, a metric, or a
+skill the user does not have. Not once, not "optimistically," not because a JD asks for
+it. Fabrication is fraud, it is detectable, and for a visa-dependent user the downside is
+not a lost job — it is their right to remain. We will not walk a user into that.
+
+**Always claim.** Fadi will *insist* the user take full credit for everything they
+actually did, in the words the market uses today. **A homelab that runs a SIEM is SIEM
+experience.** Under-claiming real work is not humility — it is an **inaccurate résumé**,
+and it is the honest person's actual disadvantage. Not honesty. Under-claiming.
+
+**Never generate what the user must then verify.** If AI writes prose, the user must
+check every line for invention — verification is slower than writing it themselves, and
+it breeds distrust. So Fadi **selects and reorders sentences the user has already
+approved** rather than composing new claims. Nothing to fact-check. That is why the
+honest path is also the *fast* path — and why the generator is a scaffold, never the
+front door.
 
 ### 4. Momentum is a health metric
 
-Unemployment and job searching are correlated with **28% higher depressive symptoms**. Burnout directly impairs search behavior — creating a downward spiral that CareerOS must interrupt.
+Job search is a rejection machine. Motivation tied to outcomes is guaranteed to collapse.
+So: **score the process, never the outcome.** Every reward is for something the user
+controls — a quality application, a rejection autopsy, a closed skill gap, an activated
+referral, deliberate rest. Outcomes are recorded honestly for pattern analysis and
+**never rewarded**.
 
-Motivation in CareerOS is not about *hollow* streaks or vanity badges. It is about **clarity and visible progress**. When a user can see their competitive position improving, their skills closing gaps, their application quality rising, and their network growing — that is intrinsically motivating.
-
-CareerOS tells the truth about progress. It does not inflate hope or minimize challenges. But it always provides a next step. There is always something worth doing. The user never needs to feel stuck.
-
-#### The Resilience & Momentum Engine
-
-This principle is made concrete by the **Resilience & Momentum Engine**. The job search is a rejection machine — 242 applicants per posting, 0.4% hire rate, 75% ghosted — and motivation tied to those outcomes is guaranteed to collapse. So the engine follows one rule: **score the process, never the outcome.** Every reward is for something the user actually controls — sending a quality application, learning from a rejection, closing a skill gap, activating a referral, resting deliberately. Outcomes (whether a company replies) are recorded honestly for pattern analysis, but are *never* rewarded.
-
-This is not gamification of desperation. It is the deliberate opposite:
-
-- **Momentum, not streaks.** A momentum signal that decays gently and never resets to zero — no shame cliff, no all-or-nothing pressure. Choosing to rest *protects* momentum; Fadi will tell a user to recover when they are overcooking it, because 66% burnout is the enemy, not the goal.
-- **Rejection as fuel.** Every "no" is run through an autopsy that produces a sharper next application and a named pattern. The reward lands on the *learning*, not the loss — which is also why the system cannot be gamed by faking rejections: there is nothing to farm.
-- **You vs. your past self, never vs. other users.** No leaderboards. In a market where most people are losing, social comparison is cruelty. Progress is always measured against the user's own trajectory.
-- **Belonging.** The crisis is partly loneliness (79% report anxiety). Anonymous cohorts normalize the grind without competition.
-
-Every mechanic in this engine is evaluated against the psychological standard: does it protect the user's mindset and locus of control, or exploit it? If it could deepen the spiral, it does not ship.
+- **Momentum, not streaks.** It decays gently, never resets to zero. No shame cliff.
+  **Choosing to rest protects momentum.** Fadi will tell a user to recover when they are
+  overcooking it — burnout is the enemy, not the goal. A user working a survival job six
+  days a week is not "behind." They are **taxed**, and the system must say so.
+- **Rejection as fuel.** Every "no" produces a sharper next application and a named
+  pattern. The reward lands on the *learning*, not the loss — which is also why it can't
+  be gamed: there is nothing to farm.
+- **Monoculture is a mental-health feature.** Telling a user that 40 rejections is one
+  correlated verdict — not 40 judgments of their worth — is *both true and protective*.
+  Their sample size is one. It restores locus of control with a fact, not a platitude.
+- **Cheap applications are a mental-health feature.** If an application costs 8 minutes
+  instead of 2 hours, a rejection costs ~15× less. The spiral is driven by **expensive**
+  rejection.
 
 ### 5. Honest intelligence, not flattery
 
-The worst thing CareerOS could do is tell a user what they want to hear.
+Fadi is not a yes-man. If a direction is misaligned with the market, it says so — with
+data. If a résumé won't survive a human skim, it says so — specifically. If a role is out
+of reach today, it says so — **and immediately shows the path**, because honesty without
+a next step is just discouragement.
 
-Fadi is not a yes-man. If a career direction is misaligned with market reality, Fadi says so — with data. If a resume would not pass a 10-second recruiter scan, Fadi says so — specifically. If a role is out of reach at the user's current profile level, Fadi says so — and immediately shows the path to change that.
+**Every signal must resolve into something the user can actually do.** "Tech hiring is
+down 20%" is true, useless, and corrosive — the user still needs a job. *"SOC postings in
+Dublin fell 40% this quarter; IT Support rose 15% — you have both tracks; weight IT
+Support"* changes a decision. **Macro data earns its place only when it changes an
+action.** Market intelligence that doesn't is anxiety with a dashboard. Cut it.
 
-Honest feedback, delivered with respect and a clear next action, is the most valuable thing a career advisor can provide. CareerOS is built to deliver it at scale.
+### 6. Dated doctrine, sourced claims
+
+**The market moves. The doctrine must be dated.**
+
+Everything Fadi asserts about how hiring works carries a **source and a date**, visible
+to the user. Data refreshes automatically from authenticated sources; doctrine is
+reviewed by a human on a schedule. **If we cannot source it, we do not say it.**
+
+Fadi never asks a user to *hope*. It shows them what it knows, how it knows it, and when
+it learned it. This principle exists because this very document once carried four claims
+we later proved false. A principle that would have caught them is worth keeping.
 
 ---
 
 ## Who This Is For
 
-### The Graduate Who Can't Get In
-Caught in the entry-level experience trap — 35% of "entry-level" jobs require years of experience they don't have. Internship routes have collapsed. They feel unprepared and the data confirms it: 48% of 2025 graduates say they feel unprepared to apply.
+### The Graduate Who Can't Get In — *our primary user*
+Caught in the entry-level trap. No network, thin formal experience, often working a
+survival job that isn't in their field, with the hours after work as their only
+resource. **They cannot attend the meetups everyone tells them to attend.** That is a
+hard constraint, not a motivation problem.
 
-CareerOS helps them build real proof of work, find the actual entry points into their field, and understand the realistic timeline to their first professional role. It tells the truth about the market — and gives a concrete, achievable path through it.
+For them, CareerOS is not a job-search tool. It is a **credibility-building tool that
+happens to track applications**: build real proof → translate it into market vocabulary
+→ make it publicly visible (a portfolio is *asynchronous networking* — it works while
+they're at their part-time job) → reach humans off the monoculture.
+
+*Honest limit:* our strongest-evidenced belief (referrals decorrelate) relies on a
+network this user does not have. Closing that gap — turning proof into visibility into
+warm contact — is the hardest and most important problem we have.
 
 ### The Career Switcher
-Changing direction mid-career with transferable skills that don't map cleanly to job titles. Struggling with how to present their background to a new field. Unsure which roles are realistic vs. aspirational.
-
-Fadi identifies the transferable evidence, maps the skill gaps, and builds a bridge — not a fantasy.
+Transferable skills that don't map to job titles — a **pure translation problem**, which
+is exactly our core mechanism. Fadi identifies transferable evidence, maps real gaps, and
+builds a bridge, not a fantasy.
 
 ### The Experienced Professional in a Competitive Search
-Laid off or voluntarily searching in a market where even strong candidates are waiting 68+ days for offers. Spending hours per application with low signal-to-noise.
-
-CareerOS compresses the per-application time dramatically, keeps the quality high, and maintains momentum through a process that statistically requires dozens of attempts.
+Strong candidate, long search, hours per application, low signal. CareerOS compresses
+per-application time, keeps quality high, and decorrelates the channel mix.
 
 ### The Student Building Toward the First Role
-Still in education, but aware that the market they are entering is competitive. Needs to build proof of work now, identify the right target roles, and understand what the job market will look for when they graduate.
+Build proof now; understand what the market will ask for on graduation.
+
+**Domain-agnostic, always.** Nothing in this product may assume the user works in tech. A
+nurse, an electrician, a civil engineer and a data analyst must each feel it was built for
+them. Audience lenses, vocabulary and skills are **derived from the user's own data and
+live postings** — never a hardcoded tech taxonomy.
 
 ---
 
 ## The Prediction Layer
 
-Alongside Fadi's active intelligence, CareerOS runs a continuous **Career Performance Trajectory** algorithm.
+CareerOS runs a continuous **Career Performance Trajectory** model. Not motivational
+fiction — a data model over: application quality, response rate vs. benchmark, interview
+conversion, skill-gap closure velocity, market-demand alignment, network activation,
+evidence density, and **channel correlation** (how much of the pipeline enters the same
+filter).
 
-This is not motivational fiction. It is a data model that tracks:
+It produces: current competitive position, **bottleneck identification** (quality? gaps?
+targeting? network? *channel monoculture?*), and **the single highest-leverage action for
+the next 7 days**.
 
-- **Application quality score** (how well each application is matched to the JD)
-- **Response rate** (actual responses vs. applications sent, compared to market benchmark)
-- **Interview conversion rate** (how many responses convert to interviews)
-- **Skill gap closure velocity** (how fast the gap between current and required skills is narrowing)
-- **Market demand alignment** (how well the target role aligns with actual hiring trends)
-- **Network activation rate** (referral connections made vs. target)
-- **Profile evidence density** (strength and specificity of proof of work)
-
-From these signals, the algorithm produces:
-
-- **Current competitive percentile** (where the user likely stands relative to other candidates for their target role)
-- **Estimated time to first interview** (based on current trajectory and market data)
-- **Bottleneck identification** (the specific factor most limiting progress — is it application quality? Skills gap? Wrong targeting? Lack of network activation?)
-- **Recommended focus** (the single highest-leverage action for the next 7 days)
-
-The prediction is honest. It uses real market benchmarks. If the trajectory suggests a long search, the algorithm says so — and immediately prescribes the specific changes that would shorten it.
+The prediction is honest and benchmarked. If the trajectory suggests a long search, it
+says so — and prescribes what would shorten it. **It never presents a correlated
+rejection streak as evidence about the person.**
 
 ---
 
 ## What CareerOS Is Not
 
-- Not a way to apply to 500 jobs faster (that strategy fails)
-- Not a CV generator that produces generic AI text
-- Not a motivational app with hollow streaks and vanity badges (it rewards real, controllable forward motion — see the Resilience & Momentum Engine)
+- Not a way to apply to 500 jobs faster (**that strategy is mathematically defeated by
+  monoculture**, not merely tiring)
+- Not a CV generator that produces generic AI text — **and not a generator at all as the
+  primary path**
+- Not a tool that helps anyone fabricate, embellish, or "optimistically" claim
+- Not a motivational app with hollow streaks and vanity badges
 - Not a job board with a chatbot
+- Not a market-news dashboard that trades the user's calm for engagement
 - Not a tool that pretends the market is easier than it is
-- Not a platform that makes promises it cannot measure
+- Not a platform that makes promises it cannot measure, or claims it cannot source
 
 ---
 
 ## The Standard
 
-Every feature in CareerOS is evaluated against one question:
+Every feature is evaluated against one question:
 
-**Does this genuinely reduce the time and cognitive burden of the job search, while improving the user's actual competitive position in the market?**
+**Does this genuinely reduce the time and cognitive burden of the job search, while
+improving the user's actual competitive position — and can we source the claim that it
+does?**
 
-If the answer is no — if a feature is cosmetic, gamified, or adds friction without adding real advantage — it does not belong in CareerOS.
+If a feature is cosmetic, gamified, adds friction without advantage, generates text the
+user must then police, or asserts something we cannot source — **it does not belong in
+CareerOS.**
 
-The job search is hard enough. CareerOS should make it measurably easier, faster, and more honest — for everyone who needs it.
+The job search is hard enough. CareerOS should make it measurably easier, faster, and
+more honest — for everyone who needs it, in every field.
 
 ---
 
-*Last updated: 2026-06-03*
-*Research sources: LinkedIn Future of Recruiting 2025, SHRM State of Recruiting 2025, WEF Future of Jobs 2025, Interview Guys State of Job Search 2025 Research Report, Cengage Group 2025 Graduate Employability Report, ZipRecruiter Annual Grad Report, ILO World Employment and Social Outlook 2025, Deloitte 2025 Global Human Capital Trends, BLS Employment Status of Recent College Graduates 2024, Interview Guys 2025 Ghosting Index.*
+## Retired Claims
+
+Kept deliberately, so they cannot creep back in.
+
+| Retired claim | Why it's gone |
+|---|---|
+| *"75% of résumés are never seen by human eyes" / ATS auto-rejects* | Traces to a **2012 marketing claim by a company that closed the next year**. No academic support. **~92% of recruiters review manually.** |
+| *"70% of résumés are rejected for formatting"* | Same folklore family; unsourceable. It would have made us build formatting/keyword-stuffing — **a myth-product**. |
+| *"73% of employers have shifted to skills-based hiring"* | Vendor PR. Actual hiring behaviour barely changed. Principle 2 is stronger without it. |
+| *"Over 90% of employers use the same few AI vendors"* | Could not be verified in the FAccT paper or any source. The paper says "many." **The real finding (correlated rejection) doesn't need the inflation.** |
+| *"1 referral = 40 applications" (as a bare number)* | Directionally right, numerically unsourced. Replaced by the **monoculture/decorrelation argument**, which is verified and explains *why*. |
+
+---
+
+*Last reviewed: 2026-07-14 · Next doctrine review due: 2026-10*
+
+**Verified sources** — Bommasani, Bana, Creel, Jurafsky & Liang, *Algorithmic Monocultures
+in Hiring*, ACM FAccT 2026 (3.4M applicants) · Kleinberg & Raghavan, *Algorithmic
+Monoculture and Social Welfare*, PNAS 2021 · Baek & Bastani, *Strategic Hiring under
+Algorithmic Monoculture*, 2025 · *Mobley v. Workday* (N.D. Cal., 3:23-cv-00770) court
+record · US BLS · Eurostat / CSO Ireland · Lightcast Open Skills · O*NET · FRED.
+
+**Survey-tier (directional only)** — SHRM State of Recruiting · LinkedIn Future of
+Recruiting · WEF Future of Jobs · ILO WESO · Deloitte Human Capital Trends · ResumeLab /
+ResumeBuilder résumé-honesty surveys · Interview Guys ghosting/job-search reports.

@@ -4,11 +4,12 @@ import { revalidatePath } from "next/cache";
 
 import {
   createApplicationsRepository,
+  createCareerProfilesRepository,
   createDocumentsRepository,
   createJobsRepository,
 } from "@careeros/database";
 import { getCurrentAuthUser } from "@/lib/auth/session";
-import { getUserDocGenerate } from "@/lib/ai/user-generate";
+import { AiRateLimitError, getUserDocGenerate } from "@/lib/ai/user-generate";
 import { generateCareerDocument, NoHistoryError, type DocKind } from "@/lib/documents/generate";
 import { getDatabase } from "@/lib/database/client";
 import { checkPostingLiveness, type PostingLiveness } from "@/lib/jobs/liveness";
@@ -65,6 +66,11 @@ export async function generateJobDocumentAction(jobId: string, kind: DocKind): P
     // Ensure an application row exists (don't clobber an existing status).
     const apps = createApplicationsRepository(db);
     const existing = (await apps.listForUserByJobIds(user.id, [jobId]))[0];
+    const activeTrack = existing
+      ? null
+      : await createCareerProfilesRepository(db)
+          .getActiveForUser(user.id)
+          .catch(() => null);
     const application =
       existing ??
       (await apps.createForUser(user.id, {
@@ -72,6 +78,7 @@ export async function generateJobDocumentAction(jobId: string, kind: DocKind): P
         company: job.company,
         title: job.title,
         url: job.url,
+        careerProfileId: activeTrack?.id ?? null,
         status: "interested",
       }));
 
@@ -94,9 +101,13 @@ export async function generateJobDocumentAction(jobId: string, kind: DocKind): P
     );
 
     revalidatePath(`/dashboard/applications/${jobId}/workspace`);
-    return { ok: true, message: "Drafted.", id: doc.id };
+    // Surface honest degradation rather than reporting a bare success: the draft is
+    // real, but the user needs to know what it was built WITHOUT (F3).
+    return { ok: true, message: doc.evidenceNotice ?? "Drafted.", id: doc.id };
   } catch (error) {
     if (error instanceof NoHistoryError) return { ok: false, message: error.message };
+    // Not a failure — their allowance simply reset window. Say so plainly.
+    if (error instanceof AiRateLimitError) return { ok: false, message: error.message };
     logger.error("workspace.generate_doc_failed", {
       userId: user.id,
       error: error instanceof Error ? error.message : "unknown",
@@ -175,6 +186,12 @@ export async function autoPrepJobAction(jobId: string): Promise<AutoPrepResult> 
       } catch (err) {
         // No history means EVERY kind will fail identically — stop and say so.
         if (err instanceof NoHistoryError) {
+          return { ok: false, message: err.message, created };
+        }
+        // Same reasoning for the allowance: the next three kinds cannot succeed
+        // either, and retrying them would hammer a limit we already hit. Keep what
+        // was drafted and report honestly.
+        if (err instanceof AiRateLimitError) {
           return { ok: false, message: err.message, created };
         }
         // Otherwise one weak/failed generation shouldn't sink the whole packet.

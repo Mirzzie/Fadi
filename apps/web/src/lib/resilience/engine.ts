@@ -30,11 +30,29 @@ export type ForwardMotionKind =
   | "comeback";
 
 /**
- * Momentum deltas. Note the deliberate shape:
+ * Momentum deltas. Every number here rewards a CONTROLLABLE action — never an
+ * outcome, which the user does not own (PLATFORM_IDEOLOGY Principle 4).
+ *
  * - `rejection_logged` is tiny (+2): we acknowledge the courage to face and
  *   record a "no", but we do NOT reward the rejection.
  * - `rejection_autopsy` is large (+10): the real reward is for LEARNING from it.
- * - `referral_added` is highest (+18): 1 referral ≈ 40 cold applications.
+ * - `quality_application` (+12) is awarded only with a tailored document attached —
+ *   the work, not the click.
+ * - `skill_closed` (+15) is the highest thing a user can always do alone: it needs
+ *   no employer, no network, and no callback.
+ * - `referral_added` is highest (+18) because a referral is a genuinely INDEPENDENT
+ *   draw. Under algorithmic monoculture (FAccT 2026; Kleinberg & Raghavan, PNAS
+ *   2021) applications through the same vendor's screening are correlated, so the
+ *   n+1th cold application is worth far less than the first — while a referral
+ *   re-rolls the dice through a different filter entirely.
+ *
+ *   (This weight was previously justified in-code as "1 referral ≈ 40 cold
+ *   applications". That figure is on the Retired Claims table in
+ *   PLATFORM_IDEOLOGY.md — directionally right, numerically unsourced. The ranking
+ *   it produced was correct; the reason given for it was folklore. Doctrine binds
+ *   code, so the reason is now the verified decorrelation argument, not a number
+ *   nobody can source.)
+ *
  * Faking a rejection nets +2 and still requires real reflective work to earn
  * the rest — and nothing is fakeable for external value (no leaderboard).
  */

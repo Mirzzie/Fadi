@@ -9,6 +9,7 @@ import { logger } from "@/lib/observability/logger";
 import {
   completeRejectionAutopsy,
   logRejection,
+  recordForwardMotion,
   type LogRejectionResult,
 } from "@/lib/resilience/service";
 import type { RejectionInsight } from "@/lib/resilience/autopsy";
@@ -31,7 +32,7 @@ import {
 } from "@/lib/documents/cv-review";
 import { generateCareerDocument, NoHistoryError } from "@/lib/documents/generate";
 import { isProseKind, letterToPlainText, parseLetter } from "@/lib/documents/letter";
-import { getUserDocGenerate } from "@/lib/ai/user-generate";
+import { AiRateLimitError, getUserDocGenerate } from "@/lib/ai/user-generate";
 
 export type RejectionStage = "keyword" | "screen" | "interview" | "final";
 
@@ -40,34 +41,78 @@ function workspacePath(jobId: string) {
 }
 
 /**
- * Mark an application as sent. This is the provenance precondition for logging a
- * rejection — momentum is intentionally NOT awarded here (clicking a button is
- * not forward motion). It only records the honest fact that the application went
- * out, so a later rejection can be verified and learned from.
+ * Mark an application as sent, and award momentum when the work behind it was real.
+ *
+ * Clicking a button is not forward motion — a spray application is one click too — so
+ * this deliberately does NOT reward the click itself. It awards `quality_application`
+ * only when a tailored document exists for this job: the deterministic, no-AI-needed
+ * proof that the user actually did the work (PLATFORM_IDEOLOGY Principle 2, "proof of
+ * work beats assertion"). Applying with nothing attached still records the honest fact
+ * that it went out — the provenance precondition for logging a rejection later.
+ *
+ * WHY THIS EXISTS AT ALL (docs/DATA_FLOW_AUDIT.md, F1): `getMomentumSummary` counts
+ * `quality_application` events to compute cadence adherence, but nothing in the
+ * codebase ever wrote one. Momentum was a reader with no writer, so every user sat at
+ * momentum 0 forever and the ONLY paths that could move it were getting rejected and
+ * adding a referral. A subsystem built to "score the process, never the outcome" was
+ * scoring only the outcome, and only the bad one — Principle 4, exactly inverted.
  */
 export async function markApplicationApplied(input: {
   jobId: string;
   company: string;
   title: string;
   url?: string | null;
-}): Promise<{ ok: boolean; applicationId?: string; message: string }> {
+}): Promise<{
+  ok: boolean;
+  applicationId?: string;
+  message: string;
+  momentum?: { value: number; delta: number; band: string; message: string };
+}> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
 
   try {
-    const application = await createApplicationsRepository(getDatabase()).upsertStatusForUser(
-      user.id,
-      {
-        jobId: input.jobId,
-        company: input.company,
-        title: input.title,
-        url: input.url ?? null,
-        status: "applied",
-      },
-    );
+    const db = getDatabase();
+    const applicationsRepo = createApplicationsRepository(db);
+
+    // `appliedAt` is set once, on the first transition into "applied" — so it is the
+    // idempotency key that stops a second click from awarding momentum twice.
+    const [before] = await applicationsRepo.listForUserByJobIds(user.id, [input.jobId]);
+    const alreadyApplied = Boolean(before?.appliedAt);
+
+    const application = await applicationsRepo.upsertStatusForUser(user.id, {
+      jobId: input.jobId,
+      company: input.company,
+      title: input.title,
+      url: input.url ?? null,
+      status: "applied",
+    });
+
+    let momentum: { value: number; delta: number; band: string; message: string } | undefined;
+    if (!alreadyApplied && application.appliedAt) {
+      const docs = await createDocumentsRepository(db).listForJob(user.id, input.jobId);
+      if (docs.length > 0) {
+        const motion = await recordForwardMotion(user.id, "quality_application", {
+          applicationId: application.id,
+          metadata: { jobId: input.jobId, documentCount: docs.length },
+        });
+        momentum = {
+          value: motion.momentum,
+          delta: motion.delta,
+          band: motion.band,
+          message: motion.message,
+        };
+      }
+    }
 
     revalidatePath(workspacePath(input.jobId));
-    return { ok: true, applicationId: application.id, message: "Marked as applied." };
+    revalidatePath("/dashboard");
+    return {
+      ok: true,
+      applicationId: application.id,
+      message: momentum ? momentum.message : "Marked as applied.",
+      momentum,
+    };
   } catch (error) {
     logger.error("applications.mark_applied_failed", {
       userId: user.id,
@@ -280,6 +325,8 @@ export async function applyReviewFixes(input: {
     return { ok: true, message: "Redrafted with the fixes — review it in the editor before sending.", docId: doc.id };
   } catch (error) {
     if (error instanceof NoHistoryError) return { ok: false, message: error.message };
+    // Not a failure — their allowance simply reset window. Say so plainly.
+    if (error instanceof AiRateLimitError) return { ok: false, message: error.message };
     logger.error("applications.apply_fixes_failed", {
       userId: user.id,
       jobId: input.jobId,

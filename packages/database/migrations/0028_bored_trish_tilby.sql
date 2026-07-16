@@ -1,0 +1,1 @@
+ALTER TABLE "evidence_items" ADD COLUMN "market_tags" jsonb DEFAULT '[]'::jsonb NOT NULL;

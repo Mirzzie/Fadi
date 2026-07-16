@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 
 import type { Database } from "../client";
 import { evidenceItems, type EvidenceItem, type NewEvidenceItem } from "../schema";
@@ -66,11 +66,15 @@ export function createEvidenceRepository(db: Database) {
     },
 
     async count(userId: string): Promise<number> {
-      const rows = await db
-        .select({ id: evidenceItems.id })
+      // COUNT in the database, not in Node. The previous version selected every row's
+      // id and took `.length` — transferring the whole pool over the wire to learn a
+      // single integer. `interview-stories.repository` already did this correctly;
+      // this one was the outlier.
+      const [row] = await db
+        .select({ value: count() })
         .from(evidenceItems)
         .where(eq(evidenceItems.userId, userId));
-      return rows.length;
+      return row?.value ?? 0;
     },
   };
 }

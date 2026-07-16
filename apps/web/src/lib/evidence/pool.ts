@@ -24,7 +24,10 @@ export type EvidenceView = {
   period: string | null;
   detail: string;
   metrics: string | null;
+  /** The user's own words for what they did ("wazuh", "proxmox"). */
   tags: string[];
+  /** What the market calls that same real thing ("siem", "incident triage"). */
+  marketTags: string[];
   origin: string;
 };
 
@@ -44,6 +47,7 @@ export function toEvidenceView(row: EvidenceItem): EvidenceView {
     detail: row.detail,
     metrics: row.metrics,
     tags: Array.isArray(row.tags) ? row.tags : [],
+    marketTags: Array.isArray(row.marketTags) ? row.marketTags : [],
     origin: row.origin,
   };
 }
@@ -56,6 +60,38 @@ const STOP = new Set([
   "you", "your", "our", "their", "his", "her", "led", "the", "a", "an", "of", "to", "in", "on", "at",
 ]);
 
+/**
+ * Shortest token we'll fuzzy-match on. Below this, coincidental overlap dominates
+ * ("port"/"portfolio", "art"/"article") and we'd match noise.
+ */
+const MIN_FUZZY = 5;
+
+/**
+ * Does one word mean the track's word? Exact match, containment, or a shared stem.
+ *
+ * Exact-token equality is not enough, and the flagship case proves it: a track named
+ * "Cybersecurity Analyst" tokenizes to `cybersecurity`, which never equals the
+ * market's own term `security monitoring`. Real vocabulary is morphological —
+ * cybersecurity/security, analyst/analysis, engineering/engineer — so an exact
+ * matcher makes the translation layer look broken when it is merely inflected.
+ *
+ * Deliberately dumb and domain-agnostic: no stemmer, no synonym table (a hardcoded
+ * one would smuggle in a "tech" assumption this platform must never make). Genuine
+ * synonymy is the model's job at extract time — see `marketTags`.
+ */
+function termMatches(token: string, trackTerms: ReadonlySet<string>): boolean {
+  if (trackTerms.has(token)) return true;
+  for (const term of trackTerms) {
+    const [short, long] = token.length <= term.length ? [token, term] : [term, token];
+    if (short.length < MIN_FUZZY) continue;
+    if (long.includes(short)) return true; // cybersecurity ⊃ security
+    let i = 0;
+    while (i < short.length && short[i] === long[i]) i += 1;
+    if (i >= MIN_FUZZY) return true; // analyst / analysis
+  }
+  return false;
+}
+
 function tokens(text: string): string[] {
   return text
     .toLowerCase()
@@ -66,8 +102,18 @@ function tokens(text: string): string[] {
 }
 
 /**
- * How relevant one evidence item is to a track. Tag hits (curated skills/domains)
- * count more than incidental word overlap. Pure + deterministic.
+ * How relevant one evidence item is to a track.
+ *
+ * Scoring reflects how much SIGNAL each kind of hit carries:
+ *   marketTags (6) — the translated vocabulary. Highest, because this is the whole
+ *     product thesis: a track is named in market language ("Cybersecurity Analyst"),
+ *     so the market's name for the user's work is the surface most likely to meet it.
+ *     Without this, a home lab tagged only `wazuh/proxmox` scores 0 against a SOC
+ *     role — the exact "not unqualified, just untranslated" failure we exist to fix.
+ *   tags (5) — the user's own curated words.
+ *   body words (2) — incidental prose overlap.
+ *
+ * Pure + deterministic.
  */
 export function evidenceRelevance(item: EvidenceView, track: TrackTerms): { score: number; matched: string[] } {
   const trackTerms = new Set([
@@ -80,15 +126,20 @@ export function evidenceRelevance(item: EvidenceView, track: TrackTerms): { scor
   const matched = new Set<string>();
   let score = 0;
 
+  for (const tag of item.marketTags.map((t) => t.toLowerCase().trim())) {
+    if (tokens(tag).some((tt) => termMatches(tt, trackTerms))) {
+      score += 6;
+      matched.add(tag);
+    }
+  }
   for (const tag of item.tags.map((t) => t.toLowerCase().trim())) {
-    const tagToks = tokens(tag);
-    if (tagToks.some((tt) => trackTerms.has(tt))) {
+    if (tokens(tag).some((tt) => termMatches(tt, trackTerms))) {
       score += 5;
       matched.add(tag);
     }
   }
   for (const w of tokens(`${item.title} ${item.organization ?? ""} ${item.detail}`)) {
-    if (trackTerms.has(w)) {
+    if (termMatches(w, trackTerms)) {
       score += 2;
       matched.add(w);
     }
@@ -100,20 +151,47 @@ export function evidenceRelevance(item: EvidenceView, track: TrackTerms): { scor
 export type RankedEvidence = { item: EvidenceView; score: number; matched: string[] };
 
 /**
- * A prompt block of the candidate's TOP evidence for the active track — the bridge
+ * A prompt block of the candidate's evidence for the active track — the bridge
  * that makes the pool actually power generation (documents, interview prep, fit).
- * "Lead with these, framed for this role." Empty string when the pool has nothing
- * relevant, so callers can append unconditionally. Pure + testable.
+ *
+ * INVARIANT: **ranking ORDERS evidence, it never DELETES it.**
+ *
+ * This used to filter to `score > 0`, which silently dropped every item whose words
+ * didn't literally overlap the track's role words. That inverted the product's whole
+ * purpose (PLATFORM_IDEOLOGY, "the translation layer"): a home lab tagged
+ * `wazuh/suricata/proxmox` scores ZERO against "Cybersecurity Analyst" — no shared
+ * tokens — so the single best proof a thin-experience candidate owns never reached
+ * their CV. The evidence that scores lowest is precisely the evidence that most needs
+ * translating, because *untranslated* is what a low score means.
+ *
+ * So the relevance score decides ORDER and (for large pools) truncation. It is never
+ * a reason to withhold the user's real, approved history from the model. A user with
+ * fewer than `max` items always gets their whole pool through — which is exactly the
+ * user this platform is for.
+ *
+ * Empty string only when the pool itself is empty, so callers can append
+ * unconditionally. Pure + testable.
  */
 export function formatTopEvidence(ranked: RankedEvidence[], max = 8): string {
-  const top = ranked.filter((r) => r.score > 0).slice(0, max);
+  // `rankEvidenceForTrack` already sorts by score desc, so a plain slice keeps the
+  // best matches first and lets un-matched real evidence ride along behind them.
+  const top = ranked.slice(0, max);
   if (top.length === 0) return "";
+
+  const anyMatched = top.some((r) => r.score > 0);
   const lines = top.map(({ item }) => {
     const head = `- [${item.kind}] ${item.title}${item.organization ? ` @ ${item.organization}` : ""}${item.period ? ` (${item.period})` : ""}`;
     const body = [item.detail, item.metrics].filter(Boolean).join(" — ");
     return body ? `${head}: ${body}` : head;
   });
-  return `MOST RELEVANT EVIDENCE FOR THIS DIRECTION (the candidate's own, ranked for this role — lead with these and frame them for the target role; never invent beyond them):\n${lines.join("\n")}`;
+
+  // Label honestly: claiming these are "ranked for this role" when nothing actually
+  // matched would be the model lying to itself about how relevant they are.
+  const header = anyMatched
+    ? "MOST RELEVANT EVIDENCE FOR THIS DIRECTION (the candidate's own, best matches first — lead with these and frame them in the target role's language; never invent beyond them)"
+    : "THE CANDIDATE'S EVIDENCE (their own, real, and approved — none of it shares obvious keywords with this direction, which usually means it is UNTRANSLATED rather than irrelevant: name each item in the target role's vocabulary where that is genuinely accurate, and stay silent about it where it is not; never invent beyond them)";
+
+  return `${header}:\n${lines.join("\n")}`;
 }
 
 /** Rank the whole pool for a track — most relevant first; everything stays in the pool. */
@@ -135,6 +213,7 @@ const poolSchema = z.object({
         detail: z.string().optional(),
         metrics: z.string().optional(),
         tags: z.array(z.string()).default([]),
+        marketTags: z.array(z.string()).default([]),
       }),
     )
     .max(40),
@@ -145,7 +224,12 @@ Extract items of kind: experience (a role held), project, achievement, skill, ed
 Rules:
 - Use ONLY the evidence provided. Never invent roles, employers, dates, metrics, or skills.
 - One item per real thing. Keep detail tight and factual. Put real numbers/outcomes in "metrics".
-- tags = lowercase skills/domains/tools keywords for that item (these power per-track relevance) — only ones genuinely supported by the evidence.
+- tags = lowercase keywords in the CANDIDATE'S OWN vocabulary — the concrete tools, systems, and words they actually used ("wazuh", "proxmox", "ward rounds"). Only ones genuinely supported by the evidence.
+- marketTags = THE TRANSLATION. The same real thing, named the way employers and job postings name it ("siem", "incident triage", "patient care"). This is the most valuable field you produce: people are usually not unqualified, they are untranslated, and their own words rarely match the words a job ad uses.
+  - This is a NAMING operation, never an inventing one. Add a market term ONLY when the detail already demonstrates it. Running Wazuh and reviewing its alerts IS "siem" and "log analysis" — say so. Merely installing something is NOT "engineering" it.
+  - Do not add seniority the evidence doesn't show, and never add a term just because it is in demand.
+  - Prefer the generic industry term over any vendor's brand name.
+  - If a real thing has no honest market name, leave marketTags empty rather than stretch.
 - If the history is thin, return fewer items. Never pad.`;
 
 export type ExtractResult =
@@ -194,6 +278,7 @@ export async function extractEvidencePool(userId: string): Promise<ExtractResult
       detail: (i.detail ?? "").trim(),
       metrics: i.metrics?.trim() || null,
       tags: (i.tags ?? []).map((t) => t.toLowerCase().trim()).filter(Boolean).slice(0, 8),
+      marketTags: (i.marketTags ?? []).map((t) => t.toLowerCase().trim()).filter(Boolean).slice(0, 8),
       origin: "ai",
     })),
   );

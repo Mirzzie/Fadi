@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { AiTellCheck } from "@/components/documents/ai-tell-check";
+import { DictatableTextarea } from "@/components/documents/dictatable-textarea";
 import { ResumeAdvisor } from "@/components/documents/resume-advisor";
 import { ResumePreview } from "@/components/documents/resume-preview";
 import {
@@ -178,11 +179,12 @@ export function ResumeEditor({
     switch (key) {
       case "summary":
         return (
-          <textarea
+          <DictatableTextarea
             className={`${field} min-h-24`}
             value={data.summary}
-            onChange={(e) => patch({ summary: e.target.value })}
+            onChange={(summary) => patch({ summary })}
             placeholder="A sharp 2–3 line professional summary."
+            label="your summary"
           />
         );
       case "experiences":
@@ -194,7 +196,17 @@ export function ResumeEditor({
               <input className={field} placeholder="Location" value={exp.location} onChange={(e) => updateList(data, patch, "experiences", i, { location: e.target.value })} />
               <input className={field} placeholder="Period (e.g. Jan 2024 – Present)" value={exp.period} onChange={(e) => updateList(data, patch, "experiences", i, { period: e.target.value })} />
             </div>
-            <textarea className={`${field} mt-2 min-h-20`} placeholder="Achievements — one per line" value={exp.bullets} onChange={(e) => updateList(data, patch, "experiences", i, { bullets: e.target.value })} />
+            {/* Bullets are where under-claiming happens: people TYPE "helped with
+                support" but SAY the three specific things they actually did. Select a
+                bullet to rewrite it; speak with nothing selected to add one. */}
+            <DictatableTextarea
+              className={`${field} mt-2 min-h-20`}
+              placeholder="Achievements — one per line"
+              value={exp.bullets}
+              onChange={(bullets) => updateList(data, patch, "experiences", i, { bullets })}
+              separator={"\n"}
+              label="an achievement"
+            />
           </RepeatItem>
         ));
       case "projects":
@@ -204,7 +216,13 @@ export function ResumeEditor({
               <input className={field} placeholder="Project title" value={p.title} onChange={(e) => updateList(data, patch, "projects", i, { title: e.target.value })} />
               <input className={field} placeholder="URL" value={p.url} onChange={(e) => updateList(data, patch, "projects", i, { url: e.target.value })} />
             </div>
-            <textarea className={`${field} mt-2 min-h-16`} placeholder="What you built and the impact" value={p.description} onChange={(e) => updateList(data, patch, "projects", i, { description: e.target.value })} />
+            <DictatableTextarea
+              className={`${field} mt-2 min-h-16`}
+              placeholder="What you built and the impact"
+              value={p.description}
+              onChange={(description) => updateList(data, patch, "projects", i, { description })}
+              label="what you built"
+            />
           </RepeatItem>
         ));
       case "education":

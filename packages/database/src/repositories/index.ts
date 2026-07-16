@@ -18,3 +18,4 @@ export * from "./saved-jobs.repository";
 export * from "./user-ai-settings.repository";
 export * from "./users.repository";
 export * from "./learning-commitments.repository";
+export * from "./portfolio.repository";

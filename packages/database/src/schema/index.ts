@@ -148,6 +148,14 @@ export const profiles = pgTable(
     // cold email, value proposition) the moment a user engages a job, instead
     // of waiting to be asked. Opt-in — defaults off so we never surprise users.
     autoPrepEnabled: boolean("auto_prep_enabled").notNull().default(false),
+    /**
+     * How the job pipeline (saved jobs + applications) reacts to switching tracks.
+     * "active" (default) = the active direction drives the product — you only see
+     * the switched-to track's pipeline. "all" = one combined pipeline, each row
+     * labelled with its track — for people deliberately running several
+     * directions at once. A preference, not a rule: both are legitimate.
+     */
+    pipelineScope: text("pipeline_scope").notNull().default("active"), // active | all
     // BYO-token Notion sync: the user's Notion internal-integration secret
     // (AES-GCM encrypted) + the target database id they shared with it.
     notionTokenCiphertext: text("notion_token_ciphertext"),
@@ -388,6 +396,17 @@ export const savedJobs = pgTable(
     jobId: uuid("job_id")
       .notNull()
       .references(() => jobs.id, { onDelete: "cascade" }),
+    /**
+     * The direction this job was saved UNDER. Job discovery is already track-aware,
+     * so the pipeline must be too — otherwise switching from "Cybersecurity" to
+     * "IT Admin" silently keeps showing the other track's jobs, which breaks the
+     * rule that the active direction drives the product.
+     * NULL = saved before tracks existed → treated as visible in every track so
+     * no existing row disappears on migration.
+     */
+    careerProfileId: uuid("career_profile_id").references(() => careerProfiles.id, {
+      onDelete: "set null",
+    }),
     status: text("status").notNull().default("saved"),
     matchScore: integer("match_score"),
     matchSummary: text("match_summary"),
@@ -399,6 +418,7 @@ export const savedJobs = pgTable(
     uniqueIndex("saved_jobs_user_job_idx").on(table.userId, table.jobId),
     index("saved_jobs_user_id_idx").on(table.userId),
     index("saved_jobs_status_idx").on(table.status),
+    index("saved_jobs_user_track_idx").on(table.userId, table.careerProfileId),
   ]
 );
 
@@ -410,6 +430,15 @@ export const applications = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     jobId: uuid("job_id").references(() => jobs.id, { onDelete: "set null" }),
+    /**
+     * The direction this application belongs to. Without it, a user running
+     * several tracks in parallel gets one undifferentiated pile and can't answer
+     * "how many security applications do I have out?" — the core question of
+     * running parallel directions. NULL = pre-tracks row; visible in every track.
+     */
+    careerProfileId: uuid("career_profile_id").references(() => careerProfiles.id, {
+      onDelete: "set null",
+    }),
     careerReportId: uuid("career_report_id").references(() => careerReports.id, {
       onDelete: "set null",
     }),
@@ -440,6 +469,7 @@ export const applications = pgTable(
     index("applications_status_idx").on(table.status),
     index("applications_user_status_idx").on(table.userId, table.status),
     index("applications_outcome_idx").on(table.outcome),
+    index("applications_user_track_idx").on(table.userId, table.careerProfileId),
   ]
 );
 
@@ -790,6 +820,19 @@ export const evidenceItems = pgTable(
     detail: text("detail").notNull().default(""), // what they actually did
     metrics: text("metrics"), // real numbers/outcomes, when present
     tags: jsonb("tags").$type<string[]>().notNull().default([]), // skills/domains keywords
+    /**
+     * THE TRANSLATION LAYER, stored (see docs/PLATFORM_IDEOLOGY.md).
+     *
+     * `tags` are the user's OWN words for what they did ("wazuh", "proxmox").
+     * `marketTags` are what the MARKET calls that same real thing ("siem",
+     * "incident triage", "security monitoring"). Same evidence, named twice.
+     *
+     * This is a naming operation, never an inventing one: a market tag may only be
+     * added when the item's real detail already supports it. Kept in a separate
+     * column precisely so the user's truthful record is never overwritten by the
+     * market's vocabulary — we add a lens, we don't edit their history.
+     */
+    marketTags: jsonb("market_tags").$type<string[]>().notNull().default([]),
     origin: text("origin").notNull().default("manual"), // ai | manual | learning
     ...timestamps,
   },
@@ -832,6 +875,91 @@ export const learningCommitments = pgTable(
   ]
 );
 
+// ── Portfolio (a projection of the evidence pool; see docs/PORTFOLIO_WEBSITE_ENGINE.md) ──
+// A portfolio is one more presentation of the user's real history — never a new
+// source of truth. `portfolio_sites` is the site (per direction), `portfolio_items`
+// are the curated, AI-drafted-from-evidence entries the public renderer shows.
+// tenant_id is added now (nullable) per MULTI_TENANT_SAAS_ARCHITECTURE.md.
+export const portfolioSites = pgTable(
+  "portfolio_sites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Forward-compat for org/edu/enterprise tenants (Phase 1: null = personal). */
+    tenantId: uuid("tenant_id"),
+    /** Which career direction this site presents; null = standalone. */
+    careerProfileId: uuid("career_profile_id").references(() => careerProfiles.id, {
+      onDelete: "set null",
+    }),
+    /** Public slug → /p/<handle>. Unique across all sites. */
+    handle: text("handle").notNull(),
+    title: text("title").notNull().default(""),
+    /** Hero tagline (AI-drafted from the active track). */
+    headline: text("headline"),
+    /** Template id the renderer uses; default is the ported design. */
+    template: text("template").notNull().default("noir-gold"),
+    /** Template config/overrides (mirrors resume_templates.config). */
+    theme: jsonb("theme").$type<Record<string, unknown>>().notNull().default({}),
+    /** name, location, email-visibility, links, avatar url. */
+    profile: jsonb("profile").$type<Record<string, unknown>>().notNull().default({}),
+    /** Per-persona résumé URLs: { default, support, cloud, security }. */
+    resumeLinks: jsonb("resume_links").$type<Record<string, string>>().notNull().default({}),
+    /** Gates the public Content API — only published sites are readable. */
+    isPublished: boolean("is_published").notNull().default(false),
+    ...timestamps,
+  },
+  (table) => [
+    index("portfolio_sites_user_id_idx").on(table.userId),
+    uniqueIndex("portfolio_sites_handle_idx").on(table.handle),
+    index("portfolio_sites_user_career_profile_idx").on(table.userId, table.careerProfileId),
+  ]
+);
+
+export const portfolioItems = pgTable(
+  "portfolio_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tenantId: uuid("tenant_id"),
+    siteId: uuid("site_id")
+      .notNull()
+      .references(() => portfolioSites.id, { onDelete: "cascade" }),
+    /** The evidence fact this presents; null = a portfolio-only item. */
+    evidenceItemId: uuid("evidence_item_id").references(() => evidenceItems.id, {
+      onDelete: "set null",
+    }),
+    /** project | experience | education | certification | skill | custom. */
+    section: text("section").notNull().default("project"),
+    title: text("title").notNull(),
+    subtitle: text("subtitle"), // org / institution
+    location: text("location"),
+    dateRange: text("date_range"), // maps to evidence.period
+    /** AI-drafted narrative blurb, portfolio voice (distinct from résumé). */
+    description: text("description"),
+    bullets: jsonb("bullets").$type<string[]>().notNull().default([]),
+    /** Persona targeting: support | cloud | security (empty = everyone). */
+    roles: jsonb("roles").$type<string[]>().notNull().default([]),
+    tag: text("tag"),
+    /** Source link — repo / live / case study. */
+    url: text("url"),
+    imageUrl: text("image_url"), // cover (Cloudinary/R2)
+    gallery: jsonb("gallery").$type<string[]>().notNull().default([]),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isPublished: boolean("is_published").notNull().default(true),
+    ...timestamps,
+  },
+  (table) => [
+    index("portfolio_items_user_id_idx").on(table.userId),
+    index("portfolio_items_site_id_idx").on(table.siteId),
+    index("portfolio_items_site_section_idx").on(table.siteId, table.section),
+    index("portfolio_items_evidence_item_idx").on(table.evidenceItemId),
+  ]
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type AuthIdentity = typeof authIdentities.$inferSelect;
@@ -869,3 +997,7 @@ export type EvidenceItem = typeof evidenceItems.$inferSelect;
 export type NewEvidenceItem = typeof evidenceItems.$inferInsert;
 export type LearningCommitment = typeof learningCommitments.$inferSelect;
 export type NewLearningCommitment = typeof learningCommitments.$inferInsert;
+export type PortfolioSite = typeof portfolioSites.$inferSelect;
+export type NewPortfolioSite = typeof portfolioSites.$inferInsert;
+export type PortfolioItem = typeof portfolioItems.$inferSelect;
+export type NewPortfolioItem = typeof portfolioItems.$inferInsert;

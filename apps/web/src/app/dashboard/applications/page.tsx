@@ -8,10 +8,13 @@ import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
 import {
   createApplicationsRepository,
+  createCareerProfilesRepository,
   createDocumentsRepository,
   createProfilesRepository,
+  type TrackScope,
 } from "@careeros/database";
 import { onboardingStatusOf } from "@/lib/onboarding/status";
+import { analyseChannelMix, channelInsight } from "@/lib/applications/channel";
 
 export const metadata: Metadata = { title: "Applications" };
 export const dynamic = "force-dynamic";
@@ -21,14 +24,29 @@ export default async function ApplicationsPage() {
   if (!user) redirect("/auth/sign-in?next=/dashboard/applications");
 
   const db = getDatabase();
-  const [apps, docs, profile] = await Promise.all([
-    createApplicationsRepository(db).listForUser(user.id),
+  const [docs, profile, activeTrack, tracks] = await Promise.all([
     createDocumentsRepository(db).listForUser(user.id),
     createProfilesRepository(db).getByUserId(user.id),
+    createCareerProfilesRepository(db).getActiveForUser(user.id),
+    createCareerProfilesRepository(db).listForUser(user.id),
   ]);
 
   // Gate on the profile we loaded in-batch — parallelized, not a serial round-trip.
   if (onboardingStatusOf(profile) !== "completed") redirect("/onboarding");
+
+  // The active direction drives the pipeline by default; "all" is opt-in for
+  // people deliberately running several directions at once. Their choice.
+  const scope: TrackScope =
+    profile?.pipelineScope === "all"
+      ? { scope: "all" }
+      : { scope: "active", careerProfileId: activeTrack?.id ?? null };
+  const apps = await createApplicationsRepository(db).listForUser(user.id, scope);
+  const trackNames = new Map(tracks.map((t) => [t.id, t.label ?? t.targetRole]));
+
+  // Monoculture check (PLATFORM_IDEOLOGY Principle 1): rejections through one vendor
+  // are correlated, so a concentrated pipeline is one draw repeated — not progress.
+  // Returns null unless there's genuine evidence of concentration.
+  const insight = channelInsight(analyseChannelMix(apps));
 
   // Batch-prep candidates: active-pipeline roles with a JD but NO documents yet.
   // Rejected/withdrawn are excluded — never spend the user's AI budget on closed doors.
@@ -50,6 +68,9 @@ export default async function ApplicationsPage() {
         <BatchPrep candidates={batchCandidates} />
       </div>
       <ApplicationsBoard
+        scope={profile?.pipelineScope === "all" ? "all" : "active"}
+        activeTrackName={activeTrack?.label ?? activeTrack?.targetRole ?? null}
+        channelInsight={insight}
         applications={apps.map((a) => ({
           id: a.id,
           jobId: a.jobId,
@@ -59,6 +80,8 @@ export default async function ApplicationsPage() {
           url: a.url,
           jobDescription: a.jobDescription,
           appliedAt: a.appliedAt ? a.appliedAt.toISOString() : null,
+          // Which direction this belongs to — so a mixed pipeline stays legible.
+          trackName: a.careerProfileId ? (trackNames.get(a.careerProfileId) ?? null) : null,
         }))}
         documents={docs
           .filter((d) => d.applicationId || d.jobId)

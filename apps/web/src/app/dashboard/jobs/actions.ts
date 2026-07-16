@@ -96,6 +96,9 @@ export async function saveJobAction(jobId: string): Promise<JobActionResult> {
     const match = scoreJobForUser({ careerProfile, resume, job });
 
     await savedJobsRepository.saveForUser(user.id, job.id, {
+      // Stamp the direction it was saved under. Discovery was already scored
+      // against this track; the pipeline must remember which one it was.
+      careerProfileId: careerProfile?.id ?? null,
       matchScore: match.matchScore,
       matchSummary: match.matchReason,
       matchedSkills: match.matchedKeywords,

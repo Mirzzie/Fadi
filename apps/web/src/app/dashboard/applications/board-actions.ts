@@ -6,11 +6,12 @@ import { randomUUID } from "node:crypto";
 
 import {
   createApplicationsRepository,
+  createCareerProfilesRepository,
   createJobsRepository,
   type ApplicationStatus,
 } from "@careeros/database";
 import { getCurrentAuthUser } from "@/lib/auth/session";
-import { getUserDocGenerate } from "@/lib/ai/user-generate";
+import { AiRateLimitError, getUserDocGenerate } from "@/lib/ai/user-generate";
 import { generateCareerDocument, NoHistoryError, type DocKind } from "@/lib/documents/generate";
 import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
@@ -49,11 +50,18 @@ export async function createApplicationAction(input: {
       jobId = job.id;
     }
 
+    // Which direction is this application for? Stamp the active track so a user
+    // running several directions can tell their pipelines apart.
+    const activeTrack = await createCareerProfilesRepository(db)
+      .getActiveForUser(user.id)
+      .catch(() => null);
+
     const app = await createApplicationsRepository(db).createForUser(user.id, {
       company: input.company.trim(),
       title: input.title.trim(),
       jobDescription: input.jobDescription?.trim() || null,
       jobId,
+      careerProfileId: activeTrack?.id ?? null,
       status: "interested",
     });
     revalidatePath("/dashboard/applications");
@@ -148,6 +156,8 @@ export async function generateApplicationDocumentAction(
     return { ok: true, message: "Drafted.", id: doc.id };
   } catch (error) {
     if (error instanceof NoHistoryError) return { ok: false, message: error.message };
+    // Not a failure — their allowance simply reset window. Say so plainly.
+    if (error instanceof AiRateLimitError) return { ok: false, message: error.message };
     logger.error("applications.generate_doc_failed", {
       userId: user.id,
       error: error instanceof Error ? error.message : "unknown",

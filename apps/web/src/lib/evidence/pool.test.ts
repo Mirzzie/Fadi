@@ -17,6 +17,7 @@ const item = (over: Partial<EvidenceView>): EvidenceView => ({
   detail: "",
   metrics: null,
   tags: [],
+  marketTags: [],
   origin: "manual",
   ...over,
 });
@@ -61,19 +62,103 @@ describe("evidenceRelevance — the same item is weighted differently per track"
   });
 });
 
-describe("formatTopEvidence — the pool→prompt bridge", () => {
-  it("returns an empty string when nothing is relevant (so callers can append unconditionally)", () => {
-    const ranked = rankEvidenceForTrack([nursing], { role: "Software Engineer", domain: "Tech" });
-    expect(formatTopEvidence(ranked)).toBe("");
+/** The doctrine's flagship example: real proof, described only in the user's own words. */
+const untranslatedHomelab = item({
+  kind: "project",
+  title: "Home SOC lab",
+  period: "2025",
+  detail: "Ran Wazuh and Suricata on Proxmox; triaged ~200 simulated attacks.",
+  metrics: "200 alerts triaged",
+  tags: ["wazuh", "suricata", "proxmox", "homelab"],
+});
+
+describe("marketTags — the stored translation layer", () => {
+  it("is what lets real-but-untranslated proof reach a market-named track", () => {
+    const track = { role: "Cybersecurity Analyst", domain: "Cybersecurity" };
+
+    // The user's own vocabulary shares no token with the role: invisible.
+    expect(evidenceRelevance(untranslatedHomelab, track).score).toBe(0);
+
+    // Naming the SAME real work the way postings name it makes it visible. Nothing
+    // about the evidence changed — only what we call it.
+    const translated = item({
+      ...untranslatedHomelab,
+      marketTags: ["siem", "incident triage", "security monitoring", "log analysis"],
+    });
+    const { score, matched } = evidenceRelevance(translated, track);
+    expect(score).toBeGreaterThan(0);
+    expect(matched).toEqual(expect.arrayContaining(["security monitoring"]));
   });
 
-  it("formats only the relevant items, leading with a clear instruction and no fabrication", () => {
+  it("weighs the market's name above the user's own words for a market-named track", () => {
+    const own = item({ title: "A", tags: ["cybersecurity"] });
+    const market = item({ title: "B", marketTags: ["cybersecurity"] });
+    const track = { role: "Cybersecurity Analyst" };
+    expect(evidenceRelevance(market, track).score).toBeGreaterThan(
+      evidenceRelevance(own, track).score,
+    );
+  });
+
+  it("ranks translated proof above an untranslated near-duplicate", () => {
+    const translated = item({
+      ...untranslatedHomelab,
+      title: "Home SOC lab (translated)",
+      marketTags: ["siem", "incident triage"],
+    });
+    const ranked = rankEvidenceForTrack([untranslatedHomelab, translated], {
+      role: "SIEM Analyst",
+    });
+    expect(ranked[0].item.title).toBe("Home SOC lab (translated)");
+    expect(ranked).toHaveLength(2); // and the untranslated one is still not deleted
+  });
+});
+
+describe("formatTopEvidence — the pool→prompt bridge", () => {
+  it("returns an empty string ONLY when the pool itself is empty", () => {
+    expect(formatTopEvidence([])).toBe("");
+  });
+
+  it("NEVER drops real evidence just because it doesn't match the track's words", () => {
+    // The regression this pins: a home lab tagged wazuh/suricata/proxmox shares no
+    // tokens with "Cybersecurity Analyst", so a score>0 filter deleted the single
+    // best proof a thin-experience candidate has. Low score = UNTRANSLATED, which is
+    // the thing this product exists to fix — not a reason to hide it from the model.
+    const ranked = rankEvidenceForTrack([untranslatedHomelab], {
+      role: "Cybersecurity Analyst",
+      domain: "Cybersecurity",
+    });
+
+    expect(ranked[0].score).toBe(0); // still no lexical overlap — that's expected
+    const block = formatTopEvidence(ranked);
+    expect(block).toContain("Home SOC lab"); // ...but it MUST still reach the prompt
+    expect(block).toContain("200 alerts triaged");
+    // And it must be labelled honestly rather than claimed as a role match.
+    expect(block).toMatch(/UNTRANSLATED/);
+    expect(block).toMatch(/never invent/i);
+  });
+
+  it("leads with the best match but keeps weaker evidence behind it", () => {
     const ranked = rankEvidenceForTrack([nursing, coding], { role: "Registered Nurse", domain: "Healthcare", synonyms: ["staff nurse"] });
     const block = formatTopEvidence(ranked);
     expect(block).toMatch(/MOST RELEVANT EVIDENCE/);
     expect(block).toMatch(/never invent/i);
-    expect(block).toContain("Staff Nurse");
-    expect(block).not.toContain("scheduling app"); // the coding item scored 0 → excluded
+    // Order carries the relevance signal...
+    expect(block.indexOf("Staff Nurse")).toBeLessThan(block.indexOf("scheduling app"));
+    // ...but the un-matched item is still available to the model, not deleted.
+    expect(block).toContain("scheduling app");
+  });
+
+  it("truncates large pools by rank, so the best evidence survives the cut", () => {
+    const many: EvidenceView[] = Array.from({ length: 12 }, (_, i) => ({
+      ...coding,
+      id: `c${i}`,
+      title: `Filler ${i}`,
+      tags: [],
+    }));
+    const ranked = rankEvidenceForTrack([...many, nursing], { role: "Registered Nurse", synonyms: ["staff nurse"] });
+    const block = formatTopEvidence(ranked, 3);
+    expect(block).toContain("Staff Nurse"); // the match survives truncation
+    expect(block.split("\n").length - 1).toBe(3); // header + exactly 3 items
   });
 });
 

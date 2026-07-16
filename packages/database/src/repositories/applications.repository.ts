@@ -1,7 +1,23 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 
 import type { Database } from "../client";
 import { applications, type Application } from "../schema";
+import type { TrackScope } from "./saved-jobs.repository";
+
+/**
+ * Track filter for the application pipeline. NULL career_profile_id = created
+ * before the pipeline was track-aware; those stay visible in every track so a
+ * migration never hides someone's live applications.
+ */
+function trackFilter(scope: TrackScope) {
+  if (scope.scope === "all") return undefined;
+  return scope.careerProfileId
+    ? or(
+        eq(applications.careerProfileId, scope.careerProfileId),
+        isNull(applications.careerProfileId),
+      )
+    : isNull(applications.careerProfileId);
+}
 
 export type ApplicationStatus =
   | "interested"
@@ -13,6 +29,8 @@ export type ApplicationStatus =
 
 export type UpsertApplicationStatusInput = {
   jobId: string;
+  /** The direction the user was in when they engaged this job. */
+  careerProfileId?: string | null;
   company: string;
   title: string;
   url?: string | null;
@@ -21,6 +39,8 @@ export type UpsertApplicationStatusInput = {
 
 export type CreateApplicationInput = {
   jobId?: string | null;
+  /** The direction this application belongs to (the user's active track). */
+  careerProfileId?: string | null;
   company: string;
   title: string;
   url?: string | null;
@@ -42,11 +62,12 @@ export type UpdateApplicationInput = Partial<{
 
 export function createApplicationsRepository(db: Database) {
   return {
-    async listForUser(userId: string): Promise<Application[]> {
+    /** Defaults to "all" so existing callers keep their current behaviour. */
+    async listForUser(userId: string, scope: TrackScope = { scope: "all" }): Promise<Application[]> {
       return db
         .select()
         .from(applications)
-        .where(eq(applications.userId, userId))
+        .where(and(eq(applications.userId, userId), trackFilter(scope)))
         .orderBy(desc(applications.updatedAt));
     },
 
@@ -66,6 +87,7 @@ export function createApplicationsRepository(db: Database) {
         .values({
           userId,
           jobId: input.jobId ?? null,
+          careerProfileId: input.careerProfileId ?? null,
           company: input.company,
           title: input.title,
           url: input.url ?? null,
@@ -145,6 +167,7 @@ export function createApplicationsRepository(db: Database) {
         .values({
           userId,
           jobId: input.jobId,
+          careerProfileId: input.careerProfileId ?? null,
           company: input.company,
           title: input.title,
           url: input.url ?? null,

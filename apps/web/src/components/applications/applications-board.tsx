@@ -24,6 +24,8 @@ type AppView = {
   url: string | null;
   jobDescription: string | null;
   appliedAt: string | null;
+  /** Which career direction this application belongs to (null = pre-tracks). */
+  trackName?: string | null;
 };
 type DocView = { id: string; kind: string; title: string; applicationId: string | null; jobId: string | null };
 
@@ -45,9 +47,17 @@ const DOC_ACTIONS: { kind: DocKind; label: string }[] = [
 export function ApplicationsBoard({
   applications,
   documents,
+  scope = "all",
+  activeTrackName = null,
+  channelInsight = null,
 }: {
   applications: AppView[];
   documents: DocView[];
+  /** "active" = only the current direction's pipeline; "all" = every direction. */
+  scope?: "active" | "all";
+  activeTrackName?: string | null;
+  /** Monoculture warning — null unless the pipeline is genuinely concentrated. */
+  channelInsight?: { headline: string; action: string } | null;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<AppView | null>(null);
@@ -67,12 +77,47 @@ export function ApplicationsBoard({
             Every role you&apos;re chasing, by stage. Open one to let Fadi draft a tailored resume,
             cover letter or cold email for it.
           </p>
+          {/* A filtered board must SAY it's filtered — otherwise hidden rows read
+              as data loss. Links to the setting rather than hiding the choice. */}
+          <p className="mt-1 text-xs text-muted-foreground">
+            {scope === "active" ? (
+              <>
+                Showing{" "}
+                <span className="text-foreground">{activeTrackName ?? "your active direction"}</span>{" "}
+                only ·{" "}
+                <Link href="/dashboard/settings" className="underline hover:text-primary">
+                  show all directions
+                </Link>
+              </>
+            ) : (
+              <>
+                Showing <span className="text-foreground">all directions</span> ·{" "}
+                <Link href="/dashboard/settings" className="underline hover:text-primary">
+                  show active only
+                </Link>
+              </>
+            )}
+          </p>
         </div>
         <Button size="sm" onClick={() => setAdding(true)}>
           <Plus className="size-4" aria-hidden="true" />
           Add
         </Button>
       </div>
+
+      {/* Monoculture warning. Deliberately NOT styled as an error: this is not the
+          user failing, it's the market being correlated. It only renders when the
+          data actually supports the claim. */}
+      {channelInsight ? (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-4">
+          <p className="text-sm text-foreground">{channelInsight.headline}</p>
+          <p className="mt-1.5 text-sm text-muted-foreground">{channelInsight.action}</p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Source: Algorithmic Monocultures in Hiring — Stanford Digital Economy Lab, ACM FAccT
+            2026 (3.4M applicants).
+          </p>
+        </div>
+      ) : null}
 
       {/* Kanban */}
       <div className="flex gap-3 overflow-x-auto pb-2">

@@ -10,9 +10,11 @@ import {
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
+import { publish } from "@/lib/events/bus";
 import { toCommitmentView, type CommitmentView } from "@/lib/learning/commitments-view";
 import { suggestProjectsForGap, type SuggestResult } from "@/lib/learning/suggest";
 import { logger } from "@/lib/observability/logger";
+import { recordForwardMotion } from "@/lib/resilience/service";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 
 const PATH = "/dashboard/learning";
@@ -75,7 +77,12 @@ export async function commitToProjectAction(input: {
 export async function completeCommitmentAction(input: {
   id: string;
   whatIBuilt: string;
-}): Promise<{ ok: boolean; message: string }> {
+}): Promise<{
+  ok: boolean;
+  message: string;
+  /** Present when the completion earned momentum, so the UI can show the gain. */
+  momentum?: { value: number; delta: number; band: string };
+}> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
 
@@ -108,17 +115,37 @@ export async function completeCommitmentAction(input: {
     });
 
     await commitments.completeForUser(user.id, commitment.id, evidence.id);
+
+    // Closing a skill gap is the most controllable forward motion there is — it is
+    // the one thing a user with no network and no callbacks can always do — and the
+    // engine has always priced it highest of the non-referral actions (+15). It was
+    // simply never awarded: `skill_closed` was defined and never emitted (see
+    // docs/DATA_FLOW_AUDIT.md, F1). The guard at the top of this function (already
+    // "completed" → early return) is what keeps this idempotent.
+    const motion = await recordForwardMotion(user.id, "skill_closed", {
+      metadata: { commitmentId: commitment.id, evidenceItemId: evidence.id, gap: commitment.gap },
+    });
+
+    // The career record grew — tell whoever cares (portfolio, and later the
+    // résumé projection) rather than importing them from here.
+    await publish("evidence.changed", {
+      userId: user.id,
+      reason: "learning_completed",
+      evidenceItemId: evidence.id,
+    });
     revalidatePath(PATH);
     revalidatePath("/dashboard/evidence");
     logger.info("learning.commitment_completed", {
       userId: user.id,
       commitmentId: commitment.id,
       evidenceId: evidence.id,
+      momentumDelta: motion.delta,
     });
     return {
       ok: true,
       message:
         "Done — added to your Evidence, so it now strengthens this direction's resume and every document Fadi drafts. You can edit it any time in Evidence.",
+      momentum: { value: motion.momentum, delta: motion.delta, band: motion.band },
     };
   } catch (error) {
     logger.error("learning.complete_failed", {

@@ -4,8 +4,8 @@ import {
   BriefcaseBusiness,
   Compass,
   FileText,
+  Globe,
   GraduationCap,
-  CloudSun,
   KanbanSquare,
   Layers,
   LayoutDashboard,
@@ -30,11 +30,11 @@ export const DOCK_APPS: DockApp[] = [
   // Start
   { href: "/dashboard", label: "Home", icon: LayoutDashboard, group: "start" },
   // Orient — where to aim, and what the world is doing
-  { href: "/dashboard/intelligence", label: "Career Weather", icon: CloudSun, group: "orient" },
   { href: "/dashboard/niche-finder", label: "Niche Finder", icon: Compass, group: "orient" },
   // You — who you are + what you send
   { href: "/dashboard/evidence", label: "Evidence", icon: Layers, group: "you" },
   { href: "/dashboard/documents", label: "Documents", icon: FileText, group: "you" },
+  { href: "/dashboard/portfolio", label: "Portfolio", icon: Globe, group: "you" },
   // Pursue — the pipeline
   { href: "/dashboard/jobs", label: "Jobs", icon: BriefcaseBusiness, group: "pursue" },
   { href: "/dashboard/applications", label: "Applications", icon: KanbanSquare, group: "pursue" },

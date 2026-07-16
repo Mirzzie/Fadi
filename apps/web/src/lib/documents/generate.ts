@@ -50,7 +50,23 @@ const KIND_LABEL: Record<string, string> = {
   value_proposition: "value proposition",
 };
 
-export type GeneratedDoc = { id: string; kind: string; title: string };
+export type GeneratedDoc = {
+  id: string;
+  kind: string;
+  title: string;
+  /**
+   * Set when the document was drafted WITHOUT the evidence pool contributing anything
+   * — i.e. from résumé/LinkedIn prose alone. Honest-degradation signal, not an error.
+   *
+   * WHY (docs/DATA_FLOW_AUDIT.md, F3): the pool is empty for every user in the live
+   * database, so `topEvidenceForPrompt` returns "" and five features quietly fall back
+   * to raw text. The fallback is correct; the SILENCE is not. A user whose entire
+   * strategy is "compensate for thin experience with real projects" was never told
+   * that none of those projects were reaching their CV. Principle 5: a signal the user
+   * can act on must actually reach them.
+   */
+  evidenceNotice?: string;
+};
 
 /**
  * Draft a tailored career document grounded in the user's REAL profile/resume,
@@ -116,6 +132,13 @@ export async function generateCareerDocument(
   // The shared evidence pool, ranked for the ACTIVE track — so the same history
   // produces a differently-framed document per direction (the multi-track payoff).
   const topEvidence = await import("@/lib/evidence/pool").then((m) => m.topEvidenceForPrompt(userId));
+
+  // Degrade honestly, out loud. An empty pool is the normal case today, and falling
+  // back to résumé prose is the right behaviour — but doing it silently means the user
+  // never learns that their projects are missing from their own CV (F3).
+  const evidenceNotice = topEvidence
+    ? undefined
+    : "Drafted from your résumé/LinkedIn text only — your Evidence pool is empty, so none of your projects, labs or certs were used. Add them in Evidence and re-draft: that's usually the difference for thin-experience applications.";
 
   const jobDescription = (opts.jobDescription ?? "").slice(0, 5000).trim();
   const candidateContext = [
@@ -184,7 +207,7 @@ ${HUMANIZE_RESUME}`;
       content: serializeResume(toResumeData(gen, personal)),
       jobContext,
     });
-    return { id: doc.id, kind: "resume", title: doc.title };
+    return { id: doc.id, kind: "resume", title: doc.title, evidenceNotice };
   }
 
   const label = KIND_LABEL[opts.kind] ?? "document";
@@ -211,5 +234,5 @@ ${HUMANIZE_PROSE}`;
     content,
     jobContext,
   });
-  return { id: doc.id, kind: opts.kind, title: doc.title };
+  return { id: doc.id, kind: opts.kind, title: doc.title, evidenceNotice };
 }
