@@ -62,9 +62,17 @@ export function aiErrorMessage(
     return "OpenRouter is blocking free (:free) models for this account. Enable them at openrouter.ai/settings/privacy (turn on 'Free model publication / prompt training'), then try again.";
   }
   if (status === 429 || code === "insufficient_quota" || /quota|billing/i.test(msg)) {
-    // Only OpenAI users hit the ChatGPT-Plus-≠-API-credits confusion.
+    // The #1 confusion, and it hits BOTH big paid providers: a consumer chat
+    // subscription is not the same account as API access. A Claude Pro/Max plan
+    // (claude.ai) and a ChatGPT Plus plan (chatgpt.com) grant neither API credits
+    // nor an API key — those live at the separate developer consoles and are billed
+    // pay-as-you-go. So a "rate limit / quota" error on a key from one of these
+    // accounts almost always means "this account has no API credits", not "slow down".
     if (provider?.id === "openai") {
-      return "OpenAI is out of quota or rate-limited. Note: a ChatGPT Plus subscription does NOT include API credits — add billing/credits at platform.openai.com, or switch providers in Settings.";
+      return "OpenAI rejected this key for quota. A ChatGPT Plus/Pro subscription is NOT API access — they're separate accounts. Add pay-as-you-go credit at platform.openai.com → Billing (or use Groq, which has a genuinely free API tier).";
+    }
+    if (provider?.id === "anthropic") {
+      return "Anthropic rejected this key for quota. A Claude Pro/Max subscription (claude.ai) is NOT API access — the API is a separate, pay-as-you-go account. Add credit at console.anthropic.com → Billing, or use Groq, which has a genuinely free API tier.";
     }
     if (provider?.id === "google") {
       return "Gemini's free quota was exceeded. Use the gemini-2.0-flash model (the most generous free tier — avoid gemini-2.5-pro, which has almost no free quota), or wait a minute and retry.";

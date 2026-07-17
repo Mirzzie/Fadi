@@ -1,7 +1,5 @@
 import "server-only";
 
-import type { ZodSchema } from "zod";
-
 import {
   createCareerProfilesRepository,
   createDocumentsRepository,
@@ -37,11 +35,11 @@ import type { DocKind } from "@/lib/jobs/application-types";
 
 export type { DocKind };
 
-/** The model-generation capability, bound to the user's provider by the caller. */
-export interface DocGenerate {
-  structured<T>(system: string, user: string, schema: ZodSchema<T>, name: string): Promise<T>;
-  text(system: string, user: string): Promise<string>;
-}
+// The generation capability now lives in the AI layer (lib/ai/doc-generate) so lib/ai
+// no longer imports this domain module to describe its own contract. Imported for local
+// use here and re-exported for the existing callers that import it from this file.
+import type { DocGenerate } from "@/lib/ai/doc-generate";
+export type { DocGenerate };
 
 const KIND_LABEL: Record<string, string> = {
   resume: "resume",

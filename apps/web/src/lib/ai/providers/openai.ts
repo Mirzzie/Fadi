@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
 import type { ZodSchema } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
 
 import { aiErrorMessage, isStructuredOutputUnsupported } from "./errors";
 import type {
@@ -151,32 +152,53 @@ export class OpenAIProvider implements AIProvider {
     const client = this.client;
     const temperature = options?.temperature ?? 0.4;
 
-    // 1) Native structured outputs (strict json_schema). OpenAI + newer Gemini
-    //    honor this; many free/local/OpenRouter models reject it.
+    // Build the strict json_schema format ONCE. OpenAI's helper throws at
+    // *construction* for schemas it can't express in strict mode — most commonly a
+    // field that is `.optional()` but not `.nullable()`. That is not a provider
+    // failure and must never abort the whole call: if it throws, we skip the strict
+    // path and use the tolerant JSON path below, which validates with `schema.parse`
+    // and handles optional fields natively. (This exact bug was hard-failing evidence
+    // extraction and interview-question drafting — the helper was also called a second
+    // time for the fallback guide, so even the fallback threw.)
+    let strictFormat: ReturnType<typeof zodResponseFormat> | null = null;
     try {
-      const response = await client.chat.completions.parse({
-        model: this.model,
-        messages,
-        response_format: zodResponseFormat(schema, schemaName),
-        temperature,
-      });
-      const parsed = response.choices[0]?.message.parsed;
-      if (parsed) return parsed;
-      // Got a response but no parsed object — fall through to tolerant parsing
-      // using the raw content rather than failing outright.
-      const raw = response.choices[0]?.message.content;
-      if (raw) return schema.parse(extractJsonObject(raw));
-    } catch (err) {
-      // Auth/quota/rate-limit etc. are real — let them bubble up to the caller.
-      // Only fall back when the provider simply can't do json_schema mode.
-      if (!isStructuredOutputUnsupported(err)) throw err;
+      strictFormat = zodResponseFormat(schema, schemaName);
+    } catch {
+      strictFormat = null;
     }
 
-    // 2) Tolerant path for any OpenAI-compatible model: instruct JSON, then
-    //    validate against the same Zod schema. Try json_object mode, then plain.
-    const jsonSchema = (
-      zodResponseFormat(schema, schemaName) as { json_schema?: { schema?: unknown } }
-    ).json_schema?.schema;
+    // 1) Native structured outputs (strict json_schema). OpenAI + newer Gemini
+    //    honor this; many free/local/OpenRouter models reject it.
+    if (strictFormat) {
+      try {
+        const response = await client.chat.completions.parse({
+          model: this.model,
+          messages,
+          response_format: strictFormat,
+          temperature,
+        });
+        const parsed = response.choices[0]?.message.parsed;
+        if (parsed) return parsed;
+        // Got a response but no parsed object — fall through to tolerant parsing
+        // using the raw content rather than failing outright.
+        const raw = response.choices[0]?.message.content;
+        if (raw) return schema.parse(extractJsonObject(raw));
+      } catch (err) {
+        // Auth/quota/rate-limit etc. are real — let them bubble up to the caller.
+        // Only fall back when the provider simply can't do json_schema mode.
+        if (!isStructuredOutputUnsupported(err)) throw err;
+      }
+    }
+
+    // 2) Tolerant path for any OpenAI-compatible model (and for schemas strict mode
+    //    can't express): instruct JSON, then validate against the same Zod schema.
+    //    Use the strict schema's shape when we have it, otherwise a non-strict
+    //    conversion (which handles optionals) so the guidance is still schema-shaped.
+    const jsonSchema =
+      (strictFormat as { json_schema?: { schema?: unknown } } | null)?.json_schema?.schema ??
+      // Cast: the bundled zod-to-json-schema is typed against a different zod build; it
+      // only reads the schema shape at runtime, so this is safe.
+      zodToJsonSchema(schema as unknown as Parameters<typeof zodToJsonSchema>[0], schemaName);
     const guide: AIMessage = {
       role: "system",
       content: jsonSchema

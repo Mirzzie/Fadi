@@ -66,9 +66,10 @@ export function ReferralBoard({ referrals }: { referrals: ReferralView[] }) {
           <h1 className="text-lg font-semibold">Referrals &amp; warm intros</h1>
         </div>
         <p className="text-sm text-muted-foreground">
-          The data is blunt: <span className="text-foreground">one referral is worth roughly forty
-          cold applications</span>, and sourced candidates are far more likely to be hired. This is
-          your highest-leverage move — track who you can ask, and let Fadi draft the message.
+          A referral is your <span className="text-foreground">highest-leverage move</span> because
+          it&apos;s a genuinely independent draw — it routes around the same screening software that
+          rejects your cold applications in a correlated batch. A different door, not the same judge
+          again. Track who you can ask, and let Fadi draft the message.
         </p>
         {items.length > 0 ? (
           <p className="text-xs text-muted-foreground">

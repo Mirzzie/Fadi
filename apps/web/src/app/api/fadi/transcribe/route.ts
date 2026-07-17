@@ -6,6 +6,10 @@ import { getCurrentAuthUser } from "@/lib/auth/session";
 import { createUserProvider } from "@/lib/ai/registry";
 import { getUserProviderConfigs } from "@/lib/ai/user-settings";
 import { logger } from "@/lib/observability/logger";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
+
+/** Whisper (Groq/OpenAI) rejects anything over 25 MB — fail fast before forwarding. */
+const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
 
 /**
  * Server-side speech-to-text via Whisper (Groq free tier / OpenAI). Browser-
@@ -17,6 +21,18 @@ export async function POST(req: NextRequest) {
   if (!session?.user) return new Response("Unauthorized", { status: 401 });
   const user = await getCurrentAuthUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
+
+  // Dictation calls this per field, so it's bursty by design — but each call is a
+  // Whisper request on the user's key and reads the upload into memory, neither of
+  // which passes through getUserDocGenerate's limiter. Generous ceiling, hard stop.
+  const rate = await consumeRateLimit({
+    key: `transcribe:${user.id}`,
+    limit: 60,
+    windowMs: 5 * 60 * 1000,
+  });
+  if (!rate.allowed) {
+    return Response.json({ error: "Too much dictation too fast — pause a moment and continue." }, { status: 429 });
+  }
 
   // Find the user's Whisper-capable provider (Groq or OpenAI), primary first.
   const configs = await getUserProviderConfigs(user.id);
@@ -38,6 +54,11 @@ export async function POST(req: NextRequest) {
     /* bad form */
   }
   if (!file) return new Response("No audio", { status: 400 });
+  // Reject oversize uploads before they're forwarded (or held in memory) — Whisper
+  // would 400 anyway, but bounding it here protects our own process.
+  if (file.size > MAX_AUDIO_BYTES) {
+    return Response.json({ error: "That recording is too long — keep dictation to short takes." }, { status: 413 });
+  }
 
   try {
     const text = await provider.transcribe(file);

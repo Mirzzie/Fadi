@@ -2,7 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 
-import type { DocGenerate } from "@/lib/documents/generate";
+import type { DocGenerate } from "@/lib/ai/doc-generate";
 
 /**
  * Domain-agnostic role-synonym expansion. Given a user's target role(s) — in

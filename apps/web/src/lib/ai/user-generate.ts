@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { DocGenerate } from "@/lib/documents/generate";
+import type { DocGenerate } from "@/lib/ai/doc-generate";
 import { logger } from "@/lib/observability/logger";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 import { buildProviderChain } from "./registry";

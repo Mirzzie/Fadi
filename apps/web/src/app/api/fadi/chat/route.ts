@@ -14,6 +14,7 @@ import { toToolSpec, type FadiToolContext } from "@/lib/ai/tools/types";
 import { createAgentMessagesRepository } from "@careeros/database";
 import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 
 /** A one-shot SSE response carrying a single message — so the client always gets a
  *  readable stream (no opaque "Failed to reach Fadi") even on the unhappy paths. */
@@ -57,6 +58,25 @@ export async function POST(req: NextRequest) {
 
   if (!user) {
     return new Response("Unauthorized", { status: 401 });
+  }
+
+  // Rate limit at the request boundary. Every chat turn spends the user's own AI key
+  // AND runs buildFadiContext (many DB reads + live-market lookups) AND may fire tool
+  // calls — none of which pass through getUserDocGenerate's limiter, so this endpoint
+  // is a separate, higher-frequency spend path that must be guarded on its own. The
+  // ceiling is generous for a human conversation but stops a runaway client/loop from
+  // draining the key or hammering the database. Answered as SSE so the client renders
+  // it like any other Fadi reply instead of an opaque error.
+  const rate = await consumeRateLimit({
+    key: `fadi-chat:${user.id}`,
+    limit: 40,
+    windowMs: 5 * 60 * 1000,
+  });
+  if (!rate.allowed) {
+    const mins = Math.max(1, Math.ceil(rate.retryAfterSeconds / 60));
+    return sseMessage(
+      `Let's take a breath — that's a lot of messages very fast. Give me about ${mins} minute${mins === 1 ? "" : "s"} and we'll pick right back up. Nothing you've done is lost.`,
+    );
   }
 
   // Parse request

@@ -37,7 +37,7 @@ export function forwardMotionMessage(kind: ForwardMotionKind): string {
     case "skill_closed":
       return "You closed a real skill gap. That's permanent — it raises your floor for every role you'll ever target.";
     case "referral_added":
-      return "A genuine connection activated. The data is blunt here: one referral is worth roughly forty cold applications. This is your highest-leverage move.";
+      return "A genuine connection activated — your highest-leverage move. A referral is an independent draw: it routes around the same screening software that rejects cold applications in correlated batches, instead of facing the same filter again.";
     case "rest_day":
       return "Rest logged — and your momentum is protected while you recover. Choosing to rest on purpose is discipline, not a lapse.";
     case "comeback":

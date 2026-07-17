@@ -64,6 +64,8 @@ type DashboardShellProps = {
   opportunities?: DashboardOpportunity[];
   profileSummary: DashboardProfileSummary | null;
   latestReport: StoredCareerReport | null;
+  /** Whether the report has drifted out of sync with the user's evidence/résumé. */
+  reportStale?: { stale: boolean; reason: string | null } | null;
   recommendedJobsPreview: RecommendedJob[];
   momentum: MomentumSummary;
   /** You-vs-past-self + morale read (honest "how am I really doing"). */
@@ -80,6 +82,7 @@ export function DashboardShell({
   opportunities = [],
   profileSummary,
   latestReport,
+  reportStale,
   recommendedJobsPreview,
   momentum,
   reflection,
@@ -262,6 +265,20 @@ export function DashboardShell({
               learning, or application decisions.
             </div>
             <GenerateReportButton />
+            {latestReport && reportStale?.stale ? (
+              // Living projection: the report knows when it's out of date with the
+              // evidence it was built from, and says so — rather than silently drifting.
+              // It does NOT auto-regenerate (that would spend the user's AI budget
+              // without asking); the "Generate report" action above is the one click.
+              <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+                <span className="font-medium text-amber-700 dark:text-amber-400">
+                  This report is out of date.
+                </span>{" "}
+                <span className="text-muted-foreground">
+                  {reportStale.reason} Regenerate it to reflect your latest history.
+                </span>
+              </div>
+            ) : null}
             {latestReport ? (
               <CareerReportView report={latestReport} />
             ) : (
@@ -298,7 +315,14 @@ export function DashboardShell({
           {recommendedJobsPreview.length > 0 ? (
             <div className="grid gap-3 md:grid-cols-3">
               {recommendedJobsPreview.map((job) => (
-                <div key={job.id} className="rounded-md border p-3">
+                // Clickable — opens the same workspace the Jobs page uses (fit-check →
+                // draft → apply). These used to be dead <div>s: a recommended role you
+                // couldn't click is worse than no recommendation.
+                <Link
+                  key={job.id}
+                  href={`/dashboard/applications/${job.id}/workspace`}
+                  className="block rounded-md border p-3 transition-colors hover:border-primary/40 hover:bg-muted/40"
+                >
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <h3 className="text-sm font-medium">{job.title}</h3>
@@ -314,12 +338,12 @@ export function DashboardShell({
                   <p className="mt-2 text-xs text-muted-foreground">
                     {[job.location, job.remoteMode, job.seniority].filter(Boolean).join(" / ")}
                   </p>
-                </div>
+                </Link>
               ))}
             </div>
           ) : (
             <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-              No seeded local jobs found yet. Run `npm run db:seed:jobs` to add example MVP jobs.
+              No matches yet — set your target role and location, and I&apos;ll pull live roles into your Jobs board.
             </div>
           )}
         </CardContent>

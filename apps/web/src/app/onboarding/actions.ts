@@ -1,5 +1,7 @@
 "use server";
 
+import { after } from "next/server";
+
 import {
   createCareerProfilesRepository,
   createLinkedInProfilesRepository,
@@ -111,6 +113,30 @@ export async function completeOnboardingAction(
     await profilesRepository.markOnboardingCompleted(user.id);
     logger.info("onboarding.complete.succeeded", {
       userId: user.id,
+    });
+
+    // Build the evidence pool in the background so the user lands on a POPULATED
+    // Evidence tab instead of a blank one they have to discover and manually trigger
+    // (the #1 reason that flagship feature looked broken). Runs after the response is
+    // sent, so onboarding stays fast. Best-effort and self-guarding: extractEvidencePool
+    // no-ops when there's no career history or no AI provider configured yet, and a
+    // failure here can never break onboarding.
+    const uid = user.id;
+    after(async () => {
+      try {
+        const [{ extractEvidencePool }, { publish }] = await Promise.all([
+          import("@/lib/evidence/pool"),
+          import("@/lib/events/bus"),
+        ]);
+        const res = await extractEvidencePool(uid);
+        if (res.ok) await publish("evidence.changed", { userId: uid, reason: "extracted" });
+        logger.info("onboarding.evidence_autobuild", { userId: uid, ok: res.ok, reason: res.ok ? undefined : res.reason });
+      } catch (err) {
+        logger.warn("onboarding.evidence_autobuild_failed", {
+          userId: uid,
+          error: err instanceof Error ? err.message : "unknown",
+        });
+      }
     });
 
     return {

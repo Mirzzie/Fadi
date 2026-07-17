@@ -59,6 +59,21 @@ describe("scoreJobForUser — domain-agnostic role matching", () => {
     expect(run(soc, "Cybersecurity Analyst").onRole).toBe(true);
   });
 
+  it("does NOT let a lone generic word like 'system' make an unrelated role on-role", () => {
+    // Real dashboard bug: this physical fire-safety role led the briefing for an IT
+    // System Administrator, because "system" appears in both titles.
+    const sysadmin = profile("IT System Administrator", [
+      "it system administrator",
+      "systems administrator",
+      "system admin",
+    ]);
+    expect(run(sysadmin, "Fire, Life and Safety System Commissioning Engineer").onRole).toBe(false);
+    expect(run(sysadmin, "Fire, Life and Safety System Commissioning Engineer").matchScore).toBeLessThanOrEqual(28);
+    // …but a genuine sysadmin role still matches, on the phrase/synonyms.
+    expect(run(sysadmin, "Systems Administrator").onRole).toBe(true);
+    expect(run(sysadmin, "IT System Administrator - Windows").onRole).toBe(true);
+  });
+
   it("flags same-field roles as fieldRelated (fallback), excluding other functions in the field", () => {
     // Real data: a SOC Analyst seeker whose store has security ENGINEERS but no
     // literal SOC/Security ANALYST postings. We'd rather show the adjacent security

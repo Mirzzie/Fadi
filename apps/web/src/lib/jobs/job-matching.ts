@@ -55,6 +55,35 @@ const genericRoleWords = new Set([
   "experienced",
 ]);
 
+// Words that appear in a role TITLE but are far too generic to decide the *kind* of
+// role on their own. "System" is the load-bearing example: it sits in "IT System
+// Administrator" AND in "Fire, Life & Safety System Commissioning Engineer", so
+// matching a single "system" token made a physical-safety role read as an on-role IT
+// match (it led the dashboard for an IT sysadmin). These are dropped from single-token
+// role matching only — the whole-role phrase and the Fadi-generated synonyms still
+// carry the real signal, so "Systems Engineer" → "Systems Administrator" still matches
+// on the phrase, not on the bare word.
+const overGenericRoleTokens = new Set([
+  "system",
+  "systems",
+  "service",
+  "services",
+  "operation",
+  "operations",
+  "information",
+  "management",
+  "center",
+  "centre",
+  "solution",
+  "solutions",
+  "technology",
+  "technologies",
+  "platform",
+  "digital",
+  "global",
+  "team",
+]);
+
 function normalize(value: string | null | undefined) {
   return value?.toLowerCase() ?? "";
 }
@@ -113,7 +142,14 @@ function roleFamilyTerms(
   // its tokens leak the DOMAIN into the role-kind decision, making any same-domain
   // job (a Professor *of* cybersecurity) read as on-role. Role kind = titles, not
   // goal text. careerGoal still feeds the soft keyword score below.
-  for (const r of roles) distinctiveTokens(r).forEach((t) => terms.add(t));
+  // Over-generic infrastructure words (system/services/operations…) are dropped here
+  // so a lone "system" can't make an unrelated title read as on-role — the whole-role
+  // phrase and the synonyms below still carry the real signal.
+  for (const r of roles) {
+    for (const t of distinctiveTokens(r)) {
+      if (!overGenericRoleTokens.has(t)) terms.add(t);
+    }
+  }
 
   // Whole-role phrases — the domain-general path (finance, healthcare, trades…).
   for (const r of roles) {

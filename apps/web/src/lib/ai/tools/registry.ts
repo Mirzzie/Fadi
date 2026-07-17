@@ -170,7 +170,7 @@ const REFERRAL_RELATIONSHIPS = [
 const draftReferralOutreachTool: FadiTool = {
   name: "draft_referral_outreach",
   description:
-    "Add a referral target at a company and draft a short, sendable outreach message asking for a referral or warm intro. Use for 'help me get a referral at X', 'draft my message to someone at X', 'who should I ask at X'. A referral is worth ~40 cold applications. Company is required; role/contact are optional.",
+    "Add a referral target at a company and draft a short, sendable outreach message asking for a referral or warm intro. Use for 'help me get a referral at X', 'draft my message to someone at X', 'who should I ask at X'. A referral is an independent draw that routes around the correlated screening software — the highest-leverage move. Company is required; role/contact are optional.",
   parameters: {
     type: "object",
     properties: {

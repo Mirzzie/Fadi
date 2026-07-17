@@ -31,7 +31,31 @@ function parseSeenDate(seendate?: string): string | undefined {
 // gracefully instead of dropping all geopolitical context. Never fabricated.
 const FRESH_TTL_MS = 15 * 60 * 1000; // within this, skip the network entirely
 const STALE_TTL_MS = 60 * 60 * 1000; // on fetch failure, serve cache up to this age
+const CACHE_MAX = 300;
 const cache = new Map<string, { at: number; signals: MarketSignal[] }>();
+
+/**
+ * Store a result while keeping the cache bounded. Two-tier TTL means we can't use the
+ * single-TTL BoundedTtlCache (an entry past FRESH but under STALE is still useful for
+ * failure-fallback), so bound it here: drop entries older than STALE_TTL (never served
+ * again), then evict oldest until under the cap. Without this the Map grew for the life
+ * of the process — one entry per distinct query — a slow leak.
+ */
+function putInCache(key: string, signals: MarketSignal[]): void {
+  const now = Date.now();
+  if (cache.size >= CACHE_MAX) {
+    for (const [k, v] of cache) {
+      if (now - v.at >= STALE_TTL_MS) cache.delete(k);
+    }
+    while (cache.size >= CACHE_MAX) {
+      const oldest = cache.keys().next().value;
+      if (oldest === undefined) break;
+      cache.delete(oldest);
+    }
+  }
+  cache.delete(key);
+  cache.set(key, { at: now, signals });
+}
 
 export class GdeltSource implements SignalSource {
   readonly id = "gdelt";
@@ -62,7 +86,7 @@ export class GdeltSource implements SignalSource {
 
     const fresh = await this.request(q, limit);
     if (fresh) {
-      cache.set(cacheKey, { at: Date.now(), signals: fresh });
+      putInCache(cacheKey, fresh);
       return fresh;
     }
 

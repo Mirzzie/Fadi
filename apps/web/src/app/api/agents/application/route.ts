@@ -7,6 +7,7 @@ import { getCurrentAuthUser } from "@/lib/auth/session";
 import { buildFadiContext } from "@/lib/ai/context/builder";
 import { buildProviderChain } from "@/lib/ai/registry";
 import { getUserProviderConfigs } from "@/lib/ai/user-settings";
+import { consumeRateLimit } from "@/lib/security/rate-limit";
 import { ResilientProvider } from "@/lib/ai/resilient";
 import { applicationAgent } from "@/lib/agents/application.agent";
 import { logger } from "@/lib/observability/logger";
@@ -40,6 +41,20 @@ export async function POST(req: NextRequest) {
 
   if (!user) {
     return new Response("Unauthorized", { status: 401 });
+  }
+
+  // Like the chat route, this spends the user's AI key and runs buildFadiContext on
+  // every call, bypassing getUserDocGenerate's limiter — so it needs its own ceiling.
+  const rate = await consumeRateLimit({
+    key: `agent-application:${user.id}`,
+    limit: 30,
+    windowMs: 5 * 60 * 1000,
+  });
+  if (!rate.allowed) {
+    return new Response(
+      JSON.stringify({ error: "Too many requests in a short window — give it a minute and try again." }),
+      { status: 429, headers: { "Content-Type": "application/json" } },
+    );
   }
 
   let body: unknown;

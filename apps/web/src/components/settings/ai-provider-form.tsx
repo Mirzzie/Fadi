@@ -207,6 +207,20 @@ function ProviderFields({
         ))}
       </div>
 
+      {descriptor?.note ? (
+        <p
+          className={cn(
+            "rounded-lg border px-3 py-2 text-xs",
+            descriptor.cost === "paid"
+              ? "border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400"
+              : "border-emerald-500/25 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400",
+          )}
+        >
+          {descriptor.cost === "free" ? "✓ Free · " : descriptor.cost === "local" ? "✓ Local · " : "⚠ Paid · "}
+          {descriptor.note}
+        </p>
+      ) : null}
+
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <label className="text-sm font-medium">Model</label>

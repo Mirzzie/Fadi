@@ -18,6 +18,18 @@ export function createEvidenceRepository(db: Database) {
         .orderBy(desc(evidenceItems.updatedAt));
     },
 
+    /** The most recent change to the pool — powers report/output staleness. Cheap:
+     *  one indexed row, not the whole pool. Null when the pool is empty. */
+    async latestUpdatedAt(userId: string): Promise<Date | null> {
+      const [row] = await db
+        .select({ updatedAt: evidenceItems.updatedAt })
+        .from(evidenceItems)
+        .where(eq(evidenceItems.userId, userId))
+        .orderBy(desc(evidenceItems.updatedAt))
+        .limit(1);
+      return row?.updatedAt ?? null;
+    },
+
     async getForUser(userId: string, id: string): Promise<EvidenceItem | null> {
       const [row] = await db
         .select()

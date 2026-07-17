@@ -114,23 +114,45 @@ export interface ProviderDescriptor {
   capabilities: ProviderCapability[];
   requiresApiKey: boolean;
   docsUrl: string;
+  /** Cost posture, shown honestly in the UI so nobody mistakes a paid API for a subscription. */
+  cost: "free" | "paid" | "local";
+  /** One honest line under the provider — the thing a first-time user needs to know. */
+  note?: string;
 }
 
+// ORDER MATTERS: the form defaults to descriptors[0]. Free options lead, because the
+// primary user is broke (PLATFORM_IDEOLOGY) and a free key that works beats a paid key
+// they don't have. The paid providers carry the honest warning that an API key is NOT
+// the same thing as a Claude Pro / ChatGPT Plus subscription — the #1 support confusion.
 export const PROVIDER_DESCRIPTORS: ProviderDescriptor[] = [
   {
-    id: "openai",
-    name: "OpenAI",
-    label: "OpenAI",
-    defaultModel: "gpt-4.1-mini",
-    models: ["gpt-4o", "gpt-4.1", "gpt-4.1-mini", "gpt-4o-mini"],
-    capabilities: ["chat", "streaming", "structured_output", "realtime_voice", "tts", "stt", "vision"],
+    id: "groq",
+    name: "Groq",
+    label: "Groq — free, fast (recommended)",
+    defaultModel: "llama-3.3-70b-versatile",
+    models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"],
+    capabilities: ["chat", "streaming", "structured_output", "stt"],
     requiresApiKey: true,
-    docsUrl: "https://platform.openai.com/api-keys",
+    docsUrl: "https://console.groq.com/keys",
+    cost: "free",
+    note: "Genuinely free API tier — no billing, no card. The best place to start. Generous daily limits.",
+  },
+  {
+    id: "google",
+    name: "Google",
+    label: "Google Gemini — free tier",
+    defaultModel: "gemini-2.0-flash",
+    models: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite"],
+    capabilities: ["chat", "streaming", "structured_output", "vision"],
+    requiresApiKey: true,
+    docsUrl: "https://aistudio.google.com/app/apikey",
+    cost: "free",
+    note: "Free key from AI Studio. Use gemini-2.0-flash — the most generous free tier.",
   },
   {
     id: "openrouter",
     name: "OpenRouter",
-    label: "OpenRouter (many models, free tier)",
+    label: "OpenRouter — many models, free tier",
     defaultModel: "meta-llama/llama-3.3-70b-instruct:free",
     models: [
       "meta-llama/llama-3.3-70b-instruct:free",
@@ -142,45 +164,43 @@ export const PROVIDER_DESCRIPTORS: ProviderDescriptor[] = [
     capabilities: ["chat", "streaming", "structured_output", "vision"],
     requiresApiKey: true,
     docsUrl: "https://openrouter.ai/keys",
-  },
-  {
-    id: "anthropic",
-    name: "Anthropic",
-    label: "Anthropic (Claude)",
-    defaultModel: "claude-sonnet-4-6",
-    models: ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
-    capabilities: ["chat", "streaming", "structured_output", "vision"],
-    requiresApiKey: true,
-    docsUrl: "https://console.anthropic.com/settings/keys",
-  },
-  {
-    id: "google",
-    name: "Google",
-    label: "Google (Gemini · free tier)",
-    defaultModel: "gemini-2.0-flash",
-    models: ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.0-flash", "gemini-2.0-flash-lite"],
-    capabilities: ["chat", "streaming", "structured_output", "vision"],
-    requiresApiKey: true,
-    docsUrl: "https://aistudio.google.com/app/apikey",
-  },
-  {
-    id: "groq",
-    name: "Groq",
-    label: "Groq (fast · free tier)",
-    defaultModel: "llama-3.3-70b-versatile",
-    models: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"],
-    capabilities: ["chat", "streaming", "structured_output", "stt"],
-    requiresApiKey: true,
-    docsUrl: "https://console.groq.com/keys",
+    cost: "free",
+    note: "One key, many models. For :free models, enable them once in OpenRouter privacy settings.",
   },
   {
     id: "ollama",
     name: "Ollama",
-    label: "Ollama (local)",
+    label: "Ollama — runs on your own machine",
     defaultModel: "llama3.2",
     models: ["llama3.2", "llama3.1", "mistral", "gemma3", "qwen2.5"],
     capabilities: ["chat", "streaming"],
     requiresApiKey: false,
     docsUrl: "https://ollama.com",
+    cost: "local",
+    note: "Free and private — models run locally, nothing leaves your machine. Needs Ollama installed.",
+  },
+  {
+    id: "openai",
+    name: "OpenAI",
+    label: "OpenAI — paid API (not ChatGPT Plus)",
+    defaultModel: "gpt-4.1-mini",
+    models: ["gpt-4o", "gpt-4.1", "gpt-4.1-mini", "gpt-4o-mini"],
+    capabilities: ["chat", "streaming", "structured_output", "realtime_voice", "tts", "stt", "vision"],
+    requiresApiKey: true,
+    docsUrl: "https://platform.openai.com/api-keys",
+    cost: "paid",
+    note: "Needs pay-as-you-go API credit at platform.openai.com. A ChatGPT Plus/Pro subscription is a SEPARATE account and does NOT work here.",
+  },
+  {
+    id: "anthropic",
+    name: "Anthropic",
+    label: "Anthropic Claude — paid API (not Claude Pro)",
+    defaultModel: "claude-sonnet-4-6",
+    models: ["claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5-20251001"],
+    capabilities: ["chat", "streaming", "structured_output", "vision"],
+    requiresApiKey: true,
+    docsUrl: "https://console.anthropic.com/settings/keys",
+    cost: "paid",
+    note: "Needs pay-as-you-go API credit at console.anthropic.com. A Claude Pro/Max subscription is a SEPARATE account and does NOT work here.",
   },
 ];

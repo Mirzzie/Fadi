@@ -1,6 +1,6 @@
 import "server-only";
 
-import type { DocGenerate } from "@/lib/documents/generate";
+import type { DocGenerate } from "@/lib/ai/doc-generate";
 import { importedToResumeData, resumeImportSchema } from "@/lib/documents/resume-schema";
 import { parseResume, serializeResume, type ResumeData } from "@/lib/documents/resume";
 

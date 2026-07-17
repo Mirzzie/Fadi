@@ -157,7 +157,7 @@ function stepsForStage(stage: string): string[] {
       return [
         "Mirror the exact job-title and 5–8 hard-skill keywords from the posting in your résumé — most no-responses are a keyword/format mismatch, not your background.",
         "Apply within 48 hours of a posting going live, and prioritise roles where you meet ~70%+ of the must-haves.",
-        "Find one person at the company to ask for a referral — a referral is worth roughly 40 cold applications.",
+        "Find one person at the company to ask for a referral — it's an independent draw that routes around the screening software rejecting your cold applications, not another pass through the same filter.",
       ];
     case "screen":
       return [

@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { ApplicationsBoard } from "@/components/applications/applications-board";
+import { ApplicationsTabs } from "@/components/applications/applications-tabs";
 import { BatchPrep } from "@/components/applications/batch-prep";
+import { DocumentsShell } from "@/components/documents/documents-shell";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
 import {
@@ -15,6 +17,18 @@ import {
 } from "@careeros/database";
 import { onboardingStatusOf } from "@/lib/onboarding/status";
 import { analyseChannelMix, channelInsight } from "@/lib/applications/channel";
+import { isProseKind, letterSnippet } from "@/lib/documents/letter";
+import { parseResume } from "@/lib/documents/resume";
+
+/** A readable card snippet — content is JSON for structured kinds, so unpack it. */
+function previewFor(kind: string, content: string): string {
+  if (isProseKind(kind)) return letterSnippet(content, kind).slice(0, 140);
+  if (kind === "resume") {
+    const r = parseResume(content);
+    return (r.summary || r.personal.headline || r.personal.name || "").slice(0, 140);
+  }
+  return content.slice(0, 140);
+}
 
 export const metadata: Metadata = { title: "Applications" };
 export const dynamic = "force-dynamic";
@@ -62,8 +76,20 @@ export default async function ApplicationsPage() {
     )
     .map((a) => ({ jobId: a.jobId as string, title: a.title, company: a.company }));
 
-  return (
-    <AppShell>
+  // The full documents library — the folded-in Documents tab. Scoped to the active
+  // track (each direction owns its documents), same as the old standalone page.
+  const libraryDocs = docs
+    .filter((d) => !activeTrack || d.careerProfileId === activeTrack.id || d.careerProfileId === null)
+    .map((d) => ({
+      id: d.id,
+      kind: d.kind,
+      title: d.title,
+      updatedAt: d.updatedAt.toISOString(),
+      preview: previewFor(d.kind, d.content),
+    }));
+
+  const board = (
+    <>
       <div className="mx-auto max-w-shell">
         <BatchPrep candidates={batchCandidates} />
       </div>
@@ -93,6 +119,14 @@ export default async function ApplicationsPage() {
             jobId: d.jobId,
           }))}
       />
+    </>
+  );
+
+  return (
+    <AppShell>
+      <div className="mx-auto max-w-shell">
+        <ApplicationsTabs board={board} library={<DocumentsShell documents={libraryDocs} />} />
+      </div>
     </AppShell>
   );
 }

@@ -3,7 +3,6 @@
 import {
   BriefcaseBusiness,
   Compass,
-  FileText,
   Globe,
   GraduationCap,
   KanbanSquare,
@@ -33,7 +32,6 @@ export const DOCK_APPS: DockApp[] = [
   { href: "/dashboard/niche-finder", label: "Niche Finder", icon: Compass, group: "orient" },
   // You — who you are + what you send
   { href: "/dashboard/evidence", label: "Evidence", icon: Layers, group: "you" },
-  { href: "/dashboard/documents", label: "Documents", icon: FileText, group: "you" },
   { href: "/dashboard/portfolio", label: "Portfolio", icon: Globe, group: "you" },
   // Pursue — the pipeline
   { href: "/dashboard/jobs", label: "Jobs", icon: BriefcaseBusiness, group: "pursue" },

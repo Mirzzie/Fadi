@@ -1,5 +1,6 @@
 import "server-only";
 
+import { BoundedTtlCache } from "@/lib/cache/bounded";
 import { logger } from "@/lib/observability/logger";
 import { parseLocation } from "@/lib/jobs/locations";
 import {
@@ -126,8 +127,14 @@ export interface MarketIntelligence {
 
 // Cache personalized intelligence per profile-query so the chat path can carry
 // live signals without paying the fetch latency on every message.
+//
+// BOUNDED on purpose (BoundedTtlCache). The key is per (role, region, skills, gaps,
+// thresholds) — high-cardinality across users — and the previous raw Map only checked
+// its TTL on READ, so stale entries were never removed and it grew without limit for
+// the life of the process: a slow memory leak on a long-running self-host node.
 const MARKET_TTL_MS = 15 * 60 * 1000;
-const marketCache = new Map<string, { at: number; intel: MarketIntelligence }>();
+const MARKET_CACHE_MAX = 500;
+const marketCache = new BoundedTtlCache<MarketIntelligence>(MARKET_TTL_MS, MARKET_CACHE_MAX);
 
 function marketCacheKey(profile: RelevanceProfile, opts: { threshold?: number; limit?: number }) {
   return JSON.stringify([
@@ -147,7 +154,7 @@ export async function getMarketIntelligence(
 ): Promise<MarketIntelligence> {
   const cacheKey = marketCacheKey(profile, opts);
   const cached = marketCache.get(cacheKey);
-  if (cached && Date.now() - cached.at < MARKET_TTL_MS) return cached.intel;
+  if (cached) return cached;
 
   const sources = getConfiguredSignalSources();
   const query = queryFromProfile(profile);
@@ -176,7 +183,7 @@ export async function getMarketIntelligence(
     activeSources: sources.map((s) => s.id),
     generatedAt: new Date().toISOString(),
   };
-  marketCache.set(cacheKey, { at: Date.now(), intel });
+  marketCache.set(cacheKey, intel);
   return intel;
 }
 

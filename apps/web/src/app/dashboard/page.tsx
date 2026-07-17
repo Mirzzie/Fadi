@@ -16,6 +16,14 @@ import { getSetupState } from "@/lib/guidance/setup";
 import { onboardingStatusOf } from "@/lib/onboarding/status";
 import { getMomentumReflection, getMomentumSummary } from "@/lib/resilience/service";
 import { getMarketIntelligence } from "@/lib/data-sources/service";
+import {
+  createCareerProfilesRepository,
+  createEvidenceRepository,
+  createLinkedInProfilesRepository,
+  createResumesRepository,
+} from "@careeros/database";
+import { getDatabase } from "@/lib/database/client";
+import { reportStaleness } from "@/lib/career-report/staleness";
 import type { ScoredSignal } from "@/lib/data-sources/relevance";
 
 export const metadata: Metadata = {
@@ -31,7 +39,8 @@ export default async function DashboardPage() {
     redirect("/auth/sign-in");
   }
 
-  const [profileSummary, latestReport, recommendedJobsPreview, momentum, reflection, setup, digest, impact] =
+  const db = getDatabase();
+  const [profileSummary, latestReport, recommendedJobsPreview, momentum, reflection, setup, digest, impact, latestEvidenceAt, activeTrack, linkedin] =
     await Promise.all([
       getDashboardProfileSummary(user.id),
       getLatestCareerReport(user.id),
@@ -41,7 +50,25 @@ export default async function DashboardPage() {
       getSetupState(user.id),
       getAgencyDigest(user.id),
       getFadiImpact(user.id),
+      createEvidenceRepository(db).latestUpdatedAt(user.id),
+      createCareerProfilesRepository(db).getActiveForUser(user.id),
+      createLinkedInProfilesRepository(db).getLatestForUser(user.id),
     ]);
+
+  // The résumé is per-track (each direction tailors its own), so compare the report
+  // against THIS track's résumé — not a change on some other direction.
+  const trackResume = activeTrack
+    ? await createResumesRepository(db).getLatestForTrack(user.id, activeTrack.id)
+    : null;
+
+  // Living projection: does the report still reflect the sources it was built from —
+  // the evidence pool, this track's résumé, and the LinkedIn record?
+  const reportStale = reportStaleness({
+    reportGeneratedAt: latestReport?.generated_at ?? latestReport?.created_at ?? null,
+    latestEvidenceAt,
+    latestResumeAt: trackResume?.updatedAt ?? null,
+    latestLinkedInAt: linkedin?.updatedAt ?? null,
+  });
 
   // Gate on the summary we already loaded — no separate profiles round-trip.
   if (onboardingStatusOf(profileSummary) !== "completed") {
@@ -148,6 +175,7 @@ export default async function DashboardPage() {
         opportunities={opportunities}
         profileSummary={profileSummary}
         latestReport={latestReport}
+        reportStale={reportStale}
         recommendedJobsPreview={recommendedJobsPreview}
         momentum={momentum}
         reflection={reflection}
