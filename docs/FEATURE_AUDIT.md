@@ -94,6 +94,51 @@ UI (only the one dashboard empty state, now fixed).
 
 ---
 
+## 🔴 PASS 2 — the finding that matters most (2026-07-20)
+
+Row counts across 7 users and months of real use:
+
+| Produced automatically | rows | Requires the user to capture something | rows |
+|---|---|---|---|
+| portfolio_items (imported) | 33 | **evidence_items** | **0** |
+| agent_runs | 31 | **referral_targets** | **0** |
+| interview_stories | 18 | **saved_jobs** (of 991 jobs) | **0** |
+| career_reports | 6 | **learning completed** | **0** |
+| | | **resilience_events** | **0** |
+
+**Every feature that requires the user to put something in has zero rows. Every feature
+that generates output automatically has data.** Fadi is an *output generator, not a
+capture system* — the exact inversion of its own doctrine ("one truthful record,
+projected into every output"). There is no record; there are only projections of a
+résumé.
+
+Critically, **the code is not broken.** `saveJobAction` and `completeCommitmentAction`
+have real handlers wired to real actions. These features *work* and are simply never
+used. That is a product-design failure, not a bug — and a harder one.
+
+### Why nobody captures anything: the scavenger hunt
+
+Every feature is correct in isolation and politely sends you somewhere else to start.
+A new user's path to a portfolio was:
+
+> Portfolio → "No evidence yet, add it in Evidence first" → Evidence → "Build from my
+> history" (needs a provider) → back to Portfolio → seed
+
+Five steps, each one honestly telling you to go do a different thing first. Nothing
+chained. That is the real reason the capture tables are empty.
+
+**Fixed:** `seedFromEvidence` now *builds the evidence pool itself* when it's empty
+(the pool derives from the user's own résumé/LinkedIn — there's nothing to ask
+permission for) and continues straight to seeding. One click instead of five hops. It
+still degrades honestly if there's genuinely no history or no AI provider.
+
+### `saved_jobs` is redundant by design
+
+0 rows against 991 ingested jobs isn't a broken button — opening a workspace or
+drafting a document already creates an application. **Applying *is* the bookmark**, so
+"Save job" adds a parallel concept nobody needs. Recommend removing it rather than
+trying to drive engagement to it.
+
 ## Still to deep-verify (pass 2)
 
 Action-level for Interview (prep/stories/mock), Learning (commit → complete → evidence),

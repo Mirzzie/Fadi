@@ -161,9 +161,23 @@ export async function seedFromEvidence(): Promise<Result<{ added: number }>> {
     return { ok: false, message: "This site already has items — seed only runs when empty." };
   }
 
-  const evidence = await createEvidenceRepository(getDatabase()).listForUser(user.id);
+  const evidenceRepo = createEvidenceRepository(getDatabase());
+  let evidence = await evidenceRepo.listForUser(user.id);
+
+  // Chain the step instead of bouncing the user. This used to return "No evidence yet
+  // — add it in Evidence first", which turned building a portfolio into a scavenger
+  // hunt: Portfolio → Evidence → build → back to Portfolio → seed. The pool is derived
+  // from the user's OWN résumé/LinkedIn, so there is nothing to ask permission for —
+  // build it here and continue. Falls back to the honest message only if it genuinely
+  // can't (no career history on file, or no AI provider configured).
   if (evidence.length === 0) {
-    return { ok: false, message: "No evidence yet. Add experience/projects in Evidence first." };
+    const { extractEvidencePool } = await import("@/lib/evidence/pool");
+    const built = await extractEvidencePool(user.id);
+    if (!built.ok) return { ok: false, message: built.message };
+    evidence = await evidenceRepo.listForUser(user.id);
+    if (evidence.length === 0) {
+      return { ok: false, message: "I couldn't find enough in your history to build a portfolio yet." };
+    }
   }
 
   const rows = seedItemsFromEvidence(evidence).map((r) => ({
