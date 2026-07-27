@@ -153,6 +153,29 @@ npm run db:seed:jobs   # seed job data
 
 ---
 
+## What works with which credentials
+
+**Nothing is required to boot, sign up, and click through the whole app** — every key is
+optional and email verification is off, so no one gets locked out. Keys only turn features
+from inert into *productive*. Set an AI key first; the rest are for exercising specific
+features.
+
+| Feature | Needs | Without it |
+| --- | --- | --- |
+| Sign up / log in, onboarding, save jobs, manual tracking | *nothing* (auto-generated auth secret) | ✅ fully works |
+| **Fadi's AI** — mentor, Career Intelligence Report, CV review, dictation, interview & mock prep, "enhance", learning suggestions | **one** of `GROQ_API_KEY` / `GOOGLE_API_KEY` / `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` **— or a per-user BYOK key in Settings** | ❌ these throw / stay inert ("No AI providers registered") |
+| Job discovery & market intelligence | *nothing* — keyless sources (GDELT, Hacker News, Remotive, BLS) + seed data | ✅ works in reduced form; optional keys (Adzuna, Reed, Jooble, JSearch, O*NET, FRED, Lightcast, Apify) add richer providers |
+| **Portfolio media upload** (image/video) | `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` + `NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET` (free, unsigned) | ⚠️ upload button disabled; text/links still work |
+| Publish portfolio to **GitHub Pages** | *nothing server-side* — the user pastes their **own** GitHub token in the app | ✅ works (per-user token, encrypted) |
+| Password reset / verification email | `RESEND_API_KEY` + `EMAIL_FROM` | ⚠️ sign-up still works; mail just isn't sent |
+| Social login (Google / LinkedIn buttons) | that provider's `*_CLIENT_ID` + `*_CLIENT_SECRET` | ⚠️ buttons hidden; email/password unaffected |
+| Multi-instance rate limits, background agency, MCP self-host | `UPSTASH_*`, `CRON_SECRET`, `FADIOS_MCP_*` | ✅ local fallbacks; not needed for dev |
+
+**Bottom line for a new developer:** run `npm run setup`, add **one free AI key** (Groq),
+and optionally a free **Cloudinary** preset if you want to test portfolio media. That's
+everything needed to see the product's core surface. Every key lives in
+`apps/web/.env.local` — see `.env.example` for the annotated full list.
+
 ## Everyday commands
 
 | Command | What it does |
