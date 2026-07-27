@@ -59,9 +59,20 @@ const serverEnvSchema = z.object({
   LIGHTCAST_CLIENT_SECRET: z.string().optional(),
 });
 
+/**
+ * Env files routinely contain empty assignments (`AI_PROVIDER=`), which arrive as "" — not
+ * undefined. Zod's `.optional()` only skips undefined, so an empty enum/URL value throws and
+ * crashes the app at boot (e.g. right after copying .env.example). Treat "" as unset.
+ */
+function stripEmpty<T extends Record<string, unknown>>(obj: T): T {
+  return Object.fromEntries(
+    Object.entries(obj).map(([k, v]) => [k, v === "" ? undefined : v]),
+  ) as T;
+}
+
 export const serverEnv = {
   ...publicEnv,
-  ...serverEnvSchema.parse({
+  ...serverEnvSchema.parse(stripEmpty({
     BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
     BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
     BETTER_AUTH_TRUSTED_ORIGINS: process.env.BETTER_AUTH_TRUSTED_ORIGINS,
@@ -99,5 +110,5 @@ export const serverEnv = {
     FADIOS_MCP_USER_ID: process.env.FADIOS_MCP_USER_ID,
     LIGHTCAST_CLIENT_ID: process.env.LIGHTCAST_CLIENT_ID,
     LIGHTCAST_CLIENT_SECRET: process.env.LIGHTCAST_CLIENT_SECRET,
-  }),
+  })),
 };
