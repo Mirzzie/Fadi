@@ -9,6 +9,8 @@
  * getMacroSnapshot does the I/O and never throws.
  */
 
+import { logger } from "@/lib/observability/logger";
+
 export type MacroReading = {
   id: "inflation" | "rate" | "unemployment";
   label: string;
@@ -154,7 +156,6 @@ async function fredSeries(
  */
 export async function getMacroSnapshot(): Promise<MacroSnapshot | null> {
   const apiKey = await fredKey();
-  const { logger } = await import("@/lib/observability/logger");
   if (!apiKey) {
     logger.info("macro.fred.no_key");
     return null;

@@ -84,22 +84,21 @@ const reviewSchema = z.object({
     .array(
       z.object({
         name: z.string(),
-        jdDemands: z.string().default(""),
-        cvSays: z.string().default(""),
-        diagnosis: z.string().default(""),
-        verdict: z.string().default("reframe"),
-        rewrite: z.string().default(""),
+        jdDemands: z.string(),
+        cvSays: z.string(),
+        diagnosis: z.string(),
+        verdict: z.string(),
+        rewrite: z.string(),
       }),
     )
-    .max(12)
-    .default([]),
-  atsScore: z.coerce.number().default(0),
-  missingKeywords: z.array(z.string()).max(12).default([]),
-  sixSecondImpression: z.string().default(""),
-  topCriticalFixes: z.array(z.string()).max(3).default([]),
-  quickWins: z.array(z.string()).max(3).default([]),
-  hireDecision: z.string().default("maybe"),
-  hireReason: z.string().default(""),
+    .max(12),
+  atsScore: z.coerce.number(),
+  missingKeywords: z.array(z.string()).max(12),
+  sixSecondImpression: z.string(),
+  topCriticalFixes: z.array(z.string()).max(3),
+  quickWins: z.array(z.string()).max(3),
+  hireDecision: z.string(),
+  hireReason: z.string(),
 });
 
 /** Per-kind framing: what "sections" means + the recruiter's bar for this document. */
@@ -227,7 +226,17 @@ export async function runDocReview(
       return { ok: false, reason: "error", message: "The review came back empty — try again in a moment." };
     }
     return { ok: true, review };
-  } catch {
+  } catch (error) {
+    // LOG THE CAUSE — see the same fix in lib/evidence/pool.ts. A bare `catch {}` on an
+    // AI path turns a 100%-reproducible failure into an invisible one: the user is told
+    // to "check your AI provider" when the provider is fine and the schema is at fault.
+    const { logger } = await import("@/lib/observability/logger");
+    logger.error("cv_review.failed", {
+      kind: input.kind,
+      jdChars: input.jobDescription.length,
+      docChars: input.docText.length,
+      error: error instanceof Error ? `${error.name}: ${error.message}` : "unknown",
+    });
     return {
       ok: false,
       reason: "error",

@@ -960,6 +960,36 @@ export const portfolioItems = pgTable(
   ]
 );
 
+// A user's GitHub connection for publishing their portfolio to Pages (ADR 0008).
+// Models user_ai_settings: the token is a BYO fine-grained PAT, AES-GCM encrypted at
+// rest (lib/security/crypto), never stored or logged in plaintext. Cascades from users
+// on account closure like every other table.
+export const githubConnections = pgTable(
+  "github_connections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** AES-GCM payload of the fine-grained PAT. */
+    tokenCiphertext: text("token_ciphertext").notNull(),
+    /** Last 4 chars, safe to display so the user can recognise which token is set. */
+    tokenHint: text("token_hint"),
+    /** GitHub login (owner), resolved from the token at connect time. */
+    githubLogin: text("github_login"),
+    /** Target repo name the portfolio publishes into (e.g. "portfolio"). */
+    repo: text("repo"),
+    /** The live Pages URL once published, for display + re-open. */
+    pagesUrl: text("pages_url"),
+    /** Whether the Phase-B auto-refresh workflow has been installed. */
+    autoRefresh: boolean("auto_refresh").notNull().default(false),
+    /** Last successful publish, for "last synced" UI. */
+    lastPublishedAt: timestamp("last_published_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [uniqueIndex("github_connections_user_id_idx").on(table.userId)]
+);
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 export type AuthIdentity = typeof authIdentities.$inferSelect;
@@ -1001,3 +1031,5 @@ export type PortfolioSite = typeof portfolioSites.$inferSelect;
 export type NewPortfolioSite = typeof portfolioSites.$inferInsert;
 export type PortfolioItem = typeof portfolioItems.$inferSelect;
 export type NewPortfolioItem = typeof portfolioItems.$inferInsert;
+export type GithubConnection = typeof githubConnections.$inferSelect;
+export type NewGithubConnection = typeof githubConnections.$inferInsert;

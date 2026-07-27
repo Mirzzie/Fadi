@@ -32,7 +32,8 @@ export type EvidenceView = {
 };
 
 const KINDS: EvidenceKind[] = ["experience", "project", "achievement", "skill", "education"];
-export function normKind(s?: string): EvidenceKind {
+/** Accepts null as well as undefined — the extraction schema uses `.nullable()`. */
+export function normKind(s?: string | null): EvidenceKind {
   const k = (s ?? "").toLowerCase().trim();
   return (KINDS as string[]).includes(k) ? (k as EvidenceKind) : "experience";
 }
@@ -202,22 +203,51 @@ export function rankEvidenceForTrack(items: EvidenceView[], track: TrackTerms): 
 }
 
 // ── AI extraction (grounded in real history) ────────────────────────────────────
-const poolSchema = z.object({
-  items: z
-    .array(
-      z.object({
-        kind: z.string().optional(),
-        title: z.string(),
-        organization: z.string().optional(),
-        period: z.string().optional(),
-        detail: z.string().optional(),
-        metrics: z.string().optional(),
-        tags: z.array(z.string()).default([]),
-        marketTags: z.array(z.string()).default([]),
-      }),
-    )
-    .max(40),
-});
+/**
+ * EVERY FIELD IS REQUIRED AND `.nullable()` — NEVER `.optional()`. This is load-bearing.
+ *
+ * OpenAI-compatible structured output (which Groq implements) only enforces a schema in
+ * STRICT mode, and strict mode requires every property to appear in `required`.
+ * `.optional()` and `.default()` make a property non-required, so strict construction is
+ * rejected and the provider silently falls back to a non-strict JSON schema. In
+ * non-strict mode the model is merely *advised* of the shape — and llama-3.3-70b then
+ * returned an object with no `items` key at all, so parsing threw `expected array,
+ * received undefined` on EVERY call.
+ *
+ * Measured 2026-07-20 against the live account: `.optional()` failed 100% of attempts;
+ * this `.nullable()` version returned 9 and 10 items on consecutive runs. That single
+ * difference is why `evidence_items` held 0 rows across 7 users while the doctrine
+ * called the evidence pool the foundation of the product.
+ *
+ * Scope of the rule, measured rather than assumed (2026-07-20): ONLY `.optional()` and
+ * `.default()` break strict mode. `.max()`, `z.coerce.number()`, plain numbers and
+ * nested object arrays were each tested against the live model and all succeeded — so
+ * they are safe to use here and elsewhere.
+ *
+ * (`.max(40)` was dropped from this schema before that was known. Keeping the cap in
+ * code is harmless, but it was not required — do not cite this file as precedent for
+ * removing `.max()` from other schemas.)
+ */
+/** Exported so pool-schema.test.ts can pin the no-optional-fields invariant. */
+export const extractionSchemaShape = {
+  items: z.array(
+    z.object({
+      kind: z.string().nullable(),
+      title: z.string(),
+      organization: z.string().nullable(),
+      period: z.string().nullable(),
+      detail: z.string().nullable(),
+      metrics: z.string().nullable(),
+      tags: z.array(z.string()),
+      marketTags: z.array(z.string()),
+    }),
+  ),
+};
+
+const poolSchema = z.object(extractionSchemaShape);
+
+/** Cap enforced here, not in the schema — see the note above. */
+const MAX_POOL_ITEMS = 40;
 
 const EXTRACT_SYSTEM = `You are building a candidate's "evidence pool": discrete, reusable pieces of their REAL career, independent of any one job.
 Extract items of kind: experience (a role held), project, achievement, skill, education.
@@ -249,7 +279,9 @@ export async function extractEvidencePool(userId: string): Promise<ExtractResult
   const ctx = await getCareerReportContext(userId);
   const evidence = composeCareerEvidence({ resumeText: ctx?.resumeText, linkedInText: ctx?.linkedInProfileText });
   if (evidence.historySource === "none") {
-    return { ok: false, reason: "no_evidence", message: "Add your LinkedIn or résumé first, and I'll build your evidence pool from your real experience." };
+    // NOTE: no longer tells the user to go somewhere else — the Evidence and Portfolio
+    // screens now offer CV capture inline, so this is a prompt to act here, not a redirect.
+    return { ok: false, reason: "no_evidence", message: "I need your career history first — add your CV below and I'll build your evidence pool from it." };
   }
 
   const generate = await getUserDocGenerate(userId);
@@ -258,11 +290,22 @@ export async function extractEvidencePool(userId: string): Promise<ExtractResult
   let parsed: z.infer<typeof poolSchema>;
   try {
     parsed = await generate.structured(EXTRACT_SYSTEM, evidence.block, poolSchema, "evidence_pool");
-  } catch {
+  } catch (error) {
+    // LOG THE CAUSE. This catch previously discarded the error and returned a generic
+    // "try again", which is how a 100%-reproducible schema failure stayed invisible
+    // while the evidence pool sat empty for every user. A swallowed exception on the
+    // product's core path is an outage you cannot see.
+    const { logger } = await import("@/lib/observability/logger");
+    logger.error("evidence.extract_failed", {
+      userId,
+      historySource: evidence.historySource,
+      blockChars: evidence.block.length,
+      error: error instanceof Error ? `${error.name}: ${error.message}` : "unknown",
+    });
     return { ok: false, reason: "empty", message: "I couldn't build the pool just now — please try again." };
   }
 
-  const clean = (parsed.items ?? []).filter((i) => i.title?.trim());
+  const clean = (parsed.items ?? []).filter((i) => i.title?.trim()).slice(0, MAX_POOL_ITEMS);
   if (clean.length === 0) {
     return { ok: false, reason: "empty", message: "Not enough concrete detail in your history yet — add more to your LinkedIn/résumé and try again." };
   }

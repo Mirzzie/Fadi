@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray, isNull, or } from "drizzle-orm";
 
 import type { Database } from "../client";
-import { applications, type Application } from "../schema";
+import { applications, jobs, type Application } from "../schema";
 import type { TrackScope } from "./saved-jobs.repository";
 
 /**
@@ -69,6 +69,26 @@ export function createApplicationsRepository(db: Database) {
         .from(applications)
         .where(and(eq(applications.userId, userId), trackFilter(scope)))
         .orderBy(desc(applications.updatedAt));
+    },
+
+    /**
+     * Channel-attribution signals for the decorrelation insight: each application's own
+     * url PLUS its linked job's url. The analysis (lib/applications/channel.ts) coalesces
+     * them — the app's own url wins, else the discovered job's url.
+     *
+     * Purpose-built and narrow (returns only the two url fields) so the widely-used
+     * `listForUser` return type is not disturbed. The LEFT JOIN keeps manually-added
+     * applications (no jobId) in the set with a null jobUrl, exactly as before.
+     */
+    async listChannelSignalsForUser(
+      userId: string,
+      scope: TrackScope = { scope: "all" },
+    ): Promise<Array<{ url: string | null; jobUrl: string | null }>> {
+      return db
+        .select({ url: applications.url, jobUrl: jobs.url })
+        .from(applications)
+        .leftJoin(jobs, eq(jobs.id, applications.jobId))
+        .where(and(eq(applications.userId, userId), trackFilter(scope)));
     },
 
     async getForUser(userId: string, id: string): Promise<Application | null> {

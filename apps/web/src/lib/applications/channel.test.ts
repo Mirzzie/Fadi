@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { analyseChannelMix, channelInsight, detectChannel } from "./channel";
+import { analyseChannelMix, channelInsight, channelUrl, detectChannel } from "./channel";
 
 describe("detectChannel", () => {
   it("fingerprints the big vendors from a real application URL", () => {
@@ -68,6 +68,36 @@ describe("analyseChannelMix", () => {
   it("survives an empty pipeline", () => {
     const mix = analyseChannelMix([]);
     expect(mix).toMatchObject({ total: 0, effectiveDraws: 0, concentrated: false, dominant: null });
+  });
+
+  it("attributes off the LINKED JOB url when the application has none", () => {
+    // The bug that kept decorrelation permanently silent: the application's own url is
+    // null on the primary creation path, but the linked discovered job carries the URL.
+    // Five concentrated Workday jobs must now fire even though every app.url is null.
+    const mix = analyseChannelMix(
+      Array.from({ length: 5 }, () => ({ url: null, jobUrl: "https://x.myworkdayjobs.com/a" })),
+    );
+    expect(mix.total).toBe(5);
+    expect(mix.concentrated).toBe(true);
+    expect(mix.dominant).toMatchObject({ channel: "workday", count: 5 });
+  });
+
+  it("prefers the application's own url over the linked job's", () => {
+    // If the user pasted the exact posting they applied through, that beats the
+    // discovered job's url — they may have applied via a different channel than found.
+    const mix = analyseChannelMix([
+      { url: "https://boards.greenhouse.io/a/1", jobUrl: "https://x.myworkdayjobs.com/a" },
+    ]);
+    expect(mix.dominant).toMatchObject({ channel: "greenhouse", count: 1 });
+  });
+});
+
+describe("channelUrl — attribution precedence", () => {
+  it("prefers app url, falls back to job url, then null", () => {
+    expect(channelUrl("https://app", "https://job")).toBe("https://app");
+    expect(channelUrl(null, "https://job")).toBe("https://job");
+    expect(channelUrl("  ", "https://job")).toBe("https://job"); // blank app url isn't a signal
+    expect(channelUrl(null, null)).toBeNull();
   });
 });
 

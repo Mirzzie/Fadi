@@ -35,13 +35,12 @@ const suggestionSchema = z.object({
     .array(
       z.object({
         title: z.string(),
-        detail: z.string().default(""),
-        kind: z.string().default("project"),
-        searchQuery: z.string().default(""),
+        detail: z.string(),
+        kind: z.string(),
+        searchQuery: z.string(),
       }),
     )
-    .max(3)
-    .default([]),
+    .max(3),
 });
 
 /** Pure: normalise a provider's free-text kind. */

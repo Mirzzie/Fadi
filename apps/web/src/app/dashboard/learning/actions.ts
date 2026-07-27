@@ -102,20 +102,37 @@ export async function completeCommitmentAction(input: {
     if (!commitment) return { ok: false, message: "Commitment not found." };
     if (commitment.status === "completed") return { ok: true, message: "Already completed." };
 
-    // Their words → evidence. kind maps: project → project; course/cert → education.
-    const evidence = await createEvidenceRepository(db).create(user.id, {
-      kind: commitment.kind === "project" ? "project" : "education",
-      title: commitment.title,
-      organization: null,
-      period: new Date().getFullYear().toString(),
-      detail: built,
-      metrics: null,
-      tags: commitment.gap ? [commitment.gap.toLowerCase().trim()] : [],
-      origin: "learning",
+    // ATOMIC: the evidence insert and the commitment update are one unit.
+    //
+    // Run as two independent writes, a failure between them left the user with an
+    // orphaned evidence item AND a commitment still marked in-progress — so the
+    // obvious retry inserted the evidence a SECOND time. The idempotence guard above
+    // only holds if the status update is guaranteed to land with the insert.
+    const evidence = await db.transaction(async (tx) => {
+      const created = await createEvidenceRepository(tx).create(user.id, {
+        kind: commitment.kind === "project" ? "project" : "education",
+        title: commitment.title,
+        organization: null,
+        period: new Date().getFullYear().toString(),
+        detail: built,
+        metrics: null,
+        tags: commitment.gap ? [commitment.gap.toLowerCase().trim()] : [],
+        origin: "learning",
+      });
+      await createLearningCommitmentsRepository(tx).completeForUser(
+        user.id,
+        commitment.id,
+        created.id,
+      );
+      return created;
     });
 
-    await commitments.completeForUser(user.id, commitment.id, evidence.id);
-
+    // Momentum and the event stay OUTSIDE the transaction on purpose. They are
+    // downstream effects, not part of the record: if the momentum write fails the
+    // user still keeps the evidence they earned, which is the outcome that matters.
+    // Holding a transaction open across them would also mean holding it across the
+    // event bus's subscribers.
+    //
     // Closing a skill gap is the most controllable forward motion there is — it is
     // the one thing a user with no network and no callbacks can always do — and the
     // engine has always priced it highest of the non-referral actions (+15). It was

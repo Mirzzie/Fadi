@@ -135,6 +135,14 @@ export async function updateProfileAction(input: UpdateProfileInput): Promise<Re
  * Delete all of the user's career data (profile, reports, jobs, momentum, AI
  * settings — everything cascades from the domain user row) and sign out.
  */
+/**
+ * "Delete my data" — erase all career data, KEEP the login.
+ *
+ * The "start over" path: wipe résumés, evidence, applications, autopsies and portfolio,
+ * but leave the account so the user can begin a fresh search under the same login. This
+ * is deliberately distinct from account closure — see docs/adr/0007. Two clearly-labelled
+ * actions beat one ambiguous "delete" that silently picks a meaning for the user.
+ */
 export async function deleteAccountDataAction(): Promise<Result> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
@@ -153,4 +161,33 @@ export async function deleteAccountDataAction(): Promise<Result> {
   // signOutAction redirects, ending the session.
   await signOutAction();
   return { ok: true, message: "Your data has been deleted." };
+}
+
+/**
+ * "Close my account" — full GDPR Art. 17 erasure: all career data AND the login, in one
+ * atomic transaction (`closeAccount`). After this the credentials no longer authenticate;
+ * there is nothing left to sign back into. See docs/adr/0007-data-retention-and-erasure.md.
+ */
+export async function closeAccountAction(): Promise<Result> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  try {
+    const { betterAuthIds } = await createUsersRepository(getDatabase()).closeAccount(user.id);
+    logger.info("profile.account_closed", {
+      userId: user.id,
+      // Count only — never the ids themselves in logs.
+      authIdentitiesRemoved: betterAuthIds.length,
+    });
+  } catch (error) {
+    logger.error("profile.close_failed", {
+      userId: user.id,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return { ok: false, message: "Couldn't close your account. Please try again." };
+  }
+
+  // Clears the (now-orphaned) session cookie and redirects.
+  await signOutAction();
+  return { ok: true, message: "Your account and all data have been permanently deleted." };
 }

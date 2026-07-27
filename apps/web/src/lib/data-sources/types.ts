@@ -46,6 +46,24 @@ export interface JobPosting {
   postedAt?: string; // ISO
   /** Human-readable salary, when the source provides it (e.g. Adzuna "70k–95k"). */
   salaryText?: string;
+  /**
+   * Structured pay — adopted from JobSpy's `Compensation` model. A string like
+   * "£45k–£55k" can be displayed but never filtered or sorted; these can. Sources that
+   * only give prose leave these undefined and `salaryText` carries the value.
+   */
+  salaryMin?: number;
+  salaryMax?: number;
+  /** ISO-4217, e.g. "GBP". */
+  salaryCurrency?: string;
+  /** What the amounts are per — so £60,000/yr and £300/day don't get compared. */
+  salaryInterval?: "yearly" | "monthly" | "weekly" | "daily" | "hourly";
+  /**
+   * Skills/tools named by the posting (JobSpy's `skills` field). Feeds keyword
+   * matching and gap analysis without having to re-derive them from the description.
+   */
+  skills?: string[];
+  /** Seniority as stated by the source ("entry", "mid", "senior"). */
+  jobLevel?: string;
 }
 
 export interface SignalQuery {
@@ -56,6 +74,12 @@ export interface SignalQuery {
   country?: string;
   /** City / area within the country, e.g. "Dublin" — maps to Adzuna's `where`. */
   city?: string;
+  /**
+   * Restrict to remote roles. Sources that support a server-side remote filter
+   * (LinkedIn `f_WT=2`, Indeed attribute `DSQF7`) push it down; others ignore it
+   * and the caller filters on the returned `remote` flag.
+   */
+  remoteOnly?: boolean;
   limit?: number;
 }
 

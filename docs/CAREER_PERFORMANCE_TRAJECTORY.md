@@ -130,7 +130,15 @@ Compares the user's target role to actual market hiring signals:
 
 ### 6. Network Activation Score (NAS)
 
-Tracks whether the user is building the referral network that the data shows is the single highest-leverage factor in a job search (1 referral = 40 cold applications).
+Tracks whether the user is building a referral network. A referral is a genuinely
+*independent* draw: under algorithmic monoculture (FAccT 2026; Kleinberg & Raghavan,
+PNAS 2021) applications screened by the same vendor are correlated, so the n+1th cold
+application is worth far less than the first, while a referral re-rolls through a
+different filter entirely.
+
+> Previously stated here as *"the data shows... 1 referral = 40 cold applications."*
+> That figure is on the Retired Claims table in `PLATFORM_IDEOLOGY.md` — directionally
+> right, numerically unsourceable. See `ASSUMPTION_LEDGER.md` R1.
 
 **Inputs**:
 - Connections made with people in target companies or roles (last 30 days)

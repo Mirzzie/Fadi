@@ -8,7 +8,9 @@ import { ArbeitnowSource } from "./providers/arbeitnow";
 import { BlsSource } from "./providers/bls";
 import { GdeltSource } from "./providers/gdelt";
 import { HackerNewsSource } from "./providers/hackernews";
+import { IndeedPublicSource } from "./providers/indeed-public";
 import { JoobleSource } from "./providers/jooble";
+import { LinkedInGuestSource } from "./providers/linkedin-guest";
 import { JSearchSource } from "./providers/jsearch";
 import { LightcastSkillsSource } from "./providers/lightcast";
 import { ReedSource } from "./providers/reed";
@@ -48,6 +50,12 @@ function buildSources(): DataSourceBase[] {
     new LightcastSkillsSource(serverEnv.LIGHTCAST_CLIENT_ID, serverEnv.LIGHTCAST_CLIENT_SECRET), // skill_trend
     // ── Opt-in scraping: OFF unless APIFY_TOKEN set; operator owns the ToS call ──
     new ApifyLinkedInSource(serverEnv.APIFY_TOKEN, serverEnv.APIFY_LINKEDIN_ACTOR),
+    // ── Direct scrapers (JobSpy method port): OFF unless SCRAPERS_ENABLED=1 ──
+    // Registered LAST on purpose. discoverJobs dedupes first-wins, so the licensed
+    // APIs above keep attribution when the same job appears on both, and a scraped
+    // copy only ever fills in fields they left blank.
+    new LinkedInGuestSource(), // public guest endpoint, no credential
+    new IndeedPublicSource(), // public search page, no credential
     //   new OnetSource(...), new FredSource(...), new WarnSource(...), etc.
   ];
 }

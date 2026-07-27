@@ -15,6 +15,7 @@ import {
   Loader2,
   Pencil,
   Plus,
+  Rocket,
   Settings,
   Sparkles,
   Trash2,
@@ -23,6 +24,8 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { GithubPublishPanel } from "@/components/portfolio/github-publish";
+import { HistoryCapture } from "@/components/evidence/history-capture";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -144,6 +147,7 @@ export function PortfolioManager({
   const [editing, setEditing] = useState<ItemForm | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [devOpen, setDevOpen] = useState(false);
+  const [githubOpen, setGithubOpen] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -163,6 +167,9 @@ export function PortfolioManager({
   function togglePublishSite() {
     run(() => setSitePublished({ published: !isPublished }));
   }
+  // The seed failed because there's no CV/LinkedIn on file — offer capture inline.
+  const needsHistory = Boolean(error && /career history/i.test(error));
+
   function seed() {
     run(() => seedFromEvidence());
   }
@@ -295,6 +302,9 @@ export function PortfolioManager({
           >
             <ExternalLink className="size-4" /> Preview site
           </Button>
+          <Button size="sm" variant="outline" onClick={() => setGithubOpen(true)}>
+            <Rocket className="size-4" /> Host on the web
+          </Button>
           {items.length > 0 && (
             <Button size="sm" variant="outline" onClick={sync} disabled={pending}>
               <Sparkles className="size-4" /> Sync evidence
@@ -375,6 +385,22 @@ export function PortfolioManager({
               </Button>
             </li>
           </ol>
+
+          {/* Seeding needs a CV on file. Rather than sending the user to Evidence (and
+              from there to Profile), capture it here and retry the seed immediately —
+              this is the same component the Evidence screen uses. */}
+          {needsHistory ? (
+            <div className="mt-4">
+              <HistoryCapture
+                title="First, add your career history"
+                hint="Your portfolio is built from your real experience. Upload or paste your CV here and Fadi will fill it in — no need to leave this page."
+                onSaved={() => {
+                  setError(null);
+                  seed();
+                }}
+              />
+            </div>
+          ) : null}
         </div>
       )}
 
@@ -468,6 +494,16 @@ export function PortfolioManager({
       {devOpen && (
         <DeveloperModal handle={handle} published={isPublished} onClose={() => setDevOpen(false)} />
       )}
+
+      {githubOpen && (
+        <Modal title="Host on the web" onClose={() => setGithubOpen(false)}>
+          <p className="mb-4 text-sm text-muted-foreground">
+            Publish your full portfolio — hero, animations and case-study pages — to GitHub Pages
+            and host it for free on your own account.
+          </p>
+          <GithubPublishPanel isPublished={isPublished} />
+        </Modal>
+      )}
     </div>
   );
 }
@@ -554,10 +590,12 @@ function DeveloperModal({
       ]);
       if (!res.ok) throw new Error("Publish your site first, then export.");
       const data = await res.json();
-      // Inlining JSON into a <script> is unsafe raw: any "</script>" inside the
-      // content (a description, a URL) would close the tag early and break the
-      // page / inject markup. Escape `<` so the payload can never break out.
+      // Inlining into a <script> is unsafe raw: any "</script>" would close the tag early
+      // and break the page. Escape `<` in the DATA, and `</script` in the SDK — the SDK's
+      // own doc comment contains example </script> tags, so inlining it raw broke the page
+      // (FadiPortfolio never defined, nothing rendered). Verified by rendering offline.
       const safeData = JSON.stringify(data).replace(/</g, "\\u003c");
+      const safeSdk = sdk.replace(/<\/(script)/gi, "<\\/$1");
       save(`<!doctype html>
 <html lang="en">
 <head>
@@ -567,7 +605,7 @@ function DeveloperModal({
 </head>
 <body style="margin:0;background:#0a0a0b">
 <div id="portfolio"></div>
-<script>${sdk}</script>
+<script>${safeSdk}</script>
 <script>FadiPortfolio.mountData(${safeData}, "#portfolio");</script>
 </body>
 </html>

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { logger } from "@/lib/observability/logger";
 
 /**
  * Interview prep brief — "research the company in minutes", the honest way.
@@ -34,10 +35,10 @@ const briefSchema = z.object({
   whatTheyDo: z.string(),
   roleFocus: z.string(),
   industryContext: z.string(),
-  smartQuestions: z.array(z.string()).max(6).default([]),
-  talkingPoints: z.array(z.string()).max(6).default([]),
-  redFlags: z.array(z.string()).max(6).default([]),
-  whereToVerify: z.array(z.string()).max(6).default([]),
+  smartQuestions: z.array(z.string()).max(6),
+  talkingPoints: z.array(z.string()).max(6),
+  redFlags: z.array(z.string()).max(6),
+  whereToVerify: z.array(z.string()).max(6),
 });
 
 const DEFAULT_CAVEAT =
@@ -119,7 +120,6 @@ export async function prepareCompanyBrief(
       },
     };
   } catch (err) {
-    const { logger } = await import("@/lib/observability/logger");
     logger.warn("interview.company_brief_failed", { userId, error: err instanceof Error ? err.message : "unknown" });
     return { ok: false, reason: "error", message: "Couldn't build the brief just now — please try again." };
   }

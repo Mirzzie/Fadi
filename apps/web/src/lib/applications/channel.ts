@@ -105,14 +105,34 @@ const MIN_FOR_CLAIM = 5;
 /** One filter holding ≥60% of the pipeline is a monoculture worth naming. */
 const CONCENTRATION_THRESHOLD = 0.6;
 
+/**
+ * The URL to attribute an application to, given its own url and its linked job's url.
+ *
+ * THIS IS WHAT MAKES DECORRELATION ABLE TO FIRE AT ALL. The differentiator was
+ * structurally dead: the channel was read from `application.url`, but that field is
+ * null on the primary creation path (`createApplicationAction` never captured it), so
+ * `analyseChannelMix` excluded almost every row as "unknown" and the insight could not
+ * trigger at any volume. Meanwhile the linked `jobs` row — present for every discovered
+ * job, ~1,114 of 1,119 with a real URL — carried exactly the channel we needed and was
+ * ignored. Measured 2026-07-20: 7 of 8 live applications had a null `application.url`.
+ *
+ * Precedence: the application's own url wins when present (a user who pasted the exact
+ * posting they applied through), else fall back to the linked job's url (the discovered
+ * posting). This is a read-side resolution, so it lights up existing rows with no
+ * migration.
+ */
+export function channelUrl(appUrl: string | null | undefined, jobUrl: string | null | undefined): string | null {
+  return appUrl?.trim() || jobUrl?.trim() || null;
+}
+
 export function analyseChannelMix(
-  applications: ReadonlyArray<{ url?: string | null }>,
+  applications: ReadonlyArray<{ url?: string | null; jobUrl?: string | null }>,
 ): ChannelMix {
   const counts: Partial<Record<Channel, number>> = {};
   let total = 0;
 
   for (const app of applications) {
-    const channel = detectChannel(app.url);
+    const channel = detectChannel(channelUrl(app.url, app.jobUrl));
     if (channel === "unknown") continue; // can't attribute — don't guess
     counts[channel] = (counts[channel] ?? 0) + 1;
     total += 1;

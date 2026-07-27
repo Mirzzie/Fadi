@@ -1,4 +1,5 @@
 import type { DomainEventName, DomainEventPayload } from "./types";
+import { logger } from "@/lib/observability/logger";
 
 /**
  * In-process, typed domain event bus.
@@ -57,7 +58,6 @@ export async function publish<K extends DomainEventName>(
   if (failures.length > 0) {
     // Lazy import keeps this module dependency-free (the bus must not pull the
     // world in — it's imported by every feature).
-    const { logger } = await import("@/lib/observability/logger");
     for (const f of failures) {
       logger.error("events.subscriber_failed", {
         event,

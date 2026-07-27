@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+@source "../../../web/src/components/portfolio";
+@source "../";
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* Backdrop ONLY on html (the canvas). An opaque body background paints ABOVE the
+   BlobField (fixed, z-index:-10) and would hide the animated orbs — the exact bug. */
+html {
+  background: #0a0a0b;
+}
+body {
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+}

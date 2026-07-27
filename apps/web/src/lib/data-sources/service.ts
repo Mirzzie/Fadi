@@ -9,6 +9,7 @@ import {
   type JobSourceCoverage,
   type SourceCoverage,
 } from "./coverage";
+import { dedupeJobs, normalizePosting } from "./normalize";
 import { getConfiguredJobSources, getConfiguredSignalSources, listSourceStatus } from "./registry";
 import { rankSignals, type RelevanceProfile, type ScoredSignal } from "./relevance";
 import type { JobPosting, JobSource, SignalQuery } from "./types";
@@ -264,15 +265,11 @@ export async function discoverJobs(
       .join(","),
   });
 
-  const seen = new Set<string>();
-  return jobs
-    .filter((j) => {
-      const key = `${j.company.toLowerCase()}::${j.title.toLowerCase()}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
-    .slice(0, limit);
+  // Normalize BEFORE dedupe: inferring remote/interval first means a posting that
+  // states "€400/day" and its duplicate that states nothing merge into one entry
+  // that is filterable. Dedupe is first-wins, and the round-robin above interleaves
+  // sources in registry order, so licensed APIs keep attribution over scrapers.
+  return dedupeJobs(jobs.map(normalizePosting)).slice(0, limit);
 }
 
 /**

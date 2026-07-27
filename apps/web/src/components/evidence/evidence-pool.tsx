@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { buildEvidencePool, deleteEvidence, saveEvidence } from "@/app/dashboard/evidence/actions";
+import { HistoryCapture } from "@/components/evidence/history-capture";
 import type { EvidenceView, RankedEvidence } from "@/lib/evidence/pool";
 
 const KINDS = ["experience", "project", "achievement", "skill", "education"] as const;
@@ -82,10 +83,21 @@ export function EvidencePool({
       ) : null}
 
       {ranked.length === 0 && editing !== "new" ? (
-        <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-          No evidence yet. Build it from your real history, or add an item by hand. Fadi only uses
-          your real experience — it never invents.
-        </p>
+        <div className="space-y-4">
+          <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+            No evidence yet. Build it from your real history, or add an item by hand. Fadi only uses
+            your real experience — it never invents.
+          </p>
+          {/* Capture history HERE rather than sending the user to Profile and back —
+              building the pool needs a CV, and that round-trip was the one real
+              navigation deflection in this flow. */}
+          <HistoryCapture
+            onSaved={() => {
+              setError(null);
+              build();
+            }}
+          />
+        </div>
       ) : (
         <ul className="space-y-3">
           {ranked.map((r) =>

@@ -36,8 +36,8 @@ const prepSchema = z.object({
         task: z.string(),
         action: z.string(),
         result: z.string(),
-        basedOn: z.string().optional(),
-        needsRealExample: z.boolean().optional(),
+        basedOn: z.string().nullable(),
+        needsRealExample: z.boolean().nullable(),
       }),
     )
     .max(8),

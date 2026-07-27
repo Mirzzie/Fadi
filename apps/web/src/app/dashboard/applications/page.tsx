@@ -54,13 +54,20 @@ export default async function ApplicationsPage() {
     profile?.pipelineScope === "all"
       ? { scope: "all" }
       : { scope: "active", careerProfileId: activeTrack?.id ?? null };
-  const apps = await createApplicationsRepository(db).listForUser(user.id, scope);
+  const appsRepo = createApplicationsRepository(db);
+  const apps = await appsRepo.listForUser(user.id, scope);
   const trackNames = new Map(tracks.map((t) => [t.id, t.label ?? t.targetRole]));
 
   // Monoculture check (PLATFORM_IDEOLOGY Principle 1): rejections through one vendor
   // are correlated, so a concentrated pipeline is one draw repeated — not progress.
   // Returns null unless there's genuine evidence of concentration.
-  const insight = channelInsight(analyseChannelMix(apps));
+  //
+  // Reads channel signals (app url + linked JOB url), not `apps`: the application's own
+  // url is null on the primary creation path, so attributing off it alone left this
+  // insight permanently silent. The linked discovered job carries the real URL.
+  const insight = channelInsight(
+    analyseChannelMix(await appsRepo.listChannelSignalsForUser(user.id, scope)),
+  );
 
   // Batch-prep candidates: active-pipeline roles with a JD but NO documents yet.
   // Rejected/withdrawn are excluded — never spend the user's AI budget on closed doors.

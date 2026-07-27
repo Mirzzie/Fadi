@@ -1,13 +1,13 @@
 import { and, desc, eq } from "drizzle-orm";
 
-import type { Database } from "../client";
+import type { DbOrTx } from "../client";
 import { learningCommitments, type LearningCommitment } from "../schema/index";
 
 /**
  * Learning commitments — the gap→growth loop's persistence. Thin CRUD; the
  * completion→evidence hand-off lives in the app layer so this stays testable.
  */
-export function createLearningCommitmentsRepository(db: Database) {
+export function createLearningCommitmentsRepository(db: DbOrTx) {
   return {
     async listForUser(userId: string, limit = 30): Promise<LearningCommitment[]> {
       return db

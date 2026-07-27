@@ -1,6 +1,6 @@
 import { and, count, desc, eq } from "drizzle-orm";
 
-import type { Database } from "../client";
+import type { DbOrTx } from "../client";
 import { evidenceItems, type EvidenceItem, type NewEvidenceItem } from "../schema";
 
 /**
@@ -8,7 +8,7 @@ import { evidenceItems, type EvidenceItem, type NewEvidenceItem } from "../schem
  * of any single career track. Tracks rank/frame this pool differently; this repo
  * just owns the items.
  */
-export function createEvidenceRepository(db: Database) {
+export function createEvidenceRepository(db: DbOrTx) {
   return {
     async listForUser(userId: string): Promise<EvidenceItem[]> {
       return db

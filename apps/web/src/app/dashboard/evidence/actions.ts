@@ -1,6 +1,10 @@
 "use server";
 
-import { createEvidenceRepository } from "@careeros/database";
+import {
+  createCareerProfilesRepository,
+  createEvidenceRepository,
+  createResumesRepository,
+} from "@careeros/database";
 import { revalidatePath } from "next/cache";
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
@@ -9,6 +13,34 @@ import { publish } from "@/lib/events/bus";
 import { extractEvidencePool, normKind, toEvidenceView, type EvidenceView } from "@/lib/evidence/pool";
 
 const PATH = "/dashboard/evidence";
+
+/**
+ * Save career history pasted/uploaded directly on the Evidence screen.
+ *
+ * Exists so a user with nothing on file can capture their history WHERE THEY ARE
+ * instead of being sent to Profile and told to come back. Building the pool needs a
+ * résumé or LinkedIn record; that was the one genuine navigation deflection in the
+ * capture flow, and this removes it. Deliberately narrow: it writes only the résumé,
+ * using the same repository call the profile form already uses — it is not a second
+ * way to edit the profile.
+ */
+export async function saveResumeTextAction(
+  text: string,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  const resumeText = text.trim();
+  if (resumeText.length < 20) {
+    return { ok: false, message: "That's too short to work from — paste your CV or a summary of your experience." };
+  }
+
+  const db = getDatabase();
+  const activeTrack = await createCareerProfilesRepository(db).getActiveForUser(user.id);
+  await createResumesRepository(db).upsertLatestForTrack(user.id, activeTrack?.id ?? null, resumeText);
+  revalidatePath(PATH);
+  return { ok: true };
+}
 
 export async function buildEvidencePool(): Promise<
   { ok: true; items: EvidenceView[] } | { ok: false; message: string }

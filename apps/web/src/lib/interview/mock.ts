@@ -103,6 +103,7 @@ export function deliveryNote(d: DeliveryStats): string {
 // without pulling this module's server-only AI imports into the browser bundle.
 export { INTERVIEWER_PERSONAS, personaStyle, type InterviewerPersona } from "./personas";
 import { personaStyle } from "./personas";
+import { logger } from "@/lib/observability/logger";
 
 // ── Question generation (AI) ────────────────────────────────────────────────────
 export type MockQuestion = { question: string; kind: "opener" | "behavioral" | "role" | "situational"; competency?: string };
@@ -115,14 +116,15 @@ const questionsSchema = z.object({
     .array(
       z.object({
         question: z.string(),
-        kind: z.string().optional(),
-        competency: z.string().optional(),
+        kind: z.string().nullable(),
+        competency: z.string().nullable(),
       }),
     )
     .max(10),
 });
 
-function toKind(s?: string): MockQuestion["kind"] {
+/** Accepts null as well as undefined — the extraction schema uses `.nullable()`. */
+function toKind(s?: string | null): MockQuestion["kind"] {
   const k = (s ?? "").toLowerCase().trim();
   return k === "opener" || k === "role" || k === "situational" ? k : "behavioral";
 }
@@ -166,7 +168,6 @@ Rules:
     }
     return { ok: true, questions };
   } catch (err) {
-    const { logger } = await import("@/lib/observability/logger");
     const reason = err instanceof Error ? err.message : "the provider call failed";
     logger.warn("interview.mock_questions_failed", { userId, role: config.role, error: reason });
     return { ok: false, message: `Couldn't draft questions: ${reason.slice(0, 160)}. Check your AI provider in Settings, then try again.` };
@@ -190,9 +191,9 @@ const scoreSchema = z.object({
   specificity: z.coerce.number(),
   relevance: z.coerce.number(),
   concision: z.coerce.number(),
-  strengths: z.array(z.string()).default([]),
-  improvements: z.array(z.string()).default([]),
-  strongerVersion: z.string().default(""),
+  strengths: z.array(z.string()),
+  improvements: z.array(z.string()),
+  strongerVersion: z.string(),
 });
 
 const clamp5 = (n: number) => Math.max(0, Math.min(5, Number.isFinite(n) ? n : 0));
@@ -266,7 +267,6 @@ HARD RULE: the strongerVersion must only reshape what the candidate actually sai
       },
     };
   } catch (err) {
-    const { logger } = await import("@/lib/observability/logger");
     const reason = err instanceof Error ? err.message : "the provider call failed";
     logger.warn("interview.score_answer_failed", { userId, error: reason });
     return { ok: false, message: `Couldn't score that answer: ${reason.slice(0, 160)}.` };

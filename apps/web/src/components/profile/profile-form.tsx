@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CheckCircle2, Loader2, Trash2, XCircle } from "lucide-react";
+import { CheckCircle2, Loader2, Trash2, UserX, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { CvUpload } from "@/components/profile/cv-upload";
@@ -9,6 +9,7 @@ import { FadiGuardianCallout } from "@/components/workspace/fadi-guardian-callou
 import { evaluateDeleteAllData } from "@/lib/guardian/guardian";
 import { cn } from "@/lib/utils";
 import {
+  closeAccountAction,
   deleteAccountDataAction,
   updateProfileAction,
   type UpdateProfileInput,
@@ -29,7 +30,9 @@ export function ProfileForm({
   const [form, setForm] = useState<UpdateProfileInput>(initial);
   const [pending, startTransition] = useTransition();
   const [status, setStatus] = useState<{ ok: boolean; message: string } | null>(null);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // Which destructive action is being confirmed. Two distinct paths (ADR 0007):
+  // "data" keeps the login and starts fresh; "account" is full erasure incl. credentials.
+  const [confirming, setConfirming] = useState<null | "data" | "account">(null);
 
   function set<K extends keyof UpdateProfileInput>(key: K, value: string) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -40,11 +43,19 @@ export function ProfileForm({
     startTransition(async () => setStatus(await updateProfileAction(form)));
   }
 
-  function remove() {
+  function removeData() {
     setStatus(null);
     startTransition(async () => {
       const res = await deleteAccountDataAction();
       // On success the action signs out + redirects; this only shows on failure.
+      setStatus(res);
+    });
+  }
+
+  function closeAccount() {
+    setStatus(null);
+    startTransition(async () => {
+      const res = await closeAccountAction();
       setStatus(res);
     });
   }
@@ -154,38 +165,87 @@ export function ProfileForm({
         </Button>
       </div>
 
-      {/* Danger zone */}
-      <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6">
-        <h3 className="text-sm font-semibold text-destructive">Delete my data</h3>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Permanently removes your profile, reports, saved jobs, applications, momentum, and AI
-          settings, then signs you out. This can&apos;t be undone.
-        </p>
-        {confirmingDelete ? (
-          <div className="mt-3 space-y-3">
-            <FadiGuardianCallout verdict={evaluateDeleteAllData()} />
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-medium">Are you sure?</span>
-              <Button variant="destructive" size="sm" onClick={remove} disabled={pending}>
-                <Trash2 className="size-4" aria-hidden="true" />
-                Yes, delete everything
+      {/* Danger zone — two distinct actions, honestly labelled (ADR 0007). */}
+      <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 space-y-6">
+        {/* 1. Start over — wipe data, keep the login. */}
+        <div>
+          <h3 className="text-sm font-semibold text-destructive">Delete my data &amp; start over</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Permanently removes your profile, reports, evidence, applications, momentum, and AI
+            settings — then signs you out. <strong>Your login stays</strong>, so you can sign back
+            in and start a fresh search. This can&apos;t be undone.
+          </p>
+          {confirming === "data" ? (
+            <div className="mt-3 space-y-3">
+              <FadiGuardianCallout verdict={evaluateDeleteAllData()} />
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium">Are you sure?</span>
+                <Button variant="destructive" size="sm" onClick={removeData} disabled={pending}>
+                  {pending ? (
+                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Trash2 className="size-4" aria-hidden="true" />
+                  )}
+                  Yes, delete my data
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setConfirming(null)} disabled={pending}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="mt-3"
+              onClick={() => setConfirming("data")}
+              disabled={pending}
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+              Delete my data
+            </Button>
+          )}
+        </div>
+
+        <div className="border-t border-destructive/20" />
+
+        {/* 2. Full closure — wipe data AND the login. GDPR erasure. */}
+        <div>
+          <h3 className="text-sm font-semibold text-destructive">Close my account</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Everything above, <strong>plus your login itself</strong>. Nothing is kept and there is
+            no account to sign back into — this is full, permanent deletion.
+          </p>
+          {confirming === "account" ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium">
+                Permanently close this account? There is no undo.
+              </span>
+              <Button variant="destructive" size="sm" onClick={closeAccount} disabled={pending}>
+                {pending ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <UserX className="size-4" aria-hidden="true" />
+                )}
+                Yes, close my account
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setConfirmingDelete(false)} disabled={pending}>
+              <Button variant="ghost" size="sm" onClick={() => setConfirming(null)} disabled={pending}>
                 Cancel
               </Button>
             </div>
-          </div>
-        ) : (
-          <Button
-            variant="destructive"
-            size="sm"
-            className="mt-3"
-            onClick={() => setConfirmingDelete(true)}
-          >
-            <Trash2 className="size-4" aria-hidden="true" />
-            Delete my data
-          </Button>
-        )}
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-3 border-destructive/40 text-destructive hover:bg-destructive/10"
+              onClick={() => setConfirming("account")}
+              disabled={pending}
+            >
+              <UserX className="size-4" aria-hidden="true" />
+              Close my account
+            </Button>
+          )}
+        </div>
       </div>
     </div>
   );

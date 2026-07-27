@@ -404,16 +404,17 @@ export async function importPortfolio(input: {
   const repo = createPortfolioRepository(getDatabase());
   const site = await ensureSite(user.id, user.email);
 
-  if (input.mode === "replace") {
-    const existing = await repo.listItemsForUser(user.id, site.id);
-    for (const it of existing) await repo.deleteItem(user.id, it.id);
-  }
-
   const rows = payload.items
     .map(fromExportItem)
     .filter((r) => r.title.trim())
     .map((r, i) => ({ ...r, siteId: site.id, sortOrder: r.sortOrder || (i + 1) * 10 }));
-  const created = await repo.createItems(user.id, rows);
+
+  // Replace is atomic (see repo.replaceItems): the old delete-then-insert could wipe
+  // the user's whole portfolio and insert nothing if the insert failed.
+  const created =
+    input.mode === "replace"
+      ? await repo.replaceItems(user.id, site.id, rows)
+      : await repo.createItems(user.id, rows);
   revalidatePath(PATH);
   return { ok: true, imported: created.length };
 }

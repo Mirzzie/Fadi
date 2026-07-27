@@ -27,6 +27,8 @@
  * is verified mechanically and REJECTED if it invented anything.
  */
 
+import { logger } from "@/lib/observability/logger";
+
 /** Digits, and the number-words a transcript realistically contains. */
 const NUMBER_WORDS = new Set([
   "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
@@ -220,7 +222,6 @@ export async function tidyDictation(
 
   const verdict = verifyTidy(raw, cleaned);
   if (!verdict.ok) {
-    const { logger } = await import("@/lib/observability/logger");
     logger.warn("dictation.tidy_rejected", {
       userId,
       reason: verdict.reason,

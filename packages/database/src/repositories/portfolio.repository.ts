@@ -167,6 +167,34 @@ export function createPortfolioRepository(db: Database) {
         .where(and(eq(portfolioItems.id, id), eq(portfolioItems.userId, userId)));
     },
 
+    /**
+     * Replace a site's entire item set atomically (the import "replace" mode).
+     *
+     * MUST be one transaction. As a bare delete-then-insert, a failure after the
+     * delete destroyed every portfolio item the user had and inserted nothing — the
+     * worst data-loss path in the platform, triggered by a routine import. Inside a
+     * transaction the failure rolls back and the user keeps what they had.
+     *
+     * The delete is a single statement scoped by (userId, siteId) rather than a loop
+     * of per-id deletes, so it cannot partially apply.
+     */
+    async replaceItems(
+      userId: string,
+      siteId: string,
+      rows: Array<Omit<NewPortfolioItem, "id" | "userId" | "createdAt" | "updatedAt">>,
+    ): Promise<PortfolioItem[]> {
+      return db.transaction(async (tx) => {
+        await tx
+          .delete(portfolioItems)
+          .where(and(eq(portfolioItems.userId, userId), eq(portfolioItems.siteId, siteId)));
+        if (rows.length === 0) return [];
+        return tx
+          .insert(portfolioItems)
+          .values(rows.map((r) => ({ ...r, userId })))
+          .returning();
+      });
+    },
+
     /** Persist a new order: sort_order = position * 10, in a single transaction. */
     async reorderItems(userId: string, orderedIds: string[]): Promise<void> {
       if (orderedIds.length === 0) return;
