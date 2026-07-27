@@ -52,7 +52,10 @@ export async function buildPortfolioSite(args: {
     // Bake the user's published data in — the export reads this JSON at build time.
     writeFileSync(join(dir, "src", "data", "portfolio.json"), JSON.stringify(args.view));
 
-    await exec("npx", ["next", "build"], {
+    // On Windows npx is `npx.cmd`; execFile doesn't go through a shell, so the bare "npx"
+    // would throw ENOENT. Use the platform-correct binary name.
+    const npx = process.platform === "win32" ? "npx.cmd" : "npx";
+    await exec(npx, ["next", "build"], {
       cwd: dir,
       env: { ...process.env, PORTFOLIO_BASE_PATH: args.basePath },
       timeout: 180_000,

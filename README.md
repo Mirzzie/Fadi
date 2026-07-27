@@ -64,54 +64,60 @@ full static site (hero, animations, case studies) directly from the app — see
 
 ## Getting started (fresh machine)
 
-### 1. Prerequisites
+Works the same on **Windows, macOS, and Linux**. After the two prerequisites, it's two
+commands.
 
-| Tool | Version | Notes |
+### 1. Prerequisites (install these first)
+
+| Tool | Version | How |
 | --- | --- | --- |
-| **Node.js** | ≥ 20.11.0 | `node -v` |
-| **npm** | ≥ 10 | ships with recent Node |
-| **Docker** | any recent | runs local PostgreSQL. (Alternatively, point `DATABASE_URL` at your own Postgres 17.) |
+| **Node.js** | ≥ 20.11 | [nodejs.org](https://nodejs.org) — LTS. Verify: `node -v`. Bundles npm ≥ 10. |
+| **Docker Desktop** | any recent | [docker.com](https://www.docker.com/products/docker-desktop/). Runs the database. **On Windows, let it enable WSL2 when prompted, then start Docker Desktop and wait for "Engine running."** |
+| **Git** | any | [git-scm.com](https://git-scm.com). On Windows, "Git for Windows" gives you Git Bash too. |
+
+> No Docker? You can instead point `DATABASE_URL` (in `apps/web/.env.local`) at any
+> PostgreSQL 17 you already have, then run `npm run setup -- --skip-db` followed by
+> `npm run db:migrate && npm run db:seed:jobs`.
 
 ### 2. Clone and install
 
 ```bash
 git clone https://github.com/Mirzzie/Fadi.git
 cd Fadi
-npm install          # installs every workspace (apps/* and packages/*)
+npm install
 ```
 
-### 3. Configure environment
+`npm install` installs every workspace (`apps/*` and `packages/*`) in one go.
 
-The app reads `apps/web/.env.local`. Copy the template and fill in two things:
+### 3. Set everything up — one command
+
+With **Docker Desktop running**, run:
 
 ```bash
-cp apps/web/.env.example apps/web/.env.local
+npm run setup
 ```
 
-Then edit `apps/web/.env.local`:
+This is a cross-platform Node script (no `openssl`, no `cp`, no bash needed). It:
+
+- creates `apps/web/.env.local` from the template (if missing),
+- generates a strong `BETTER_AUTH_SECRET` for you,
+- starts PostgreSQL 17 in Docker and waits until it's healthy,
+- applies migrations and seeds job data.
+
+It's safe to re-run — it never overwrites an env file or secret you already have.
+
+### 4. Add an AI key (recommended)
+
+The app **runs without a key**, but Fadi's AI features (guidance, Career Intelligence
+Report, etc.) stay off until you add one. Open `apps/web/.env.local` and set a free
+**Groq** key ([console.groq.com/keys](https://console.groq.com/keys)):
 
 ```env
-# REQUIRED — generate one with:  openssl rand -base64 32
-BETTER_AUTH_SECRET=replace-with-a-strong-secret
-
-# REQUIRED for AI features — Groq has a free tier: https://console.groq.com/keys
 GROQ_API_KEY=your-key-here
-# (or set GOOGLE_API_KEY / ANTHROPIC_API_KEY / OPENAI_API_KEY instead;
-#  leave AI_PROVIDER blank to auto-pick the first key present)
 ```
 
-You do **not** need to set `DATABASE_URL` for local dev — it defaults to the Docker
-instance below (`postgres://careeros:careeros@localhost:5433/careeros`). The app boots
-without an AI key, but AI features (Fadi's guidance, Career Intelligence Report, etc.)
-won't work until one is set.
-
-### 4. Start the database and apply migrations
-
-```bash
-npm run db:up        # starts PostgreSQL 17 in Docker (host port 5433)
-npm run db:migrate   # applies committed Drizzle migrations
-npm run db:seed:jobs # seeds local job data used by discovery
-```
+(Or use `GOOGLE_API_KEY` / `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` instead — leave
+`AI_PROVIDER` blank to auto-pick the first key present.)
 
 ### 5. Run the app
 
@@ -120,8 +126,30 @@ npm run dev
 ```
 
 Open **http://localhost:3000**, then **sign up** (email/password) and follow onboarding —
-that first run creates your user and walks through the Career Intelligence flow as a fresh
+that first run creates your user and walks the full Career Intelligence flow as a brand-new
 user would experience it.
+
+<details>
+<summary>Prefer to set up manually (no <code>npm run setup</code>)?</summary>
+
+```bash
+# 1. env file — Windows PowerShell:  copy apps\web\.env.example apps\web\.env.local
+#    macOS/Linux:                     cp apps/web/.env.example apps/web/.env.local
+
+# 2. a BETTER_AUTH_SECRET — works everywhere Node is installed:
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+#    paste the output into BETTER_AUTH_SECRET in apps/web/.env.local
+
+# 3. database (Docker running):
+npm run db:up          # PostgreSQL 17, host port 5433
+npm run db:migrate     # committed Drizzle migrations
+npm run db:seed:jobs   # seed job data
+```
+
+`DATABASE_URL` is optional for local dev — it defaults to the Docker instance
+(`postgres://careeros:careeros@localhost:5433/careeros`).
+
+</details>
 
 ---
 

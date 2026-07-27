@@ -8,6 +8,7 @@
     "packages/*"
   ],
   "scripts": {
+    "setup": "node scripts/setup.mjs",
     "dev": "npm --workspace @careeros/web run dev",
     "build": "npm --workspace @careeros/web run build",
     "test": "npm --workspace @careeros/web run test",
