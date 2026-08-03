@@ -73,8 +73,12 @@ an empty "invent anything" start.
   button in the document workspace. A client component renders the sample résumé through all
   15 templates live via `createResumePdfBlob` → object-URL → iframe. Client-side render
   sidesteps the App Router `react-server` limit. Additive; web typecheck unchanged.
-- **2b — interactive editor.** Port the builder feature (zustand store, dnd-kit sections,
-  tiptap, artboard) into the Studio route, alongside (not replacing) the current editor.
+- **2b-i — editing loop (DONE).** A zustand store (`resume-store.ts`) seeded from the résumé;
+  an editable **Basics** panel (name/headline/email/phone/location/summary) + template picker;
+  the preview re-renders **debounced** from the store on every edit. This is the interactive
+  data-flow loop, built on Fadi's stack + the vendored engine (zustand added to web).
+- **2b-ii — full editor.** Remaining sections (experience, education, …) with dnd-kit
+  reordering and tiptap rich text, matching more of rxresume's builder UX.
 - **3 — engine bridge + migration.** Seed from verified history, wire AI, map/persist to the
   existing `resumes`/`documents` tables so the two editors share data.
 
