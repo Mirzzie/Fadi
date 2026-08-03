@@ -8,6 +8,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { AiTellCheck } from "@/components/documents/ai-tell-check";
 import { DictatableTextarea } from "@/components/documents/dictatable-textarea";
+import {
+  REACTIVE_TEMPLATES,
+  ReactiveResumePreview,
+  downloadReactiveResumePdf,
+  isReactiveTemplate,
+} from "@/components/documents/reactive-resume-preview";
 import { ResumeAdvisor } from "@/components/documents/resume-advisor";
 import { ResumePreview } from "@/components/documents/resume-preview";
 import {
@@ -62,9 +68,9 @@ export function ResumeEditor({
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
   const [data, setData] = useState<ResumeData>(() => parseResume(initialContent));
-  const [template, setTemplate] = useState<ResumeTemplate>(
-    (initialTemplate as ResumeTemplate) || "classic",
-  );
+  // A template id is either one of Fadi's (ResumeTemplate) or a Reactive Resume one — a
+  // plain string covers both; the renderer branches on isReactiveTemplate().
+  const [template, setTemplate] = useState<string>(initialTemplate || "classic");
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
   const dirty = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -157,6 +163,12 @@ export function ResumeEditor({
   );
 
   function exportPdf() {
+    // Reactive Resume templates export via their own client-side PDF engine (mapped from
+    // the user's real data); Fadi templates keep the existing print route.
+    if (isReactiveTemplate(template)) {
+      void downloadReactiveResumePdf(data, template, title);
+      return;
+    }
     window.open(`/dashboard/documents/${id}/print`, "_blank");
   }
   function exportDocx() {
@@ -291,16 +303,25 @@ export function ResumeEditor({
             onChange={(e) => {
               dirty.current = true;
               setStatus("idle");
-              setTemplate(e.target.value as ResumeTemplate);
+              setTemplate(e.target.value);
             }}
             aria-label="Resume template"
             className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-primary/40"
           >
-            {RESUME_TEMPLATES.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.label}
-              </option>
-            ))}
+            <optgroup label="Fadi">
+              {RESUME_TEMPLATES.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.label}
+                </option>
+              ))}
+            </optgroup>
+            <optgroup label="Reactive Resume">
+              {REACTIVE_TEMPLATES.map((t) => (
+                <option key={t} value={t}>
+                  {t.charAt(0).toUpperCase() + t.slice(1)}
+                </option>
+              ))}
+            </optgroup>
           </select>
           <select
             value={data.font ?? ""}
@@ -418,10 +439,15 @@ export function ResumeEditor({
       <AiTellCheck text={proseText} />
 
       <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-2">
-        {/* Live preview */}
-        <div className="nice-scrollbar min-h-0 overflow-y-auto rounded-xl border border-border/60 bg-white p-8 text-[13px] text-zinc-800 shadow-sm lg:p-10">
-          <ResumePreview data={data} template={template} />
-        </div>
+        {/* Live preview — Reactive Resume templates render via their PDF engine (real data
+            mapped through the JSON-Resume bridge); Fadi templates use the HTML preview. */}
+        {isReactiveTemplate(template) ? (
+          <ReactiveResumePreview data={data} template={template} />
+        ) : (
+          <div className="nice-scrollbar min-h-0 overflow-y-auto rounded-xl border border-border/60 bg-white p-8 text-[13px] text-zinc-800 shadow-sm lg:p-10">
+            <ResumePreview data={data} template={template as ResumeTemplate} />
+          </div>
+        )}
 
         {/* Form */}
         <div className="nice-scrollbar min-h-0 space-y-4 overflow-y-auto pr-2">

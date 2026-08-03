@@ -81,8 +81,22 @@ an empty "invent anything" start.
   `SortableSection` (add/remove/**dnd-kit reorder**) now drive **Experience, Education and
   Skills** editors. Remaining: projects/awards/… sections and tiptap rich text for
   descriptions (currently plain textareas), matching more of rxresume's UX.
-- **3 — engine bridge + migration.** Seed from verified history, wire AI, map/persist to the
-  existing `resumes`/`documents` tables so the two editors share data.
+- **3 — engine bridge + integration into the REAL editor (DONE).** After a course-correction
+  (the standalone Studio was the wrong shape — the value belongs in the existing editor,
+  which already has section editing, dictation and export), the integration went where users
+  actually work:
+  - `lib/documents/rr-bridge.ts` — `fadiToReactiveResume()`: the user's real résumé →
+    `toJsonResume` → `parseJSONResume` → rxresume `ResumeData`. Two existing tested
+    converters chained via JSON Resume; no hand-mapping, so nothing is invented.
+    Runtime-tested (real details preserved; schema-valid output).
+  - `resume-editor.tsx` — the 15 rxresume templates now sit in the existing template
+    `<select>` under a "Reactive Resume" optgroup beside Fadi's "Classic". Selecting one
+    swaps the live preview + PDF export to the rxresume engine (`ReactiveResumePreview`),
+    fed the real data. Fadi's templates, DOCX/JSON and the rest are untouched. This reaches
+    the per-job workspace + auto-prep for free (same editor). Full suite: 455 tests green.
+- **Remaining:** persist which engine/template is chosen (already saved as the `template`
+  string), wire Fadi's AI advisor into rxresume templates, and retire the now-redundant
+  standalone Studio.
 
 ## Consequences
 
