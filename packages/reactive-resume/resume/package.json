@@ -1,0 +1,30 @@
+{
+  "name": "@reactive-resume/resume",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./export-sections": "./src/export-sections.ts",
+    "./icons": "./src/icons.ts",
+    "./markdown": "./src/markdown.ts",
+    "./patch": "./src/patch.ts",
+    "./stylesheet": "./src/stylesheet/index.ts",
+    "./stylesheet/registry": "./src/stylesheet/registry/index.ts",
+    "./stylesheet/types": "./src/stylesheet/semantic-types.ts",
+    "./stylesheet/render-data": "./src/stylesheet/render-data.ts"
+  },
+  "dependencies": {
+    "@bramus/specificity": "^2.4.2",
+    "@reactive-resume/schema": "*",
+    "canonicalize": "^3.0.0",
+    "css-tree": "^3.2.1",
+    "fast-json-patch": "^3.1.1",
+    "zod": "^4.4.3"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5"
+  }
+}
