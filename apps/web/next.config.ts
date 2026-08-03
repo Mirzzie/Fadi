@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
     "@reactive-resume/utils",
     "@reactive-resume/fonts",
     "@reactive-resume/pdf",
+    "@reactive-resume/import",
   ],
 };
 
