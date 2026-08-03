@@ -68,8 +68,13 @@ an empty "invent anything" start.
   production endpoint (Phase 2): (a) a **worker thread / child process** that renders off the
   request graph — pure App Router, isolates the heavy render; (b) accept Pages Router and add
   null-guards. Leaning (a).
-- **2 — editor UI.** Port the builder feature into a Next.js route as a new tab in the
-  document workspace, alongside (not replacing) the current editor.
+- **2a — template preview (DONE).** A **Template Studio** route
+  (`/dashboard/documents/studio`, a static sibling of the `[id]` editor) + a "Template Studio"
+  button in the document workspace. A client component renders the sample résumé through all
+  15 templates live via `createResumePdfBlob` → object-URL → iframe. Client-side render
+  sidesteps the App Router `react-server` limit. Additive; web typecheck unchanged.
+- **2b — interactive editor.** Port the builder feature (zustand store, dnd-kit sections,
+  tiptap, artboard) into the Studio route, alongside (not replacing) the current editor.
 - **3 — engine bridge + migration.** Seed from verified history, wire AI, map/persist to the
   existing `resumes`/`documents` tables so the two editors share data.
 
