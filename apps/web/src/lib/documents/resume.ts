@@ -28,6 +28,15 @@ export type ResumeProject = {
   description: string;
 };
 
+// Certifications & licenses — critical for many non-tech careers (nursing licenses,
+// trade certs, CPA/CFA, teaching registration, forklift/HGV, etc.), not just tech.
+export type ResumeCertification = {
+  id: string;
+  name: string; // e.g. "Registered Nurse (RN)", "AWS Solutions Architect", "CPA"
+  issuer: string; // the awarding body — e.g. "NMBI", "Amazon Web Services"
+  date: string; // year or range — e.g. "2024" or "2024 – 2027"
+};
+
 export type ResumeTemplate = "classic" | "modern" | "compact" | "ats" | "executive";
 export const RESUME_TEMPLATES: { id: ResumeTemplate; label: string; hint?: string }[] = [
   { id: "ats", label: "ATS", hint: "Maximum parse-safety — single column, plain, no color" },
@@ -80,12 +89,19 @@ export function resolveResumeFontSize(id?: string | null) {
 }
 
 /** The canonical render order of resume sections (reorderable in the editor). */
-export type ResumeSectionKey = "summary" | "experiences" | "projects" | "education" | "skills";
+export type ResumeSectionKey =
+  | "summary"
+  | "experiences"
+  | "projects"
+  | "education"
+  | "certifications"
+  | "skills";
 export const DEFAULT_SECTION_ORDER: ResumeSectionKey[] = [
   "summary",
   "experiences",
   "projects",
   "education",
+  "certifications",
   "skills",
 ];
 
@@ -101,6 +117,7 @@ export type ResumeData = {
   summary: string;
   experiences: ResumeExperience[];
   education: ResumeEducation[];
+  certifications: ResumeCertification[];
   skills: string; // one "Category: a, b, c" per line
   projects: ResumeProject[];
   /** Section render order — reorderable in the editor. */
@@ -120,6 +137,7 @@ export function emptyResume(): ResumeData {
     summary: "",
     experiences: [],
     education: [],
+    certifications: [],
     skills: "",
     projects: [],
     order: [...DEFAULT_SECTION_ORDER],
@@ -146,6 +164,7 @@ export function parseResume(content: string): ResumeData {
       summary: parsed.summary ?? "",
       experiences: Array.isArray(parsed.experiences) ? parsed.experiences : [],
       education: Array.isArray(parsed.education) ? parsed.education : [],
+      certifications: Array.isArray(parsed.certifications) ? parsed.certifications : [],
       skills: parsed.skills ?? "",
       projects: Array.isArray(parsed.projects) ? parsed.projects : [],
       order: normalizeOrder((parsed as { order?: unknown }).order),

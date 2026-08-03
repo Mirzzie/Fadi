@@ -22,6 +22,9 @@ function sampleFadiResume(): ResumeData {
     },
     summary: "IT professional with experience in IT operations and cloud platforms.",
     skills: "Cloud: AWS, Azure\nOps: Linux, Windows Server",
+    certifications: [
+      { id: "c1", name: "AWS Solutions Architect", issuer: "Amazon Web Services", date: "2024" },
+    ],
   };
 }
 
@@ -37,6 +40,14 @@ describe("fadiToReactiveResume", () => {
     expect(rr.basics.headline).toBe("IT System Administrator");
     expect(rr.basics.email).toBe("mirzad@example.com");
     expect(rr.summary.content).toContain("IT operations");
+  });
+
+  it("carries certifications & licenses through to the rxresume section (any-career)", () => {
+    const rr = fadiToReactiveResume(sampleFadiResume());
+    const certs = rr.sections.certifications.items;
+    expect(certs.length).toBeGreaterThan(0);
+    // rxresume's certification item uses `title` for the cert name.
+    expect(certs.some((c) => c.title === "AWS Solutions Architect")).toBe(true);
   });
 
   it("handles an empty résumé without throwing", () => {

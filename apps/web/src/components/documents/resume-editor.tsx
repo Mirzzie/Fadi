@@ -28,6 +28,7 @@ import {
   RESUME_FONT_SIZES,
   RESUME_TEMPLATES,
   serializeResume,
+  type ResumeCertification,
   type ResumeData,
   type ResumeEducation,
   type ResumeExperience,
@@ -46,9 +47,10 @@ const SECTION_TITLES: Record<ResumeSectionKey, string> = {
   experiences: "Experience",
   projects: "Projects",
   education: "Education",
+  certifications: "Certifications & Licenses",
   skills: "Skills",
 };
-const ADDABLE = new Set<ResumeSectionKey>(["experiences", "projects", "education"]);
+const ADDABLE = new Set<ResumeSectionKey>(["experiences", "projects", "education", "certifications"]);
 
 export function ResumeEditor({
   id,
@@ -185,6 +187,8 @@ export function ResumeEditor({
       patch({ projects: [...data.projects, { id: newId(), title: "", url: "", description: "" }] });
     else if (key === "education")
       patch({ education: [...data.education, { id: newId(), degree: "", school: "", location: "", period: "" }] });
+    else if (key === "certifications")
+      patch({ certifications: [...data.certifications, { id: newId(), name: "", issuer: "", date: "" }] });
   }
 
   function renderSectionForm(key: ResumeSectionKey): React.ReactNode {
@@ -245,6 +249,16 @@ export function ResumeEditor({
               <input className={field} placeholder="School" value={ed.school} onChange={(e) => updateList(data, patch, "education", i, { school: e.target.value })} />
               <input className={field} placeholder="Location" value={ed.location} onChange={(e) => updateList(data, patch, "education", i, { location: e.target.value })} />
               <input className={field} placeholder="Period" value={ed.period} onChange={(e) => updateList(data, patch, "education", i, { period: e.target.value })} />
+            </div>
+          </RepeatItem>
+        ));
+      case "certifications":
+        return data.certifications.map((c, i) => (
+          <RepeatItem key={c.id} onRemove={() => patch({ certifications: data.certifications.filter((_, j) => j !== i) })}>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input className={field} placeholder="Certification / license (e.g. RN, CPA, AWS SAA)" value={c.name} onChange={(e) => updateList(data, patch, "certifications", i, { name: e.target.value })} />
+              <input className={field} placeholder="Issuer (e.g. NMBI, AWS)" value={c.issuer} onChange={(e) => updateList(data, patch, "certifications", i, { issuer: e.target.value })} />
+              <input className={field} placeholder="Date (e.g. 2024)" value={c.date} onChange={(e) => updateList(data, patch, "certifications", i, { date: e.target.value })} />
             </div>
           </RepeatItem>
         ));
@@ -493,13 +507,13 @@ export function ResumeEditor({
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-type ListKey = "experiences" | "education" | "projects";
+type ListKey = "experiences" | "education" | "projects" | "certifications";
 function updateList(
   data: ResumeData,
   patch: (n: Partial<ResumeData>) => void,
   key: ListKey,
   index: number,
-  changes: Partial<ResumeExperience & ResumeEducation & ResumeProject>,
+  changes: Partial<ResumeExperience & ResumeEducation & ResumeProject & ResumeCertification>,
 ) {
   const list = (data[key] as Array<Record<string, unknown>>).map((item, j) =>
     j === index ? { ...item, ...changes } : item,
