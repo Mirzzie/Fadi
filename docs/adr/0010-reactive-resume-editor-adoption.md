@@ -77,9 +77,10 @@ an empty "invent anything" start.
   an editable **Basics** panel (name/headline/email/phone/location/summary) + template picker;
   the preview re-renders **debounced** from the store on every edit. This is the interactive
   data-flow loop, built on Fadi's stack + the vendored engine (zustand added to web).
-- **2b-ii — full editor (in progress).** Experience section: add/remove/edit items with
-  **dnd-kit drag-reorder** (done). Remaining: education/skills/projects/… sections, and tiptap
-  rich text for descriptions (currently plain textareas), matching more of rxresume's UX.
+- **2b-ii — full editor (in progress).** Generic section store ops + a shared
+  `SortableSection` (add/remove/**dnd-kit reorder**) now drive **Experience, Education and
+  Skills** editors. Remaining: projects/awards/… sections and tiptap rich text for
+  descriptions (currently plain textareas), matching more of rxresume's UX.
 - **3 — engine bridge + migration.** Seed from verified history, wire AI, map/persist to the
   existing `resumes`/`documents` tables so the two editors share data.
 

@@ -10,8 +10,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { createResumePdfBlob } from "@reactive-resume/pdf/browser";
 import { templateSchema, type Template } from "@reactive-resume/schema/templates";
 
-import { ExperienceEditor } from "./experience-editor";
 import { useResumeStore } from "./resume-store";
+import { EducationEditor, ExperienceEditor, SkillsEditor } from "./section-editors";
 
 // Phase 2b (ADR 0010): the interactive editing loop. Edit the résumé on the left → the store
 // updates → the Reactive Resume engine re-renders the preview on the right (debounced,
@@ -99,6 +99,8 @@ export function ResumeStudio() {
         </div>
 
         <ExperienceEditor />
+        <EducationEditor />
+        <SkillsEditor />
 
         <Button variant="outline" size="sm" onClick={reset}>
           <RotateCcw className="size-4" aria-hidden="true" /> Reset to sample
