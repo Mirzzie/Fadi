@@ -54,9 +54,20 @@ an empty "invent anything" start.
 - **1a — render foundation (DONE).** Vendored `@reactive-resume/schema` (data model) and
   `@reactive-resume/resume` (template/stylesheet renderer). Wired into workspaces +
   `transpilePackages`; both typecheck clean inside Fadi; web/database typecheck unchanged.
-- **1b — export.** Vendor `utils` + `fonts` + `pdf` (`@react-pdf/renderer`) → real
-  client-side PDF. Prove it by rendering one existing Fadi résumé through a rxresume
-  template + exporting a PDF (proof of concept, no UI change yet).
+- **1b — export (DONE).** Vendored `utils` + `fonts` + `pdf` (`@react-pdf/renderer`). All five
+  packages typecheck clean inside Fadi; web/database unchanged. **Proven:** a Pages-Router API
+  route rendered `sampleResumeData` through the engine to a real **4-page PDF** in Fadi's
+  runtime. The PoC route was then removed (see the render-host finding below); the engine and
+  its packages remain.
+
+  **Render-host finding (decides Phase 2/3 wiring):** `@react-pdf/renderer`'s components use
+  `createContext`, which the App Router's `react-server` build **forbids in route handlers** —
+  so PDF cannot render from an App Router `route.ts`. A **Pages-Router** API route works (full
+  React, Node runtime) but has a cost: adding any `pages/` dir flips `useSearchParams()` /
+  `usePathname()` to nullable **app-wide**, which broke unrelated type checks. Options for the
+  production endpoint (Phase 2): (a) a **worker thread / child process** that renders off the
+  request graph — pure App Router, isolates the heavy render; (b) accept Pages Router and add
+  null-guards. Leaning (a).
 - **2 — editor UI.** Port the builder feature into a Next.js route as a new tab in the
   document workspace, alongside (not replacing) the current editor.
 - **3 — engine bridge + migration.** Seed from verified history, wire AI, map/persist to the

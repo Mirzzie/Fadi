@@ -11,12 +11,13 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "jsx": "react-jsx",
+    "resolveJsonModule": true,
     "types": []
   },
   "include": [
     "src/**/*.ts",
-    "src/**/*.tsx"
+    "src/**/*.tsx",
+    "src/**/*.d.ts"
   ],
   "exclude": [
     "node_modules"
