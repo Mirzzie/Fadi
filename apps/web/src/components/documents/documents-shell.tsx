@@ -42,6 +42,20 @@ const KIND_META: Record<string, { label: string; icon: LucideIcon }> = {
   note: { label: "Note", icon: NotebookPen },
 };
 
+// Deterministic date format (explicit locale + UTC) so the server and client render the
+// SAME string — a bare toLocaleDateString() differs between the two (locale/timezone) and
+// caused a hydration mismatch. "3 Aug 2026" also avoids dd/mm vs mm/dd ambiguity.
+const UPDATED_FMT = new Intl.DateTimeFormat("en-GB", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  timeZone: "UTC",
+});
+function formatUpdated(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? "" : UPDATED_FMT.format(d);
+}
+
 export function DocumentsShell({ documents }: { documents: DocView[] }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -171,7 +185,7 @@ export function DocumentsShell({ documents }: { documents: DocView[] }) {
                       {doc.preview || "Empty — open to start writing."}
                     </p>
                     <p className="mt-2 text-[0.7rem] text-muted-foreground">
-                      Updated {new Date(doc.updatedAt).toLocaleDateString()}
+                      Updated {formatUpdated(doc.updatedAt)}
                     </p>
                   </button>
                   <button
