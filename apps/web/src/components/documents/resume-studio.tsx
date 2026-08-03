@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { createResumePdfBlob } from "@reactive-resume/pdf/browser";
 import { templateSchema, type Template } from "@reactive-resume/schema/templates";
 
+import { ExperienceEditor } from "./experience-editor";
 import { useResumeStore } from "./resume-store";
 
 // Phase 2b (ADR 0010): the interactive editing loop. Edit the résumé on the left → the store
@@ -96,6 +97,8 @@ export function ResumeStudio() {
             />
           </div>
         </div>
+
+        <ExperienceEditor />
 
         <Button variant="outline" size="sm" onClick={reset}>
           <RotateCcw className="size-4" aria-hidden="true" /> Reset to sample
