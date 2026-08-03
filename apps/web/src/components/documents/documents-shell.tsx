@@ -2,7 +2,6 @@
 
 import {
   FileText,
-  LayoutTemplate,
   Mail,
   NotebookPen,
   Plus,
@@ -132,15 +131,6 @@ export function DocumentsShell({ documents }: { documents: DocView[] }) {
             >
               <Upload className="size-4" aria-hidden="true" />
               Import CV
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push("/dashboard/documents/studio")}
-              title="Preview Reactive Resume templates (new)"
-            >
-              <LayoutTemplate className="size-4" aria-hidden="true" />
-              Template Studio
             </Button>
             <input
               ref={fileInput}
