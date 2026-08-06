@@ -68,6 +68,21 @@ export type ResumeReference = {
   reference: string; // role/relationship + contact, e.g. "Manager, Acme — jane@acme.com"
 };
 
+// Interests / hobbies — valued in some regions and fields (and for culture-fit signalling).
+export type ResumeInterest = {
+  id: string;
+  name: string; // e.g. "Photography"
+  keywords: string; // comma-separated, e.g. "landscape, film"
+};
+
+// Publications — academia, research, medicine, law.
+export type ResumePublication = {
+  id: string;
+  name: string; // title of the work
+  publisher: string;
+  date: string;
+};
+
 export type ResumeTemplate = "classic" | "modern" | "compact" | "ats" | "executive";
 export const RESUME_TEMPLATES: { id: ResumeTemplate; label: string; hint?: string }[] = [
   { id: "ats", label: "ATS", hint: "Maximum parse-safety — single column, plain, no color" },
@@ -130,7 +145,9 @@ export type ResumeSectionKey =
   | "languages"
   | "awards"
   | "volunteer"
-  | "references";
+  | "references"
+  | "interests"
+  | "publications";
 export const DEFAULT_SECTION_ORDER: ResumeSectionKey[] = [
   "summary",
   "experiences",
@@ -141,6 +158,8 @@ export const DEFAULT_SECTION_ORDER: ResumeSectionKey[] = [
   "languages",
   "awards",
   "volunteer",
+  "publications",
+  "interests",
   "references",
 ];
 
@@ -161,6 +180,8 @@ export type ResumeData = {
   awards: ResumeAward[];
   volunteer: ResumeVolunteer[];
   references: ResumeReference[];
+  interests: ResumeInterest[];
+  publications: ResumePublication[];
   skills: string; // one "Category: a, b, c" per line
   projects: ResumeProject[];
   /** Section render order — reorderable in the editor. */
@@ -185,6 +206,8 @@ export function emptyResume(): ResumeData {
     awards: [],
     volunteer: [],
     references: [],
+    interests: [],
+    publications: [],
     skills: "",
     projects: [],
     order: [...DEFAULT_SECTION_ORDER],
@@ -216,6 +239,8 @@ export function parseResume(content: string): ResumeData {
       awards: Array.isArray(parsed.awards) ? parsed.awards : [],
       volunteer: Array.isArray(parsed.volunteer) ? parsed.volunteer : [],
       references: Array.isArray(parsed.references) ? parsed.references : [],
+      interests: Array.isArray(parsed.interests) ? parsed.interests : [],
+      publications: Array.isArray(parsed.publications) ? parsed.publications : [],
       skills: parsed.skills ?? "",
       projects: Array.isArray(parsed.projects) ? parsed.projects : [],
       order: normalizeOrder((parsed as { order?: unknown }).order),

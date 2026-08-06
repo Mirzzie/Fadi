@@ -78,9 +78,24 @@ export interface JsonResume {
   awards?: JsonResumeAward[];
   volunteer?: JsonResumeVolunteer[];
   references?: JsonResumeReference[];
+  interests?: JsonResumeInterest[];
+  publications?: JsonResumePublication[];
   skills?: JsonResumeSkill[];
   projects?: JsonResumeProject[];
   meta?: Record<string, unknown> & { careeros?: { order?: ResumeSectionKey[] } };
+}
+
+/** JSON Resume `interests` entry. */
+export interface JsonResumeInterest {
+  name?: string;
+  keywords?: string[];
+}
+
+/** JSON Resume `publications` entry. */
+export interface JsonResumePublication {
+  name?: string;
+  publisher?: string;
+  releaseDate?: string;
 }
 
 /** JSON Resume `awards` entry. */
@@ -262,6 +277,17 @@ export function toJsonResume(data: ResumeData): JsonResume {
       name: r.name || undefined,
       reference: r.reference || undefined,
     })),
+    interests: data.interests.map((i) => ({
+      name: i.name || undefined,
+      keywords: i.keywords
+        ? i.keywords.split(",").map((k) => k.trim()).filter(Boolean)
+        : undefined,
+    })),
+    publications: data.publications.map((p) => ({
+      name: p.name || undefined,
+      publisher: p.publisher || undefined,
+      releaseDate: p.date || undefined,
+    })),
     skills: skillsTextToJson(data.skills),
     projects: data.projects.map((p) => ({
       name: p.title || undefined,
@@ -337,6 +363,17 @@ export function fromJsonResume(jr: JsonResume): ResumeData {
       id: newId(),
       name: r.name ?? "",
       reference: r.reference ?? "",
+    })),
+    interests: (jr.interests ?? []).map((i) => ({
+      id: newId(),
+      name: i.name ?? "",
+      keywords: (i.keywords ?? []).join(", "),
+    })),
+    publications: (jr.publications ?? []).map((p) => ({
+      id: newId(),
+      name: p.name ?? "",
+      publisher: p.publisher ?? "",
+      date: p.releaseDate ?? "",
     })),
     skills: skillsJsonToText(jr.skills),
     projects: (jr.projects ?? []).map((p) => ({

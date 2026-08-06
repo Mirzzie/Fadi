@@ -56,6 +56,7 @@ function sanitizeDates(jr: JsonResume): JsonResume {
     volunteer: jr.volunteer?.map(range),
     awards: jr.awards?.map((a) => ({ ...a, date: toIso(a.date) })),
     certificates: jr.certificates?.map((c) => ({ ...c, date: toIso(c.date) })),
+    publications: jr.publications?.map((p) => ({ ...p, releaseDate: toIso(p.releaseDate) })),
   };
 }
 

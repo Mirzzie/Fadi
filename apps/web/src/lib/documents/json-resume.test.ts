@@ -22,9 +22,11 @@ const sample: ResumeData = {
   awards: [{ id: "aw", title: "Dean's List", awarder: "DCU", date: "2024" }],
   volunteer: [{ id: "v", organization: "Red Cross", role: "IT Volunteer", period: "2023", summary: "Set up kit" }],
   references: [{ id: "r", name: "Jane Doe", reference: "Manager — jane@acme.com" }],
+  interests: [{ id: "in", name: "Photography", keywords: "landscape, film" }],
+  publications: [{ id: "pub", name: "On Zero Trust", publisher: "IEEE", date: "2024" }],
   skills: "Cloud: AWS, Azure\nLanguages: Python, Bash",
   projects: [{ id: "p", title: "Home Lab", url: "https://lab.dev", description: "Self-hosted k8s cluster." }],
-  order: ["summary", "experiences", "projects", "education", "certifications", "skills", "languages", "awards", "volunteer", "references"],
+  order: ["summary", "experiences", "projects", "education", "certifications", "skills", "languages", "awards", "volunteer", "publications", "interests", "references"],
 };
 
 describe("JSON Resume bridge", () => {
@@ -63,6 +65,6 @@ describe("JSON Resume bridge", () => {
     expect(imported.personal.location).toBe("Berlin, DE");
     expect(imported.experiences[0].period).toBe("2021-01 – 2023-06");
     expect(imported.skills).toBe("Design: Figma, UX");
-    expect(imported.order).toHaveLength(10);
+    expect(imported.order).toHaveLength(12);
   });
 });

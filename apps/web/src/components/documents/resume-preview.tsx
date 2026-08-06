@@ -209,6 +209,31 @@ export function ResumePreview({
             ))}
           </Section>
         ) : null;
+      case "publications":
+        return data.publications.length ? (
+          <Section title="Publications">
+            {data.publications.map((p) => (
+              <div key={p.id} className="flex justify-between">
+                <span>
+                  <span className="font-semibold">{p.name || "Publication"}</span>
+                  {p.publisher ? ` — ${p.publisher}` : ""}
+                </span>
+                <span className="text-[11px] text-zinc-500">{p.date}</span>
+              </div>
+            ))}
+          </Section>
+        ) : null;
+      case "interests":
+        return data.interests.length ? (
+          <Section title="Interests">
+            <p className="leading-relaxed">
+              {data.interests
+                .map((it) => (it.keywords ? `${it.name} (${it.keywords})` : it.name))
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          </Section>
+        ) : null;
       case "skills":
         return data.skills ? (
           <Section title="Skills">

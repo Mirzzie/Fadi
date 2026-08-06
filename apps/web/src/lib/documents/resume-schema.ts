@@ -51,6 +51,8 @@ export function toResumeData(
     awards: [],
     volunteer: [],
     references: [],
+    interests: [],
+    publications: [],
     experiences: gen.experiences.map((e) => ({
       id: newId(),
       title: e.title,

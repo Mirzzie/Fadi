@@ -33,7 +33,9 @@ import {
   type ResumeData,
   type ResumeEducation,
   type ResumeExperience,
+  type ResumeInterest,
   type ResumeLanguage,
+  type ResumePublication,
   type ResumeReference,
   type ResumeVolunteer,
   type ResumeFontId,
@@ -57,6 +59,8 @@ const SECTION_TITLES: Record<ResumeSectionKey, string> = {
   awards: "Awards & Honours",
   volunteer: "Volunteer & Community",
   references: "References",
+  interests: "Interests",
+  publications: "Publications",
 };
 const ADDABLE = new Set<ResumeSectionKey>([
   "experiences",
@@ -67,6 +71,8 @@ const ADDABLE = new Set<ResumeSectionKey>([
   "awards",
   "volunteer",
   "references",
+  "interests",
+  "publications",
 ]);
 
 export function ResumeEditor({
@@ -214,6 +220,10 @@ export function ResumeEditor({
       patch({ volunteer: [...data.volunteer, { id: newId(), organization: "", role: "", period: "", summary: "" }] });
     else if (key === "references")
       patch({ references: [...data.references, { id: newId(), name: "", reference: "" }] });
+    else if (key === "interests")
+      patch({ interests: [...data.interests, { id: newId(), name: "", keywords: "" }] });
+    else if (key === "publications")
+      patch({ publications: [...data.publications, { id: newId(), name: "", publisher: "", date: "" }] });
   }
 
   function renderSectionForm(key: ResumeSectionKey): React.ReactNode {
@@ -323,6 +333,25 @@ export function ResumeEditor({
             <div className="grid gap-2 sm:grid-cols-2">
               <input className={field} placeholder="Name" value={r.name} onChange={(e) => updateList(data, patch, "references", i, { name: e.target.value })} />
               <input className={field} placeholder="Relationship & contact" value={r.reference} onChange={(e) => updateList(data, patch, "references", i, { reference: e.target.value })} />
+            </div>
+          </RepeatItem>
+        ));
+      case "publications":
+        return data.publications.map((p, i) => (
+          <RepeatItem key={p.id} onRemove={() => patch({ publications: data.publications.filter((_, j) => j !== i) })}>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input className={field} placeholder="Title" value={p.name} onChange={(e) => updateList(data, patch, "publications", i, { name: e.target.value })} />
+              <input className={field} placeholder="Publisher / journal" value={p.publisher} onChange={(e) => updateList(data, patch, "publications", i, { publisher: e.target.value })} />
+              <input className={field} placeholder="Date (e.g. 2024)" value={p.date} onChange={(e) => updateList(data, patch, "publications", i, { date: e.target.value })} />
+            </div>
+          </RepeatItem>
+        ));
+      case "interests":
+        return data.interests.map((it, i) => (
+          <RepeatItem key={it.id} onRemove={() => patch({ interests: data.interests.filter((_, j) => j !== i) })}>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input className={field} placeholder="Interest (e.g. Photography)" value={it.name} onChange={(e) => updateList(data, patch, "interests", i, { name: e.target.value })} />
+              <input className={field} placeholder="Keywords (comma-separated)" value={it.keywords} onChange={(e) => updateList(data, patch, "interests", i, { keywords: e.target.value })} />
             </div>
           </RepeatItem>
         ));
@@ -579,7 +608,9 @@ type ListKey =
   | "languages"
   | "awards"
   | "volunteer"
-  | "references";
+  | "references"
+  | "interests"
+  | "publications";
 function updateList(
   data: ResumeData,
   patch: (n: Partial<ResumeData>) => void,
@@ -593,7 +624,9 @@ function updateList(
       ResumeLanguage &
       ResumeAward &
       ResumeVolunteer &
-      ResumeReference
+      ResumeReference &
+      ResumeInterest &
+      ResumePublication
   >,
 ) {
   const list = (data[key] as Array<Record<string, unknown>>).map((item, j) =>
