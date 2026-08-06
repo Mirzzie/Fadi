@@ -86,6 +86,11 @@ describe("fadiToReactiveResume", () => {
     expect(rr.picture.hidden).toBe(false);
   });
 
+  it("clears the default star icon on skills (no stray ☆)", () => {
+    const rr = fadiToReactiveResume({ ...emptyResume(), skills: "Windows 10/11\nLinux" });
+    expect(rr.sections.skills.items.every((s) => s.icon === "")).toBe(true);
+  });
+
   it("handles an empty résumé without throwing", () => {
     expect(() => fadiToReactiveResume(emptyResume())).not.toThrow();
   });

@@ -67,5 +67,8 @@ export function fadiToReactiveResume(data: ResumeData): ReactiveResumeData {
   // valid default picture object the importer produces.
   const photo = data.personal.photo?.trim();
   if (photo) rr.picture = { ...rr.picture, url: photo, hidden: false };
+  // The importer defaults every skill's icon to "star", which renders a stray ☆ before each
+  // skill (Fadi skills have no icon). Clear it so skills read as clean text.
+  rr.sections.skills.items = rr.sections.skills.items.map((s) => ({ ...s, icon: "" }));
   return rr;
 }

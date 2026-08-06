@@ -72,7 +72,15 @@ export function ReactiveResumePreview({ data, template }: { data: ResumeData; te
           {error}
         </div>
       ) : null}
-      {url ? <iframe title="Résumé preview" src={url} className="h-full min-h-[60vh] w-full" /> : null}
+      {url ? (
+        // #toolbar=0&navpanes=0 hides Chromium's built-in PDF-viewer chrome so the preview
+        // reads as a clean résumé, not a PDF viewer. (Fadi's own DOCX/PDF/JSON buttons remain.)
+        <iframe
+          title="Résumé preview"
+          src={`${url}#toolbar=0&navpanes=0&scrollbar=0`}
+          className="h-full min-h-[60vh] w-full"
+        />
+      ) : null}
     </div>
   );
 }
