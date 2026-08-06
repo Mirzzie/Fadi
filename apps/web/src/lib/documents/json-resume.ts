@@ -74,6 +74,7 @@ export interface JsonResume {
   work?: JsonResumeWork[];
   education?: JsonResumeEducation[];
   certificates?: JsonResumeCertificate[];
+  languages?: JsonResumeLanguage[];
   skills?: JsonResumeSkill[];
   projects?: JsonResumeProject[];
   meta?: Record<string, unknown> & { careeros?: { order?: ResumeSectionKey[] } };
@@ -85,6 +86,12 @@ export interface JsonResumeCertificate {
   date?: string;
   issuer?: string;
   url?: string;
+}
+
+/** JSON Resume `languages` entry (jsonresume.org). */
+export interface JsonResumeLanguage {
+  language?: string;
+  fluency?: string;
 }
 
 const JSON_RESUME_SCHEMA =
@@ -206,6 +213,10 @@ export function toJsonResume(data: ResumeData): JsonResume {
       date: c.date || undefined,
       issuer: c.issuer || undefined,
     })),
+    languages: data.languages.map((l) => ({
+      language: l.name || undefined,
+      fluency: l.level || undefined,
+    })),
     skills: skillsTextToJson(data.skills),
     projects: data.projects.map((p) => ({
       name: p.title || undefined,
@@ -258,6 +269,11 @@ export function fromJsonResume(jr: JsonResume): ResumeData {
       name: c.name ?? "",
       issuer: c.issuer ?? "",
       date: c.date ?? "",
+    })),
+    languages: (jr.languages ?? []).map((l) => ({
+      id: newId(),
+      name: l.language ?? "",
+      level: l.fluency ?? "",
     })),
     skills: skillsJsonToText(jr.skills),
     projects: (jr.projects ?? []).map((p) => ({

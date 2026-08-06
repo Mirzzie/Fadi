@@ -18,9 +18,10 @@ const sample: ResumeData = {
   ],
   education: [{ id: "e", degree: "MSc, Cybersecurity", school: "Dublin City University", location: "Ireland", period: "2024 – 2025" }],
   certifications: [{ id: "c", name: "CompTIA Security+", issuer: "CompTIA", date: "2024" }],
+  languages: [{ id: "l", name: "English", level: "Native" }],
   skills: "Cloud: AWS, Azure\nLanguages: Python, Bash",
   projects: [{ id: "p", title: "Home Lab", url: "https://lab.dev", description: "Self-hosted k8s cluster." }],
-  order: ["summary", "experiences", "projects", "education", "certifications", "skills"],
+  order: ["summary", "experiences", "projects", "education", "certifications", "skills", "languages"],
 };
 
 describe("JSON Resume bridge", () => {
@@ -59,6 +60,6 @@ describe("JSON Resume bridge", () => {
     expect(imported.personal.location).toBe("Berlin, DE");
     expect(imported.experiences[0].period).toBe("2021-01 – 2023-06");
     expect(imported.skills).toBe("Design: Figma, UX");
-    expect(imported.order).toHaveLength(6);
+    expect(imported.order).toHaveLength(7);
   });
 });

@@ -32,6 +32,7 @@ import {
   type ResumeData,
   type ResumeEducation,
   type ResumeExperience,
+  type ResumeLanguage,
   type ResumeFontId,
   type ResumeFontSizeId,
   type ResumeProject,
@@ -49,8 +50,15 @@ const SECTION_TITLES: Record<ResumeSectionKey, string> = {
   education: "Education",
   certifications: "Certifications & Licenses",
   skills: "Skills",
+  languages: "Languages",
 };
-const ADDABLE = new Set<ResumeSectionKey>(["experiences", "projects", "education", "certifications"]);
+const ADDABLE = new Set<ResumeSectionKey>([
+  "experiences",
+  "projects",
+  "education",
+  "certifications",
+  "languages",
+]);
 
 export function ResumeEditor({
   id,
@@ -189,6 +197,8 @@ export function ResumeEditor({
       patch({ education: [...data.education, { id: newId(), degree: "", school: "", location: "", period: "" }] });
     else if (key === "certifications")
       patch({ certifications: [...data.certifications, { id: newId(), name: "", issuer: "", date: "" }] });
+    else if (key === "languages")
+      patch({ languages: [...data.languages, { id: newId(), name: "", level: "" }] });
   }
 
   function renderSectionForm(key: ResumeSectionKey): React.ReactNode {
@@ -259,6 +269,15 @@ export function ResumeEditor({
               <input className={field} placeholder="Certification / license (e.g. RN, CPA, AWS SAA)" value={c.name} onChange={(e) => updateList(data, patch, "certifications", i, { name: e.target.value })} />
               <input className={field} placeholder="Issuer (e.g. NMBI, AWS)" value={c.issuer} onChange={(e) => updateList(data, patch, "certifications", i, { issuer: e.target.value })} />
               <input className={field} placeholder="Date (e.g. 2024)" value={c.date} onChange={(e) => updateList(data, patch, "certifications", i, { date: e.target.value })} />
+            </div>
+          </RepeatItem>
+        ));
+      case "languages":
+        return data.languages.map((l, i) => (
+          <RepeatItem key={l.id} onRemove={() => patch({ languages: data.languages.filter((_, j) => j !== i) })}>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input className={field} placeholder="Language (e.g. English)" value={l.name} onChange={(e) => updateList(data, patch, "languages", i, { name: e.target.value })} />
+              <input className={field} placeholder="Level (e.g. Native, Fluent)" value={l.level} onChange={(e) => updateList(data, patch, "languages", i, { level: e.target.value })} />
             </div>
           </RepeatItem>
         ));
@@ -507,13 +526,15 @@ export function ResumeEditor({
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-type ListKey = "experiences" | "education" | "projects" | "certifications";
+type ListKey = "experiences" | "education" | "projects" | "certifications" | "languages";
 function updateList(
   data: ResumeData,
   patch: (n: Partial<ResumeData>) => void,
   key: ListKey,
   index: number,
-  changes: Partial<ResumeExperience & ResumeEducation & ResumeProject & ResumeCertification>,
+  changes: Partial<
+    ResumeExperience & ResumeEducation & ResumeProject & ResumeCertification & ResumeLanguage
+  >,
 ) {
   const list = (data[key] as Array<Record<string, unknown>>).map((item, j) =>
     j === index ? { ...item, ...changes } : item,

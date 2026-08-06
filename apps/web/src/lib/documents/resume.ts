@@ -37,6 +37,13 @@ export type ResumeCertification = {
   date: string; // year or range — e.g. "2024" or "2024 – 2027"
 };
 
+// Languages — universally relevant (healthcare, hospitality, translation, any global role).
+export type ResumeLanguage = {
+  id: string;
+  name: string; // e.g. "English", "Arabic", "Irish"
+  level: string; // e.g. "Native", "Fluent (C2)", "Intermediate (B1)"
+};
+
 export type ResumeTemplate = "classic" | "modern" | "compact" | "ats" | "executive";
 export const RESUME_TEMPLATES: { id: ResumeTemplate; label: string; hint?: string }[] = [
   { id: "ats", label: "ATS", hint: "Maximum parse-safety — single column, plain, no color" },
@@ -95,7 +102,8 @@ export type ResumeSectionKey =
   | "projects"
   | "education"
   | "certifications"
-  | "skills";
+  | "skills"
+  | "languages";
 export const DEFAULT_SECTION_ORDER: ResumeSectionKey[] = [
   "summary",
   "experiences",
@@ -103,6 +111,7 @@ export const DEFAULT_SECTION_ORDER: ResumeSectionKey[] = [
   "education",
   "certifications",
   "skills",
+  "languages",
 ];
 
 export type ResumeData = {
@@ -118,6 +127,7 @@ export type ResumeData = {
   experiences: ResumeExperience[];
   education: ResumeEducation[];
   certifications: ResumeCertification[];
+  languages: ResumeLanguage[];
   skills: string; // one "Category: a, b, c" per line
   projects: ResumeProject[];
   /** Section render order — reorderable in the editor. */
@@ -138,6 +148,7 @@ export function emptyResume(): ResumeData {
     experiences: [],
     education: [],
     certifications: [],
+    languages: [],
     skills: "",
     projects: [],
     order: [...DEFAULT_SECTION_ORDER],
@@ -165,6 +176,7 @@ export function parseResume(content: string): ResumeData {
       experiences: Array.isArray(parsed.experiences) ? parsed.experiences : [],
       education: Array.isArray(parsed.education) ? parsed.education : [],
       certifications: Array.isArray(parsed.certifications) ? parsed.certifications : [],
+      languages: Array.isArray(parsed.languages) ? parsed.languages : [],
       skills: parsed.skills ?? "",
       projects: Array.isArray(parsed.projects) ? parsed.projects : [],
       order: normalizeOrder((parsed as { order?: unknown }).order),

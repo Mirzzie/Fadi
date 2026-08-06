@@ -25,6 +25,7 @@ function sampleFadiResume(): ResumeData {
     certifications: [
       { id: "c1", name: "AWS Solutions Architect", issuer: "Amazon Web Services", date: "2024" },
     ],
+    languages: [{ id: "l1", name: "English", level: "Native" }],
   };
 }
 
@@ -48,6 +49,13 @@ describe("fadiToReactiveResume", () => {
     expect(certs.length).toBeGreaterThan(0);
     // rxresume's certification item uses `title` for the cert name.
     expect(certs.some((c) => c.title === "AWS Solutions Architect")).toBe(true);
+  });
+
+  it("carries languages through to the rxresume section (any-career)", () => {
+    const rr = fadiToReactiveResume(sampleFadiResume());
+    const langs = rr.sections.languages.items;
+    // rxresume's language item uses `language` for the name.
+    expect(langs.some((l) => l.language === "English")).toBe(true);
   });
 
   it("handles an empty résumé without throwing", () => {

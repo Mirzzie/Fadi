@@ -142,6 +142,31 @@ export function ResumePreview({
             ))}
           </Section>
         ) : null;
+      case "certifications":
+        return data.certifications.length ? (
+          <Section title="Certifications & Licenses">
+            {data.certifications.map((c) => (
+              <div key={c.id} className="flex justify-between">
+                <span>
+                  <span className="font-semibold">{c.name || "Certification"}</span>
+                  {c.issuer ? ` — ${c.issuer}` : ""}
+                </span>
+                <span className="text-[11px] text-zinc-500">{c.date}</span>
+              </div>
+            ))}
+          </Section>
+        ) : null;
+      case "languages":
+        return data.languages.length ? (
+          <Section title="Languages">
+            <p className="leading-relaxed">
+              {data.languages
+                .map((l) => (l.level ? `${l.name} (${l.level})` : l.name))
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
+          </Section>
+        ) : null;
       case "skills":
         return data.skills ? (
           <Section title="Skills">
