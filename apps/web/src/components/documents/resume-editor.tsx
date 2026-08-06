@@ -10,6 +10,7 @@ import { AiTellCheck } from "@/components/documents/ai-tell-check";
 import { DictatableTextarea } from "@/components/documents/dictatable-textarea";
 import { ResumeAdvisor } from "@/components/documents/resume-advisor";
 import { ResumePreview } from "@/components/documents/resume-preview";
+import { AccentPicker } from "@/components/ui/accent-picker";
 import { SelectMenu } from "@/components/ui/select-menu";
 import {
   deleteResumeTemplateAction,
@@ -19,6 +20,7 @@ import {
 import {
   newId,
   parseResume,
+  RESUME_ACCENTS,
   RESUME_FONTS,
   RESUME_FONT_SIZES,
   RESUME_TEMPLATES,
@@ -438,6 +440,11 @@ export function ResumeEditor({
                 ],
               },
             ]}
+          />
+          <AccentPicker
+            value={data.accent}
+            onChange={(hex) => patch({ accent: hex })}
+            presets={RESUME_ACCENTS}
           />
           <Button
             variant="outline"

@@ -75,10 +75,15 @@ export function ResumePreview({
     ...(sizeDef ? { fontSize: `${sizeDef.previewPx}px` } : {}),
   };
 
+  // Optional accent colour override — applied to headings; unset keeps the template default.
+  const accent = data.accent?.trim() || undefined;
+
   function Section({ title, children }: { title: string; children: React.ReactNode }) {
     return (
       <section>
-        <h2 className={t.sectionHeader}>{title}</h2>
+        <h2 className={t.sectionHeader} style={accent ? { color: accent } : undefined}>
+          {title}
+        </h2>
         {children}
       </section>
     );
@@ -261,7 +266,9 @@ export function ResumePreview({
             className="mx-auto mb-2 size-20 rounded-full object-cover"
           />
         ) : null}
-        <h1 className={t.name}>{data.personal.name || "Your Name"}</h1>
+        <h1 className={t.name} style={accent ? { color: accent } : undefined}>
+          {data.personal.name || "Your Name"}
+        </h1>
         {data.personal.headline ? <p className="text-sm text-zinc-600">{data.personal.headline}</p> : null}
         {contact ? <p className={cn("mt-1 text-[11px] text-zinc-500")}>{contact}</p> : null}
       </header>

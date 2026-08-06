@@ -192,7 +192,20 @@ export type ResumeData = {
   /** Optional font/size overrides; when unset the template's defaults apply. */
   font?: ResumeFontId;
   fontSize?: ResumeFontSizeId;
+  /** Optional accent colour (hex) for headings; when unset the template's default applies. */
+  accent?: string;
 };
+
+/** Preset accent colours (print-safe hex). "" / undefined = the template's own default. */
+export const RESUME_ACCENTS: { label: string; hex: string }[] = [
+  { label: "Teal", hex: "#0f766e" },
+  { label: "Blue", hex: "#1d4ed8" },
+  { label: "Indigo", hex: "#4338ca" },
+  { label: "Emerald", hex: "#047857" },
+  { label: "Rose", hex: "#be123c" },
+  { label: "Amber", hex: "#b45309" },
+  { label: "Slate", hex: "#334155" },
+];
 
 export function newId(): string {
   return Math.random().toString(36).slice(2, 10);
@@ -249,6 +262,7 @@ export function parseResume(content: string): ResumeData {
       order: normalizeOrder((parsed as { order?: unknown }).order),
       font: resolveResumeFont(parsed.font)?.id,
       fontSize: resolveResumeFontSize(parsed.fontSize)?.id,
+      accent: typeof parsed.accent === "string" && parsed.accent.trim() ? parsed.accent : undefined,
     };
   } catch {
     // Legacy plain-text resume → drop it into the summary so nothing is lost.
