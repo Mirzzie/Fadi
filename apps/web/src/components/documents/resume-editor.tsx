@@ -16,6 +16,7 @@ import {
 } from "@/components/documents/reactive-resume-preview";
 import { ResumeAdvisor } from "@/components/documents/resume-advisor";
 import { ResumePreview } from "@/components/documents/resume-preview";
+import { SelectMenu } from "@/components/ui/select-menu";
 import {
   deleteResumeTemplateAction,
   saveResumeTemplateAction,
@@ -405,59 +406,56 @@ export function ResumeEditor({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <select
+          <SelectMenu
+            ariaLabel="Resume template"
+            className="min-w-32"
             value={template}
-            onChange={(e) => {
+            onChange={(v) => {
               dirty.current = true;
               setStatus("idle");
-              setTemplate(e.target.value);
+              setTemplate(v);
             }}
-            aria-label="Resume template"
-            className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-primary/40"
-          >
-            <optgroup label="Fadi">
-              {RESUME_TEMPLATES.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.label}
-                </option>
-              ))}
-            </optgroup>
-            <optgroup label="Reactive Resume">
-              {REACTIVE_TEMPLATES.map((t) => (
-                <option key={t} value={t}>
-                  {t.charAt(0).toUpperCase() + t.slice(1)}
-                </option>
-              ))}
-            </optgroup>
-          </select>
-          <select
-            value={data.font ?? ""}
-            onChange={(e) => patch({ font: (e.target.value || undefined) as ResumeFontId | undefined })}
-            aria-label="Resume font"
+            groups={[
+              { label: "Fadi", options: RESUME_TEMPLATES.map((t) => ({ value: t.id, label: t.label })) },
+              {
+                label: "Reactive Resume",
+                options: REACTIVE_TEMPLATES.map((t) => ({
+                  value: t,
+                  label: t.charAt(0).toUpperCase() + t.slice(1),
+                })),
+              },
+            ]}
+          />
+          <SelectMenu
+            ariaLabel="Resume font"
             title="Font (ATS-safe options)"
-            className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-primary/40"
-          >
-            <option value="">Font: default</option>
-            {RESUME_FONTS.map((f) => (
-              <option key={f.id} value={f.id}>
-                {f.label}
-              </option>
-            ))}
-          </select>
-          <select
-            value={data.fontSize ?? ""}
-            onChange={(e) => patch({ fontSize: (e.target.value || undefined) as ResumeFontSizeId | undefined })}
-            aria-label="Resume text size"
+            className="min-w-28"
+            value={data.font ?? ""}
+            onChange={(v) => patch({ font: (v || undefined) as ResumeFontId | undefined })}
+            groups={[
+              {
+                options: [
+                  { value: "", label: "Font: default" },
+                  ...RESUME_FONTS.map((f) => ({ value: f.id, label: f.label })),
+                ],
+              },
+            ]}
+          />
+          <SelectMenu
+            ariaLabel="Resume text size"
             title="Body text size"
-            className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-primary/40"
-          >
-            <option value="">Size: default</option>
-            {RESUME_FONT_SIZES.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+            className="min-w-28"
+            value={data.fontSize ?? ""}
+            onChange={(v) => patch({ fontSize: (v || undefined) as ResumeFontSizeId | undefined })}
+            groups={[
+              {
+                options: [
+                  { value: "", label: "Size: default" },
+                  ...RESUME_FONT_SIZES.map((s) => ({ value: s.id, label: s.label })),
+                ],
+              },
+            ]}
+          />
           <Button
             variant="outline"
             size="sm"
