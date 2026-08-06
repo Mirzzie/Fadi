@@ -21,6 +21,15 @@ function sampleFadiResume(): ResumeData {
       links: "LinkedIn · GitHub",
     },
     summary: "IT professional with experience in IT operations and cloud platforms.",
+    // Real-world FREE-TEXT periods — not ISO 8601. RR's importer rejects these unless the
+    // bridge normalizes them (regression guard for the ZodError users hit).
+    experiences: [
+      { id: "x1", title: "IT Support Specialist", company: "Hexastack", location: "India", period: "01/2024 – 06/2024", bullets: "Ran the help desk" },
+      { id: "x2", title: "Senior Game Dev", company: "Cascade", location: "Seattle", period: "March 2022 - Present", bullets: "Led gameplay" },
+    ],
+    education: [
+      { id: "e1", degree: "BSc Computer Science", school: "University of Washington", location: "Seattle", period: "2014 - 2018" },
+    ],
     skills: "Cloud: AWS, Azure\nOps: Linux, Windows Server",
     certifications: [
       { id: "c1", name: "AWS Solutions Architect", issuer: "Amazon Web Services", date: "2024" },
