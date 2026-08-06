@@ -28,11 +28,14 @@ import {
   RESUME_FONT_SIZES,
   RESUME_TEMPLATES,
   serializeResume,
+  type ResumeAward,
   type ResumeCertification,
   type ResumeData,
   type ResumeEducation,
   type ResumeExperience,
   type ResumeLanguage,
+  type ResumeReference,
+  type ResumeVolunteer,
   type ResumeFontId,
   type ResumeFontSizeId,
   type ResumeProject,
@@ -51,6 +54,9 @@ const SECTION_TITLES: Record<ResumeSectionKey, string> = {
   certifications: "Certifications & Licenses",
   skills: "Skills",
   languages: "Languages",
+  awards: "Awards & Honours",
+  volunteer: "Volunteer & Community",
+  references: "References",
 };
 const ADDABLE = new Set<ResumeSectionKey>([
   "experiences",
@@ -58,6 +64,9 @@ const ADDABLE = new Set<ResumeSectionKey>([
   "education",
   "certifications",
   "languages",
+  "awards",
+  "volunteer",
+  "references",
 ]);
 
 export function ResumeEditor({
@@ -199,6 +208,12 @@ export function ResumeEditor({
       patch({ certifications: [...data.certifications, { id: newId(), name: "", issuer: "", date: "" }] });
     else if (key === "languages")
       patch({ languages: [...data.languages, { id: newId(), name: "", level: "" }] });
+    else if (key === "awards")
+      patch({ awards: [...data.awards, { id: newId(), title: "", awarder: "", date: "" }] });
+    else if (key === "volunteer")
+      patch({ volunteer: [...data.volunteer, { id: newId(), organization: "", role: "", period: "", summary: "" }] });
+    else if (key === "references")
+      patch({ references: [...data.references, { id: newId(), name: "", reference: "" }] });
   }
 
   function renderSectionForm(key: ResumeSectionKey): React.ReactNode {
@@ -278,6 +293,36 @@ export function ResumeEditor({
             <div className="grid gap-2 sm:grid-cols-2">
               <input className={field} placeholder="Language (e.g. English)" value={l.name} onChange={(e) => updateList(data, patch, "languages", i, { name: e.target.value })} />
               <input className={field} placeholder="Level (e.g. Native, Fluent)" value={l.level} onChange={(e) => updateList(data, patch, "languages", i, { level: e.target.value })} />
+            </div>
+          </RepeatItem>
+        ));
+      case "awards":
+        return data.awards.map((a, i) => (
+          <RepeatItem key={a.id} onRemove={() => patch({ awards: data.awards.filter((_, j) => j !== i) })}>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input className={field} placeholder="Award / honour" value={a.title} onChange={(e) => updateList(data, patch, "awards", i, { title: e.target.value })} />
+              <input className={field} placeholder="Awarded by" value={a.awarder} onChange={(e) => updateList(data, patch, "awards", i, { awarder: e.target.value })} />
+              <input className={field} placeholder="Date (e.g. 2024)" value={a.date} onChange={(e) => updateList(data, patch, "awards", i, { date: e.target.value })} />
+            </div>
+          </RepeatItem>
+        ));
+      case "volunteer":
+        return data.volunteer.map((v, i) => (
+          <RepeatItem key={v.id} onRemove={() => patch({ volunteer: data.volunteer.filter((_, j) => j !== i) })}>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input className={field} placeholder="Organisation" value={v.organization} onChange={(e) => updateList(data, patch, "volunteer", i, { organization: e.target.value })} />
+              <input className={field} placeholder="Role" value={v.role} onChange={(e) => updateList(data, patch, "volunteer", i, { role: e.target.value })} />
+              <input className={field} placeholder="Period" value={v.period} onChange={(e) => updateList(data, patch, "volunteer", i, { period: e.target.value })} />
+              <input className={field} placeholder="What you did" value={v.summary} onChange={(e) => updateList(data, patch, "volunteer", i, { summary: e.target.value })} />
+            </div>
+          </RepeatItem>
+        ));
+      case "references":
+        return data.references.map((r, i) => (
+          <RepeatItem key={r.id} onRemove={() => patch({ references: data.references.filter((_, j) => j !== i) })}>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <input className={field} placeholder="Name" value={r.name} onChange={(e) => updateList(data, patch, "references", i, { name: e.target.value })} />
+              <input className={field} placeholder="Relationship & contact" value={r.reference} onChange={(e) => updateList(data, patch, "references", i, { reference: e.target.value })} />
             </div>
           </RepeatItem>
         ));
@@ -526,14 +571,29 @@ export function ResumeEditor({
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-type ListKey = "experiences" | "education" | "projects" | "certifications" | "languages";
+type ListKey =
+  | "experiences"
+  | "education"
+  | "projects"
+  | "certifications"
+  | "languages"
+  | "awards"
+  | "volunteer"
+  | "references";
 function updateList(
   data: ResumeData,
   patch: (n: Partial<ResumeData>) => void,
   key: ListKey,
   index: number,
   changes: Partial<
-    ResumeExperience & ResumeEducation & ResumeProject & ResumeCertification & ResumeLanguage
+    ResumeExperience &
+      ResumeEducation &
+      ResumeProject &
+      ResumeCertification &
+      ResumeLanguage &
+      ResumeAward &
+      ResumeVolunteer &
+      ResumeReference
   >,
 ) {
   const list = (data[key] as Array<Record<string, unknown>>).map((item, j) =>

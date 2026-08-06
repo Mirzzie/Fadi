@@ -75,9 +75,35 @@ export interface JsonResume {
   education?: JsonResumeEducation[];
   certificates?: JsonResumeCertificate[];
   languages?: JsonResumeLanguage[];
+  awards?: JsonResumeAward[];
+  volunteer?: JsonResumeVolunteer[];
+  references?: JsonResumeReference[];
   skills?: JsonResumeSkill[];
   projects?: JsonResumeProject[];
   meta?: Record<string, unknown> & { careeros?: { order?: ResumeSectionKey[] } };
+}
+
+/** JSON Resume `awards` entry. */
+export interface JsonResumeAward {
+  title?: string;
+  date?: string;
+  awarder?: string;
+  summary?: string;
+}
+
+/** JSON Resume `volunteer` entry. */
+export interface JsonResumeVolunteer {
+  organization?: string;
+  position?: string;
+  startDate?: string;
+  endDate?: string;
+  summary?: string;
+}
+
+/** JSON Resume `references` entry. */
+export interface JsonResumeReference {
+  name?: string;
+  reference?: string;
 }
 
 /** JSON Resume `certificates` entry (jsonresume.org). */
@@ -217,6 +243,25 @@ export function toJsonResume(data: ResumeData): JsonResume {
       language: l.name || undefined,
       fluency: l.level || undefined,
     })),
+    awards: data.awards.map((a) => ({
+      title: a.title || undefined,
+      date: a.date || undefined,
+      awarder: a.awarder || undefined,
+    })),
+    volunteer: data.volunteer.map((v) => {
+      const { startDate, endDate } = splitPeriod(v.period);
+      return {
+        organization: v.organization || undefined,
+        position: v.role || undefined,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        summary: v.summary || undefined,
+      };
+    }),
+    references: data.references.map((r) => ({
+      name: r.name || undefined,
+      reference: r.reference || undefined,
+    })),
     skills: skillsTextToJson(data.skills),
     projects: data.projects.map((p) => ({
       name: p.title || undefined,
@@ -274,6 +319,24 @@ export function fromJsonResume(jr: JsonResume): ResumeData {
       id: newId(),
       name: l.language ?? "",
       level: l.fluency ?? "",
+    })),
+    awards: (jr.awards ?? []).map((a) => ({
+      id: newId(),
+      title: a.title ?? "",
+      awarder: a.awarder ?? "",
+      date: a.date ?? "",
+    })),
+    volunteer: (jr.volunteer ?? []).map((v) => ({
+      id: newId(),
+      organization: v.organization ?? "",
+      role: v.position ?? "",
+      period: joinPeriod(v.startDate, v.endDate),
+      summary: v.summary ?? "",
+    })),
+    references: (jr.references ?? []).map((r) => ({
+      id: newId(),
+      name: r.name ?? "",
+      reference: r.reference ?? "",
     })),
     skills: skillsJsonToText(jr.skills),
     projects: (jr.projects ?? []).map((p) => ({

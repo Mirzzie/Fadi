@@ -167,6 +167,48 @@ export function ResumePreview({
             </p>
           </Section>
         ) : null;
+      case "awards":
+        return data.awards.length ? (
+          <Section title="Awards & Honours">
+            {data.awards.map((a) => (
+              <div key={a.id} className="flex justify-between">
+                <span>
+                  <span className="font-semibold">{a.title || "Award"}</span>
+                  {a.awarder ? ` — ${a.awarder}` : ""}
+                </span>
+                <span className="text-[11px] text-zinc-500">{a.date}</span>
+              </div>
+            ))}
+          </Section>
+        ) : null;
+      case "volunteer":
+        return data.volunteer.length ? (
+          <Section title="Volunteer & Community">
+            {data.volunteer.map((v) => (
+              <div key={v.id} className="mb-1.5">
+                <div className="flex justify-between font-semibold">
+                  <span>
+                    {v.role || "Role"}
+                    {v.organization ? ` — ${v.organization}` : ""}
+                  </span>
+                  <span className="text-[11px] font-normal text-zinc-500">{v.period}</span>
+                </div>
+                {v.summary ? <p className="text-zinc-700">{v.summary}</p> : null}
+              </div>
+            ))}
+          </Section>
+        ) : null;
+      case "references":
+        return data.references.length ? (
+          <Section title="References">
+            {data.references.map((r) => (
+              <div key={r.id}>
+                <span className="font-semibold">{r.name || "Reference"}</span>
+                {r.reference ? <span className="text-zinc-700"> — {r.reference}</span> : null}
+              </div>
+            ))}
+          </Section>
+        ) : null;
       case "skills":
         return data.skills ? (
           <Section title="Skills">

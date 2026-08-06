@@ -19,9 +19,12 @@ const sample: ResumeData = {
   education: [{ id: "e", degree: "MSc, Cybersecurity", school: "Dublin City University", location: "Ireland", period: "2024 – 2025" }],
   certifications: [{ id: "c", name: "CompTIA Security+", issuer: "CompTIA", date: "2024" }],
   languages: [{ id: "l", name: "English", level: "Native" }],
+  awards: [{ id: "aw", title: "Dean's List", awarder: "DCU", date: "2024" }],
+  volunteer: [{ id: "v", organization: "Red Cross", role: "IT Volunteer", period: "2023", summary: "Set up kit" }],
+  references: [{ id: "r", name: "Jane Doe", reference: "Manager — jane@acme.com" }],
   skills: "Cloud: AWS, Azure\nLanguages: Python, Bash",
   projects: [{ id: "p", title: "Home Lab", url: "https://lab.dev", description: "Self-hosted k8s cluster." }],
-  order: ["summary", "experiences", "projects", "education", "certifications", "skills", "languages"],
+  order: ["summary", "experiences", "projects", "education", "certifications", "skills", "languages", "awards", "volunteer", "references"],
 };
 
 describe("JSON Resume bridge", () => {
@@ -60,6 +63,6 @@ describe("JSON Resume bridge", () => {
     expect(imported.personal.location).toBe("Berlin, DE");
     expect(imported.experiences[0].period).toBe("2021-01 – 2023-06");
     expect(imported.skills).toBe("Design: Figma, UX");
-    expect(imported.order).toHaveLength(7);
+    expect(imported.order).toHaveLength(10);
   });
 });

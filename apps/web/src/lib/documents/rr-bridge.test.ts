@@ -26,6 +26,11 @@ function sampleFadiResume(): ResumeData {
       { id: "c1", name: "AWS Solutions Architect", issuer: "Amazon Web Services", date: "2024" },
     ],
     languages: [{ id: "l1", name: "English", level: "Native" }],
+    awards: [{ id: "aw1", title: "Employee of the Year", awarder: "Acme", date: "2023" }],
+    volunteer: [
+      { id: "v1", organization: "Red Cross", role: "IT Volunteer", period: "2022 – 2023", summary: "Ran the help desk" },
+    ],
+    references: [{ id: "r1", name: "Jane Manager", reference: "Team lead — jane@acme.com" }],
   };
 }
 
@@ -56,6 +61,13 @@ describe("fadiToReactiveResume", () => {
     const langs = rr.sections.languages.items;
     // rxresume's language item uses `language` for the name.
     expect(langs.some((l) => l.language === "English")).toBe(true);
+  });
+
+  it("carries awards, volunteer and references through to rxresume (any-career)", () => {
+    const rr = fadiToReactiveResume(sampleFadiResume());
+    expect(rr.sections.awards.items.length).toBeGreaterThan(0);
+    expect(rr.sections.volunteer.items.length).toBeGreaterThan(0);
+    expect(rr.sections.references.items.length).toBeGreaterThan(0);
   });
 
   it("handles an empty résumé without throwing", () => {

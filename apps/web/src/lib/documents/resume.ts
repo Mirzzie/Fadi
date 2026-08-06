@@ -44,6 +44,30 @@ export type ResumeLanguage = {
   level: string; // e.g. "Native", "Fluent (C2)", "Intermediate (B1)"
 };
 
+// Awards & honours — academia, sales, military, arts, and beyond.
+export type ResumeAward = {
+  id: string;
+  title: string; // e.g. "Employee of the Year"
+  awarder: string; // who gave it
+  date: string;
+};
+
+// Volunteer / community experience — career-changers, students, healthcare, nonprofit.
+export type ResumeVolunteer = {
+  id: string;
+  organization: string;
+  role: string;
+  period: string;
+  summary: string; // one line, what you did
+};
+
+// References — common in UK/IE, healthcare, education ("available on request" or named).
+export type ResumeReference = {
+  id: string;
+  name: string;
+  reference: string; // role/relationship + contact, e.g. "Manager, Acme — jane@acme.com"
+};
+
 export type ResumeTemplate = "classic" | "modern" | "compact" | "ats" | "executive";
 export const RESUME_TEMPLATES: { id: ResumeTemplate; label: string; hint?: string }[] = [
   { id: "ats", label: "ATS", hint: "Maximum parse-safety — single column, plain, no color" },
@@ -103,7 +127,10 @@ export type ResumeSectionKey =
   | "education"
   | "certifications"
   | "skills"
-  | "languages";
+  | "languages"
+  | "awards"
+  | "volunteer"
+  | "references";
 export const DEFAULT_SECTION_ORDER: ResumeSectionKey[] = [
   "summary",
   "experiences",
@@ -112,6 +139,9 @@ export const DEFAULT_SECTION_ORDER: ResumeSectionKey[] = [
   "certifications",
   "skills",
   "languages",
+  "awards",
+  "volunteer",
+  "references",
 ];
 
 export type ResumeData = {
@@ -128,6 +158,9 @@ export type ResumeData = {
   education: ResumeEducation[];
   certifications: ResumeCertification[];
   languages: ResumeLanguage[];
+  awards: ResumeAward[];
+  volunteer: ResumeVolunteer[];
+  references: ResumeReference[];
   skills: string; // one "Category: a, b, c" per line
   projects: ResumeProject[];
   /** Section render order — reorderable in the editor. */
@@ -149,6 +182,9 @@ export function emptyResume(): ResumeData {
     education: [],
     certifications: [],
     languages: [],
+    awards: [],
+    volunteer: [],
+    references: [],
     skills: "",
     projects: [],
     order: [...DEFAULT_SECTION_ORDER],
@@ -177,6 +213,9 @@ export function parseResume(content: string): ResumeData {
       education: Array.isArray(parsed.education) ? parsed.education : [],
       certifications: Array.isArray(parsed.certifications) ? parsed.certifications : [],
       languages: Array.isArray(parsed.languages) ? parsed.languages : [],
+      awards: Array.isArray(parsed.awards) ? parsed.awards : [],
+      volunteer: Array.isArray(parsed.volunteer) ? parsed.volunteer : [],
+      references: Array.isArray(parsed.references) ? parsed.references : [],
       skills: parsed.skills ?? "",
       projects: Array.isArray(parsed.projects) ? parsed.projects : [],
       order: normalizeOrder((parsed as { order?: unknown }).order),
