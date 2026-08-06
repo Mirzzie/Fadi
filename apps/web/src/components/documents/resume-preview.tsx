@@ -253,6 +253,14 @@ export function ResumePreview({
   return (
     <div className={t.root} style={rootStyle}>
       <header className={t.header}>
+        {data.personal.photo ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={data.personal.photo}
+            alt=""
+            className="mx-auto mb-2 size-20 rounded-full object-cover"
+          />
+        ) : null}
         <h1 className={t.name}>{data.personal.name || "Your Name"}</h1>
         {data.personal.headline ? <p className="text-sm text-zinc-600">{data.personal.headline}</p> : null}
         {contact ? <p className={cn("mt-1 text-[11px] text-zinc-500")}>{contact}</p> : null}

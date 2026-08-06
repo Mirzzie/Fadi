@@ -79,6 +79,13 @@ describe("fadiToReactiveResume", () => {
     expect(rr.sections.references.items.length).toBeGreaterThan(0);
   });
 
+  it("puts a headshot URL onto the rxresume picture (any-career photo)", () => {
+    const withPhoto = { ...sampleFadiResume(), personal: { ...sampleFadiResume().personal, photo: "https://x/p.jpg" } };
+    const rr = fadiToReactiveResume(withPhoto);
+    expect(rr.picture.url).toBe("https://x/p.jpg");
+    expect(rr.picture.hidden).toBe(false);
+  });
+
   it("handles an empty résumé without throwing", () => {
     expect(() => fadiToReactiveResume(emptyResume())).not.toThrow();
   });

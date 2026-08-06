@@ -171,6 +171,9 @@ export type ResumeData = {
     phone: string;
     location: string;
     links: string; // "LinkedIn · GitHub · Portfolio" freeform
+    // Optional headshot URL — expected on résumés in much of Europe/Asia/Middle East and in
+    // fields like hospitality, healthcare and the arts. Blank = no photo (common in US/UK/tech).
+    photo?: string;
   };
   summary: string;
   experiences: ResumeExperience[];
@@ -197,7 +200,7 @@ export function newId(): string {
 
 export function emptyResume(): ResumeData {
   return {
-    personal: { name: "", headline: "", email: "", phone: "", location: "", links: "" },
+    personal: { name: "", headline: "", email: "", phone: "", location: "", links: "", photo: "" },
     summary: "",
     experiences: [],
     education: [],

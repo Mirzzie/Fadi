@@ -578,6 +578,9 @@ export function ResumeEditor({
               <Labeled label="Links">
                 <input className={field} value={data.personal.links} onChange={(e) => patchPersonal({ links: e.target.value })} placeholder="LinkedIn · GitHub · Portfolio" />
               </Labeled>
+              <Labeled label="Photo URL (optional)">
+                <input className={field} value={data.personal.photo ?? ""} onChange={(e) => patchPersonal({ photo: e.target.value })} placeholder="https://…/headshot.jpg — shows on templates that support a photo" />
+              </Labeled>
             </div>
           </Section>
 

@@ -64,6 +64,7 @@ export interface JsonResume {
   basics?: {
     name?: string;
     label?: string;
+    image?: string;
     email?: string;
     phone?: string;
     url?: string;
@@ -218,6 +219,7 @@ export function toJsonResume(data: ResumeData): JsonResume {
     basics: {
       name: data.personal.name || undefined,
       label: data.personal.headline || undefined,
+      image: data.personal.photo || undefined,
       email: data.personal.email || undefined,
       phone: data.personal.phone || undefined,
       url: profiles[0]?.url,
@@ -318,6 +320,7 @@ export function fromJsonResume(jr: JsonResume): ResumeData {
       phone: basics.phone ?? "",
       location: locationToString(basics.location),
       links: profilesToLinks(basics.profiles, basics.url),
+      photo: basics.image ?? "",
     },
     summary: basics.summary ?? "",
     experiences: (jr.work ?? []).map((w) => ({

@@ -62,5 +62,10 @@ function sanitizeDates(jr: JsonResume): JsonResume {
 
 export function fadiToReactiveResume(data: ResumeData): ReactiveResumeData {
   const jsonResume = sanitizeDates(toJsonResume(data));
-  return parseJSONResume(JSON.stringify(jsonResume));
+  const rr = parseJSONResume(JSON.stringify(jsonResume));
+  // JSON Resume's `image` doesn't reliably land on RR's picture, so set it explicitly on the
+  // valid default picture object the importer produces.
+  const photo = data.personal.photo?.trim();
+  if (photo) rr.picture = { ...rr.picture, url: photo, hidden: false };
+  return rr;
 }
