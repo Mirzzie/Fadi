@@ -1,7 +1,11 @@
 # 0010 — Adopt Reactive Resume's editor stack for the document workspace
 
-- **Status:** **ACCEPTED — 2026-08-03.** Phase 1a shipped on branch
-  `feat/reactive-resume-editor`.
+- **Status:** **SUPERSEDED — 2026-08-10.** The RR *rendering* path was adopted, then removed
+  (its PDF-in-iframe never sat natively in Fadi). The lasting value — 12 any-career sections,
+  photo, accent, a JSON-Resume-shaped model — was kept as **native Fadi** features. On
+  2026-08-10 the now-dead RR stack (vendored `packages/reactive-resume/*`, `rr-bridge`, the
+  orphan preview, ~143 MB + 78 deps) was deleted as redundant. This ADR is retained as the
+  record of what was learned. Originally ACCEPTED 2026-08-03 on `feat/reactive-resume-editor`.
 - **Related:** builds on the document workspace (`lib/documents/*`, the `resumes`/`documents`
   tables) and the JSON-Resume bridge (`lib/documents/json-resume.ts`).
 

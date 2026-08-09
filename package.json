@@ -5,8 +5,7 @@
   "description": "Fadi — an AI operating system for a person's career (monorepo).",
   "workspaces": [
     "apps/*",
-    "packages/*",
-    "packages/reactive-resume/*"
+    "packages/*"
   ],
   "scripts": {
     "setup": "node scripts/setup.mjs",
