@@ -1,0 +1,6 @@
+{
+  "name": "@careeros/extension",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fadi browser extension (MV3, vanilla JS — no build step)."
+}
