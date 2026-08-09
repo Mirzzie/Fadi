@@ -24,8 +24,15 @@ export type SiteRecipe = {
   searchUrl: (query: SignalQuery, page: number) => string;
   /** How many result pages to walk (the "paginate" step). */
   maxPages: number;
-  /** CSS selectors for the "read each listing" step. */
-  selectors: {
+  /**
+   * Extraction strategy for the "read each listing" step:
+   * - "ai": the LLM extracts jobs from the rendered page text (self-healing, no selectors) —
+   *   the 2026 default.
+   * - "selectors": classic CSS extraction (cheaper/faster, but brittle).
+   */
+  mode?: "ai" | "selectors";
+  /** CSS selectors — required only for `mode: "selectors"`. */
+  selectors?: {
     card: string;
     title: string;
     company: string;
@@ -71,6 +78,9 @@ export const RECIPES: SiteRecipe[] = [
     searchUrl: (q) =>
       `https://weworkremotely.com/remote-jobs/search?term=${encodeURIComponent(buildKeywords(q))}`,
     maxPages: 1,
+    // 2026 default: the LLM reads the rendered page and extracts jobs (self-healing, survives
+    // layout changes). The optional selectors below are a cheaper "selectors"-mode fallback.
+    mode: "ai",
     selectors: {
       card: "section.jobs article li:not(.view-all)",
       title: "span.title",

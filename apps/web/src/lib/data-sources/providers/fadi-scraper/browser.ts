@@ -30,6 +30,9 @@ export async function scrapeRecipe(
     return []; // Playwright not installed — the scraper stays dormant.
   }
 
+  const selectors = recipe.selectors;
+  if (!selectors) return []; // selector-mode only; AI mode uses scrapePageText instead.
+
   const browser = await pw.chromium.launch({ headless: true });
   try {
     const context = await browser.newContext({
@@ -49,23 +52,61 @@ export async function scrapeRecipe(
       await page.mouse.wheel(0, jitter(800, 1800)); // scroll to load lazily
       await page.waitForTimeout(jitter(300, 900));
 
-      const cards = await page.$$(recipe.selectors.card);
+      const cards = await page.$$(selectors.card);
       for (const card of cards) {
         if (records.length >= limit) break;
         const text = async (sel?: string) =>
           sel
             ? await card.$eval(sel, (el: Element) => el.textContent?.trim() ?? "").catch(() => undefined)
             : undefined;
-        const title = await text(recipe.selectors.title);
-        const company = await text(recipe.selectors.company);
-        const location = await text(recipe.selectors.location);
+        const title = await text(selectors.title);
+        const company = await text(selectors.company);
+        const location = await text(selectors.location);
         const url = await card
-          .$eval(recipe.selectors.link, (el: Element) => el.getAttribute("href") ?? undefined)
+          .$eval(selectors.link, (el: Element) => el.getAttribute("href") ?? undefined)
           .catch(() => undefined);
         if (title && company) records.push({ title, company, location, url });
       }
     }
     return records.slice(0, limit);
+  } finally {
+    await browser.close();
+  }
+}
+
+/**
+ * AI-mode capture: navigate like a human and return the rendered page's visible text, for an
+ * LLM to extract from (self-healing — no per-site selectors). Concatenates the first few
+ * result pages. Returns "" if Playwright is unavailable.
+ */
+export async function scrapePageText(recipe: SiteRecipe, query: SignalQuery): Promise<string> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let pw: any;
+  try {
+    const specifier = "playwright";
+    pw = await import(/* webpackIgnore: true */ specifier);
+  } catch {
+    return "";
+  }
+
+  const browser = await pw.chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext({
+      userAgent: HUMAN_UA,
+      viewport: { width: 1280, height: 900 },
+      locale: "en-US",
+    });
+    const page = await context.newPage();
+    const chunks: string[] = [];
+    for (let p = 1; p <= recipe.maxPages; p++) {
+      await page.goto(recipe.searchUrl(query, p), { waitUntil: "domcontentloaded", timeout: 20_000 });
+      await page.waitForTimeout(jitter(500, 1400));
+      await page.mouse.wheel(0, jitter(800, 1800));
+      await page.waitForTimeout(jitter(300, 900));
+      const body = await page.evaluate(() => document.body?.innerText ?? "").catch(() => "");
+      if (body) chunks.push(body);
+    }
+    return chunks.join("\n\n").slice(0, 40_000);
   } finally {
     await browser.close();
   }

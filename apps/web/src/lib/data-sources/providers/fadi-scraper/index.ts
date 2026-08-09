@@ -28,9 +28,21 @@ export class FadiScraperSource implements JobSource {
     if (!this.isConfigured) return [];
     const limit = query.limit ?? 20;
     try {
-      // Dynamic import keeps Playwright out of the bundle unless the scraper actually runs.
-      const { scrapeRecipe } = await import("./browser");
-      const settled = await Promise.allSettled(RECIPES.map((r) => scrapeRecipe(r, query, limit)));
+      // Dynamic imports keep Playwright/AI out of the bundle unless the scraper actually runs.
+      const [{ scrapeRecipe, scrapePageText }, { aiExtractJobs }] = await Promise.all([
+        import("./browser"),
+        import("./ai-extract"),
+      ]);
+      const settled = await Promise.allSettled(
+        RECIPES.map(async (r) => {
+          // AI mode (default): render → LLM extracts (self-healing). Else CSS selectors.
+          if (r.mode !== "selectors") {
+            const text = await scrapePageText(r, query);
+            return aiExtractJobs(text, r.name);
+          }
+          return scrapeRecipe(r, query, limit);
+        }),
+      );
       const postings: JobPosting[] = [];
       settled.forEach((res, i) => {
         if (res.status !== "fulfilled") return;
