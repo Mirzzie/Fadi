@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createProfilesRepository } from "@careeros/database";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { AiJobSearchBar } from "@/components/jobs/ai-job-search-bar";
 import { JobsShell } from "@/components/jobs/jobs-shell";
 import { JobPreferencesPanel } from "@/components/jobs/job-preferences-panel";
 import { JobSourcesStatus } from "@/components/jobs/job-sources-status";
@@ -94,6 +95,7 @@ export default async function JobsPage({
   return (
     <AppShell>
       <div className="mx-auto mb-4 max-w-shell space-y-4">
+        <AiJobSearchBar />
         <JobPreferencesPanel
           activeModes={modes}
           activeTypes={types}

@@ -13,6 +13,9 @@ import { z } from "zod";
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
+import { applyIntentFilter, parseJobPrompt, type JobSearchIntent } from "@/lib/jobs/ai-search";
+import { getRecommendedJobsForUser } from "@/lib/jobs/data";
+import type { RecommendedJob } from "@/lib/jobs/types";
 import { scoreJobForUser } from "@/lib/jobs/job-matching";
 import { evaluateApply, type GuardianVerdict } from "@/lib/guardian/guardian";
 import { logger } from "@/lib/observability/logger";
@@ -292,4 +295,26 @@ export async function saveJobPreferences(input: {
   });
   revalidatePath("/dashboard/jobs");
   return { ok: true };
+}
+
+/**
+ * AI-prompt job search — the user describes what they want in plain language and Fadi runs it
+ * through the central discoverJobs engine, scoped to their active direction, then filters by
+ * the parsed keywords/salary/exclusions. Results in one round-trip.
+ */
+export async function aiJobSearch(
+  prompt: string,
+): Promise<
+  { ok: true; jobs: RecommendedJob[]; intent: JobSearchIntent } | { ok: false; message: string }
+> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  const intent = await parseJobPrompt(prompt);
+  const jobs = await getRecommendedJobsForUser(user.id, 40, {
+    country: intent.country,
+    city: intent.city,
+    modes: intent.remote ? ["remote"] : undefined,
+  });
+  return { ok: true, jobs: applyIntentFilter(jobs, intent), intent };
 }
