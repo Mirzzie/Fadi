@@ -38,6 +38,9 @@ const serverEnvSchema = z.object({
   // GDELT, Hacker News and Remotive are keyless and always active.
   JOB_SOURCE_API_KEY: z.string().optional(),
   NEWS_API_KEY: z.string().optional(),
+  // Fadi's own browser-automation job scraper — "1"/"true" to enable (needs Playwright + a
+  // browser installed). Off by default: it self-reports unavailable and returns no jobs.
+  FADI_SCRAPER_ENABLED: z.string().optional(),
   // Phase B/C — providers self-report unavailable until their key is set.
   ADZUNA_APP_ID: z.string().optional(),
   ADZUNA_APP_KEY: z.string().optional(),
@@ -96,6 +99,7 @@ export const serverEnv = {
     GOOGLE_MODEL: process.env.GOOGLE_MODEL,
     JOB_SOURCE_API_KEY: process.env.JOB_SOURCE_API_KEY,
     NEWS_API_KEY: process.env.NEWS_API_KEY,
+    FADI_SCRAPER_ENABLED: process.env.FADI_SCRAPER_ENABLED,
     ADZUNA_APP_ID: process.env.ADZUNA_APP_ID,
     ADZUNA_APP_KEY: process.env.ADZUNA_APP_KEY,
     REED_API_KEY: process.env.REED_API_KEY,

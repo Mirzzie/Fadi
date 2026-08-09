@@ -8,6 +8,7 @@ import { ArbeitnowSource } from "./providers/arbeitnow";
 import { BlsSource } from "./providers/bls";
 import { GdeltSource } from "./providers/gdelt";
 import { HackerNewsSource } from "./providers/hackernews";
+import { FadiScraperSource } from "./providers/fadi-scraper";
 import { IndeedPublicSource } from "./providers/indeed-public";
 import { JoobleSource } from "./providers/jooble";
 import { LinkedInGuestSource } from "./providers/linkedin-guest";
@@ -56,6 +57,11 @@ function buildSources(): DataSourceBase[] {
     // copy only ever fills in fields they left blank.
     new LinkedInGuestSource(), // public guest endpoint, no credential
     new IndeedPublicSource(), // public search page, no credential
+    // Fadi's own browser-automation scraper — human-flow across API-less sites. Off unless
+    // FADI_SCRAPER_ENABLED, so it self-reports unavailable (like the keyed APIs) by default.
+    new FadiScraperSource(
+      serverEnv.FADI_SCRAPER_ENABLED === "1" || serverEnv.FADI_SCRAPER_ENABLED === "true",
+    ),
     //   new OnetSource(...), new FredSource(...), new WarnSource(...), etc.
   ];
 }
