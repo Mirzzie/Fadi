@@ -10,6 +10,14 @@ function fadiExtractJob() {
       document.querySelector(`meta[name="${name}"]`);
     return el ? el.getAttribute("content") || "" : "";
   };
+  // First non-empty match across a list of candidate selectors (portal → generic).
+  const pick = (sels) => {
+    for (const s of sels) {
+      const v = text(document.querySelector(s));
+      if (v) return v;
+    }
+    return "";
+  };
 
   // 1) Structured data — the most reliable source when present.
   let ld = {};
@@ -35,14 +43,42 @@ function fadiExtractJob() {
   };
 
   const title =
-    ld.title || meta("og:title") || text(document.querySelector("h1")) || document.title || "";
+    ld.title ||
+    pick([
+      ".job-details-jobs-unified-top-card__job-title",
+      ".jobs-unified-top-card__job-title",
+      ".t-24.job-details-jobs-unified-top-card__job-title",
+      "h1.top-card-layout__title",
+      '[data-testid="jobsearch-JobInfoHeader-title"]',
+      "h2.jobsearch-JobInfoHeader-title",
+      "h1",
+    ]) ||
+    meta("og:title") ||
+    document.title ||
+    "";
   const company =
     orgOf(ld.hiringOrganization) ||
+    pick([
+      ".job-details-jobs-unified-top-card__company-name",
+      ".jobs-unified-top-card__company-name",
+      ".topcard__org-name-link",
+      ".topcard__flavor",
+      '[data-testid="inlineHeader-companyName"]',
+      '[data-company-name]',
+      '[class*="company" i]',
+    ]) ||
     meta("og:site_name") ||
-    text(document.querySelector('[class*="company" i], [data-company]')) ||
     "";
   const location =
-    locOf(ld.jobLocation) || text(document.querySelector('[class*="location" i]')) || "";
+    locOf(ld.jobLocation) ||
+    pick([
+      ".job-details-jobs-unified-top-card__primary-description-container",
+      ".jobs-unified-top-card__bullet",
+      ".topcard__flavor--bullet",
+      '[data-testid="inlineHeader-companyLocation"]',
+      '[class*="location" i]',
+    ]) ||
+    "";
   const description = (
     ld.description ||
     meta("og:description") ||
@@ -82,4 +118,51 @@ function fadiExtractProfile() {
     contactRole: (role || "").slice(0, 300),
     company: (company || "").trim().slice(0, 200),
   };
+}
+
+// Auto-scrape ALL job cards on a portal SEARCH page (LinkedIn/Indeed/etc.). Because this
+// runs in the user's own logged-in session, it reads results a server scraper can't (no
+// Cloudflare block). Returns [{ title, company, location, url }]. This is the "scrape the
+// internet, like a human" leg — the human's real browser is doing it.
+function fadiExtractJobList() {
+  const t = (el) => (el && el.textContent ? el.textContent.replace(/\s+/g, " ").trim() : "");
+  const cards = document.querySelectorAll(
+    [
+      ".job-card-container",
+      "li.jobs-search-results__list-item",
+      ".jobs-search-results__list-item",
+      ".scaffold-layout__list-item",
+      ".job_seen_beacon",
+      "[data-job-id]",
+      "[data-jk]",
+    ].join(","),
+  );
+  const out = [];
+  const seen = new Set();
+  for (const c of cards) {
+    const title = t(
+      c.querySelector(
+        '.job-card-list__title, .job-card-container__link span, a[class*="title" i], .jobTitle, h2 a, [data-testid="job-title"]',
+      ),
+    );
+    const company = t(
+      c.querySelector(
+        '.job-card-container__company-name, .artdeco-entity-lockup__subtitle, .companyName, [data-testid="company-name"], [class*="company" i]',
+      ),
+    );
+    const location = t(
+      c.querySelector('.job-card-container__metadata-item, .companyLocation, [class*="location" i]'),
+    );
+    const a =
+      c.querySelector('a[href*="/jobs/view/"], a[href*="viewjob"], a[href*="/jobs/"]') ||
+      c.querySelector("a[href]");
+    const url = a ? a.href : undefined;
+    if (!title || !company) continue;
+    const key = `${title}|${company}`.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ title: title.slice(0, 300), company: company.slice(0, 200), location: location || undefined, url });
+    if (out.length >= 50) break;
+  }
+  return out;
 }

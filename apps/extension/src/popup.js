@@ -34,6 +34,44 @@ async function runInPage(func, args = []) {
   return res && res.result;
 }
 
+// --- Scrape ALL jobs on this page --------------------------------------------
+// The core "search the internet like a human" action: reads every job card on a portal
+// search-results page (in the user's own logged-in session, so no Cloudflare wall) and
+// sends the batch to Fadi. Never invents — it only forwards listings that are on-screen.
+document.getElementById("scrapeall").addEventListener("click", async () => {
+  setStatus("Scanning this page for jobs…");
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId: (await activeTab()).id },
+      files: ["src/extract.js"],
+    });
+    const jobs = await runInPage(() => fadiExtractJobList());
+    if (!jobs || jobs.length === 0) {
+      setStatus("No job list detected here. Open a search-results page (e.g. LinkedIn/Indeed jobs).", "err");
+      return;
+    }
+    setStatus(`Sending ${jobs.length} job(s) to Fadi…`);
+    const base = await getBase();
+    const res = await fetch(`${base}/api/extension/capture-batch`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ jobs: jobs.slice(0, 60) }),
+    });
+    if (res.status === 401) {
+      setStatus("Sign in to Fadi first, then try again.", "err");
+      return;
+    }
+    const data = await res.json().catch(() => ({}));
+    setStatus(
+      data.ok ? `Scraped ${data.saved} job(s) into Fadi.` : `Failed: ${data.error || res.status}`,
+      data.ok ? "ok" : "err",
+    );
+  } catch (e) {
+    setStatus(`Error: ${e.message}`, "err");
+  }
+});
+
 // --- Save this job -----------------------------------------------------------
 document.getElementById("save").addEventListener("click", async () => {
   setStatus("Reading the job…");

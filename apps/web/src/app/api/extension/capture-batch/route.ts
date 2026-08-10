@@ -1,0 +1,93 @@
+import { NextResponse } from "next/server";
+
+import { createJobsRepository, createSavedJobsRepository } from "@careeros/database";
+import { z } from "zod";
+
+import { getCurrentAuthUser } from "@/lib/auth/session";
+import { getDatabase } from "@/lib/database/client";
+import { logger } from "@/lib/observability/logger";
+
+// Bulk capture: the extension scrapes a whole portal SEARCH page (in the user's own session,
+// so it reads results a server scraper can't) and sends the list here. This is how "search
+// the internet like a human" reaches Fadi — the human's real browser did the scraping.
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const schema = z.object({
+  jobs: z
+    .array(
+      z.object({
+        title: z.string().trim().min(1).max(300),
+        company: z.string().trim().min(1).max(200),
+        url: z.string().url().optional(),
+        location: z.string().trim().max(200).optional(),
+        description: z.string().max(20_000).optional(),
+      }),
+    )
+    .min(1)
+    .max(60),
+});
+
+function withCors(res: NextResponse, origin: string | null): NextResponse {
+  res.headers.set("Access-Control-Allow-Origin", origin ?? "*");
+  res.headers.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.headers.set("Access-Control-Allow-Headers", "Content-Type");
+  res.headers.set("Access-Control-Allow-Credentials", "true");
+  res.headers.set("Vary", "Origin");
+  return res;
+}
+
+export function OPTIONS(req: Request) {
+  return withCors(new NextResponse(null, { status: 204 }), req.headers.get("origin"));
+}
+
+export async function POST(req: Request) {
+  const origin = req.headers.get("origin");
+  const user = await getCurrentAuthUser();
+  if (!user) {
+    return withCors(NextResponse.json({ ok: false, error: "not_authenticated" }, { status: 401 }), origin);
+  }
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return withCors(NextResponse.json({ ok: false, error: "bad_json" }, { status: 400 }), origin);
+  }
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) {
+    return withCors(NextResponse.json({ ok: false, error: "invalid" }, { status: 400 }), origin);
+  }
+
+  try {
+    const db = getDatabase();
+    const jobsRepo = createJobsRepository(db);
+    const savedRepo = createSavedJobsRepository(db);
+    let saved = 0;
+    for (const d of parsed.data.jobs) {
+      try {
+        const externalId = (d.url ?? `${d.company}:${d.title}`).slice(0, 250);
+        const job = await jobsRepo.upsertSeedJob({
+          source: "extension",
+          externalId,
+          title: d.title,
+          company: d.company,
+          location: d.location ?? null,
+          description: d.description ?? null,
+          url: d.url ?? null,
+        });
+        await savedRepo.saveForUser(user.id, job.id, {});
+        saved += 1;
+      } catch {
+        /* skip the one that failed; keep the batch going */
+      }
+    }
+    logger.info("extension.capture_batch", { userId: user.id, count: saved });
+    return withCors(NextResponse.json({ ok: true, saved }), origin);
+  } catch (error) {
+    logger.error("extension.capture_batch_failed", {
+      userId: user.id,
+      error: error instanceof Error ? error.name : "unknown",
+    });
+    return withCors(NextResponse.json({ ok: false, error: "server" }, { status: 500 }), origin);
+  }
+}
