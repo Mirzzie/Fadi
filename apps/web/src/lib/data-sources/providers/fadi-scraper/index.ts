@@ -35,8 +35,10 @@ export class FadiScraperSource implements JobSource {
       ]);
       const settled = await Promise.allSettled(
         RECIPES.map(async (r) => {
-          // AI mode (default): render → LLM extracts (self-healing). Else CSS selectors.
-          if (r.mode !== "selectors") {
+          // Selectors by DEFAULT — the scraper is self-contained, no API/LLM dependence.
+          // AI extraction is opt-in per recipe (mode: "ai") for sites where selectors are too
+          // brittle; it's the only part that needs the LLM.
+          if (r.mode === "ai") {
             const text = await scrapePageText(r, query);
             return aiExtractJobs(text, r.name);
           }

@@ -78,9 +78,9 @@ export const RECIPES: SiteRecipe[] = [
     searchUrl: (q) =>
       `https://weworkremotely.com/remote-jobs/search?term=${encodeURIComponent(buildKeywords(q))}`,
     maxPages: 1,
-    // 2026 default: the LLM reads the rendered page and extracts jobs (self-healing, survives
-    // layout changes). The optional selectors below are a cheaper "selectors"-mode fallback.
-    mode: "ai",
+    // Selector mode: pure browser extraction, NO API/LLM dependence. (Set mode:"ai" to have
+    // the LLM extract instead — self-healing but needs the AI provider.)
+    mode: "selectors",
     selectors: {
       card: "section.jobs article li:not(.view-all)",
       title: "span.title",
