@@ -304,6 +304,7 @@ export async function saveJobPreferences(input: {
  */
 export async function aiJobSearch(
   prompt: string,
+  opts?: { global?: boolean },
 ): Promise<
   { ok: true; jobs: RecommendedJob[]; intent: JobSearchIntent } | { ok: false; message: string }
 > {
@@ -311,9 +312,12 @@ export async function aiJobSearch(
   if (!user) return { ok: false, message: "Please sign in again." };
 
   const intent = await parseJobPrompt(prompt);
+  // Global scope = search worldwide, ignoring the prompt's / profile's location. Still scoped
+  // to the user's active career direction (Fadi's spine); "global" only broadens geography.
   const jobs = await getRecommendedJobsForUser(user.id, 40, {
-    country: intent.country,
-    city: intent.city,
+    country: opts?.global ? undefined : intent.country,
+    city: opts?.global ? undefined : intent.city,
+    worldwide: opts?.global || undefined,
     modes: intent.remote ? ["remote"] : undefined,
   });
   return { ok: true, jobs: applyIntentFilter(jobs, intent), intent };

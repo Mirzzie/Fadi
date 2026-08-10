@@ -95,7 +95,7 @@ export default async function JobsPage({
   return (
     <AppShell>
       <div className="mx-auto mb-4 max-w-shell space-y-4">
-        <AiJobSearchBar />
+        <AiJobSearchBar activeRole={profile?.targetRole ?? null} />
         <JobPreferencesPanel
           activeModes={modes}
           activeTypes={types}

@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, Globe, Loader2, Sparkles } from "lucide-react";
+import { ExternalLink, Globe, Loader2, Radio, Sparkles } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 
 import { aiJobSearch } from "@/app/dashboard/jobs/actions";
@@ -13,15 +13,18 @@ import { Input } from "@/components/ui/input";
 
 type LiveState = "idle" | "scraping" | "done" | "error";
 
-// AI-prompt job search: describe the job in plain language → Fadi parses it (scoped to your
-// active direction), runs the central job engine, and filters by keywords/salary/exclusions.
-// When the Fadi extension is installed, it can ALSO scrape live job portals in your own
-// browser session and fold those listings in — the "search Fadi, see the live web" path.
-export function AiJobSearchBar() {
+const keyOf = (title: string, company?: string | null) => `${title}|${company ?? ""}`.toLowerCase().trim();
+
+// The unified job search. It is SCRAPER-LED: when the extension is present, live portal
+// results (LinkedIn/Indeed, scraped in the user's own session) lead the board; Fadi's API
+// sources fill in behind as the safety net so the board is never empty. Scoped to the user's
+// active career direction, with a global (worldwide) toggle. Deduped across both.
+export function AiJobSearchBar({ activeRole }: { activeRole?: string | null }) {
   const [prompt, setPrompt] = useState("");
   const [jobs, setJobs] = useState<RecommendedJob[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  const [global, setGlobal] = useState(false);
 
   const [extAvailable, setExtAvailable] = useState(false);
   const [useLive, setUseLive] = useState(true);
@@ -44,7 +47,6 @@ export function AiJobSearchBar() {
     }
     setLiveJobs(res.jobs);
     setLiveState("done");
-    // Persist into the pipeline (same-origin session cookie works here). Best-effort.
     if (res.jobs.length > 0) {
       try {
         await fetch("/api/extension/capture-batch", {
@@ -64,8 +66,10 @@ export function AiJobSearchBar() {
     setError(null);
     setLiveJobs(null);
     setLiveState("idle");
+    // Scraper-led: kick off the live scrape immediately (parallel with the API search) so
+    // portal results start arriving first.
     start(async () => {
-      const res = await aiJobSearch(prompt);
+      const res = await aiJobSearch(prompt, { global });
       if (!res.ok) {
         setError(res.message);
         return;
@@ -73,21 +77,31 @@ export function AiJobSearchBar() {
       setJobs(res.jobs);
       if (extAvailable && useLive) {
         const keywords = (res.intent.keywords ?? []).join(" ").trim();
-        const location = res.intent.city || getCountry(res.intent.country)?.name || "";
+        const location = global ? "" : res.intent.city || getCountry(res.intent.country)?.name || "";
         void scrapeLive({ keywords, location, remote: res.intent.remote });
       }
     });
   }
 
+  // Dedupe the API results against whatever the live scrape already surfaced.
+  const liveKeys = new Set((liveJobs ?? []).map((j) => keyOf(j.title, j.company)));
+  const apiJobs = (jobs ?? []).filter((j) => !liveKeys.has(keyOf(j.title, j.company)));
+  const liveLeads = extAvailable && useLive;
+
   return (
     <div className="rounded-xl border border-border/60 bg-card p-4">
       <div className="flex items-center gap-2">
         <Sparkles className="size-4 text-primary" aria-hidden="true" />
-        <h3 className="text-sm font-semibold">Ask Fadi for jobs</h3>
+        <h3 className="text-sm font-semibold">Search jobs</h3>
+        {activeRole ? (
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+            {global ? "Global" : activeRole}
+          </span>
+        ) : null}
       </div>
       <p className="mt-1 text-xs text-muted-foreground">
-        e.g. &ldquo;remote senior DevOps roles in Germany, €80k+, no crypto&rdquo; — searched
-        across every source, scoped to your active direction.
+        Describe the role in plain language. {liveLeads ? "Live web results (scraped in your browser) lead; " : ""}
+        Fadi&rsquo;s sources fill in behind — scoped to your active direction.
       </p>
       <div className="mt-3 flex gap-2">
         <Input
@@ -96,7 +110,7 @@ export function AiJobSearchBar() {
           onKeyDown={(e) => {
             if (e.key === "Enter") run();
           }}
-          placeholder="Describe the job you want…"
+          placeholder="e.g. graduate IT support roles in Dublin"
           aria-label="Describe the job you want"
         />
         <Button onClick={run} disabled={pending || !prompt.trim()}>
@@ -105,63 +119,42 @@ export function AiJobSearchBar() {
         </Button>
       </div>
 
-      {extAvailable ? (
-        <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+        <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
           <input
             type="checkbox"
-            checked={useLive}
-            onChange={(e) => setUseLive(e.target.checked)}
+            checked={global}
+            onChange={(e) => setGlobal(e.target.checked)}
             className="size-3.5 accent-primary"
           />
           <Globe className="size-3.5" aria-hidden="true" />
-          Also search the live web (LinkedIn / Indeed) in my browser
+          Search worldwide (ignore location)
         </label>
-      ) : null}
+        {extAvailable ? (
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={useLive}
+              onChange={(e) => setUseLive(e.target.checked)}
+              className="size-3.5 accent-primary"
+            />
+            <Radio className="size-3.5" aria-hidden="true" />
+            Include live web (LinkedIn / Indeed)
+          </label>
+        ) : null}
+      </div>
 
       {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
 
-      {jobs ? (
+      {/* ── Scraper-led: live web results first ── */}
+      {liveLeads && liveState !== "idle" ? (
         <div className="mt-3 space-y-2">
-          <p className="text-xs text-muted-foreground">
-            {jobs.length} match{jobs.length === 1 ? "" : "es"} from Fadi&rsquo;s sources
-          </p>
-          {jobs.slice(0, 12).map((j) => (
-            <div key={j.id} className="rounded-lg border border-border/50 bg-background/40 p-2.5 text-sm">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-medium">{j.title}</span>
-                {j.url ? (
-                  <a
-                    href={j.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-xs text-muted-foreground underline"
-                  >
-                    <ExternalLink className="size-3" aria-hidden="true" /> open
-                  </a>
-                ) : null}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {[j.company, j.location].filter(Boolean).join(" · ")}
-              </p>
-            </div>
-          ))}
-          {jobs.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              Nothing matched Fadi&rsquo;s sources.{" "}
-              {extAvailable && useLive
-                ? "The live web scrape below may still find roles."
-                : "Try broadening the request, or check the sources below."}
-            </p>
-          ) : null}
-        </div>
-      ) : null}
-
-      {/* Live web section — only when the extension is doing / has done a scrape. */}
-      {extAvailable && useLive && liveState !== "idle" ? (
-        <div className="mt-4 space-y-2 border-t border-border/50 pt-3">
           <div className="flex items-center gap-2 text-xs font-medium">
-            <Globe className="size-3.5 text-primary" aria-hidden="true" />
-            Live web (scraped in your browser)
+            <Radio className="size-3.5 text-primary" aria-hidden="true" />
+            Live web
+            {liveState === "done" && liveJobs ? (
+              <span className="text-muted-foreground">· {liveJobs.length}</span>
+            ) : null}
           </div>
           {liveState === "scraping" ? (
             <p className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -169,47 +162,84 @@ export function AiJobSearchBar() {
               Opening LinkedIn / Indeed in your session and reading the results…
             </p>
           ) : null}
-          {liveState === "error" ? (
-            <p className="text-xs text-destructive">{liveError}</p>
-          ) : null}
-          {liveState === "done" && liveJobs ? (
-            liveJobs.length === 0 ? (
-              <p className="text-xs text-muted-foreground">
-                No live listings found on the portal pages.
-              </p>
-            ) : (
-              <>
-                <p className="text-xs text-muted-foreground">
-                  {liveJobs.length} live listing{liveJobs.length === 1 ? "" : "s"} — saved to your pipeline.
-                </p>
-                {liveJobs.slice(0, 20).map((j, i) => (
-                  <div
-                    key={`${j.title}-${j.company ?? ""}-${i}`}
-                    className="rounded-lg border border-primary/30 bg-primary/5 p-2.5 text-sm"
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-medium">{j.title}</span>
-                      {j.url ? (
-                        <a
-                          href={j.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-1 text-xs text-muted-foreground underline"
-                        >
-                          <ExternalLink className="size-3" aria-hidden="true" /> open
-                        </a>
-                      ) : null}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {[j.company, j.location].filter(Boolean).join(" · ")}
-                    </p>
-                  </div>
-                ))}
-              </>
-            )
+          {liveState === "error" ? <p className="text-xs text-destructive">{liveError}</p> : null}
+          {liveState === "done" && liveJobs
+            ? liveJobs.slice(0, 20).map((j, i) => (
+                <JobRow
+                  key={`live-${j.title}-${j.company ?? ""}-${i}`}
+                  title={j.title}
+                  company={j.company}
+                  location={j.location}
+                  url={j.url}
+                  badge="Live web"
+                  accent
+                />
+              ))
+            : null}
+        </div>
+      ) : null}
+
+      {/* ── Safety net: Fadi's API sources ── */}
+      {jobs ? (
+        <div className="mt-3 space-y-2">
+          <p className="text-xs text-muted-foreground">
+            {liveLeads ? "From Fadi’s sources · " : ""}
+            {apiJobs.length} match{apiJobs.length === 1 ? "" : "es"}
+          </p>
+          {apiJobs.slice(0, 12).map((j) => (
+            <JobRow key={j.id} title={j.title} company={j.company} location={j.location} url={j.url} badge="Fadi sources" />
+          ))}
+          {apiJobs.length === 0 && (!liveLeads || liveState === "done") ? (
+            <p className="text-xs text-muted-foreground">
+              {liveJobs && liveJobs.length > 0
+                ? "No extra matches beyond the live results above."
+                : "Nothing matched. Try broadening the request or toggling worldwide."}
+            </p>
           ) : null}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function JobRow({
+  title,
+  company,
+  location,
+  url,
+  badge,
+  accent,
+}: {
+  title: string;
+  company?: string | null;
+  location?: string | null;
+  url?: string | null;
+  badge: string;
+  accent?: boolean;
+}) {
+  return (
+    <div
+      className={`rounded-lg border p-2.5 text-sm ${
+        accent ? "border-primary/30 bg-primary/5" : "border-border/50 bg-background/40"
+      }`}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="font-medium">{title}</span>
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">{badge}</span>
+          {url ? (
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-xs text-muted-foreground underline"
+            >
+              <ExternalLink className="size-3" aria-hidden="true" /> open
+            </a>
+          ) : null}
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">{[company, location].filter(Boolean).join(" · ")}</p>
     </div>
   );
 }
