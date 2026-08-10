@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { createProfilesRepository } from "@careeros/database";
 
-import { getCurrentAuthUser } from "@/lib/auth/session";
+import { getExtensionUser } from "@/lib/extension/auth";
 import { getDatabase } from "@/lib/database/client";
 
 // Serves the user's verified basics to the Fadi extension for application autofill. Read-only,
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 function withCors(res: NextResponse, origin: string | null): NextResponse {
   res.headers.set("Access-Control-Allow-Origin", origin ?? "*");
   res.headers.set("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.headers.set("Access-Control-Allow-Headers", "Content-Type");
+  res.headers.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
   res.headers.set("Access-Control-Allow-Credentials", "true");
   res.headers.set("Vary", "Origin");
   return res;
@@ -25,7 +25,7 @@ export function OPTIONS(req: Request) {
 
 export async function GET(req: Request) {
   const origin = req.headers.get("origin");
-  const user = await getCurrentAuthUser();
+  const user = await getExtensionUser(req);
   if (!user) {
     return withCors(NextResponse.json({ ok: false, error: "not_authenticated" }, { status: 401 }), origin);
   }

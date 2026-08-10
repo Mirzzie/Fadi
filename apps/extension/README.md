@@ -7,33 +7,44 @@ human-in-the-loop path — plus **application autofill**.
 
 ## What it does (MVP)
 
-- **Save this job to Fadi** — reads the job on the current page (JSON-LD `JobPosting` →
-  Open Graph → sensible fallbacks) and POSTs it to `POST /api/extension/capture`, which saves
-  it to the user's pipeline. Works on any site the user can see.
+- **Scrape all jobs on this page** — on a portal search-results page (LinkedIn, Indeed, …),
+  reads **every** job card and sends the batch to `POST /api/extension/capture-batch`. Because
+  it runs in the user's own logged-in session, it sees results a server scraper can't (no
+  Cloudflare wall). Selectors rot, so it works off the stable job-detail anchors first and, if
+  those miss, sends the page text for Fadi's AI to extract (self-healing). This is the
+  "search the internet like a human" leg.
+- **Save just this job** — reads the single job on the current page (JSON-LD `JobPosting` →
+  Open Graph → fallbacks) and POSTs it to `POST /api/extension/capture`.
 - **Autofill this application** — fills obviously-named fields (name/email/phone/location)
-  from cached profile basics and **never submits** (the user reviews).
+  from the user's verified Fadi profile and **never submits** (the user reviews).
+- **Clip selection to Evidence** / **Add referral (LinkedIn)** — capture a win or a contact.
 
-## Load it (Chrome/Edge, unpacked)
+## Load it (Chrome/Edge/Brave, unpacked)
 
 1. Run Fadi (`npm run dev`) and sign in.
 2. `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select this
    `apps/extension` folder.
-3. Open a job posting, click the Fadi icon → **Save this job to Fadi**. Set the Fadi URL in
-   the popup if it isn't `http://localhost:3000`.
+3. **Connect it to your account** (once) — see below. Set the Fadi URL in the popup if it
+   isn't `http://localhost:3000`.
 
-## Auth caveat (productionization)
+## Connecting (auth)
 
-The capture endpoint reuses the **Fadi session cookie** (`credentials: "include"`). For that
-cookie to be sent cross-site from the extension, Better Auth's session cookie must be
-`SameSite=Lax` (default) and, in production over HTTPS, `Secure`. If cookie auth proves
-unreliable across browsers, switch to a **capture token**: generate one in Fadi settings,
-paste it into the extension, and have the endpoint accept `Authorization: Bearer <token>`.
-That's the robust, browser-agnostic path most tools use.
+A `chrome-extension://` popup can't send Fadi's `SameSite` session cookie cross-site, so the
+extension authenticates with a **bearer connection code** instead:
+
+1. In the popup, click **Get code** → opens `/extension/connect` in a Fadi tab.
+2. Sign in if needed, **Copy code**, paste it into the popup, click **Connect**.
+3. The popup stores the code and sends it as `Authorization: Bearer <code>` on every call.
+
+The code is a signed (HMAC) 90-day token scoped to the user — **not** a session cookie and no
+substitute for one. Server side, `getExtensionUser()` accepts either a real session cookie
+(same-origin) or this bearer token. Re-open the connect page any time for a fresh code.
 
 ## Roadmap
 
-- Fetch the live Fadi profile for richer autofill (Workday/Lever/Greenhouse/iCIMS field maps).
+- Fadi-search → extension bridge (`externally_connectable`) so a search in Fadi triggers the
+  extension to scrape the open portal and stream jobs back — trigger lives inside Fadi.
 - On-page overlay: fit score / "should you apply" / "tailor résumé to this JD".
-- Evidence + networking capture.
+- Richer autofill field maps (Workday/Lever/Greenhouse/iCIMS).
 
 Vanilla MV3 — no build step. Not part of the Next.js app build.

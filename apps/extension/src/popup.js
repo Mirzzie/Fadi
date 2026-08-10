@@ -15,12 +15,61 @@ async function getBase() {
   return (fadiBase || DEFAULT_BASE).replace(/\/$/, "");
 }
 
-chrome.storage.sync.get("fadiBase").then(({ fadiBase }) => {
+async function getToken() {
+  const { fadiToken } = await chrome.storage.sync.get("fadiToken");
+  return fadiToken || "";
+}
+
+// Headers for every Fadi call. The bearer token is how the extension authenticates — it can't
+// send Fadi's SameSite session cookie from its own origin. credentials:"include" is kept as a
+// fallback for the same-origin/dev case.
+async function authHeaders(json) {
+  const h = {};
+  if (json) h["Content-Type"] = "application/json";
+  const token = await getToken();
+  if (token) h["Authorization"] = `Bearer ${token}`;
+  return h;
+}
+
+const tokenInput = document.getElementById("token");
+const connState = document.getElementById("connstate");
+
+function renderConnState(token) {
+  if (token) {
+    connState.textContent = "Connected to Fadi ✓";
+    connState.style.color = "#0f766e";
+  } else {
+    connState.textContent = "Not connected — paste a connection code below.";
+    connState.style.color = "#777";
+  }
+}
+
+chrome.storage.sync.get(["fadiBase", "fadiToken"]).then(({ fadiBase, fadiToken }) => {
   baseInput.value = fadiBase || DEFAULT_BASE;
+  renderConnState(fadiToken);
 });
 baseInput.addEventListener("change", () =>
   chrome.storage.sync.set({ fadiBase: baseInput.value.trim() || DEFAULT_BASE }),
 );
+
+// Open the Fadi connect page (user copies their code there).
+document.getElementById("getcode").addEventListener("click", async () => {
+  const base = await getBase();
+  chrome.tabs.create({ url: `${base}/extension/connect` });
+});
+
+// Save the pasted connection code.
+document.getElementById("connect").addEventListener("click", async () => {
+  const token = (tokenInput.value || "").trim();
+  if (!token) {
+    setStatus("Paste your connection code first (click ‘Get code’).", "err");
+    return;
+  }
+  await chrome.storage.sync.set({ fadiToken: token });
+  tokenInput.value = "";
+  renderConnState(token);
+  setStatus("Connected to Fadi.", "ok");
+});
 
 async function activeTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -64,7 +113,7 @@ document.getElementById("scrapeall").addEventListener("click", async () => {
     }
     const res = await fetch(`${base}/api/extension/capture-batch`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await authHeaders(true),
       credentials: "include",
       body: JSON.stringify({ jobs: jobs.slice(0, 60), pageText, source }),
     });
@@ -102,7 +151,7 @@ document.getElementById("save").addEventListener("click", async () => {
     const base = await getBase();
     const res = await fetch(`${base}/api/extension/capture`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await authHeaders(true),
       credentials: "include",
       body: JSON.stringify(job),
     });
@@ -125,7 +174,7 @@ document.getElementById("autofill").addEventListener("click", async () => {
   try {
     // Pull the user's VERIFIED basics from Fadi (never invented) for the fill.
     const base = await getBase();
-    const pres = await fetch(`${base}/api/extension/profile`, { credentials: "include" });
+    const pres = await fetch(`${base}/api/extension/profile`, { credentials: "include", headers: await authHeaders(false) });
     if (pres.status === 401) {
       setStatus("Sign in to Fadi first, then try again.", "err");
       return;
@@ -175,7 +224,7 @@ document.getElementById("evidence").addEventListener("click", async () => {
     const base = await getBase();
     const res = await fetch(`${base}/api/extension/evidence`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await authHeaders(true),
       credentials: "include",
       body: JSON.stringify({ title, detail: detail.slice(0, 4000) }),
     });
@@ -200,7 +249,7 @@ document.getElementById("contact").addEventListener("click", async () => {
     const base = await getBase();
     const res = await fetch(`${base}/api/extension/contact`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: await authHeaders(true),
       credentials: "include",
       body: JSON.stringify(p),
     });
