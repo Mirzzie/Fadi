@@ -41,7 +41,7 @@ export function isLikelyTechDomain(domain?: string | null): boolean {
 }
 
 const ADD_KEY_HINT =
-  "Add a general job-board key (Reed, Adzuna, or Jooble) in Settings to pull real roles across every industry.";
+  "Add a job-source key in Settings to pull real roles: a JSearch key gives the broadest reach (Google for Jobs — LinkedIn, Indeed, Glassdoor, compliantly), or Reed / Adzuna / Jooble for cross-industry coverage.";
 
 /** Decide coverage for a domain against the configured sources. Pure. */
 export function decideJobCoverage(
