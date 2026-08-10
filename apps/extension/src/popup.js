@@ -73,8 +73,15 @@ document.getElementById("save").addEventListener("click", async () => {
 document.getElementById("autofill").addEventListener("click", async () => {
   setStatus("Autofilling…");
   try {
-    const { fadiProfile } = await chrome.storage.sync.get("fadiProfile");
-    const profile = fadiProfile || {};
+    // Pull the user's VERIFIED basics from Fadi (never invented) for the fill.
+    const base = await getBase();
+    const pres = await fetch(`${base}/api/extension/profile`, { credentials: "include" });
+    if (pres.status === 401) {
+      setStatus("Sign in to Fadi first, then try again.", "err");
+      return;
+    }
+    const pdata = await pres.json().catch(() => ({}));
+    const profile = (pdata && pdata.profile) || {};
     const filled = await runInPage((p) => {
       const set = (selectors, value) => {
         if (!value) return 0;
