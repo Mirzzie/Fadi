@@ -110,3 +110,54 @@ document.getElementById("autofill").addEventListener("click", async () => {
     setStatus(`Error: ${e.message}`, "err");
   }
 });
+
+// --- Clip selection → Evidence -----------------------------------------------
+document.getElementById("evidence").addEventListener("click", async () => {
+  setStatus("Reading selection…");
+  try {
+    const sel = await runInPage(() => (window.getSelection ? window.getSelection().toString().trim() : ""));
+    const detail = (sel || "").trim();
+    if (!detail) {
+      setStatus("Select some text on the page first.", "err");
+      return;
+    }
+    const title = detail.split("\n")[0].slice(0, 120) || document.title;
+    const base = await getBase();
+    const res = await fetch(`${base}/api/extension/evidence`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ title, detail: detail.slice(0, 4000) }),
+    });
+    if (res.status === 401) return setStatus("Sign in to Fadi first.", "err");
+    const data = await res.json().catch(() => ({}));
+    setStatus(data.ok ? "Clipped to Evidence." : `Failed: ${data.error || res.status}`, data.ok ? "ok" : "err");
+  } catch (e) {
+    setStatus(`Error: ${e.message}`, "err");
+  }
+});
+
+// --- Add referral from this profile ------------------------------------------
+document.getElementById("contact").addEventListener("click", async () => {
+  setStatus("Reading profile…");
+  try {
+    await chrome.scripting.executeScript({ target: { tabId: (await activeTab()).id }, files: ["src/extract.js"] });
+    const p = await runInPage(() => fadiExtractProfile());
+    if (!p || !p.company) {
+      setStatus("Couldn't read a company from this profile. Open a LinkedIn profile.", "err");
+      return;
+    }
+    const base = await getBase();
+    const res = await fetch(`${base}/api/extension/contact`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify(p),
+    });
+    if (res.status === 401) return setStatus("Sign in to Fadi first.", "err");
+    const data = await res.json().catch(() => ({}));
+    setStatus(data.ok ? `Added referral: ${p.contactName || p.company}` : `Failed: ${data.error || res.status}`, data.ok ? "ok" : "err");
+  } catch (e) {
+    setStatus(`Error: ${e.message}`, "err");
+  }
+});

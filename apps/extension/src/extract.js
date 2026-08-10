@@ -63,3 +63,23 @@ function fadiExtractJob() {
     url: window.location.href,
   };
 }
+
+// Reads a LinkedIn (or generic) profile page for a referral target: { company, contactName,
+// contactRole }. Runs in the user's own session, so walled profiles are readable.
+function fadiExtractProfile() {
+  const t = (el) => (el && el.textContent ? el.textContent.trim() : "");
+  const name = t(document.querySelector("h1")) || document.title.replace(/\s*[|\-–].*$/, "").trim();
+  const role =
+    t(document.querySelector('.text-body-medium, [class*="headline" i], [data-generated-suggestion-target]')) ||
+    "";
+  // Current company: LinkedIn shows it in the experience/top-card; fall back to og:site_name.
+  const company =
+    t(document.querySelector('[aria-label*="Current company" i], [class*="company" i]')) ||
+    (document.querySelector('meta[property="og:title"]')?.content || "").split(" - ")[1] ||
+    "";
+  return {
+    contactName: (name || "").slice(0, 200),
+    contactRole: (role || "").slice(0, 300),
+    company: (company || "").trim().slice(0, 200),
+  };
+}
