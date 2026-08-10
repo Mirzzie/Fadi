@@ -3,6 +3,31 @@ import "server-only";
 import { z } from "zod";
 
 import { getAIProvider } from "@/lib/ai/registry";
+import { getCountry, parseLocation } from "@/lib/jobs/locations";
+
+// Stopwords + generic job-hunt filler that must never become search keywords — otherwise a
+// term like "for" or "roles" matches virtually every job description and the location intent
+// gets buried under noise (the "graduate roles for IT in Ireland → US results" bug).
+const STOPWORDS = new Set([
+  "for", "the", "and", "with", "any", "all", "job", "jobs", "role", "roles", "position", "positions",
+  "search", "find", "show", "list", "get", "want", "looking", "look", "please", "near", "around",
+  "that", "this", "from", "into", "onto", "over", "under", "about", "graduate", "graduates", "entry",
+  "level", "junior", "senior", "remote", "hybrid", "onsite", "office", "based", "work", "working",
+]);
+
+/** Naive keyword extraction (used when AI is unavailable): drop stopwords + the location words. */
+function naiveKeywords(text: string, loc: { country?: string; city?: string }): string[] {
+  const locWords = new Set(
+    [loc.city, getCountry(loc.country)?.name]
+      .filter((v): v is string => Boolean(v))
+      .flatMap((v) => v.toLowerCase().split(/\s+/)),
+  );
+  return text
+    .split(/[^a-zA-Z0-9+#]+/)
+    .map((w) => w.trim())
+    .filter((w) => w.length > 1 && !STOPWORDS.has(w.toLowerCase()) && !locWords.has(w.toLowerCase()))
+    .slice(0, 6);
+}
 
 // AI-prompt job search: the user describes the job in plain language ("remote senior DevOps
 // roles in Germany, €80k+, no crypto") and Fadi turns it into a structured intent — location
@@ -38,6 +63,9 @@ const SYSTEM =
 export async function parseJobPrompt(prompt: string): Promise<JobSearchIntent> {
   const text = prompt.trim();
   if (!text) return { keywords: [] };
+  // Deterministic location backstop — runs regardless of the AI so "in Ireland" / "Dublin"
+  // is never lost when the model omits it or the AI call fails.
+  const loc = parseLocation(text);
   try {
     const provider = getAIProvider();
     const raw = await provider.parseStructured(
@@ -51,15 +79,16 @@ export async function parseJobPrompt(prompt: string): Promise<JobSearchIntent> {
     );
     return {
       keywords: (raw.keywords ?? []).map((k) => k.trim()).filter(Boolean),
-      country: raw.country?.trim().toLowerCase() || undefined,
-      city: raw.city?.trim() || undefined,
+      // Trust the model when it found a location; otherwise use the deterministic parse.
+      country: raw.country?.trim().toLowerCase() || loc.country,
+      city: raw.city?.trim() || loc.city,
       remote: raw.remote,
       salaryMinK: typeof raw.salaryMinK === "number" && raw.salaryMinK > 0 ? raw.salaryMinK : undefined,
       exclude: (raw.exclude ?? []).map((e) => e.trim().toLowerCase()).filter(Boolean),
     };
   } catch {
-    // No AI / failure: fall back to naive keywords so search still runs.
-    return { keywords: text.split(/[^a-zA-Z0-9+#]+/).filter((w) => w.length > 2).slice(0, 6) };
+    // No AI / failure: keep the location + de-noised keywords so search still runs correctly.
+    return { keywords: naiveKeywords(text, loc), country: loc.country, city: loc.city };
   }
 }
 

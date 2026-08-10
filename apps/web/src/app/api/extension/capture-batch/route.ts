@@ -67,12 +67,15 @@ export async function POST(req: Request) {
     const jobsRepo = createJobsRepository(db);
     const savedRepo = createSavedJobsRepository(db);
 
-    // Heuristic list from the extension's DOM scrape. If it's empty but we got page text,
-    // let Fadi's AI read the jobs off the raw page (self-healing when selectors rot).
+    // Heuristic list from the extension's DOM scrape. A job is only usable if it has BOTH a
+    // title and a company (doctrine: we never invent a company). If the selectors rotted and
+    // produced no usable rows, fall back to Fadi's AI reading the raw page text — that's what
+    // makes scraping self-heal instead of silently returning "no jobs".
     type Item = { title?: string; company?: string; location?: string; url?: string; description?: string };
     let items: Item[] = parsed.data.jobs;
+    const usable = (list: Item[]) => list.filter((d) => d.title?.trim() && d.company?.trim()).length;
     let usedAi = false;
-    if (items.length === 0 && parsed.data.pageText?.trim()) {
+    if (usable(items) === 0 && parsed.data.pageText?.trim()) {
       items = await aiExtractJobs(parsed.data.pageText, parsed.data.source ?? "job board");
       usedAi = true;
     }

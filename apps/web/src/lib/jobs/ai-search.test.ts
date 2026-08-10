@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { applyIntentFilter, parseSalaryK } from "./ai-search";
+import { applyIntentFilter, parseJobPrompt, parseSalaryK } from "./ai-search";
 
 describe("applyIntentFilter", () => {
   const jobs = [
@@ -27,6 +27,28 @@ describe("applyIntentFilter", () => {
   it("keeps jobs whose salary can't be parsed (never over-filters)", () => {
     const out = applyIntentFilter([{ title: "Role", salaryText: "Competitive" }], { keywords: [], salaryMinK: 80 });
     expect(out).toHaveLength(1);
+  });
+});
+
+describe("parseJobPrompt location backstop", () => {
+  // No AI key in unit tests → the catch path runs, so these assert the deterministic
+  // location parse + de-noised keywords that fix the "Ireland search → US results" bug.
+  it("extracts the country even when the model is unavailable", async () => {
+    const intent = await parseJobPrompt("search for graduate roles for IT in Ireland");
+    expect(intent.country).toBe("ie");
+  });
+
+  it("resolves a city and its country", async () => {
+    const intent = await parseJobPrompt("IT jobs in Dublin");
+    expect(intent.country).toBe("ie");
+    expect(intent.city).toBe("Dublin");
+  });
+
+  it("does not turn stopwords/filler into keywords", async () => {
+    const intent = await parseJobPrompt("search for graduate roles for IT in Ireland");
+    expect(intent.keywords).not.toContain("for");
+    expect(intent.keywords).not.toContain("roles");
+    expect(intent.keywords.map((k) => k.toLowerCase())).not.toContain("ireland");
   });
 });
 
