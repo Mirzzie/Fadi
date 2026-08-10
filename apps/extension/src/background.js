@@ -64,9 +64,10 @@ async function scrapeUrl(url) {
     await waitForComplete(tabId, 20000);
     await sleep(2800); // let JS-rendered / lazy job cards paint
     await chrome.scripting.executeScript({ target: { tabId }, files: ["src/extract.js"] });
+    // Scroll + accumulate (handles LinkedIn's virtualized list) rather than a single pass.
     const [res] = await chrome.scripting.executeScript({
       target: { tabId },
-      func: () => fadiExtractJobList(),
+      func: () => fadiScrollAndCollect(50),
     });
     const out = res && res.result;
     return (out && out.jobs) || [];

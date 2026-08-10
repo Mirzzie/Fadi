@@ -217,3 +217,43 @@ function fadiExtractJobList() {
   const pageText = clean(main.innerText || "").slice(0, 12000);
   return { jobs: out, pageText };
 }
+
+// Scroll a search page to pull in lazy-loaded results, ACCUMULATING as we go. LinkedIn
+// virtualizes its list (off-screen cards are emptied from the DOM), so a scroll-then-extract
+// misses rows — we extract every step and merge by title|company. Returns { jobs, pageText }.
+// Used by the background worker's live-search bridge. Async: executeScript awaits the promise.
+async function fadiScrollAndCollect(maxCards) {
+  const cap = maxCards || 50;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const container =
+    document.querySelector(".jobs-search-results-list") ||
+    document.querySelector(".scaffold-layout__list") ||
+    document.querySelector(".jobs-search__results-list") ||
+    null;
+  const merged = new Map();
+  let lastText = "";
+  const absorb = () => {
+    const r = fadiExtractJobList();
+    if (r.pageText && r.pageText.length > lastText.length) lastText = r.pageText;
+    for (const j of r.jobs) {
+      const key = `${j.title}|${j.company || ""}`.toLowerCase();
+      if (!merged.has(key)) merged.set(key, j);
+    }
+  };
+  absorb();
+  let stable = 0;
+  for (let i = 0; i < 15 && merged.size < cap; i++) {
+    const before = merged.size;
+    if (container) container.scrollTo(0, container.scrollHeight);
+    else window.scrollTo(0, document.body.scrollHeight);
+    await sleep(1100);
+    absorb();
+    if (merged.size === before) {
+      stable += 1;
+      if (stable >= 2) break; // two quiet rounds → the list is exhausted
+    } else {
+      stable = 0;
+    }
+  }
+  return { jobs: Array.from(merged.values()).slice(0, cap), pageText: lastText };
+}

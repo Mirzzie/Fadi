@@ -55,7 +55,6 @@ origin (e.g. `https://app.fadi.example/*`) to both `content_scripts[].matches` a
 
 ## Roadmap
 
-- Scroll-to-load more results during a live scrape (LinkedIn lazy-loads job cards).
 - On-page overlay: fit score / "should you apply" / "tailor résumé to this JD".
 - Richer autofill field maps (Workday/Lever/Greenhouse/iCIMS).
 

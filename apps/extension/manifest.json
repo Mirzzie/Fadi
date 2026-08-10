@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Fadi — Save & Autofill",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Capture jobs to Fadi from any site, and autofill applications from your verified profile.",
   "permissions": ["activeTab", "scripting", "storage", "tabs"],
   "host_permissions": ["http://localhost:3000/*", "http://localhost:3001/*", "https://*/*"],
