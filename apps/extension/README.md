@@ -7,6 +7,12 @@ human-in-the-loop path — plus **application autofill**.
 
 ## What it does (MVP)
 
+- **Live web search from inside Fadi** — when you run "Ask Fadi for jobs" on the Fadi site and
+  leave "Also search the live web" ticked, Fadi asks the extension to open the matching
+  LinkedIn/Indeed search **in your own session**, scrape the results, and fold them into the
+  board (and your pipeline). This is the bridge: a search in Fadi reaches the live web through
+  your real browser. Wiring: a content script (`bridge.js`) on the Fadi origin relays
+  `window.postMessage` ⇄ the background worker, which opens/settles/scrapes/closes portal tabs.
 - **Scrape all jobs on this page** — on a portal search-results page (LinkedIn, Indeed, …),
   reads **every** job card and sends the batch to `POST /api/extension/capture-batch`. Because
   it runs in the user's own logged-in session, it sees results a server scraper can't (no
@@ -40,10 +46,16 @@ The code is a signed (HMAC) 90-day token scoped to the user — **not** a sessio
 substitute for one. Server side, `getExtensionUser()` accepts either a real session cookie
 (same-origin) or this bearer token. Re-open the connect page any time for a fresh code.
 
+## Production origin
+
+The live-search bridge content script is registered only for `http://localhost:3000/3001` in
+`manifest.json` (`content_scripts[].matches`). To use it against a deployed Fadi, add that
+origin (e.g. `https://app.fadi.example/*`) to both `content_scripts[].matches` and
+`host_permissions`.
+
 ## Roadmap
 
-- Fadi-search → extension bridge (`externally_connectable`) so a search in Fadi triggers the
-  extension to scrape the open portal and stream jobs back — trigger lives inside Fadi.
+- Scroll-to-load more results during a live scrape (LinkedIn lazy-loads job cards).
 - On-page overlay: fit score / "should you apply" / "tailor résumé to this JD".
 - Richer autofill field maps (Workday/Lever/Greenhouse/iCIMS).
 
