@@ -14,22 +14,26 @@ import { logger } from "@/lib/observability/logger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// Clamp any string to `n` chars instead of REJECTING it — a real listing must never be lost
+// because e.g. Indeed's tracking URL runs past a length cap (that caused "Failed: invalid").
+const clamped = (n: number) =>
+  z.preprocess((v) => (typeof v === "string" ? v.slice(0, n) : v == null ? undefined : v), z.string().optional());
+
 const jobSchema = z.object({
-  title: z.string().trim().min(1).max(300),
-  // Optional: an anchor-only card may not resolve a company; we skip those at persist time
-  // rather than reject the whole batch. url is kept lenient (not strict .url()) so an odd
-  // href never sinks the request.
-  company: z.string().trim().max(200).optional(),
-  url: z.string().trim().max(1000).optional(),
-  location: z.string().trim().max(200).optional(),
-  description: z.string().max(20_000).optional(),
+  // All optional + clamped; the persist loop keeps only rows with a real title AND company
+  // (doctrine: never invent a company), so bad rows are skipped, never fabricated.
+  title: clamped(300),
+  company: clamped(200),
+  url: clamped(2000),
+  location: clamped(200),
+  description: clamped(20_000),
 });
 
 const schema = z.object({
-  jobs: z.array(jobSchema).max(60).optional().default([]),
+  jobs: z.array(jobSchema).max(120).optional().default([]),
   // Cleaned page text for the AI self-healing fallback when the DOM selectors miss.
-  pageText: z.string().max(20_000).optional(),
-  source: z.string().trim().max(60).optional(),
+  pageText: z.preprocess((v) => (typeof v === "string" ? v.slice(0, 20_000) : v), z.string().optional()),
+  source: clamped(60),
 });
 
 function withCors(res: NextResponse, origin: string | null): NextResponse {

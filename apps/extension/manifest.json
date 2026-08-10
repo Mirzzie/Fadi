@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Fadi — Save & Autofill",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Capture jobs to Fadi from any site, and autofill applications from your verified profile.",
   "permissions": ["activeTab", "scripting", "storage", "tabs"],
   "host_permissions": ["http://localhost:3000/*", "http://localhost:3001/*", "https://*/*"],
@@ -16,6 +16,11 @@
     {
       "matches": ["http://localhost:3000/*", "http://localhost:3001/*"],
       "js": ["src/bridge.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["https://*.linkedin.com/*", "https://*.indeed.com/*"],
+      "js": ["src/extract.js", "src/portal.js"],
       "run_at": "document_idle"
     }
   ]

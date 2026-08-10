@@ -184,7 +184,13 @@ function fadiExtractJobList() {
     const key = `${title}|${company}`.toLowerCase();
     if (seen.has(key)) return;
     seen.add(key);
-    out.push({ title, company: company || undefined, location: location || undefined, url });
+    // Indeed/LinkedIn hrefs carry long tracking query-strings — cap so they never bloat.
+    out.push({
+      title,
+      company: company || undefined,
+      location: location || undefined,
+      url: url ? String(url).slice(0, 2000) : undefined,
+    });
   };
 
   // Strategy A — anchors to a job detail page. Stable across redesigns; every card has one.

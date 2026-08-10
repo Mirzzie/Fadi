@@ -97,13 +97,38 @@ async function handleScrape(query) {
   return jobs;
 }
 
-// Messages from the in-page bridge (content script on the Fadi origin).
+const DEFAULT_BASE = "http://localhost:3000";
+
+/** Send scraped jobs to Fadi using the stored connection code. Used by auto-capture. */
+async function sendToFadi(jobs, source) {
+  const { fadiBase, fadiToken } = await chrome.storage.sync.get(["fadiBase", "fadiToken"]);
+  if (!fadiToken) return { ok: false, error: "not_connected" };
+  const base = (fadiBase || DEFAULT_BASE).replace(/\/$/, "");
+  const res = await fetch(`${base}/api/extension/capture-batch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${fadiToken}` },
+    body: JSON.stringify({ jobs: (jobs || []).slice(0, 60), source: source || "auto" }),
+  });
+  if (res.status === 401) return { ok: false, error: "not_connected" };
+  const data = await res.json().catch(() => ({}));
+  return data && data.ok ? { ok: true, saved: data.saved || 0 } : { ok: false, error: (data && data.error) || res.status };
+}
+
+// Messages from the content scripts.
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  // In-page bridge (Fadi origin) → open portals and scrape them.
   if (msg && msg.type === "fadi_scrape") {
     handleScrape(msg.query)
       .then((jobs) => sendResponse({ ok: true, jobs }))
       .catch((e) => sendResponse({ ok: false, error: String((e && e.message) || e) }));
     return true; // keep the message channel open for the async response
+  }
+  // Auto-capture (portal content script) → persist the jobs it scraped on the page.
+  if (msg && msg.type === "fadi_autocapture") {
+    sendToFadi(msg.jobs, msg.source)
+      .then((r) => sendResponse(r))
+      .catch((e) => sendResponse({ ok: false, error: String((e && e.message) || e) }));
+    return true;
   }
   return undefined;
 });

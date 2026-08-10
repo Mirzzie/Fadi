@@ -44,10 +44,16 @@ function renderConnState(token) {
   }
 }
 
-chrome.storage.sync.get(["fadiBase", "fadiToken"]).then(({ fadiBase, fadiToken }) => {
+const autoCaptureInput = document.getElementById("autocapture");
+
+chrome.storage.sync.get(["fadiBase", "fadiToken", "fadiAutoCapture"]).then(({ fadiBase, fadiToken, fadiAutoCapture }) => {
   baseInput.value = fadiBase || DEFAULT_BASE;
   renderConnState(fadiToken);
+  autoCaptureInput.checked = fadiAutoCapture !== false; // default on
 });
+autoCaptureInput.addEventListener("change", () =>
+  chrome.storage.sync.set({ fadiAutoCapture: autoCaptureInput.checked }),
+);
 baseInput.addEventListener("change", () =>
   chrome.storage.sync.set({ fadiBase: baseInput.value.trim() || DEFAULT_BASE }),
 );

@@ -7,6 +7,11 @@ human-in-the-loop path — plus **application autofill**.
 
 ## What it does (MVP)
 
+- **Auto-capture (no clicking)** — once connected, just browsing a LinkedIn/Indeed job list
+  auto-scrapes it and sends the jobs to Fadi in the background, with a small toast reporting
+  the count. Guardrails: only when the toggle is on (popup, default on) and you're connected,
+  only on pages that actually have a job list, once per URL, and it never submits anything or
+  alters the page. Content script: `portal.js` (+ `extract.js`).
 - **Live web search from inside Fadi** — when you run "Ask Fadi for jobs" on the Fadi site and
   leave "Also search the live web" ticked, Fadi asks the extension to open the matching
   LinkedIn/Indeed search **in your own session**, scrape the results, and fold them into the
