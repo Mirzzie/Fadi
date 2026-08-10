@@ -233,9 +233,13 @@ export function FadiChat({
         { id: assistantId, role: "assistant", content: "", timestamp: new Date() },
       ]);
 
+      // Send only the most recent turns: the server caps history at 20 items and 8000 chars
+      // each — a longer conversation would otherwise 400 ("Failed to reach Fadi"). The full
+      // history still lives server-side; recent turns are what the reply needs for context.
       const history = messages
         .filter((m) => m.id !== "init")
-        .map((m) => ({ role: m.role, content: m.content }));
+        .slice(-20)
+        .map((m) => ({ role: m.role, content: m.content.slice(0, 8000) }));
 
       abortRef.current = new AbortController();
 
