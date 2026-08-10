@@ -45,28 +45,40 @@ document.getElementById("scrapeall").addEventListener("click", async () => {
       target: { tabId: (await activeTab()).id },
       files: ["src/extract.js"],
     });
-    const jobs = await runInPage(() => fadiExtractJobList());
-    if (!jobs || jobs.length === 0) {
+    const result = await runInPage(() => fadiExtractJobList());
+    const jobs = (result && result.jobs) || [];
+    const pageText = (result && result.pageText) || "";
+    if (jobs.length === 0 && !pageText) {
       setStatus("No job list detected here. Open a search-results page (e.g. LinkedIn/Indeed jobs).", "err");
       return;
     }
-    setStatus(`Sending ${jobs.length} job(s) to Fadi…`);
+    // If the selectors matched, send the list; otherwise send the page text and let Fadi's
+    // AI read the jobs off it (self-healing when a site changes its markup).
+    setStatus(jobs.length ? `Sending ${jobs.length} job(s) to Fadi…` : "Asking Fadi's AI to read this page…");
     const base = await getBase();
+    let source = "job board";
+    try {
+      source = new URL((await activeTab()).url).hostname.replace(/^www\./, "");
+    } catch {
+      /* keep default */
+    }
     const res = await fetch(`${base}/api/extension/capture-batch`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       credentials: "include",
-      body: JSON.stringify({ jobs: jobs.slice(0, 60) }),
+      body: JSON.stringify({ jobs: jobs.slice(0, 60), pageText, source }),
     });
     if (res.status === 401) {
       setStatus("Sign in to Fadi first, then try again.", "err");
       return;
     }
     const data = await res.json().catch(() => ({}));
-    setStatus(
-      data.ok ? `Scraped ${data.saved} job(s) into Fadi.` : `Failed: ${data.error || res.status}`,
-      data.ok ? "ok" : "err",
-    );
+    if (data.ok) {
+      const how = data.usedAi ? " (read by Fadi AI)" : "";
+      setStatus(data.saved > 0 ? `Scraped ${data.saved} job(s) into Fadi${how}.` : "No jobs found on this page.", data.saved > 0 ? "ok" : "err");
+    } else {
+      setStatus(`Failed: ${data.error || res.status}`, "err");
+    }
   } catch (e) {
     setStatus(`Error: ${e.message}`, "err");
   }

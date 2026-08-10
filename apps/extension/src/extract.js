@@ -122,47 +122,98 @@ function fadiExtractProfile() {
 
 // Auto-scrape ALL job cards on a portal SEARCH page (LinkedIn/Indeed/etc.). Because this
 // runs in the user's own logged-in session, it reads results a server scraper can't (no
-// Cloudflare block). Returns [{ title, company, location, url }]. This is the "scrape the
-// internet, like a human" leg — the human's real browser is doing it.
+// Cloudflare block). This is the "scrape the internet, like a human" leg — the human's
+// real browser is doing it.
+//
+// Returns { jobs: [{title, company, location, url}], pageText }. Selectors rot as sites
+// change their markup (2026 reality), so this is defensive: it works off the job-detail
+// ANCHORS first (stable — every card links to /jobs/view/…), dedupes LinkedIn's doubled
+// title text, and always also returns cleaned page text so Fadi can AI-extract as a
+// self-healing fallback when the DOM heuristics miss.
 function fadiExtractJobList() {
-  const t = (el) => (el && el.textContent ? el.textContent.replace(/\s+/g, " ").trim() : "");
-  const cards = document.querySelectorAll(
-    [
-      ".job-card-container",
-      "li.jobs-search-results__list-item",
-      ".jobs-search-results__list-item",
-      ".scaffold-layout__list-item",
-      ".job_seen_beacon",
-      "[data-job-id]",
-      "[data-jk]",
-    ].join(","),
-  );
+  const clean = (s) => (s || "").replace(/\s+/g, " ").trim();
+  // LinkedIn renders the title twice (visible + a screen-reader "… with verification" copy),
+  // so textContent doubles it. Strip the a11y suffix, then collapse an exact double.
+  const dedupe = (s) => {
+    let v = clean(s).replace(/\s*with verification\s*$/i, "");
+    const n = v.length;
+    if (n > 0 && n % 2 === 0 && v.slice(0, n / 2).trim() === v.slice(n / 2).trim()) {
+      v = v.slice(0, n / 2).trim();
+    }
+    return v;
+  };
+
+  const CARD_SEL = [
+    "[data-occludable-job-id]",
+    "li.scaffold-layout__list-item",
+    ".scaffold-layout__list-item",
+    ".job-card-container",
+    "li.jobs-search-results__list-item",
+    ".jobs-search-results__list-item",
+    ".job_seen_beacon",
+    "[data-job-id]",
+    "[data-jk]",
+    "div.base-card",
+  ].join(",");
+  const closestCard = (el) => el.closest(CARD_SEL) || el.parentElement;
+  const titleFromAnchor = (a) => {
+    const vis = a.querySelector('[aria-hidden="true"]');
+    let t = vis ? clean(vis.textContent) : "";
+    if (!t) t = clean(a.getAttribute("aria-label"));
+    if (!t) t = clean(a.textContent);
+    return dedupe(t);
+  };
+  const pickText = (card, sel) => clean((card && card.querySelector(sel) || {}).textContent);
+  const companyOf = (card) =>
+    pickText(
+      card,
+      '.artdeco-entity-lockup__subtitle, .job-card-container__company-name, .job-card-container__primary-description, [data-testid="company-name"], .companyName, [class*="company" i]',
+    );
+  const locationOf = (card) =>
+    pickText(
+      card,
+      '.artdeco-entity-lockup__caption, .job-card-container__metadata-item, [data-testid="text-location"], .companyLocation, [class*="location" i]',
+    );
+
   const out = [];
   const seen = new Set();
-  for (const c of cards) {
-    const title = t(
-      c.querySelector(
-        '.job-card-list__title, .job-card-container__link span, a[class*="title" i], .jobTitle, h2 a, [data-testid="job-title"]',
-      ),
-    );
-    const company = t(
-      c.querySelector(
-        '.job-card-container__company-name, .artdeco-entity-lockup__subtitle, .companyName, [data-testid="company-name"], [class*="company" i]',
-      ),
-    );
-    const location = t(
-      c.querySelector('.job-card-container__metadata-item, .companyLocation, [class*="location" i]'),
-    );
-    const a =
-      c.querySelector('a[href*="/jobs/view/"], a[href*="viewjob"], a[href*="/jobs/"]') ||
-      c.querySelector("a[href]");
-    const url = a ? a.href : undefined;
-    if (!title || !company) continue;
+  const push = (title, company, location, url) => {
+    title = clean(title).slice(0, 300);
+    company = clean(company).slice(0, 200);
+    if (!title) return;
     const key = `${title}|${company}`.toLowerCase();
-    if (seen.has(key)) continue;
+    if (seen.has(key)) return;
     seen.add(key);
-    out.push({ title: title.slice(0, 300), company: company.slice(0, 200), location: location || undefined, url });
+    out.push({ title, company: company || undefined, location: location || undefined, url });
+  };
+
+  // Strategy A — anchors to a job detail page. Stable across redesigns; every card has one.
+  const anchors = document.querySelectorAll(
+    'a[href*="/jobs/view/"], a[href*="currentJobId="], a[href*="viewjob"], a.jcs-JobTitle, h2.jobTitle a, a[data-jk]',
+  );
+  for (const a of anchors) {
     if (out.length >= 50) break;
+    const title = titleFromAnchor(a);
+    if (!title) continue;
+    const card = closestCard(a);
+    push(title, companyOf(card), locationOf(card), a.href);
   }
-  return out;
+
+  // Strategy B — card-based fallback if no anchors matched.
+  if (out.length === 0) {
+    for (const card of document.querySelectorAll(CARD_SEL)) {
+      if (out.length >= 50) break;
+      const a = card.querySelector('a[href*="/jobs/view/"], a[href*="viewjob"], a[href]');
+      const titleEl = card.querySelector(
+        '.job-card-list__title, .artdeco-entity-lockup__title, .jobTitle, h2 a, [data-testid="job-title"]',
+      );
+      const title = titleEl ? dedupe(titleEl.textContent) : a ? titleFromAnchor(a) : "";
+      push(title, companyOf(card), locationOf(card), a ? a.href : undefined);
+    }
+  }
+
+  // Always return cleaned page text so the server can AI-extract if the heuristics miss.
+  const main = document.querySelector("main") || document.body;
+  const pageText = clean(main.innerText || "").slice(0, 12000);
+  return { jobs: out, pageText };
 }
