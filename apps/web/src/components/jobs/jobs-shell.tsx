@@ -2,10 +2,8 @@ import { BriefcaseBusiness, CalendarClock, Info, MapPin, Signal, Wallet } from "
 
 import { JobActions } from "@/components/jobs/job-actions";
 import { JobDescription } from "@/components/jobs/job-description";
-import { JobLocationFilter } from "@/components/jobs/job-location-filter";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import type { EmploymentType, VisaFilter, WorkMode } from "@/lib/jobs/filters";
 import { matchAccent } from "@/lib/jobs/match-accent";
 import type { RecommendedJob } from "@/lib/jobs/types";
 
@@ -15,9 +13,6 @@ type JobsShellProps = {
   activeRole?: string | null;
   selectedCountry: string | null;
   selectedCity: string | null;
-  selectedModes: WorkMode[];
-  selectedTypes: EmploymentType[];
-  selectedVisa: VisaFilter;
   /** Honest advisory when the live sources don't cover the user's field. */
   coverageNotice?: string | null;
 };
@@ -27,9 +22,6 @@ export function JobsShell({
   activeRole,
   selectedCountry,
   selectedCity,
-  selectedModes,
-  selectedTypes,
-  selectedVisa,
   coverageNotice,
 }: JobsShellProps) {
   return (
@@ -51,25 +43,17 @@ export function JobsShell({
                 </span>
               </h2>
               <p className="text-muted-foreground">
-                Live postings from the connected job sources — Google for Jobs, Adzuna, Reed,
-                Jooble, Remotive and more — matched to{" "}
+                Live postings from the connected sources — Google for Jobs, Adzuna, Reed, Jooble,
+                Remotive and more — matched to{" "}
                 {activeRole ? (
                   <span className="text-foreground">your active direction: {activeRole}</span>
                 ) : (
                   "your profile"
                 )}
-                . Each card links to the original posting so you can apply directly. Switch country
-                and city to search anywhere.
+                . Each card links to the original posting so you can apply directly.
               </p>
             </div>
           </div>
-          <JobLocationFilter
-            selectedCountry={selectedCountry}
-            selectedCity={selectedCity}
-            selectedModes={selectedModes}
-            selectedTypes={selectedTypes}
-            selectedVisa={selectedVisa}
-          />
         </div>
       </section>
 

@@ -325,6 +325,22 @@ export async function aiJobSearch(
 }
 
 /**
+ * Turn a plain-language search ("graduate IT support in Dublin, remote") into the location +
+ * mode the board understands. The ONE search box calls this, then navigates — so the board's
+ * existing fresh live-pull runs for the right place. Role stays the active direction (the spine).
+ */
+export async function resolveSearch(
+  prompt: string,
+): Promise<{ country: string | null; city: string | null; remote: boolean }> {
+  const intent = await parseJobPrompt(prompt);
+  return {
+    country: intent.country ?? null,
+    city: intent.city ?? null,
+    remote: Boolean(intent.remote),
+  };
+}
+
+/**
  * Fadi Web Surfer: read a company career page or ATS board (Greenhouse / Lever) server-side —
  * the open long tail no API covers — and save the jobs to the pipeline. When the page is a bot
  * wall (Cloudflare / login), it says so and points the user at the extension instead.

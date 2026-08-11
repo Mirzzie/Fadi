@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { createProfilesRepository } from "@careeros/database";
 
 import { AppShell } from "@/components/layout/app-shell";
-import { AiJobSearchBar } from "@/components/jobs/ai-job-search-bar";
+import { UnifiedJobSearch } from "@/components/jobs/unified-job-search";
 import { JobsShell } from "@/components/jobs/jobs-shell";
 import { JobControlBar } from "@/components/jobs/job-control-bar";
 import { getCurrentAuthUser } from "@/lib/auth/session";
@@ -94,7 +94,14 @@ export default async function JobsPage({
   return (
     <AppShell>
       <div className="mx-auto mb-4 max-w-shell space-y-3">
-        <AiJobSearchBar activeRole={profile?.targetRole ?? null} />
+        <UnifiedJobSearch
+          activeRole={profile?.targetRole ?? null}
+          selectedCountry={worldwide ? "any" : (getCountry(country)?.code ?? null)}
+          selectedCity={city ?? null}
+          selectedModes={modes}
+          selectedTypes={types}
+          selectedVisa={visa}
+        />
         <JobControlBar
           sources={sourcesHealth.sources}
           lastRunAt={sourcesHealth.lastRunAt}
@@ -108,9 +115,6 @@ export default async function JobsPage({
         activeRole={profile?.targetRole ?? null}
         selectedCountry={worldwide ? "any" : (getCountry(country)?.code ?? null)}
         selectedCity={city ?? null}
-        selectedModes={modes}
-        selectedTypes={types}
-        selectedVisa={visa}
         coverageNotice={coverage.message}
       />
     </AppShell>
