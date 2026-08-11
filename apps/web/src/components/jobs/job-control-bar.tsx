@@ -11,12 +11,18 @@ import type { JobSourceHealth } from "@/lib/data-sources/service";
 // sources" cards. The search bar above is the primary action and the board below is the
 // content — this is deliberately quiet, with both halves behind progressive disclosure.
 
-type Health = "returning" | "live-empty" | "error" | "needs-key";
+type Health = "returning" | "live-empty" | "error" | "idle" | "needs-key" | "off-optin";
+
+// These sources are SCRAPERS gated by a feature flag (FADI_SCRAPER_ENABLED / SCRAPERS_ENABLED)
+// — they take NO API key. Server-side scraping is largely blocked anyway; the browser
+// extension does this in the user's own session instead.
+const SCRAPER_IDS = new Set(["fadi-scraper", "linkedin-guest", "indeed-public"]);
 
 function healthOf(s: JobSourceHealth): Health {
-  if (!s.configured) return "needs-key";
+  if (!s.configured) return SCRAPER_IDS.has(s.id) ? "off-optin" : "needs-key";
   if (s.lastRun?.status === "error") return "error";
-  if (s.lastRun && s.lastRun.count > 0) return "returning";
+  if (!s.lastRun) return "idle"; // configured, but no pull has run this session yet
+  if (s.lastRun.count > 0) return "returning";
   return "live-empty";
 }
 
@@ -24,14 +30,18 @@ const DOT: Record<Health, string> = {
   returning: "bg-emerald-400",
   "live-empty": "bg-amber-400",
   error: "bg-rose-400",
+  idle: "bg-sky-400",
   "needs-key": "bg-muted-foreground/40",
+  "off-optin": "bg-muted-foreground/40",
 };
 
 const LABEL: Record<Health, string> = {
   returning: "returning jobs",
   "live-empty": "no jobs last pull",
   error: "error last pull",
+  idle: "ready — not searched yet",
   "needs-key": "needs an API key",
+  "off-optin": "off · no key needed",
 };
 
 export function JobControlBar({
@@ -112,7 +122,7 @@ export function JobControlBar({
               <span className="font-medium text-foreground">{returning}</span> of {configured} sources live
             </>
           ) : (
-            <>{configured} sources configured</>
+            <>{configured} sources ready · search to check</>
           )}
           <ChevronDown className={cn("size-3.5 transition-transform", sourcesOpen && "rotate-180")} aria-hidden="true" />
         </button>
@@ -136,8 +146,11 @@ export function JobControlBar({
             );
           })}
           <p className="pt-1 text-xs text-muted-foreground">
-            &ldquo;Returning&rdquo; means the source answered on the last live pull. A source can be configured but
-            quiet for a role/region — that&rsquo;s normal. Counts are pre-filter.
+            &ldquo;Ready&rdquo; means configured but not yet pulled this session — run a search and the counts fill
+            in. &ldquo;Returning&rdquo; means it answered with postings on the last pull (a source can be live but
+            quiet for a role/region — that&rsquo;s normal). The scraper sources need <strong>no API key</strong>;
+            they&rsquo;re off by default (blocked server-side) — the browser extension scrapes in your own
+            session instead.
           </p>
         </div>
       ) : null}
