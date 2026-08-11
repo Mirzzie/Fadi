@@ -231,7 +231,14 @@ export async function discoverJobs(
   }
   const query = queryFromProfile(profile, limit, location);
 
-  const settled = await Promise.allSettled(sources.map((s) => s.fetchJobs(query)));
+  // Per-source timeout: one slow source (e.g. the Web Surfer sweeping several boards) must
+  // never stall the whole pull. A source that overruns contributes [] for this pull.
+  const withTimeout = (p: Promise<JobPosting[]>): Promise<JobPosting[]> =>
+    Promise.race([
+      p.catch(() => [] as JobPosting[]),
+      new Promise<JobPosting[]>((resolve) => setTimeout(() => resolve([]), 9000)),
+    ]);
+  const settled = await Promise.allSettled(sources.map((s) => withTimeout(s.fetchJobs(query))));
   const perSource = settled.map((r) => (r.status === "fulfilled" ? r.value : []));
 
   // Record what each source returned on this real pull, so the UI can show which

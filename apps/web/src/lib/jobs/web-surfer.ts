@@ -133,6 +133,12 @@ export function extractJsonLdJobs(html: string): SurfedJob[] {
       const type = n["@type"];
       const isJob = type === "JobPosting" || (Array.isArray(type) && type.includes("JobPosting"));
       if (!isJob || !clean(n.title)) continue;
+      // Non-expired only: schema.org validThrough is the closing date. Drop anything past it.
+      const validThrough = clean(n.validThrough);
+      if (validThrough) {
+        const end = Date.parse(validThrough);
+        if (!Number.isNaN(end) && end < Date.now()) continue;
+      }
       out.push({
         title: clean(n.title).slice(0, 300),
         company: orgName(n.hiringOrganization) || undefined,
