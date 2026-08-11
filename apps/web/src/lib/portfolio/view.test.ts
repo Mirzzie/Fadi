@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { EvidenceItem, PortfolioItem } from "@careeros/database";
-import { fromExportItem, isSameEntry, seedItemsFromEvidence, toExportItem, toItemView } from "@careeros/portfolio";
+import { findDuplicates, fromExportItem, isSameEntry, seedItemsFromEvidence, toExportItem, toItemView } from "@careeros/portfolio";
 
 /**
  * These transforms have zero tests and sit on the two most destructive portfolio paths:
@@ -259,5 +259,44 @@ describe("isSameEntry (sync dedup)", () => {
         { section: "certification", title: "AWS", subtitle: "Amazon", dateRange: "2024" },
       ),
     ).toBe(false);
+  });
+});
+
+describe("findDuplicates (integrity — deterministic pass)", () => {
+  const edu = (id: string, title: string, org: string, dates: string) => ({
+    id,
+    section: "education",
+    title,
+    subtitle: org,
+    dateRange: dates,
+  });
+
+  it("flags the same credential worded differently as one finding", () => {
+    const found = findDuplicates([
+      edu("a", "MSc Cybersecurity", "National College of Ireland", "2025 — 2026"),
+      edu("b", "M.Sc. Cybersecurity", "National College of Ireland", "Jan 2025 - April 2026"),
+      edu("c", "BCA, Computer Science", "Mahatma Gandhi University", "2020 — 2023"),
+      edu("d", "Bachelor of Computer Application (BCA)", "Mahatma Gandhi University, Kottayam", "April 2020 - Mar 2023"),
+    ]);
+    expect(found).toHaveLength(2);
+    expect(found[0].severity).toBe("duplicate");
+    expect(found.every((f) => f.itemIds.length === 2)).toBe(true);
+  });
+
+  it("returns nothing for a clean portfolio", () => {
+    expect(
+      findDuplicates([
+        edu("a", "MSc Cybersecurity", "NCI", "2025 — 2026"),
+        edu("b", "BSc Physics", "Trinity", "2016 — 2019"),
+      ]),
+    ).toEqual([]);
+  });
+
+  it("does not double-report the same pair", () => {
+    const found = findDuplicates([
+      edu("a", "MSc AI", "NCI", "2025"),
+      edu("b", "M.Sc. AI", "NCI", "2025"),
+    ]);
+    expect(found).toHaveLength(1);
   });
 });

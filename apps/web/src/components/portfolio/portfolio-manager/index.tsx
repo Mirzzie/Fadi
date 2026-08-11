@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Code2,
@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { GithubPublishPanel } from "@/components/portfolio/github-publish";
 import { HistoryCapture } from "@/components/evidence/history-capture";
 import {
+  checkIntegrity,
   deleteItem,
   exportPortfolio,
   importPortfolio,
@@ -31,9 +32,15 @@ import {
   syncFromEvidence,
   updateSiteSettings,
 } from "@/app/dashboard/portfolio/actions";
-import type { PortfolioItemView, PortfolioSiteView } from "@careeros/portfolio";
+import {
+  findDuplicates,
+  type IntegrityFinding,
+  type PortfolioItemView,
+  type PortfolioSiteView,
+} from "@careeros/portfolio";
 
 import { DeveloperModal } from "./developer-modal";
+import { IntegrityPanel } from "./integrity-panel";
 import { ItemCard } from "./item-card";
 import { ItemEditor } from "./item-editor";
 import { Modal } from "./modal";
@@ -64,6 +71,39 @@ export function PortfolioManager({
   const [githubOpen, setGithubOpen] = useState(false);
   const [dragId, setDragId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Integrity: deterministic duplicate findings recompute for free on every change; the AI
+  // pass (contradictions / timeline / anomalies) is on demand. The AI verdict is keyed to the
+  // exact content it ran against, so a later edit invalidates it — derived, no effect needed.
+  const [checking, setChecking] = useState(false);
+  const [ai, setAi] = useState<{ key: string; findings: IntegrityFinding[]; note: string | null } | null>(null);
+  const dupFindings = useMemo(() => findDuplicates(items), [items]);
+  const titleById = useMemo(() => new Map(items.map((i) => [i.id, i.title])), [items]);
+  const itemsKey = useMemo(
+    () => items.map((i) => `${i.id}:${i.title}:${i.subtitle ?? ""}:${i.dateRange ?? ""}`).join("|"),
+    [items],
+  );
+  const aiValid = ai && ai.key === itemsKey ? ai : null;
+  const allFindings = [...dupFindings, ...(aiValid?.findings ?? [])];
+
+  function runAiCheck() {
+    setChecking(true);
+    startTransition(async () => {
+      const r = await checkIntegrity();
+      setChecking(false);
+      if (!r.ok) {
+        setError(r.message);
+        return;
+      }
+      setAi({
+        key: itemsKey,
+        findings: r.findings,
+        note: r.aiUnavailable
+          ? "Connect an AI provider in Settings to run the Fadi AI check."
+          : (r.aiError ?? null),
+      });
+    });
+  }
 
   const grouped: Record<string, PortfolioItemView[]> = {};
   for (const it of items) (grouped[it.section] ??= []).push(it);
@@ -255,6 +295,17 @@ export function PortfolioManager({
         <div className="mb-6 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-400">
           {notice}
         </div>
+      )}
+
+      {items.length > 0 && (
+        <IntegrityPanel
+          findings={allFindings}
+          checking={checking}
+          aiRan={Boolean(aiValid)}
+          aiNote={aiValid?.note ?? null}
+          titleOf={(id) => titleById.get(id)}
+          onRunAi={runAiCheck}
+        />
       )}
 
       {items.length === 0 && (

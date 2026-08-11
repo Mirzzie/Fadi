@@ -4,6 +4,7 @@
 
 // View contract + mapper (pure).
 export * from "./view";
+export * from "./integrity";
 export * from "./themes";
 export * from "./media";
 export * from "./persona";

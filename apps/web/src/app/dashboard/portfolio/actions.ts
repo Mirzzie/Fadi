@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getUserDocGenerate } from "@/lib/ai/user-generate";
 import { getDatabase } from "@/lib/database/client";
+import { checkPortfolioIntegrityAI, type IntegrityAiResult } from "@/lib/portfolio/integrity";
 import { publish } from "@/lib/events/bus";
 import {
   fromExportItem,
@@ -235,6 +236,22 @@ export async function syncFromEvidence(): Promise<Result<{ added: number }>> {
   await publish("portfolio.changed", { userId: user.id, siteId: site.id, reason: "synced" });
   revalidatePath(PATH);
   return { ok: true, added: created.length };
+}
+
+/**
+ * Fadi AI integrity pass: audits the whole portfolio for contradictions, timeline errors and
+ * anomalies (deterministic duplicate detection runs client-side, for free, on every edit).
+ * Detect & propose only — nothing is changed. Degrades gracefully when no AI key is set.
+ */
+export async function checkIntegrity(): Promise<Result<IntegrityAiResult>> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  const repo = createPortfolioRepository(getDatabase());
+  const site = await ensureSite(user.id, user.email);
+  const items = (await repo.listItemsForUser(user.id, site.id)).map(toItemView);
+  const res = await checkPortfolioIntegrityAI(user.id, items);
+  return { ok: true, ...res };
 }
 
 export async function saveItem(input: {
