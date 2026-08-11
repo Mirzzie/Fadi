@@ -6,8 +6,7 @@ import { createProfilesRepository } from "@careeros/database";
 import { AppShell } from "@/components/layout/app-shell";
 import { AiJobSearchBar } from "@/components/jobs/ai-job-search-bar";
 import { JobsShell } from "@/components/jobs/jobs-shell";
-import { JobPreferencesPanel } from "@/components/jobs/job-preferences-panel";
-import { JobSourcesStatus } from "@/components/jobs/job-sources-status";
+import { JobControlBar } from "@/components/jobs/job-control-bar";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDashboardProfileSummary } from "@/lib/career-report/data";
 import { getDatabase } from "@/lib/database/client";
@@ -94,14 +93,15 @@ export default async function JobsPage({
 
   return (
     <AppShell>
-      <div className="mx-auto mb-4 max-w-shell space-y-4">
+      <div className="mx-auto mb-4 max-w-shell space-y-3">
         <AiJobSearchBar activeRole={profile?.targetRole ?? null} />
-        <JobPreferencesPanel
+        <JobControlBar
+          sources={sourcesHealth.sources}
+          lastRunAt={sourcesHealth.lastRunAt}
           activeModes={modes}
           activeTypes={types}
           autoSearch={Boolean(prefs.autoSearch)}
         />
-        <JobSourcesStatus sources={sourcesHealth.sources} lastRunAt={sourcesHealth.lastRunAt} />
       </div>
       <JobsShell
         jobs={jobs}
