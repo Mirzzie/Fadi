@@ -7,6 +7,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { AiJobSearchBar } from "@/components/jobs/ai-job-search-bar";
 import { JobsShell } from "@/components/jobs/jobs-shell";
 import { JobControlBar } from "@/components/jobs/job-control-bar";
+import { WebSurferInput } from "@/components/jobs/web-surfer-input";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDashboardProfileSummary } from "@/lib/career-report/data";
 import { getDatabase } from "@/lib/database/client";
@@ -102,6 +103,7 @@ export default async function JobsPage({
           activeTypes={types}
           autoSearch={Boolean(prefs.autoSearch)}
         />
+        <WebSurferInput />
       </div>
       <JobsShell
         jobs={jobs}

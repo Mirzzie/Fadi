@@ -14,6 +14,7 @@ import { z } from "zod";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
 import { applyIntentFilter, parseJobPrompt, type JobSearchIntent } from "@/lib/jobs/ai-search";
+import { surfForJobs } from "@/lib/jobs/web-surfer";
 import { getRecommendedJobsForUser } from "@/lib/jobs/data";
 import type { RecommendedJob } from "@/lib/jobs/types";
 import { scoreJobForUser } from "@/lib/jobs/job-matching";
@@ -321,4 +322,56 @@ export async function aiJobSearch(
     modes: intent.remote ? ["remote"] : undefined,
   });
   return { ok: true, jobs: applyIntentFilter(jobs, intent), intent };
+}
+
+/**
+ * Fadi Web Surfer: read a company career page or ATS board (Greenhouse / Lever) server-side —
+ * the open long tail no API covers — and save the jobs to the pipeline. When the page is a bot
+ * wall (Cloudflare / login), it says so and points the user at the extension instead.
+ */
+export async function surfCareerPage(
+  input: string,
+): Promise<
+  | { ok: true; saved: number; found: number; via: string; company?: string }
+  | { ok: false; message: string; blocked?: boolean }
+> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  const url = input.trim();
+  if (!url) return { ok: false, message: "Paste a company career page or a Greenhouse / Lever board URL." };
+
+  const res = await surfForJobs(url);
+  if (!res.ok) return { ok: false, message: res.reason, blocked: res.blocked };
+  if (res.jobs.length === 0) {
+    return { ok: false, message: "No jobs found on that page. Try the company's Greenhouse or Lever board URL." };
+  }
+
+  const db = getDatabase();
+  const jobsRepo = createJobsRepository(db);
+  const savedRepo = createSavedJobsRepository(db);
+  let saved = 0;
+  let company: string | undefined;
+  for (const j of res.jobs.slice(0, 80)) {
+    if (!j.title?.trim()) continue;
+    company = company ?? j.company;
+    try {
+      const externalId = (j.url ?? `${j.company ?? ""}:${j.title}`).slice(0, 250);
+      const job = await jobsRepo.upsertSeedJob({
+        source: "web-surfer",
+        externalId,
+        title: j.title,
+        company: j.company ?? company ?? "Unknown",
+        location: j.location ?? null,
+        description: j.description ?? null,
+        url: j.url ?? null,
+      });
+      await savedRepo.saveForUser(user.id, job.id, {});
+      saved += 1;
+    } catch {
+      /* skip the one that failed */
+    }
+  }
+  revalidatePath("/dashboard/jobs");
+  return { ok: true, saved, found: res.jobs.length, via: res.via, company };
 }
