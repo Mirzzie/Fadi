@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { EvidenceItem, PortfolioItem } from "@careeros/database";
-import { fromExportItem, seedItemsFromEvidence, toExportItem, toItemView } from "@careeros/portfolio";
+import { fromExportItem, isSameEntry, seedItemsFromEvidence, toExportItem, toItemView } from "@careeros/portfolio";
 
 /**
  * These transforms have zero tests and sit on the two most destructive portfolio paths:
@@ -205,5 +205,59 @@ describe("toItemView — null-safe array coalescing", () => {
     expect(view.bullets).toEqual([]);
     expect(view.roles).toEqual([]);
     expect(view.gallery).toEqual([]);
+  });
+});
+
+describe("isSameEntry (sync dedup)", () => {
+  const edu = (title: string, org: string, dates: string) => ({
+    section: "education",
+    title,
+    subtitle: org,
+    dateRange: dates,
+  });
+
+  it("matches the same degree worded differently — punctuation ('MSc' vs 'M.Sc.')", () => {
+    expect(
+      isSameEntry(
+        edu("MSc Cybersecurity", "National College of Ireland", "2025 — 2026"),
+        edu("M.Sc. Cybersecurity", "National College of Ireland", "January 2025 - April 2026"),
+      ),
+    ).toBe(true);
+  });
+
+  it("matches acronym vs expanded ('BCA' vs 'Bachelor of Computer Application (BCA)')", () => {
+    expect(
+      isSameEntry(
+        edu("BCA, Computer Science", "Mahatma Gandhi University", "2020 — 2023"),
+        edu("Bachelor of Computer Application (BCA)", "Mahatma Gandhi University, Kottayam", "April 2020 - Mar 2023"),
+      ),
+    ).toBe(true);
+  });
+
+  it("does NOT merge different degrees at the same school (BSc vs MSc)", () => {
+    expect(
+      isSameEntry(
+        edu("BSc Computer Science", "Same University", "2016 — 2019"),
+        edu("MSc Computer Science", "Same University", "2020 — 2021"),
+      ),
+    ).toBe(false);
+  });
+
+  it("does NOT merge two different master's subjects even at the same school/years", () => {
+    expect(
+      isSameEntry(
+        edu("MSc Cybersecurity", "Same University", "2025 — 2026"),
+        edu("MSc Data Science", "Same University", "2025 — 2026"),
+      ),
+    ).toBe(false);
+  });
+
+  it("does NOT merge across different sections", () => {
+    expect(
+      isSameEntry(
+        { section: "education", title: "AWS", subtitle: "Amazon", dateRange: "2024" },
+        { section: "certification", title: "AWS", subtitle: "Amazon", dateRange: "2024" },
+      ),
+    ).toBe(false);
   });
 });

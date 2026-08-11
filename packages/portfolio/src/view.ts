@@ -192,3 +192,68 @@ export function seedItemsFromEvidence(
     sortOrder: (i + 1) * 10,
   }));
 }
+
+// ── Duplicate detection for sync ──────────────────────────────────────────────
+// Exact-title matching is too weak: the same real credential shows up worded differently
+// across sources ("MSc" vs "M.Sc.", "BCA, Computer Science" vs "Bachelor of Computer
+// Application (BCA)"), so an exact check re-adds it as a duplicate. This decides whether two
+// entries are the SAME thing — biased to avoid FALSE merges (losing a distinct entry is worse
+// than an occasional missed dedup the user can delete).
+
+type EntryLike = { section: string; title: string; subtitle?: string | null; dateRange?: string | null };
+
+const STOP = new Set(["of", "the", "and", "for", "a", "an", "at", "to", "in", "on", "de", "du"]);
+const collapse = (s: string | null | undefined) => (s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+const wordsOf = (s: string | null | undefined) => (s ?? "").toLowerCase().match(/[a-z0-9]+/g) ?? [];
+
+function yearsOf(s: string | null | undefined): [number, number] | null {
+  const ys = (s ?? "").match(/\b(?:19|20)\d{2}\b/g)?.map(Number) ?? [];
+  return ys.length ? [Math.min(...ys), Math.max(...ys)] : null;
+}
+function orgSimilar(a?: string | null, b?: string | null): boolean {
+  const x = collapse(a);
+  const y = collapse(b);
+  if (!x || !y) return false;
+  return x === y || x.includes(y) || y.includes(x);
+}
+function yearsOverlap(a?: string | null, b?: string | null): boolean {
+  const x = yearsOf(a);
+  const y = yearsOf(b);
+  if (!x || !y) return true; // missing dates can't disprove a match
+  return x[0] <= y[1] && y[0] <= x[1];
+}
+/** Do two titles name the same thing? Shared short code (e.g. "BCA") + non-contradicting subject. */
+function titlesRelated(a: string, b: string, orgA: string, orgB: string): boolean {
+  if (collapse(a) && collapse(a) === collapse(b)) return true;
+  const orgTokens = new Set([...wordsOf(orgA), ...wordsOf(orgB)]);
+  // Short alpha tokens = degree/cert codes ("bca", "saa"); ignore ones that are just the org.
+  const codes = (t: string) =>
+    new Set(
+      wordsOf(t).filter(
+        (w) => w.length >= 2 && w.length <= 5 && /^[a-z]+$/.test(w) && !STOP.has(w) && !orgTokens.has(w),
+      ),
+    );
+  const ca = codes(a);
+  const cb = codes(b);
+  const sharedCode = [...ca].some((c) => cb.has(c));
+  if (!sharedCode) return false;
+  // A shared code isn't enough if the subjects clearly differ (MSc Cybersecurity vs MSc Data).
+  const longs = (t: string) => new Set(wordsOf(t).filter((w) => w.length >= 5 && !STOP.has(w)));
+  const la = longs(a);
+  const lb = longs(b);
+  if (la.size > 0 && lb.size > 0 && ![...la].some((w) => lb.has(w))) return false;
+  return true;
+}
+
+/** True when two entries are the same real thing worded differently. Section-scoped. */
+export function isSameEntry(a: EntryLike, b: EntryLike): boolean {
+  if (a.section !== b.section) return false;
+  // Unambiguous: identical once punctuation/spacing is ignored ("M.Sc." === "MSc").
+  if (collapse(a.title) && collapse(a.title) === collapse(b.title)) return true;
+  // Otherwise: same organisation + overlapping years + a related title.
+  return (
+    orgSimilar(a.subtitle, b.subtitle) &&
+    yearsOverlap(a.dateRange, b.dateRange) &&
+    titlesRelated(a.title, b.title, a.subtitle ?? "", b.subtitle ?? "")
+  );
+}

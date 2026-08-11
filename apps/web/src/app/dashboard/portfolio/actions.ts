@@ -9,6 +9,7 @@ import { getDatabase } from "@/lib/database/client";
 import { publish } from "@/lib/events/bus";
 import {
   fromExportItem,
+  isSameEntry,
   seedItemsFromEvidence,
   toExportItem,
   toItemView,
@@ -206,19 +207,21 @@ export async function syncFromEvidence(): Promise<Result<{ added: number }>> {
   const site = await ensureSite(user.id, user.email);
   const existing = await repo.listItemsForUser(user.id, site.id);
   const have = new Set(existing.map((i) => i.evidenceItemId).filter(Boolean) as string[]);
-  // Items that arrived via Import (or the original Firestore migration) have NO
-  // evidence_item_id, so an id-only check would re-add every one of them as a
-  // duplicate. Fall back to matching on title so sync stays idempotent.
-  const haveTitles = new Set(existing.map((i) => i.title.trim().toLowerCase()));
 
   const evidence = await createEvidenceRepository(getDatabase()).listForUser(user.id);
-  const missing = evidence.filter(
-    (e) => !have.has(e.id) && !haveTitles.has(e.title.trim().toLowerCase()),
+  // Seed every evidence item into a row, then keep only the ones we don't already have.
+  // Items from Import / the original migration carry NO evidence_item_id, so we also match
+  // on the CONTENT (section + org + years + title) — the same credential worded differently
+  // ("MSc" vs "M.Sc.", "BCA, Computer Science" vs "Bachelor of Computer Application (BCA)")
+  // no longer sneaks back in as a duplicate.
+  const seeded = seedItemsFromEvidence(evidence);
+  const kept = seeded.filter(
+    (r) => !have.has(r.evidenceItemId) && !existing.some((x) => isSameEntry(r, x)),
   );
-  if (missing.length === 0) return { ok: true, added: 0 };
+  if (kept.length === 0) return { ok: true, added: 0 };
 
   const maxSort = existing.reduce((m, i) => Math.max(m, i.sortOrder), 0);
-  const rows = seedItemsFromEvidence(missing).map((r, i) => ({
+  const rows = kept.map((r, i) => ({
     ...r,
     siteId: site.id,
     roles: [] as string[],
