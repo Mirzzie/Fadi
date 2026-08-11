@@ -5,6 +5,7 @@ import { serverEnv } from "@/lib/env.server";
 import { AdzunaSource } from "./providers/adzuna";
 import { ApifyLinkedInSource } from "./providers/apify-linkedin";
 import { ArbeitnowSource } from "./providers/arbeitnow";
+import { WebSurferSource } from "./providers/web-surfer-source";
 import { BlsSource } from "./providers/bls";
 import { GdeltSource } from "./providers/gdelt";
 import { HackerNewsSource } from "./providers/hackernews";
@@ -41,6 +42,7 @@ function buildSources(): DataSourceBase[] {
     new HackerNewsSource(), // AI / skill_trend
     new RemotiveSource(), // live job_listings
     new ArbeitnowSource(), // live job_listings (EU / ATS)
+    new WebSurferSource(), // ALWAYS-ON: sweeps verified Greenhouse/Lever boards — fresh, keyless
     new BlsSource(), // labor_market — real US gov data (keyless v1; BLS_API_KEY → v2)
     // ── Phase B: keyed sources — self-report unavailable until their env key is set ──
     new AdzunaSource(serverEnv.ADZUNA_APP_ID, serverEnv.ADZUNA_APP_KEY), // jobs + salary, ~19 countries (NOT Ireland)

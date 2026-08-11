@@ -14,6 +14,8 @@ export type SurfedJob = {
   location?: string;
   url?: string;
   description?: string;
+  /** ISO date the posting was created/updated, when the source gives one. */
+  postedAt?: string;
 };
 
 export type SurfResult =
@@ -78,6 +80,7 @@ export function mapGreenhouse(json: any, company?: string): SurfedJob[] {
       location: clean(j?.location?.name) || undefined,
       url: clean(j?.absolute_url) || undefined,
       description: clean(j?.content ? String(j.content).replace(/<[^>]+>/g, " ") : "").slice(0, 4000) || undefined,
+      postedAt: clean(j?.updated_at) || undefined,
     }))
     .filter((j: SurfedJob) => j.title);
 }
@@ -91,6 +94,7 @@ export function mapLever(json: any, company?: string): SurfedJob[] {
       location: clean(j?.categories?.location) || undefined,
       url: clean(j?.hostedUrl) || undefined,
       description: clean(j?.descriptionPlain).slice(0, 4000) || undefined,
+      postedAt: typeof j?.createdAt === "number" ? new Date(j.createdAt).toISOString() : undefined,
     }))
     .filter((j: SurfedJob) => j.title);
 }
