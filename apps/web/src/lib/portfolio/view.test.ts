@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { EvidenceItem, PortfolioItem } from "@careeros/database";
-import { fromExportItem, seedItemsFromEvidence, toExportItem, toItemView } from "./view";
+import { fromExportItem, seedItemsFromEvidence, toExportItem, toItemView } from "@careeros/portfolio";
 
 /**
  * These transforms have zero tests and sit on the two most destructive portfolio paths:

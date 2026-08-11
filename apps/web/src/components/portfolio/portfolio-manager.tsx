@@ -43,7 +43,7 @@ import {
   updateSiteSettings,
 } from "@/app/dashboard/portfolio/actions";
 import { isVideoUrl, mediaUploadConfigured, uploadPortfolioMedia } from "@/lib/portfolio/upload";
-import type { PortfolioItemView, PortfolioSiteView } from "@/lib/portfolio/view";
+import type { PortfolioItemView, PortfolioSiteView } from "@careeros/portfolio";
 
 const SECTION_KEYS = [
   "project",

@@ -7,7 +7,7 @@ import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
 import { buildPortfolioSite, pagesBasePath } from "@/lib/portfolio/build-export";
 import { buildPagesDeployWorkflow, GitHubClient, GitHubError, pagesUrl } from "@/lib/portfolio/github";
-import { toPortfolioView } from "@/lib/portfolio/view";
+import { toPortfolioView } from "@careeros/portfolio";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 import { decryptSecret, encryptSecret } from "@/lib/security/crypto";
 

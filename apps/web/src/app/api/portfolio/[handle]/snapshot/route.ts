@@ -5,7 +5,7 @@ import { createPortfolioRepository } from "@careeros/database";
 
 import { getDatabase } from "@/lib/database/client";
 import { buildSnapshotHtml } from "@/lib/portfolio/snapshot";
-import { toPortfolioView } from "@/lib/portfolio/view";
+import { toPortfolioView } from "@careeros/portfolio";
 
 // Server-rendered static snapshot: the same self-contained index.html the client
 // "Static snapshot" button produces, but served from a public URL so the Phase-B

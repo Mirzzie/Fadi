@@ -5,7 +5,7 @@ import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 
-import type { PortfolioView } from "@/lib/portfolio/view";
+import type { PortfolioView } from "@careeros/portfolio";
 
 const exec = promisify(execFile);
 

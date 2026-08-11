@@ -1,0 +1,28 @@
+{
+  "name": "@careeros/portfolio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared portfolio presentation layer — view types, the view mapper, and the render components used by BOTH the Fadi app and the static export site. The single source of truth so the two apps never drift.",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "sideEffects": false,
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@careeros/database": "*"
+  },
+  "peerDependencies": {
+    "framer-motion": "*",
+    "lucide-react": "*",
+    "next": "*",
+    "react": "*",
+    "react-dom": "*"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^5"
+  }
+}

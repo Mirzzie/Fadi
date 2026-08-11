@@ -9,9 +9,9 @@ export function mediaUploadConfigured(): boolean {
   return Boolean(CLOUD && PRESET);
 }
 
-export function isVideoUrl(url: string): boolean {
-  return /\.(mp4|webm|mov|m4v|ogg|ogv)(\?|#|$)/i.test(url);
-}
+// `isVideoUrl` (a pure classifier used by the shared render layer) now lives in
+// @careeros/portfolio; re-exported here so existing admin importers keep working.
+export { isVideoUrl } from "@careeros/portfolio";
 
 export async function uploadPortfolioMedia(file: File): Promise<string> {
   if (!CLOUD || !PRESET) {

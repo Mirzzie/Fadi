@@ -1,7 +1,7 @@
 import { createPortfolioRepository } from "@careeros/database";
 
 import { getDatabase } from "@/lib/database/client";
-import { toPortfolioView } from "@/lib/portfolio/view";
+import { toPortfolioView } from "@careeros/portfolio";
 
 // Public, stack-agnostic Content API. Any website — our template or a third
 // party's — reads a live portfolio here. Returns ONLY a published site and its

@@ -4,8 +4,7 @@ import { notFound } from "next/navigation";
 import { createPortfolioRepository } from "@careeros/database";
 
 import { getDatabase } from "@/lib/database/client";
-import { toPortfolioView } from "@/lib/portfolio/view";
-import { PortfolioTemplate } from "@/components/portfolio/portfolio-template";
+import { PortfolioTemplate, toPortfolioView } from "@careeros/portfolio";
 
 export const dynamic = "force-dynamic";
 

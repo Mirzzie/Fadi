@@ -13,12 +13,10 @@ import {
   toExportItem,
   toItemView,
   toSiteView,
-} from "@/lib/portfolio/view";
-import type {
-  PortfolioExport,
-  PortfolioItemView,
-  PortfolioSiteView,
-} from "@/lib/portfolio/view";
+  type PortfolioExport,
+  type PortfolioItemView,
+  type PortfolioSiteView,
+} from "@careeros/portfolio";
 
 const PATH = "/dashboard/portfolio";
 

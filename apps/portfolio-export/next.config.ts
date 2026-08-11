@@ -12,7 +12,7 @@ const nextConfig: NextConfig = {
   assetPrefix: basePath || undefined,
   images: { unoptimized: true }, // static host: no image optimizer
   // Compile the shared template + components imported from apps/web as source.
-  transpilePackages: ["@careeros/database"],
+  transpilePackages: ["@careeros/database", "@careeros/portfolio"],
   typescript: { ignoreBuildErrors: true },
 };
 

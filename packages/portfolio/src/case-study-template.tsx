@@ -1,10 +1,10 @@
 import Link from "next/link";
 
-import { accentFor } from "@/lib/portfolio/themes";
-import type { PortfolioItemView, PortfolioSiteView } from "@/lib/portfolio/view";
-import { GalleryLightbox } from "@/components/portfolio/gallery-lightbox";
-import { Reveal } from "@/components/portfolio/reveal";
-import { Cursor, PortfolioBackground } from "@/components/portfolio/site-chrome";
+import { accentFor } from "./themes";
+import type { PortfolioItemView, PortfolioSiteView } from "./view";
+import { GalleryLightbox } from "./gallery-lightbox";
+import { Reveal } from "./reveal";
+import { Cursor, PortfolioBackground } from "./site-chrome";
 
 /**
  * The case-study (item detail) template — the ONE renderer, shared by the live route

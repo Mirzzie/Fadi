@@ -1,6 +1,5 @@
 import data from "@export/data/portfolio.json";
-import type { PortfolioView } from "@/lib/portfolio/view";
-import { PortfolioTemplate } from "@/components/portfolio/portfolio-template";
+import { PortfolioTemplate, type PortfolioView } from "@careeros/portfolio";
 
 // The portfolio IS the site root here, so a case study links to /<id>/ (not /p/<handle>/<id>).
 export default function Home() {

@@ -1,13 +1,13 @@
 import Link from "next/link";
 
-import { accentFor } from "@/lib/portfolio/themes";
-import type { PortfolioItemView, PortfolioView } from "@/lib/portfolio/view";
-import { GalleryLightbox } from "@/components/portfolio/gallery-lightbox";
-import { Reveal } from "@/components/portfolio/reveal";
-import { Cursor, Marquee, PortfolioBackground, WordRise } from "@/components/portfolio/site-chrome";
-import { WelcomeGate } from "@/components/portfolio/welcome-gate";
-import { TuneTheStory } from "@/components/portfolio/tune-the-story";
-import { ResumeButton } from "@/components/portfolio/resume-button";
+import { accentFor } from "./themes";
+import type { PortfolioItemView, PortfolioView } from "./view";
+import { GalleryLightbox } from "./gallery-lightbox";
+import { Reveal } from "./reveal";
+import { Cursor, Marquee, PortfolioBackground, WordRise } from "./site-chrome";
+import { WelcomeGate } from "./welcome-gate";
+import { TuneTheStory } from "./tune-the-story";
+import { ResumeButton } from "./resume-button";
 
 /**
  * The portfolio template — the ONE renderer for a published portfolio.

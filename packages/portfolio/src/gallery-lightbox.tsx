@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronLeft, ChevronRight, Images, X } from "lucide-react";
 
-import { isVideoUrl } from "@/lib/portfolio/upload";
+import { isVideoUrl } from "./media";
 
 /**
  * A self-contained gallery affordance for the public portfolio: a small badge

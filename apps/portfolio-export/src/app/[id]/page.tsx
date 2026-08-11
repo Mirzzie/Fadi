@@ -1,6 +1,5 @@
 import data from "@export/data/portfolio.json";
-import type { PortfolioView } from "@/lib/portfolio/view";
-import { CaseStudyTemplate } from "@/components/portfolio/case-study-template";
+import { CaseStudyTemplate, type PortfolioView } from "@careeros/portfolio";
 
 const view = data as unknown as PortfolioView;
 
