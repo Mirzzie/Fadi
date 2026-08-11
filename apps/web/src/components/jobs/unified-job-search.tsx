@@ -5,14 +5,15 @@ import { useRouter } from "next/navigation";
 import { Globe, Loader2, Search, SlidersHorizontal } from "lucide-react";
 
 import { resolveSearch } from "@/app/dashboard/jobs/actions";
-import { JobLocationFilter } from "@/components/jobs/job-location-filter";
+import { JobFilterChips } from "@/components/jobs/job-filter-chips";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { EmploymentType, VisaFilter, WorkMode } from "@/lib/jobs/filters";
 
-// THE search. One plain-language box → Fadi reads the location/mode from your words and pulls
-// the board fresh for the right place (role stays your active direction). Dropdowns live behind
-// a "Filters" disclosure for precision — no competing search surfaces.
+// THE search — one plain-language box. Fadi reads location + mode from your words and pulls the
+// board fresh for the right place (role stays your active direction). No competing controls:
+// "worldwide" DERIVES from the active location (can't contradict it), and Filters are refinement
+// chips only, not a second search.
 export function UnifiedJobSearch({
   activeRole,
   selectedCountry,
@@ -30,21 +31,43 @@ export function UnifiedJobSearch({
 }) {
   const router = useRouter();
   const [prompt, setPrompt] = useState("");
-  const [worldwide, setWorldwide] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [pending, start] = useTransition();
+
+  // Single source of truth: worldwide is simply "the active country is Any". No separate toggle
+  // state to drift out of sync with the shown location.
+  const worldwide = selectedCountry === "any";
+
+  function push(next: { country?: string | null; city?: string | null; modes?: WorkMode[] }) {
+    const country = next.country === undefined ? selectedCountry : next.country;
+    const city = next.city === undefined ? selectedCity : next.city;
+    const modes = next.modes ?? selectedModes;
+    const p = new URLSearchParams();
+    if (country && country !== null) p.set("country", country);
+    if (country !== "any" && city) p.set("city", city);
+    if (modes.length) p.set("modes", modes.join(","));
+    if (selectedTypes.length) p.set("types", selectedTypes.join(","));
+    if (selectedVisa && selectedVisa !== "any") p.set("visa", selectedVisa);
+    const qs = p.toString();
+    start(() => router.push(qs ? `/dashboard/jobs?${qs}` : "/dashboard/jobs"));
+  }
 
   function run() {
     if (!prompt.trim()) return;
     start(async () => {
       const r = await resolveSearch(prompt);
-      const p = new URLSearchParams();
-      if (worldwide) p.set("country", "any");
-      else if (r.country) p.set("country", r.country);
-      if (!worldwide && r.city) p.set("city", r.city);
-      if (r.remote) p.set("modes", "remote");
-      router.push(`/dashboard/jobs${p.toString() ? `?${p}` : ""}`);
+      // Typing a place overrides worldwide; typing none keeps the current scope.
+      push({
+        country: r.country ?? (worldwide ? "any" : selectedCountry),
+        city: r.city ?? (r.country ? null : selectedCity),
+        modes: r.remote ? Array.from(new Set([...selectedModes, "remote" as WorkMode])) : selectedModes,
+      });
     });
+  }
+
+  function toggleWorldwide() {
+    if (worldwide) push({ country: null, city: null }); // back to a located search
+    else push({ country: "any", city: null }); // go global
   }
 
   return (
@@ -54,7 +77,7 @@ export function UnifiedJobSearch({
         <h3 className="text-sm font-semibold">Search jobs</h3>
         {activeRole ? (
           <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
-            {worldwide ? "Global" : activeRole}
+            {worldwide ? "Worldwide" : activeRole}
           </span>
         ) : null}
       </div>
@@ -79,21 +102,20 @@ export function UnifiedJobSearch({
         </Button>
       </div>
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-        <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-          <input
-            type="checkbox"
-            checked={worldwide}
-            onChange={(e) => setWorldwide(e.target.checked)}
-            className="size-3.5 accent-primary"
-          />
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <label className="flex cursor-pointer items-center gap-2">
+          <input type="checkbox" checked={worldwide} onChange={toggleWorldwide} className="size-3.5 accent-primary" />
           <Globe className="size-3.5" aria-hidden="true" />
-          Search worldwide (ignore location)
+          Search worldwide
         </label>
+        <span aria-hidden="true">·</span>
+        <span>
+          {worldwide ? "Anywhere" : selectedCity ? `${selectedCity}` : "your saved region"}
+        </span>
         <button
           type="button"
           onClick={() => setShowFilters((s) => !s)}
-          className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+          className="ml-auto flex items-center gap-1.5 hover:text-foreground"
           aria-expanded={showFilters}
         >
           <SlidersHorizontal className="size-3.5" aria-hidden="true" />
@@ -103,7 +125,7 @@ export function UnifiedJobSearch({
 
       {showFilters ? (
         <div className="mt-3 border-t pt-3">
-          <JobLocationFilter
+          <JobFilterChips
             selectedCountry={selectedCountry}
             selectedCity={selectedCity}
             selectedModes={selectedModes}

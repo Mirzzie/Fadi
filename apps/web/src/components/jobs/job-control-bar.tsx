@@ -62,8 +62,12 @@ export function JobControlBar({
   const [pending, startTransition] = useTransition();
   const [sourcesOpen, setSourcesOpen] = useState(false);
 
-  const configured = sources.filter((s) => s.configured).length;
-  const returning = sources.filter((s) => healthOf(s) === "returning").length;
+  // Hide the server-side scraper sources unless they're actually enabled: off, they can't
+  // return jobs (blocked server-side) and only prompt "why is this off?". The real scraping
+  // paths are the browser extension (walled sites) and the Web Surfer (open web).
+  const visible = sources.filter((s) => s.configured || !SCRAPER_IDS.has(s.id));
+  const configured = visible.filter((s) => s.configured).length;
+  const returning = visible.filter((s) => healthOf(s) === "returning").length;
   const changed = autoSearch !== initialAutoSearch;
   const filterSummary = [
     activeModes.length ? activeModes.join("/") : "any mode",
@@ -130,7 +134,7 @@ export function JobControlBar({
 
       {sourcesOpen ? (
         <div className="space-y-1.5 border-t px-4 py-3">
-          {sources.map((s) => {
+          {visible.map((s) => {
             const h = healthOf(s);
             return (
               <div key={s.id} className="flex items-center justify-between gap-3 text-sm">
@@ -148,9 +152,8 @@ export function JobControlBar({
           <p className="pt-1 text-xs text-muted-foreground">
             &ldquo;Ready&rdquo; means configured but not yet pulled this session — run a search and the counts fill
             in. &ldquo;Returning&rdquo; means it answered with postings on the last pull (a source can be live but
-            quiet for a role/region — that&rsquo;s normal). The scraper sources need <strong>no API key</strong>;
-            they&rsquo;re off by default (blocked server-side) — the browser extension scrapes in your own
-            session instead.
+            quiet for a role/region — that&rsquo;s normal). Walled sites (LinkedIn/Indeed) aren&rsquo;t here — the
+            browser extension reads those in your own session.
           </p>
         </div>
       ) : null}
