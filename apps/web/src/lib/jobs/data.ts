@@ -90,7 +90,10 @@ export async function getRecommendedJobsForUser(
       },
       { country: filters?.country, city: filters?.city, worldwide: filters?.worldwide },
     );
-    await Promise.race([sync, new Promise((resolve) => setTimeout(resolve, 3500))]);
+    // Wait for the pull so an explicit search shows fresh results on the SAME load (the pull
+    // is now ~3-4s: surfer + crawler are slimmed). Passive/cached loads skip the sync entirely
+    // and never hit this wait. Capped so a stuck external source can't hang the page forever.
+    await Promise.race([sync, new Promise((resolve) => setTimeout(resolve, 6000))]);
   }
 
   const jobs = await jobsRepository.listActive();

@@ -15,6 +15,7 @@ import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
 import { applyIntentFilter, parseJobPrompt, type JobSearchIntent } from "@/lib/jobs/ai-search";
 import { surfForJobs } from "@/lib/jobs/web-surfer";
+import { invalidateJobSync } from "@/lib/jobs/sync";
 import { getRecommendedJobsForUser } from "@/lib/jobs/data";
 import type { RecommendedJob } from "@/lib/jobs/types";
 import { scoreJobForUser } from "@/lib/jobs/job-matching";
@@ -333,6 +334,9 @@ export async function resolveSearch(
   prompt: string,
 ): Promise<{ country: string | null; city: string | null; remote: boolean }> {
   const intent = await parseJobPrompt(prompt);
+  // An explicit search should FETCH, not read a 30-min cache. Drop the sync window so the
+  // navigation that follows re-pulls every source fresh for what the user just asked for.
+  invalidateJobSync();
   return {
     country: intent.country ?? null,
     city: intent.city ?? null,
