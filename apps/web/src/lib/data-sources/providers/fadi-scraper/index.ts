@@ -29,7 +29,7 @@ export class FadiScraperSource implements JobSource {
     const limit = query.limit ?? 20;
     try {
       // Dynamic imports keep Playwright/AI out of the bundle unless the scraper actually runs.
-      const [{ scrapeRecipe, scrapePageText }, { aiExtractJobs }] = await Promise.all([
+      const [{ scrapeRecipe, scrapeRendered, scrapePageText }, { aiExtractJobs }] = await Promise.all([
         import("./browser"),
         import("./ai-extract"),
       ]);
@@ -41,6 +41,9 @@ export class FadiScraperSource implements JobSource {
           if (r.mode === "ai") {
             const text = await scrapePageText(r, query);
             return aiExtractJobs(text, r.name);
+          }
+          if (r.mode === "rendered") {
+            return scrapeRendered(r, query, limit);
           }
           return scrapeRecipe(r, query, limit);
         }),

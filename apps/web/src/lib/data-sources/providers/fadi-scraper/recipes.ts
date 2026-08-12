@@ -1,3 +1,5 @@
+import { getCountry } from "@/lib/jobs/locations";
+
 import type { JobPosting, SignalQuery } from "../../types";
 
 // The Fadi Job Scraper automates the human job-search flow (navigate → search → filter →
@@ -26,11 +28,12 @@ export type SiteRecipe = {
   maxPages: number;
   /**
    * Extraction strategy for the "read each listing" step:
-   * - "ai": the LLM extracts jobs from the rendered page text (self-healing, no selectors) —
-   *   the 2026 default.
+   * - "ai": the LLM extracts jobs from the rendered page text (self-healing, no selectors).
+   * - "rendered": drive a real browser (defeats fetch-level walls), extract from the live DOM
+   *   with a resilient anchor+JSON-LD heuristic — no LLM, no per-site selector config.
    * - "selectors": classic CSS extraction (cheaper/faster, but brittle).
    */
-  mode?: "ai" | "selectors";
+  mode?: "ai" | "rendered" | "selectors";
   /** CSS selectors — required only for `mode: "selectors"`. */
   selectors?: {
     card: string;
@@ -69,8 +72,35 @@ export function recordToPosting(r: ScrapedRecord, recipe: SiteRecipe): JobPostin
 }
 
 // Example recipe — a static-HTML, cross-field remote board. Selectors are a starting point
+// Indeed's country domains — the browser renders these fine where a plain fetch is 403'd.
+const INDEED_DOMAIN: Record<string, string> = {
+  ie: "ie.indeed.com",
+  gb: "uk.indeed.com",
+  us: "www.indeed.com",
+  ca: "ca.indeed.com",
+  au: "au.indeed.com",
+  in: "in.indeed.com",
+  de: "de.indeed.com",
+  nl: "nl.indeed.com",
+  fr: "fr.indeed.com",
+  sg: "sg.indeed.com",
+};
+
 // and are meant to be tuned against the live site (scraping is inherently maintenance).
 export const RECIPES: SiteRecipe[] = [
+  {
+    // Fadi's own browser scraper on Indeed — a walled aggregator plain HTTP can't read.
+    id: "indeed",
+    name: "Indeed",
+    origin: "https://www.indeed.com",
+    searchUrl: (q) => {
+      const dom = INDEED_DOMAIN[q.country ?? ""] ?? "www.indeed.com";
+      const loc = q.city || getCountry(q.country)?.name || "";
+      return `https://${dom}/jobs?q=${encodeURIComponent(buildKeywords(q))}&l=${encodeURIComponent(loc)}`;
+    },
+    maxPages: 1,
+    mode: "rendered",
+  },
   {
     id: "weworkremotely",
     name: "We Work Remotely",
