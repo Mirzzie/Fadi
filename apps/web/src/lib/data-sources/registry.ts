@@ -5,6 +5,7 @@ import { serverEnv } from "@/lib/env.server";
 import { AdzunaSource } from "./providers/adzuna";
 import { ApifyLinkedInSource } from "./providers/apify-linkedin";
 import { ArbeitnowSource } from "./providers/arbeitnow";
+import { MuseSource } from "./providers/themuse";
 import { WebCrawlSource } from "./providers/web-crawl-source";
 import { WebSurferSource } from "./providers/web-surfer-source";
 import { BlsSource } from "./providers/bls";
@@ -43,6 +44,7 @@ function buildSources(): DataSourceBase[] {
     new HackerNewsSource(), // AI / skill_trend
     new RemotiveSource(), // live job_listings
     new ArbeitnowSource(), // live job_listings (EU / ATS)
+    new MuseSource(), // FREE + KEYLESS, cross-industry, location-searchable — covers Ireland
     new WebSurferSource(), // ALWAYS-ON: sweeps verified Greenhouse/Lever boards — fresh, keyless
     new WebCrawlSource(), // searches the open web (Brave key) → visits pages → non-expired jobs
     new BlsSource(), // labor_market — real US gov data (keyless v1; BLS_API_KEY → v2)
