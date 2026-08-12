@@ -1,0 +1,20 @@
+# Minimal SearXNG config for the Fadi Web Crawler. `use_default_settings: true` merges this on
+# top of SearXNG's defaults, so we only override what the crawler needs:
+#   - JSON output (disabled by default) so Fadi can read results as JSON
+#   - the limiter off, since Fadi is the only (local) client
+# This runs entirely on your machine — free, no API key, no data leaves your box except the
+# searches SearXNG forwards to public engines.
+use_default_settings: true
+
+server:
+  # Any random string ≥ 16 chars. Local-only instance, so this is low-stakes — but change it.
+  secret_key: "fadi-local-searxng-change-me-please-0192"
+  limiter: false
+  image_proxy: false
+
+search:
+  formats:
+    - html
+    - json
+  # Be gentle so public engines don't rate-limit your instance.
+  autocomplete: ""

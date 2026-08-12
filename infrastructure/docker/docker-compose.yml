@@ -17,5 +17,19 @@ services:
       timeout: 5s
       retries: 10
 
+  # Free, self-hosted metasearch — powers the Fadi Web Crawler at ZERO cost (no API key).
+  # Start with:  docker compose -f infrastructure/docker/docker-compose.yml up -d searxng
+  # Then set in apps/web/.env.local:  SEARXNG_URL=http://localhost:8888
+  searxng:
+    image: searxng/searxng:latest
+    container_name: careeros-searxng
+    restart: unless-stopped
+    ports:
+      - "${SEARXNG_HOST_PORT:-8888}:8080"
+    volumes:
+      - ./searxng:/etc/searxng:rw
+    environment:
+      SEARXNG_BASE_URL: http://localhost:${SEARXNG_HOST_PORT:-8888}/
+
 volumes:
   careeros_postgres_data:

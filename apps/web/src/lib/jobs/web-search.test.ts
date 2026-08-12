@@ -1,25 +1,30 @@
 import { describe, expect, it } from "vitest";
 
-import { keepCrawlable, parseBrave, type SearchHit } from "./web-search";
+import { keepCrawlable, parseBrave, parseGoogle, parseSearxng, type SearchHit } from "./web-search";
 
-describe("parseBrave", () => {
-  it("maps Brave web results to hits", () => {
-    const hits = parseBrave({
-      web: {
-        results: [
-          { url: "https://careers.acme.com/job/1", title: "IT Support", description: "Dublin role" },
-          { url: "not-a-url", title: "junk" },
-        ],
-      },
-    });
-    expect(hits).toEqual([
-      { url: "https://careers.acme.com/job/1", title: "IT Support", snippet: "Dublin role" },
-    ]);
+describe("search backend parsers", () => {
+  it("parseSearxng maps results", () => {
+    expect(
+      parseSearxng({ results: [{ url: "https://careers.acme.com/1", title: "IT Support", content: "Dublin" }] }),
+    ).toEqual([{ url: "https://careers.acme.com/1", title: "IT Support", snippet: "Dublin" }]);
   });
 
-  it("returns [] for a shape without results", () => {
+  it("parseGoogle maps items", () => {
+    expect(
+      parseGoogle({ items: [{ link: "https://careers.acme.com/1", title: "IT Support", snippet: "Dublin" }] }),
+    ).toEqual([{ url: "https://careers.acme.com/1", title: "IT Support", snippet: "Dublin" }]);
+  });
+
+  it("parseBrave maps web.results", () => {
+    expect(
+      parseBrave({ web: { results: [{ url: "https://careers.acme.com/1", title: "IT Support", description: "Dublin" }] } }),
+    ).toEqual([{ url: "https://careers.acme.com/1", title: "IT Support", snippet: "Dublin" }]);
+  });
+
+  it("all return [] for an empty/wrong shape", () => {
+    expect(parseSearxng({})).toEqual([]);
+    expect(parseGoogle(null)).toEqual([]);
     expect(parseBrave({})).toEqual([]);
-    expect(parseBrave(null)).toEqual([]);
   });
 });
 

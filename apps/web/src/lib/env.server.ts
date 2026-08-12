@@ -47,7 +47,10 @@ const serverEnvSchema = z.object({
   REED_API_KEY: z.string().optional(), // reed.co.uk — UK + Ireland, salary
   JOOBLE_API_KEY: z.string().optional(), // jooble.org — global aggregator, covers IE
   JSEARCH_RAPIDAPI_KEY: z.string().optional(),
-  BRAVE_SEARCH_API_KEY: z.string().optional(), // Brave Search API — free tier ~2k/mo; powers the web crawler
+  BRAVE_SEARCH_API_KEY: z.string().optional(), // Brave Search API (paid-ish)
+  SEARXNG_URL: z.string().optional(), // self-hosted SearXNG — FREE, no key, zero budget
+  GOOGLE_CSE_KEY: z.string().optional(), // Google Programmable Search — 100/day free, no card
+  GOOGLE_CSE_CX: z.string().optional(),
   // Apify — OPT-IN job scraping (e.g. Curious Coder's LinkedIn Jobs actor).
   // Off unless a token is set; the operator owns the ToS/legal decision.
   APIFY_TOKEN: z.string().optional(),
@@ -107,6 +110,9 @@ export const serverEnv = {
     JOOBLE_API_KEY: process.env.JOOBLE_API_KEY,
     JSEARCH_RAPIDAPI_KEY: process.env.JSEARCH_RAPIDAPI_KEY,
     BRAVE_SEARCH_API_KEY: process.env.BRAVE_SEARCH_API_KEY,
+    SEARXNG_URL: process.env.SEARXNG_URL,
+    GOOGLE_CSE_KEY: process.env.GOOGLE_CSE_KEY,
+    GOOGLE_CSE_CX: process.env.GOOGLE_CSE_CX,
     APIFY_TOKEN: process.env.APIFY_TOKEN,
     APIFY_LINKEDIN_ACTOR: process.env.APIFY_LINKEDIN_ACTOR,
     BLS_API_KEY: process.env.BLS_API_KEY,
