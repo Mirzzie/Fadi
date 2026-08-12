@@ -1,6 +1,6 @@
+import { isLegitJob } from "@/lib/jobs/job-validation";
 import { getCountry } from "@/lib/jobs/locations";
 import { searchJobUrls, webSearchConfigured } from "@/lib/jobs/web-search";
-import { surfPage } from "@/lib/jobs/web-surfer";
 import { logger } from "@/lib/observability/logger";
 
 import type { DataSourceCapability, JobPosting, JobSource, SignalQuery } from "../types";
@@ -42,51 +42,51 @@ export class WebCrawlSource implements JobSource {
       return [];
     }
 
-    // 2) Visit + read + extract (non-expired, full JD) — each page read once, in parallel.
-    const visited = await Promise.allSettled(hits.map((h) => surfPage(h.url)));
+    // 2) VISIT the pages in a real browser, in parallel (renders JS, gets past fetch-level
+    //    walls), and read the full posting off each — JD, apply link, dates.
+    const { scrapeJobPages } = await import("./fadi-scraper/browser");
+    const records = await scrapeJobPages(
+      hits.map((h) => h.url),
+      4,
+    );
+    const pagesRead = records.length;
 
-    // A visited page can be a whole company board (many jobs); keep only the ones matching the
-    // search so we don't dump a company's entire catalogue into the results.
+    // 3) VALIDATE — drop expired and scam/lead-gen postings — then match the search.
     const kws = (query.keywords ?? []).map((k) => k.toLowerCase()).filter(Boolean);
     const countryName = query.country ? getCountry(query.country)?.name?.toLowerCase() : undefined;
     const city = query.city?.toLowerCase();
     const wantsLocation = Boolean(city || countryName);
 
     const out: JobPosting[] = [];
-    let pagesRead = 0;
-    visited.forEach((res, i) => {
-      if (res.status !== "fulfilled" || !res.value.ok) return;
-      pagesRead += 1;
-      for (const j of res.value.jobs) {
-        if (!j.title?.trim()) continue;
-        const hay = `${j.title} ${j.description ?? ""}`.toLowerCase();
-        const loc = (j.location ?? "").toLowerCase();
-        const isRemote = /\bremote\b|anywhere|work from home|wfh/.test(loc);
-        const remoteAnywhere = isRemote && /\banywhere\b|worldwide|\bglobal\b|\bemea\b|\beurope\b/.test(loc);
-        if (kws.length && !kws.some((k) => hay.includes(k))) continue;
-        if (wantsLocation) {
-          const ok = (city && loc.includes(city)) || (countryName && loc.includes(countryName)) || remoteAnywhere;
-          if (!ok) continue;
-        }
-        let host = "";
-        try {
-          host = new URL(hits[i].url).hostname.replace(/^www\./, "");
-        } catch {
-          /* keep empty */
-        }
-        out.push({
-          sourceId: this.id,
-          externalId: (j.url ?? hits[i].url).slice(0, 250),
-          title: j.title,
-          company: j.company || host || "Unknown",
-          location: j.location,
-          url: j.url ?? hits[i].url,
-          description: j.description, // full JD from the page
-          tags: [],
-          postedAt: j.postedAt,
-        });
+    for (const j of records) {
+      if (!isLegitJob({ title: j.title, description: j.description, validThrough: j.validThrough })) continue;
+      const hay = `${j.title} ${j.description ?? ""}`.toLowerCase();
+      const loc = (j.location ?? "").toLowerCase();
+      const isRemote = /\bremote\b|anywhere|work from home|wfh/.test(loc);
+      const remoteAnywhere = isRemote && /\banywhere\b|worldwide|\bglobal\b|\bemea\b|\beurope\b/.test(loc);
+      if (kws.length && !kws.some((k) => hay.includes(k))) continue;
+      if (wantsLocation) {
+        const ok = (city && loc.includes(city)) || (countryName && loc.includes(countryName)) || remoteAnywhere;
+        if (!ok) continue;
       }
-    });
+      let host = "";
+      try {
+        host = j.url ? new URL(j.url).hostname.replace(/^www\./, "") : "";
+      } catch {
+        /* keep empty */
+      }
+      out.push({
+        sourceId: this.id,
+        externalId: (j.url ?? `${j.company}:${j.title}`).slice(0, 250),
+        title: j.title!,
+        company: j.company || host || "Unknown",
+        location: j.location,
+        url: j.url, // the real apply / source link
+        description: j.description, // full JD read off the page
+        tags: [],
+        postedAt: j.postedAt,
+      });
+    }
 
     _lastCrawl = { at: Date.now(), query: q, hits: hits.length, pagesRead, jobs: out.length };
     logger.info("web_crawl.done", { q, hits: hits.length, pagesRead, jobs: out.length });

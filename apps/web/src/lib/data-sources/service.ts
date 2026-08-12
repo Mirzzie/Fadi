@@ -233,10 +233,14 @@ export async function discoverJobs(
 
   // Per-source timeout: one slow source (e.g. the Web Surfer sweeping several boards) must
   // never stall the whole pull. A source that overruns contributes [] for this pull.
+  // Generous: the browser sources (crawler visits pages, scraper drives Chromium) legitimately
+  // take ~10-20s. The PAGE never waits this long — it renders in a few seconds and the pull
+  // finishes in the background, persisting for the next load. This cap only stops a truly stuck
+  // source from hanging the background pull forever.
   const withTimeout = (p: Promise<JobPosting[]>): Promise<JobPosting[]> =>
     Promise.race([
       p.catch(() => [] as JobPosting[]),
-      new Promise<JobPosting[]>((resolve) => setTimeout(() => resolve([]), 9000)),
+      new Promise<JobPosting[]>((resolve) => setTimeout(() => resolve([]), 22_000)),
     ]);
   const settled = await Promise.allSettled(sources.map((s) => withTimeout(s.fetchJobs(query))));
   const perSource = settled.map((r) => (r.status === "fulfilled" ? r.value : []));

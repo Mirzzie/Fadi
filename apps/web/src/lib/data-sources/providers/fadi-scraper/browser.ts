@@ -184,6 +184,93 @@ export async function scrapeRendered(
 }
 
 /**
+ * Visit many job pages IN PARALLEL in a real browser — the "open a bunch of tabs, scan each"
+ * flow — and read the FULL posting off each (title, company, location, full JD, the real apply
+ * link, posted date, and the closing date for the expiry check). Structured JobPosting JSON-LD
+ * is the primary source; a text fallback covers pages without it. Concurrency-bounded so we
+ * don't open hundreds of tabs at once. Returns [] if Playwright is unavailable.
+ */
+export async function scrapeJobPages(urls: string[], concurrency = 4): Promise<ScrapedRecord[]> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let pw: any;
+  try {
+    const specifier = "playwright";
+    pw = await import(/* webpackIgnore: true */ specifier);
+  } catch {
+    return [];
+  }
+  const browser = await pw.chromium.launch({ headless: true });
+  try {
+    const context = await browser.newContext({
+      userAgent: HUMAN_UA,
+      viewport: { width: 1280, height: 900 },
+      locale: "en-IE",
+    });
+    const out: ScrapedRecord[] = [];
+    // Process in bounded parallel batches — the "multiple tabs at once" the user wants.
+    for (let i = 0; i < urls.length; i += concurrency) {
+      const batch = urls.slice(i, i + concurrency);
+      const settled = await Promise.allSettled(
+        batch.map(async (u) => {
+          const page = await context.newPage();
+          try {
+            await page.goto(u, { waitUntil: "domcontentloaded", timeout: 20_000 });
+            await page.waitForTimeout(jitter(1400, 2400));
+            await page.evaluate(() => window.scrollTo(0, 1600)); // scan the page
+            const rec: ScrapedRecord | null = await page.evaluate((pageUrl: string) => {
+              const clean = (s: string | null | undefined) => (s ? s.replace(/\s+/g, " ").trim() : "");
+              for (const s of document.querySelectorAll('script[type="application/ld+json"]')) {
+                try {
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const d: any = JSON.parse(s.textContent || "{}");
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  const arr: any[] = Array.isArray(d) ? d : [d, ...(d["@graph"] || [])];
+                  for (const j of arr) {
+                    const ty = j?.["@type"];
+                    if (j && (ty === "JobPosting" || (Array.isArray(ty) && ty.includes("JobPosting")))) {
+                      const org =
+                        typeof j.hiringOrganization === "string" ? j.hiringOrganization : j.hiringOrganization?.name;
+                      const addr = (Array.isArray(j.jobLocation) ? j.jobLocation[0] : j.jobLocation)?.address;
+                      const loc =
+                        typeof addr === "string"
+                          ? addr
+                          : [addr?.addressLocality, addr?.addressRegion, addr?.addressCountry]
+                              .filter(Boolean)
+                              .join(", ");
+                      return {
+                        title: clean(j.title),
+                        company: clean(org),
+                        location: clean(loc) || undefined,
+                        url: clean(j.url) || pageUrl,
+                        description: clean(String(j.description ?? "").replace(/<[^>]+>/g, " ")).slice(0, 8000) || undefined,
+                        postedAt: clean(j.datePosted) || undefined,
+                        validThrough: clean(j.validThrough) || undefined,
+                      };
+                    }
+                  }
+                } catch {
+                  /* ignore malformed */
+                }
+              }
+              return null;
+            }, u);
+            return rec;
+          } finally {
+            await page.close();
+          }
+        }),
+      );
+      for (const r of settled) {
+        if (r.status === "fulfilled" && r.value?.title) out.push(r.value);
+      }
+    }
+    return out;
+  } finally {
+    await browser.close();
+  }
+}
+
+/**
  * AI-mode capture: navigate like a human and return the rendered page's visible text, for an
  * LLM to extract from (self-healing — no per-site selectors). Concatenates the first few
  * result pages. Returns "" if Playwright is unavailable.

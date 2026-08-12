@@ -15,6 +15,10 @@ export type ScrapedRecord = {
   location?: string;
   url?: string;
   postedAt?: string;
+  /** Full job description (JD) read off the page. */
+  description?: string;
+  /** schema.org validThrough — the closing date, for the expiry check. */
+  validThrough?: string;
 };
 
 export type SiteRecipe = {
