@@ -1,5 +1,7 @@
 import "server-only";
 
+import { getCountry } from "@/lib/jobs/locations";
+
 import type { SignalQuery } from "../../types";
 import type { ScrapedRecord, SiteRecipe } from "./recipes";
 
@@ -104,6 +106,10 @@ export async function scrapeRendered(
     });
     const page = await context.newPage();
     const records: ScrapedRecord[] = [];
+    // The search was scoped to this location (l=Dublin / &location=…), so every result IS in
+    // it. Use that as the location when the (rot-prone) card selectors don't yield one — robust,
+    // no per-site DOM guessing, and it's what keeps the board's location filter from dropping them.
+    const queryLoc = query.city || (query.country ? getCountry(query.country)?.name : "") || "";
 
     for (let p = 1; p <= recipe.maxPages && records.length < limit; p++) {
       await page.goto(recipe.searchUrl(query, p), { waitUntil: "domcontentloaded", timeout: 25_000 });
@@ -173,8 +179,13 @@ export async function scrapeRendered(
       for (const j of jobs) {
         if (records.length >= limit) break;
         // Company is best-effort from the card; keep the job even if it's blank (title + url are
-        // the real signal), letting the pipeline fill/verify later.
-        records.push({ title: j.title, company: j.company || recipe.name, location: j.location, url: j.url });
+        // the real signal). Location falls back to the searched place so the board doesn't drop it.
+        records.push({
+          title: j.title,
+          company: j.company || recipe.name,
+          location: j.location || queryLoc || undefined,
+          url: j.url,
+        });
       }
     }
     return records.slice(0, limit);
