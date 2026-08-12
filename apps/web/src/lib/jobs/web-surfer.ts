@@ -196,9 +196,10 @@ export async function surfForJobs(
   const ats = detectAts(input);
   try {
     if (ats?.kind === "greenhouse") {
-      const { status, body } = await getText(
-        `https://boards-api.greenhouse.io/v1/boards/${ats.token}/jobs?content=true`,
-      );
+      // No content=true: the full-content board can be tens of MB across a sweep, which stalls
+      // the pull. The board sweep needs title/company/location/url only; full JD comes from the
+      // single job page (surfPage) when needed.
+      const { status, body } = await getText(`https://boards-api.greenhouse.io/v1/boards/${ats.token}/jobs`);
       if (looksBlocked(status, body)) return { ok: false, blocked: true, reason: wallMsg };
       return { ok: true, jobs: mapGreenhouse(safeJson(body), ats.token), via: "greenhouse" };
     }
@@ -245,6 +246,22 @@ export async function surfForJobs(
 
 const wallMsg =
   "This site is bot-protected (Cloudflare / login wall). Open it with the Fadi extension to read it in your own session.";
+
+/**
+ * Read ONE page and extract its JobPosting(s) with full JD from JSON-LD — no ATS board
+ * expansion. This is the crawler's per-URL reader: a discovered job-detail page (Greenhouse/
+ * Ashby/Workable/…) is small and carries the full posting, so we fetch exactly it.
+ */
+export async function surfPage(url: string): Promise<SurfResult> {
+  try {
+    const { status, body } = await getText(url.includes("://") ? url : `https://${url}`);
+    if (looksBlocked(status, body)) return { ok: false, blocked: true, reason: wallMsg };
+    const jobs = extractJsonLdJobs(body);
+    return { ok: true, jobs, via: jobs.length ? "jsonld" : "none" };
+  } catch {
+    return { ok: false, blocked: false, reason: "Couldn't reach that page." };
+  }
+}
 
 function safeJson(body: string): unknown {
   try {

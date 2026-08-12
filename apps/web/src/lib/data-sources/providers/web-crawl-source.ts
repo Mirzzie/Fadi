@@ -1,6 +1,6 @@
 import { getCountry } from "@/lib/jobs/locations";
 import { searchJobUrls, webSearchConfigured } from "@/lib/jobs/web-search";
-import { surfForJobs } from "@/lib/jobs/web-surfer";
+import { surfPage } from "@/lib/jobs/web-surfer";
 import { logger } from "@/lib/observability/logger";
 
 import type { DataSourceCapability, JobPosting, JobSource, SignalQuery } from "../types";
@@ -35,15 +35,15 @@ export class WebCrawlSource implements JobSource {
     const q = `${keywords} ${location}`.trim();
 
     // 1) Discover — search the open web for job pages.
-    const hits = await searchJobUrls(keywords, location, 12);
+    const hits = await searchJobUrls(keywords, location, 8);
     logger.info("web_crawl.search", { q, hits: hits.length });
     if (hits.length === 0) {
       _lastCrawl = { at: Date.now(), query: q, hits: 0, pagesRead: 0, jobs: 0 };
       return [];
     }
 
-    // 2) Visit + read + extract (non-expired, full JD) — every page in parallel.
-    const visited = await Promise.allSettled(hits.map((h) => surfForJobs(h.url)));
+    // 2) Visit + read + extract (non-expired, full JD) — each page read once, in parallel.
+    const visited = await Promise.allSettled(hits.map((h) => surfPage(h.url)));
 
     // A visited page can be a whole company board (many jobs); keep only the ones matching the
     // search so we don't dump a company's entire catalogue into the results.
