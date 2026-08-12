@@ -153,10 +153,9 @@ export async function scrapeRendered(
           try {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const d: any = JSON.parse(s.textContent || "{}");
+            const list = (d.itemListElement || []).map((x: { item?: unknown }) => x?.item ?? x);
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const arr: any[] = Array.isArray(d)
-              ? d
-              : [d, ...(d["@graph"] || []), ...((d.itemListElement || []).map((x: any) => x?.item ?? x))];
+            const arr: any[] = Array.isArray(d) ? d : [d, ...(d["@graph"] || []), ...list];
             for (const j of arr) {
               const ty = j?.["@type"];
               if (j && (ty === "JobPosting" || (Array.isArray(ty) && ty.includes("JobPosting")))) {
