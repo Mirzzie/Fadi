@@ -28,6 +28,13 @@ describe("jobMatchesLocation", () => {
     expect(jobMatchesLocation(at("Blanchardstown, Fingal, Ireland"), "ie", "Dublin")).toBe(false);
   });
 
+  it("a city search DOES accept a country-level posting (no specific city)", () => {
+    // "Systems Engineer — Ireland" is relevant to a Dublin search; a different named city is not.
+    expect(jobMatchesLocation(at("Ireland"), "ie", "Dublin")).toBe(true);
+    expect(jobMatchesLocation(at("Remote - Ireland"), "ie", "Dublin")).toBe(true);
+    expect(jobMatchesLocation(at("Cork, Ireland"), "ie", "Dublin")).toBe(false);
+  });
+
   it("a country-only search matches anywhere in the country", () => {
     expect(jobMatchesLocation(at("Carlow, County Carlow, Ireland"), "ie", undefined)).toBe(true);
     expect(jobMatchesLocation(at("Berlin, Germany"), "ie", undefined)).toBe(false);

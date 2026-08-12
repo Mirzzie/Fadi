@@ -69,9 +69,24 @@ export function jobMatchesLocation(j: FilterableJob, country?: string, city?: st
   // Carlow or Cork role through a "Dublin" search (the bug). The country token is
   // a fallback ONLY when no city is given. (Work mode is filtered separately, so a
   // city search stays geographic — "only Dublin roles, never remote-worldwide".)
-  if (city) return loc.includes(city.toLowerCase());
-
   const countryName = getCountry(country)?.name?.toLowerCase();
+  if (city) {
+    if (loc.includes(city.toLowerCase())) return true;
+    // Also accept a COUNTRY-LEVEL posting ("Ireland", "Remote — Ireland") — one that names the
+    // country but no other specific city. A "Systems Engineer — Ireland" is relevant to a Dublin
+    // search; a "Cork, Ireland" role is not. So we strip the country/county/work-mode words and
+    // pass only when nothing city-specific remains.
+    if (!countryName || !loc.includes(countryName)) return false;
+    const remainder = loc
+      .split(countryName)
+      .join(" ")
+      .replace(/county\s+[a-z]+/g, " ")
+      .replace(/\b(remote|hybrid|onsite|on-site|flexible|anywhere)\b/g, " ")
+      .replace(/[^a-z]+/g, " ")
+      .trim();
+    return remainder.length === 0;
+  }
+
   return countryName ? loc.includes(countryName) : true;
 }
 

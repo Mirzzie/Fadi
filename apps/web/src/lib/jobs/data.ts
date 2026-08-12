@@ -178,14 +178,18 @@ export async function getRecommendedJobsForUser(
   //    and never a role far above the user's experience (an 8–10-yr Staff role for
   //    an early-career profile is not a realistic "related" suggestion).
   const fieldRelated = hardFiltered.filter((j) => (j.fieldRelated && !j.overLevel) || tracked(j));
-  // Show ALL on-role roles, best-scored first — not just the above-the-bar "strong" set. A
-  // single tracked/stale job would otherwise pin the board to "strong" and hide fresh on-role
-  // matches that happen to score lower (e.g. a new posting with thin salary/description data).
-  // Doctrine holds: onRoleAny is strictly on-role, so this never pads with off-role noise.
-  let shown =
-    onRoleAny.length > 0
-      ? onRoleAny.slice(0, 40)
-      : fieldRelated.slice(0, 12);
+  // Show on-role roles FIRST, then same-field roles (SRE / Support / Security Engineer for a
+  // Sys-Admin seeker are what they actually want). Exact-title-only hid ~all fresh jobs behind
+  // one stale pinned posting. Still domain-gated (in-field), just not word-for-word — deduped,
+  // best-scored within each tier.
+  const seenIds = new Set<string>();
+  let shown = [...onRoleAny, ...fieldRelated]
+    .filter((j) => {
+      if (seenIds.has(j.id)) return false;
+      seenIds.add(j.id);
+      return true;
+    })
+    .slice(0, 40);
 
   // ── Semantic layer (hybrid search) ── re-rank the board by MEANING and, when no
   // exact role matched, rescue close-by-meaning roles the keyword pass missed
