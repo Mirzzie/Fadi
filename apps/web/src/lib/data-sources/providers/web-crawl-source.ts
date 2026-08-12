@@ -45,6 +45,13 @@ export class WebCrawlSource implements JobSource {
     // 2) Visit + read + extract (non-expired, full JD) — every page in parallel.
     const visited = await Promise.allSettled(hits.map((h) => surfForJobs(h.url)));
 
+    // A visited page can be a whole company board (many jobs); keep only the ones matching the
+    // search so we don't dump a company's entire catalogue into the results.
+    const kws = (query.keywords ?? []).map((k) => k.toLowerCase()).filter(Boolean);
+    const countryName = query.country ? getCountry(query.country)?.name?.toLowerCase() : undefined;
+    const city = query.city?.toLowerCase();
+    const wantsLocation = Boolean(city || countryName);
+
     const out: JobPosting[] = [];
     let pagesRead = 0;
     visited.forEach((res, i) => {
@@ -52,6 +59,15 @@ export class WebCrawlSource implements JobSource {
       pagesRead += 1;
       for (const j of res.value.jobs) {
         if (!j.title?.trim()) continue;
+        const hay = `${j.title} ${j.description ?? ""}`.toLowerCase();
+        const loc = (j.location ?? "").toLowerCase();
+        const isRemote = /\bremote\b|anywhere|work from home|wfh/.test(loc);
+        const remoteAnywhere = isRemote && /\banywhere\b|worldwide|\bglobal\b|\bemea\b|\beurope\b/.test(loc);
+        if (kws.length && !kws.some((k) => hay.includes(k))) continue;
+        if (wantsLocation) {
+          const ok = (city && loc.includes(city)) || (countryName && loc.includes(countryName)) || remoteAnywhere;
+          if (!ok) continue;
+        }
         let host = "";
         try {
           host = new URL(hits[i].url).hostname.replace(/^www\./, "");

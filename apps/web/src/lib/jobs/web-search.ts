@@ -80,9 +80,15 @@ async function getJson(url: string, headers?: Record<string, string>): Promise<u
   return res.json();
 }
 
+// Bias the search to ATS/career hosts Fadi can actually READ server-side. The open web's big
+// job boards (irishjobs, jobs.ie, Indeed, LinkedIn) 403 a server bot — verified — so an
+// unbiased search just finds walls. These hosts return 200 and carry structured JobPosting data.
+const CRAWLABLE_BIAS =
+  "(site:greenhouse.io OR site:lever.co OR site:ashbyhq.com OR site:workable.com OR site:bamboohr.com OR site:smartrecruiters.com)";
+
 /** Search the open web for job pages. Returns [] (never throws) with no backend / on failure. */
 export async function searchJobUrls(keywords: string, location: string, limit = 12): Promise<SearchHit[]> {
-  const q = [keywords, "jobs", location].filter(Boolean).join(" ").trim();
+  const q = [keywords, location, CRAWLABLE_BIAS].filter(Boolean).join(" ").trim();
   const enc = encodeURIComponent(q);
   try {
     // 1) SearXNG — free, self-hosted, unlimited.
