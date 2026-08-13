@@ -331,5 +331,16 @@ export async function getRecommendedJobsForUser(
     }
   }
 
+  // Final ordering: FRESHNESS leads. A month-stale posting must not sit above this week's —
+  // even if it scores higher or is tracked (that's why the board kept showing one old
+  // "Interested" role over ~90 fresh ones). Fresh first, then by match score.
+  const STALE_MS = 30 * 24 * 60 * 60 * 1000;
+  const isStale = (j: (typeof shown)[number]) =>
+    j.postedAt ? Date.now() - new Date(j.postedAt).getTime() > STALE_MS : false;
+  shown = [...shown].sort((a, b) => {
+    const staleDelta = (isStale(a) ? 1 : 0) - (isStale(b) ? 1 : 0);
+    return staleDelta !== 0 ? staleDelta : b.matchScore - a.matchScore;
+  });
+
   return typeof limit === "number" ? shown.slice(0, limit) : shown;
 }
