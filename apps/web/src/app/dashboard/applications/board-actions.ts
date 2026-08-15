@@ -39,12 +39,13 @@ export async function createApplicationAction(input: {
       const job = await createJobsRepository(db).upsertSeedJob({
         source: "manual",
         externalId: randomUUID(),
+        // PRIVATE capture: owned by this user, scoped away from the public catalog by the
+        // partial unique, cascade-deleted with the account. status "manual" additionally keeps
+        // it out of listActive; ownership is what actually enforces the privacy boundary.
+        ownerUserId: user.id,
         title: input.title.trim(),
         company: input.company.trim(),
         description: input.jobDescription?.trim() || null,
-        // NOT "active": the jobs table is a shared pool, and a user's pasted job
-        // must never surface on anyone else's board (privacy mandate). "manual"
-        // keeps it workspace-able (findById) but out of listActive entirely.
         status: "manual",
       });
       jobId = job.id;
@@ -77,7 +78,7 @@ export async function createApplicationAction(input: {
 
 export async function updateApplicationStatusAction(
   id: string,
-  status: ApplicationStatus,
+  status: ApplicationStatus
 ): Promise<Result> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
@@ -99,7 +100,7 @@ export async function updateApplicationStatusAction(
 
 export async function updateApplicationAction(
   id: string,
-  input: { company?: string; title?: string; jobDescription?: string; url?: string },
+  input: { company?: string; title?: string; jobDescription?: string; url?: string }
 ): Promise<Result> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
@@ -107,7 +108,9 @@ export async function updateApplicationAction(
     const updated = await createApplicationsRepository(getDatabase()).updateForUser(user.id, id, {
       ...(input.company !== undefined ? { company: input.company.trim() } : {}),
       ...(input.title !== undefined ? { title: input.title.trim() } : {}),
-      ...(input.jobDescription !== undefined ? { jobDescription: input.jobDescription.trim() || null } : {}),
+      ...(input.jobDescription !== undefined
+        ? { jobDescription: input.jobDescription.trim() || null }
+        : {}),
       ...(input.url !== undefined ? { url: input.url.trim() || null } : {}),
     });
     if (!updated) return { ok: false, message: "Application not found." };
@@ -125,7 +128,7 @@ export async function updateApplicationAction(
 /** Fadi drafts a document for THIS application — saved + linked to it. */
 export async function generateApplicationDocumentAction(
   applicationId: string,
-  kind: DocKind,
+  kind: DocKind
 ): Promise<Result> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
@@ -137,7 +140,10 @@ export async function generateApplicationDocumentAction(
 
     const generate = await getUserDocGenerate(user.id);
     if (!generate) {
-      return { ok: false, message: "Connect an AI provider in Settings to let Fadi draft documents." };
+      return {
+        ok: false,
+        message: "Connect an AI provider in Settings to let Fadi draft documents.",
+      };
     }
 
     const doc = await generateCareerDocument(
@@ -150,7 +156,7 @@ export async function generateApplicationDocumentAction(
         jobId: app.jobId,
         applicationId: app.id,
       },
-      generate,
+      generate
     );
     revalidatePath("/dashboard/applications");
     return { ok: true, message: "Drafted.", id: doc.id };
@@ -162,6 +168,9 @@ export async function generateApplicationDocumentAction(
       userId: user.id,
       error: error instanceof Error ? error.message : "unknown",
     });
-    return { ok: false, message: "Fadi couldn't draft that. Check your AI provider and try again." };
+    return {
+      ok: false,
+      message: "Fadi couldn't draft that. Check your AI provider and try again.",
+    };
   }
 }

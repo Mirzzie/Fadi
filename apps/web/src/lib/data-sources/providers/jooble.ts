@@ -8,6 +8,7 @@
 import { getCountry } from "@/lib/jobs/locations";
 
 import { htmlToText } from "../sanitize";
+import { stableHash } from "../stable-id";
 import type { DataSourceCapability, JobPosting, SignalQuery, JobSource } from "../types";
 
 const JOOBLE_API = "https://jooble.org/api";
@@ -67,7 +68,10 @@ export class JoobleSource implements JobSource {
         .slice(0, Math.min(query.limit ?? 20, 50))
         .map((j) => ({
           sourceId: this.id,
-          externalId: String(j.id ?? j.link),
+          // NOT j.id: Jooble's numeric id overflows JS safe-integer range and is
+          // reassigned between crawls, so keying on it duplicates the same posting on
+          // every pull. A content hash keeps one stable row. See stable-id.ts.
+          externalId: stableHash(j.title, j.company, j.location),
           title: j.title!.trim(),
           company: j.company!.trim(),
           location: j.location,

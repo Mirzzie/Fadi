@@ -7,11 +7,12 @@ import { AppShell } from "@/components/layout/app-shell";
 import { UnifiedJobSearch } from "@/components/jobs/unified-job-search";
 import { JobsShell } from "@/components/jobs/jobs-shell";
 import { JobControlBar } from "@/components/jobs/job-control-bar";
+import { JobSearchProgress } from "@/components/jobs/job-search-progress";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDashboardProfileSummary } from "@/lib/career-report/data";
 import { getDatabase } from "@/lib/database/client";
 import { getJobSourceCoverage, getJobSourcesHealth } from "@/lib/data-sources/service";
-import { getRecommendedJobsForUser } from "@/lib/jobs/data";
+import { getJobSyncStatusForUser, getRecommendedJobsForUser } from "@/lib/jobs/data";
 import type { EmploymentType, VisaFilter, WorkMode } from "@/lib/jobs/filters";
 import { getCountry, parseLocation } from "@/lib/jobs/locations";
 import { onboardingStatusOf } from "@/lib/onboarding/status";
@@ -69,7 +70,7 @@ export default async function JobsPage({
   const country = worldwide
     ? undefined
     : (params.country ?? savedLoc?.country ?? fromProfile.country)?.toLowerCase();
-  const city = worldwide ? undefined : (params.city?.trim() || savedLoc?.city || fromProfile.city);
+  const city = worldwide ? undefined : params.city?.trim() || savedLoc?.city || fromProfile.city;
   // Saved preferences are the defaults; an explicit URL filter overrides them.
   const modes = parseList(params.modes ?? (prefs.modes ?? []).join(","), MODES);
   const types = parseList(params.types ?? (prefs.types ?? []).join(","), TYPES);
@@ -84,6 +85,10 @@ export default async function JobsPage({
     types,
     visa,
   });
+
+  // Live crawl status (getRecommendedJobsForUser just kicked off the background run) — drives
+  // the "searching the web…" banner that auto-refreshes the board until results land.
+  const syncStatus = await getJobSyncStatusForUser(user.id, { country, city, worldwide });
 
   // Honest, domain-agnostic: if the live sources don't cover this user's field,
   // say so (and how to fix it) rather than showing tech noise or a blank list.
@@ -109,6 +114,7 @@ export default async function JobsPage({
           activeTypes={types}
           autoSearch={Boolean(prefs.autoSearch)}
         />
+        <JobSearchProgress status={syncStatus} />
       </div>
       <JobsShell
         jobs={jobs}

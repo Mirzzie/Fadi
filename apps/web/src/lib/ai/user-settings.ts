@@ -74,7 +74,9 @@ export async function getUserProviderConfigs(userId: string): Promise<ProviderCo
   if (row.fallbackProvider) {
     configs.push({
       id: row.fallbackProvider,
-      apiKey: row.fallbackApiKeyCiphertext ? (decryptSecret(row.fallbackApiKeyCiphertext) ?? "") : "",
+      apiKey: row.fallbackApiKeyCiphertext
+        ? (decryptSecret(row.fallbackApiKeyCiphertext) ?? "")
+        : "",
       model: row.fallbackModel ?? undefined,
       baseURL: row.fallbackBaseUrl ?? undefined,
     });
@@ -84,7 +86,7 @@ export async function getUserProviderConfigs(userId: string): Promise<ProviderCo
 
 export async function saveUserAiSettings(
   userId: string,
-  input: SaveAiSettingsInput,
+  input: SaveAiSettingsInput
 ): Promise<void> {
   const existing = await repo().getByUserId(userId);
 
@@ -92,13 +94,27 @@ export async function saveUserAiSettings(
   const fallbackKey = input.fallbackApiKey?.trim() ?? "";
   const hasFallback = Boolean(input.fallbackProvider);
 
+  // SECURITY: a stored key belongs to the provider it was entered for. Only retain an existing
+  // ciphertext when the provider id is UNCHANGED — otherwise an empty key box on a provider
+  // switch would carry, say, an OpenAI key over to Anthropic and leak it to that vendor.
+  const providerUnchanged = existing?.provider === input.provider;
+  const fallbackUnchanged = hasFallback && existing?.fallbackProvider === input.fallbackProvider;
+
   await repo().upsert({
     userId,
     provider: input.provider,
     model: input.model?.trim() || null,
     baseUrl: input.baseUrl?.trim() || null,
-    apiKeyCiphertext: primaryKey ? encryptSecret(primaryKey) : (existing?.apiKeyCiphertext ?? null),
-    apiKeyHint: primaryKey ? primaryKey.slice(-4) : (existing?.apiKeyHint ?? null),
+    apiKeyCiphertext: primaryKey
+      ? encryptSecret(primaryKey)
+      : providerUnchanged
+        ? (existing?.apiKeyCiphertext ?? null)
+        : null,
+    apiKeyHint: primaryKey
+      ? primaryKey.slice(-4)
+      : providerUnchanged
+        ? (existing?.apiKeyHint ?? null)
+        : null,
     fallbackProvider: hasFallback ? input.fallbackProvider : null,
     fallbackModel: hasFallback ? input.fallbackModel?.trim() || null : null,
     fallbackBaseUrl: hasFallback ? input.fallbackBaseUrl?.trim() || null : null,
@@ -106,12 +122,16 @@ export async function saveUserAiSettings(
       ? null
       : fallbackKey
         ? encryptSecret(fallbackKey)
-        : (existing?.fallbackApiKeyCiphertext ?? null),
+        : fallbackUnchanged
+          ? (existing?.fallbackApiKeyCiphertext ?? null)
+          : null,
     fallbackApiKeyHint: !hasFallback
       ? null
       : fallbackKey
         ? fallbackKey.slice(-4)
-        : (existing?.fallbackApiKeyHint ?? null),
+        : fallbackUnchanged
+          ? (existing?.fallbackApiKeyHint ?? null)
+          : null,
   });
 }
 

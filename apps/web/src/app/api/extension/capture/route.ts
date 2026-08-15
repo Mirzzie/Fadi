@@ -40,7 +40,10 @@ export async function POST(req: Request) {
   const origin = req.headers.get("origin");
   const user = await getExtensionUser(req);
   if (!user) {
-    return withCors(NextResponse.json({ ok: false, error: "not_authenticated" }, { status: 401 }), origin);
+    return withCors(
+      NextResponse.json({ ok: false, error: "not_authenticated" }, { status: 401 }),
+      origin
+    );
   }
 
   let body: unknown;
@@ -63,6 +66,7 @@ export async function POST(req: Request) {
     const job = await jobs.upsertSeedJob({
       source: "extension",
       externalId,
+      ownerUserId: user.id, // PRIVATE capture from the user's own browser session
       title: d.title,
       company: d.company,
       location: d.location ?? null,

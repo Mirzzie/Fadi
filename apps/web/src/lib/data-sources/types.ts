@@ -81,6 +81,13 @@ export interface SignalQuery {
    */
   remoteOnly?: boolean;
   limit?: number;
+  /**
+   * Cooperative cancellation. The orchestrator aborts this when a source exceeds its budget;
+   * a source that threads it into its `fetch`/browser calls stops wasted work instead of
+   * running on after the orchestrator has already given up waiting. Optional — sources that
+   * don't honor it are simply raced out as before.
+   */
+  signal?: AbortSignal;
 }
 
 /** Base descriptor every source exposes. */

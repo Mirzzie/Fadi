@@ -16,6 +16,7 @@ import {
   stripAiTells,
 } from "@/lib/documents/humanize";
 import { composeCareerEvidence, isResumeJustLinkedInCopy } from "@/lib/career/evidence";
+import { truthCheck, type TruthFinding } from "@/lib/documents/truth-gate";
 import { pivotFraming } from "@/lib/career/pivot";
 
 /** Thrown when there's no career history to ground a document — callers show the
@@ -23,7 +24,7 @@ import { pivotFraming } from "@/lib/career/pivot";
 export class NoHistoryError extends Error {
   constructor() {
     super(
-      "I don't have your career history yet, and drafting without it would just be generic filler. Paste your LinkedIn history (or your resume) in Profile first — then everything I write is grounded in you.",
+      "I don't have your career history yet, and drafting without it would just be generic filler. Paste your LinkedIn history (or your resume) in Profile first — then everything I write is grounded in you."
     );
     this.name = "NoHistoryError";
   }
@@ -64,6 +65,13 @@ export type GeneratedDoc = {
    * can act on must actually reach them.
    */
   evidenceNotice?: string;
+  /**
+   * Deterministic truth-gate findings for THIS draft, checked against the candidate's real
+   * record (résumé + LinkedIn + evidence). "block" = a metric with no backing (reads as
+   * invented) — the UI should stop export until resolved; "warn" = JD-only skill terms or
+   * seniority inflation to confirm. This is the doctrine made architectural, not just a prompt.
+   */
+  truthFindings?: TruthFinding[];
 };
 
 /**
@@ -83,7 +91,7 @@ export async function generateCareerDocument(
     /** Red-pen review fixes to incorporate (the review→redraft loop). */
     guidance?: string | null;
   },
-  generate: DocGenerate,
+  generate: DocGenerate
 ): Promise<GeneratedDoc> {
   const db = getDatabase();
   const careerProfile = await createCareerProfilesRepository(db).getActiveForUser(userId);
@@ -129,7 +137,9 @@ export async function generateCareerDocument(
 
   // The shared evidence pool, ranked for the ACTIVE track — so the same history
   // produces a differently-framed document per direction (the multi-track payoff).
-  const topEvidence = await import("@/lib/evidence/pool").then((m) => m.topEvidenceForPrompt(userId));
+  const topEvidence = await import("@/lib/evidence/pool").then((m) =>
+    m.topEvidenceForPrompt(userId)
+  );
 
   // Degrade honestly, out loud. An empty pool is the normal case today, and falling
   // back to résumé prose is the right behaviour — but doing it silently means the user
@@ -139,6 +149,15 @@ export async function generateCareerDocument(
     : "Drafted from your résumé/LinkedIn text only — your Evidence pool is empty, so none of your projects, labs or certs were used. Add them in Evidence and re-draft: that's usually the difference for thin-experience applications.";
 
   const jobDescription = (opts.jobDescription ?? "").slice(0, 5000).trim();
+  // The candidate's REAL record — everything the truth gate is allowed to treat as backed.
+  const truthCorpus = [
+    evidence.block,
+    topEvidence,
+    resume?.parsedText ?? resume?.rawText,
+    linkedInText,
+  ]
+    .filter(Boolean)
+    .join("\n");
   const candidateContext = [
     `Candidate: ${profile?.fullName ?? "the candidate"}`,
     `Target role: ${role}${company ? ` at ${company}` : ""}`,
@@ -189,7 +208,12 @@ CRITICAL: use ONLY real experience, education, skills and projects from the prov
 ${HUMANIZE_CORE}
 
 ${HUMANIZE_RESUME}`;
-    const gen = await generate.structured(system, candidateContext, resumeGenerationSchema, "resume");
+    const gen = await generate.structured(
+      system,
+      candidateContext,
+      resumeGenerationSchema,
+      "resume"
+    );
     const personal: ResumeData["personal"] = {
       name: profile?.fullName ?? "",
       headline: role,
@@ -198,14 +222,21 @@ ${HUMANIZE_RESUME}`;
       location: careerProfile?.location ?? "",
       links: linkedin?.profileUrl ?? "",
     };
+    const content = serializeResume(toResumeData(gen, personal));
     const doc = await docsRepo.createForUser(userId, {
       ...link,
       kind: "resume",
       title: `Resume — ${titleSuffix}`,
-      content: serializeResume(toResumeData(gen, personal)),
+      content,
       jobContext,
     });
-    return { id: doc.id, kind: "resume", title: doc.title, evidenceNotice };
+    return {
+      id: doc.id,
+      kind: "resume",
+      title: doc.title,
+      evidenceNotice,
+      truthFindings: truthCheck(content, { corpus: truthCorpus, jobDescription }),
+    };
   }
 
   const label = KIND_LABEL[opts.kind] ?? "document";
@@ -221,9 +252,7 @@ ${HUMANIZE_PROSE}`;
 
   // Store prose kinds as a structured letter (Body-filled) so the draft opens
   // straight into the rich editor; other kinds (notes) stay plain text.
-  const content = isProseKind(opts.kind)
-    ? serializeLetter(letterFromText(text, opts.kind))
-    : text;
+  const content = isProseKind(opts.kind) ? serializeLetter(letterFromText(text, opts.kind)) : text;
 
   const doc = await docsRepo.createForUser(userId, {
     ...link,
@@ -232,5 +261,11 @@ ${HUMANIZE_PROSE}`;
     content,
     jobContext,
   });
-  return { id: doc.id, kind: opts.kind, title: doc.title, evidenceNotice };
+  return {
+    id: doc.id,
+    kind: opts.kind,
+    title: doc.title,
+    evidenceNotice,
+    truthFindings: truthCheck(text, { corpus: truthCorpus, jobDescription }),
+  };
 }

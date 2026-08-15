@@ -351,6 +351,19 @@ export const jobs = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     source: text("source").notNull(),
     externalId: text("external_id"),
+    /**
+     * Owner of a PRIVATE capture (manual paste / extension / user-surfed page). NULL = a row in
+     * the shared PUBLIC catalog written only by the systematic crawl. This is the privacy line:
+     * private rows are scoped to their owner on every read, cascade-delete with the account, and
+     * a provider crawl never mutates them (nor a paste a public row). owner_user_id — not source —
+     * is the discriminator (source strings like "web-surfer" are shared by public and private).
+     */
+    ownerUserId: uuid("owner_user_id").references(() => users.id, { onDelete: "cascade" }),
+    /**
+     * Cross-source canonical identity (normalized company + title + city — see canonical.ts).
+     * THE dedupe key: one row per real vacancy per scope (public, or per private owner).
+     */
+    canonicalKey: text("canonical_key").notNull(),
     title: text("title").notNull(),
     company: text("company").notNull(),
     location: text("location"),
@@ -377,12 +390,66 @@ export const jobs = pgTable(
     ...timestamps,
   },
   (table) => [
-    uniqueIndex("jobs_source_external_id_idx").on(table.source, table.externalId),
+    // Provenance lookup only — NOT unique. canonical_key is now THE dedupe identity; keeping a
+    // unique here would spuriously reject a genuinely-new posting whose source recycles an id.
+    index("jobs_source_external_id_idx").on(table.source, table.externalId),
+    // Dedupe identity is SCOPED: one canonical row per vacancy in the public catalog, and one
+    // per (owner, vacancy) for private captures — so a paste can't collide with the global
+    // catalog or with another user's private row. Two partial uniques, since a full unique on
+    // canonical_key alone would wrongly merge a user's private capture into the public row.
+    uniqueIndex("jobs_public_canonical_key_idx")
+      .on(table.canonicalKey)
+      .where(sql`${table.ownerUserId} is null`),
+    uniqueIndex("jobs_private_canonical_key_idx")
+      .on(table.ownerUserId, table.canonicalKey)
+      .where(sql`${table.ownerUserId} is not null`),
+    index("jobs_owner_user_id_idx").on(table.ownerUserId),
     index("jobs_status_idx").on(table.status),
     index("jobs_title_idx").on(table.title),
     index("jobs_company_idx").on(table.company),
     // The jobs board's hottest read: filter status='active' + sort by (company, title).
     index("jobs_status_company_title_idx").on(table.status, table.company, table.title),
+  ]
+);
+
+/**
+ * Per-provider PROVENANCE for a canonical vacancy. One `jobs` row is the merged vacancy card the
+ * app reads; each `job_occurrences` row is how ONE source (Indeed, Jooble, a company board, a
+ * paste) represented it — its own url, description, requisition id, dates and liveness. The
+ * canonical row's rolled-up fields are AGGREGATED from these (so all readers stay unchanged),
+ * and its status is "active while ANY occurrence is active" — which is what stops one closed
+ * listing from closing the whole vacancy, and lets a re-list reopen it.
+ */
+export const jobOccurrences = pgTable(
+  "job_occurrences",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => jobs.id, { onDelete: "cascade" }),
+    source: text("source").notNull(),
+    externalId: text("external_id"),
+    /** Provider requisition id when the source exposes a stable one (Indeed jk, Greenhouse id). */
+    requisitionId: text("requisition_id"),
+    url: text("url"),
+    description: text("description"),
+    postedAt: timestamp("posted_at", { withTimezone: true }),
+    /** This occurrence's own state: active | closed | expired. */
+    status: text("status").notNull().default("active"),
+    livenessState: text("liveness_state"),
+    livenessCheckedAt: timestamp("liveness_checked_at", { withTimezone: true }),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    rawPayload: jsonb("raw_payload").$type<Record<string, unknown>>().notNull().default({}),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("job_occurrences_job_source_external_idx").on(
+      table.jobId,
+      table.source,
+      table.externalId
+    ),
+    index("job_occurrences_job_id_idx").on(table.jobId),
   ]
 );
 
@@ -1003,6 +1070,7 @@ export type Resume = typeof resumes.$inferSelect;
 export type LinkedInProfile = typeof linkedinProfiles.$inferSelect;
 export type CareerReport = typeof careerReports.$inferSelect;
 export type Job = typeof jobs.$inferSelect;
+export type JobOccurrence = typeof jobOccurrences.$inferSelect;
 export type SavedJob = typeof savedJobs.$inferSelect;
 export type Application = typeof applications.$inferSelect;
 export type ResilienceEvent = typeof resilienceEvents.$inferSelect;

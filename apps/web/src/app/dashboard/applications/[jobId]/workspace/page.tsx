@@ -38,8 +38,11 @@ type Props = { params: Promise<{ jobId: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { jobId } = await params;
+  const user = await getCurrentAuthUser();
+  if (!user) return { title: "Application Workspace" };
   const db = getDatabase();
-  const job = await createJobsRepository(db).findById(jobId);
+  // Owner-scoped: never put another user's private job title in the tab.
+  const job = await createJobsRepository(db).findByIdForUser(user.id, jobId);
   if (!job) return { title: "Application Workspace" };
   return { title: `${job.title} at ${job.company} — Workspace` };
 }
@@ -54,7 +57,7 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
   const db = getDatabase();
 
   const [job, savedJob, applications, jobDocs, profile, track] = await Promise.all([
-    createJobsRepository(db).findById(jobId),
+    createJobsRepository(db).findByIdForUser(user.id, jobId),
     createSavedJobsRepository(db).listForUserByJobIds(user.id, [jobId]),
     createApplicationsRepository(db).listForUserByJobIds(user.id, [jobId]),
     createDocumentsRepository(db).listForJob(user.id, jobId),
@@ -91,8 +94,7 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
         {/* Workspace header */}
         <div className="shrink-0">
           <h1 className="text-lg font-semibold">
-            {job.title}{" "}
-            <span className="text-muted-foreground font-normal">at {job.company}</span>
+            {job.title} <span className="text-muted-foreground font-normal">at {job.company}</span>
           </h1>
           <p className="text-sm text-muted-foreground">
             Application workspace — all documents are drafts until you approve them
@@ -141,22 +143,68 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
         {/* The tools, progressively disclosed (Hick's law): each is one self-describing
             row, one click away — in journey order: decide → perfect → prep → learn. */}
         <div className="shrink-0 space-y-2">
-          <WorkspaceSection icon="fit" title="Should you apply?" hint="An honest fit check before you invest time">
-            <FitGatePanel jobTitle={job.title} jobCompany={job.company} jobDescription={job.description ?? undefined} />
+          <WorkspaceSection
+            icon="fit"
+            title="Should you apply?"
+            hint="An honest fit check before you invest time"
+          >
+            <FitGatePanel
+              jobTitle={job.title}
+              jobCompany={job.company}
+              jobDescription={job.description ?? undefined}
+            />
           </WorkspaceSection>
-          <WorkspaceSection icon="quality" title="Is it ready to send?" hint="Score your resume against this exact posting">
-            <ApplicationQualityPanel jobId={job.id} jobTitle={job.title} jobCompany={job.company} jobDescription={job.description ?? undefined} />
+          <WorkspaceSection
+            icon="quality"
+            title="Is it ready to send?"
+            hint="Score your resume against this exact posting"
+          >
+            <ApplicationQualityPanel
+              jobId={job.id}
+              jobTitle={job.title}
+              jobCompany={job.company}
+              jobDescription={job.description ?? undefined}
+            />
           </WorkspaceSection>
-          <WorkspaceSection icon="redpen" title="Red-pen review" hint="Recruiter markup of any document, with rewrites">
-            <CvReviewPanel jobId={job.id} jobTitle={job.title} jobCompany={job.company} jobDescription={job.description ?? undefined} />
+          <WorkspaceSection
+            icon="redpen"
+            title="Red-pen review"
+            hint="Recruiter markup of any document, with rewrites"
+          >
+            <CvReviewPanel
+              jobId={job.id}
+              jobTitle={job.title}
+              jobCompany={job.company}
+              jobDescription={job.description ?? undefined}
+            />
           </WorkspaceSection>
-          <WorkspaceSection icon="interview" title="Interview prep" hint="Likely questions + STAR answers from your real experience">
-            <InterviewPrepPanel jobTitle={job.title} jobCompany={job.company} jobDescription={job.description ?? undefined} />
+          <WorkspaceSection
+            icon="interview"
+            title="Interview prep"
+            hint="Likely questions + STAR answers from your real experience"
+          >
+            <InterviewPrepPanel
+              jobTitle={job.title}
+              jobCompany={job.company}
+              jobDescription={job.description ?? undefined}
+            />
           </WorkspaceSection>
-          <WorkspaceSection icon="company" title="Company brief" hint="Understand the business + smart questions to ask">
-            <CompanyBriefPanel jobTitle={job.title} jobCompany={job.company} jobDescription={job.description ?? undefined} />
+          <WorkspaceSection
+            icon="company"
+            title="Company brief"
+            hint="Understand the business + smart questions to ask"
+          >
+            <CompanyBriefPanel
+              jobTitle={job.title}
+              jobCompany={job.company}
+              jobDescription={job.description ?? undefined}
+            />
           </WorkspaceSection>
-          <WorkspaceSection icon="outcome" title="Outcome & learning" hint="Log the result — rejections become data, not verdicts">
+          <WorkspaceSection
+            icon="outcome"
+            title="Outcome & learning"
+            hint="Log the result — rejections become data, not verdicts"
+          >
             <ApplicationOutcomePanel
               jobId={job.id}
               jobCompany={job.company}

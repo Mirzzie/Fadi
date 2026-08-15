@@ -27,4 +27,17 @@ describe("MemoryKv", () => {
     await kv.decr("n");
     expect(await kv.get("n")).toBeNull(); // refunded to zero → gone
   });
+
+  it("setNx claims once: the first caller wins, the rest fail until TTL expiry", async () => {
+    vi.useFakeTimers();
+    const kv = new MemoryKv();
+    // Single-winner lock: exactly one of N racers may claim the key.
+    expect(await kv.setNx("lock", "1", 30)).toBe(true);
+    expect(await kv.setNx("lock", "1", 30)).toBe(false);
+    expect(await kv.setNx("lock", "1", 30)).toBe(false);
+    // After the window expires the key is free to claim again.
+    vi.advanceTimersByTime(31_000);
+    expect(await kv.setNx("lock", "1", 30)).toBe(true);
+    vi.useRealTimers();
+  });
 });

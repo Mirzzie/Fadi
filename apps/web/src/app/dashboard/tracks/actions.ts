@@ -69,7 +69,7 @@ export async function listTracksAction(): Promise<TrackSummary[]> {
 }
 
 export async function switchTrackAction(
-  trackId: string,
+  trackId: string
 ): Promise<{ ok: boolean; message?: string }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Not signed in." };
@@ -79,12 +79,12 @@ export async function switchTrackAction(
 
   const updated = await createCareerProfilesRepository(getDatabase()).setActiveForUser(
     user.id,
-    id.data,
+    id.data
   );
   if (!updated) return { ok: false, message: "That track isn't yours." };
 
   // Make jobs follow the new direction right away (don't serve the stale sync window).
-  invalidateJobSync(updated.targetRole);
+  await invalidateJobSync(updated.targetRole);
   logger.info("tracks.switched", { userId: user.id, trackId: id.data });
   revalidatePath("/dashboard", "layout");
   return { ok: true };
@@ -99,7 +99,7 @@ export async function switchTrackAction(
  * deleted with it — regenerable, and dangerous as orphans (see below).
  */
 export async function deleteTrackAction(
-  trackId: string,
+  trackId: string
 ): Promise<{ ok: boolean; message?: string }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Not signed in." };
@@ -158,7 +158,7 @@ const createTrackSchema = z.object({
 export type CreateTrackInput = z.input<typeof createTrackSchema>;
 
 export async function createTrackAction(
-  input: CreateTrackInput,
+  input: CreateTrackInput
 ): Promise<{ ok: boolean; message?: string; trackId?: string }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Not signed in." };
@@ -182,7 +182,7 @@ export async function createTrackAction(
   });
 
   // A brand-new direction → pull its jobs fresh on the next load.
-  invalidateJobSync(track.targetRole);
+  await invalidateJobSync(track.targetRole);
 
   // The direction architecture: shared history stays the source of truth; this
   // direction gets its OWN tailored base resume, drafted in the background from

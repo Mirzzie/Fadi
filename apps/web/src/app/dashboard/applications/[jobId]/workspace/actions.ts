@@ -28,7 +28,7 @@ export async function checkJobLivenessAction(jobId: string): Promise<PostingLive
   const user = await getCurrentAuthUser();
   if (!user) return { state: "unknown", reason: "Not signed in", checkedAt };
 
-  const job = await createJobsRepository(getDatabase()).findById(jobId);
+  const job = await createJobsRepository(getDatabase()).findByIdForUser(user.id, jobId);
   if (!job) return { state: "unknown", reason: "Job not found", checkedAt };
 
   if (job.status === "closed" || job.status === "expired" || job.status === "archived") {
@@ -60,7 +60,7 @@ export async function generateJobDocumentAction(jobId: string, kind: DocKind): P
 
   try {
     const db = getDatabase();
-    const job = await createJobsRepository(db).findById(jobId);
+    const job = await createJobsRepository(db).findByIdForUser(user.id, jobId);
     if (!job) return { ok: false, message: "Job not found." };
 
     // Ensure an application row exists (don't clobber an existing status).
@@ -97,7 +97,7 @@ export async function generateJobDocumentAction(jobId: string, kind: DocKind): P
         jobId,
         applicationId: application.id,
       },
-      generate,
+      generate
     );
 
     revalidatePath(`/dashboard/applications/${jobId}/workspace`);
@@ -112,7 +112,10 @@ export async function generateJobDocumentAction(jobId: string, kind: DocKind): P
       userId: user.id,
       error: error instanceof Error ? error.message : "unknown",
     });
-    return { ok: false, message: "Fadi couldn't draft that. Check your AI provider and try again." };
+    return {
+      ok: false,
+      message: "Fadi couldn't draft that. Check your AI provider and try again.",
+    };
   }
 }
 
@@ -134,7 +137,7 @@ export async function autoPrepJobAction(jobId: string): Promise<AutoPrepResult> 
 
   try {
     const db = getDatabase();
-    const job = await createJobsRepository(db).findById(jobId);
+    const job = await createJobsRepository(db).findByIdForUser(user.id, jobId);
     if (!job) return { ok: false, message: "Job not found.", created: 0 };
 
     const generate = await getUserDocGenerate(user.id);
@@ -180,7 +183,7 @@ export async function autoPrepJobAction(jobId: string): Promise<AutoPrepResult> 
             jobId,
             applicationId: application.id,
           },
-          generate,
+          generate
         );
         created += 1;
       } catch (err) {
@@ -204,10 +207,19 @@ export async function autoPrepJobAction(jobId: string): Promise<AutoPrepResult> 
     }
 
     revalidatePath(`/dashboard/applications/${jobId}/workspace`);
-    logger.info("workspace.auto_prep.completed", { userId: user.id, jobId, created, requested: todo.length });
+    logger.info("workspace.auto_prep.completed", {
+      userId: user.id,
+      jobId,
+      created,
+      requested: todo.length,
+    });
 
     if (created === 0) {
-      return { ok: false, message: "Fadi couldn't draft the packet. Check your AI provider.", created: 0 };
+      return {
+        ok: false,
+        message: "Fadi couldn't draft the packet. Check your AI provider.",
+        created: 0,
+      };
     }
     return {
       ok: true,

@@ -5,6 +5,7 @@ import {
   canonicalCompany,
   canonicalTitle,
   dedupeJobs,
+  dedupeWithinSource,
   inferRemote,
   inferSalaryInterval,
   normalizeJobType,
@@ -179,6 +180,20 @@ describe("dedupeJobs", () => {
     expect(result[0].skills).toEqual(expect.arrayContaining(["TypeScript", "React"]));
   });
 
+  it("keeps the FULLER description, not merely the first one", () => {
+    // Real bug: Jooble arrives first with a ~270-char teaser and won; the full-JD copy
+    // from another board was discarded, so the card showed almost no description.
+    const teaser = "Field Security Engineer to join our team. Apply now.";
+    const full = "Field Security Engineer ".repeat(200); // the real ~4k posting
+    const result = dedupeJobs([
+      posting({ sourceId: "jooble", company: "Atlan", description: teaser }),
+      posting({ sourceId: "adzuna", company: "Atlan", description: full }),
+    ]);
+    expect(result).toHaveLength(1);
+    expect(result[0].sourceId).toBe("jooble"); // first-wins attribution preserved
+    expect(result[0].description).toBe(full); // …but the body is the fuller one
+  });
+
   it("keeps genuinely different roles apart", () => {
     const result = dedupeJobs([
       posting({ company: "Acme", title: "Software Engineer", location: "Dublin" }),
@@ -190,10 +205,74 @@ describe("dedupeJobs", () => {
   });
 });
 
+describe("dedupeWithinSource", () => {
+  it("PRESERVES the same vacancy from different providers (each must become an occurrence)", () => {
+    // The release-blocker regression: cross-source dedupe before persistence meant only one
+    // provider's posting ever reached the DB, so no job had multi-source occurrences.
+    const result = dedupeWithinSource([
+      posting({ sourceId: "jooble", externalId: "j1", company: "Acme", location: "Dublin" }),
+      posting({ sourceId: "adzuna", externalId: "a1", company: "Acme", location: "Dublin" }),
+      posting({ sourceId: "reed", externalId: "r1", company: "Acme", location: "Dublin" }),
+    ]);
+    expect(result).toHaveLength(3);
+    expect(result.map((p) => p.sourceId).sort()).toEqual(["adzuna", "jooble", "reed"]);
+  });
+
+  it("collapses a single source's exact repeat (same external id)", () => {
+    const result = dedupeWithinSource([
+      posting({ sourceId: "jooble", externalId: "j1", company: "Acme, Inc.", location: "Dublin" }),
+      posting({ sourceId: "jooble", externalId: "j1", company: "Acme", location: "Dublin" }),
+    ]);
+    expect(result).toHaveLength(1);
+  });
+
+  it("KEEPS two distinct requisitions from one source (same title, different external id)", () => {
+    // Stable identity first: a provider can list two different roles with an identical
+    // title/company/location — they must not merge before persistence.
+    const result = dedupeWithinSource([
+      posting({
+        sourceId: "jooble",
+        externalId: "req-1",
+        title: "Engineer",
+        company: "Acme",
+        location: "Dublin",
+      }),
+      posting({
+        sourceId: "jooble",
+        externalId: "req-2",
+        title: "Engineer",
+        company: "Acme",
+        location: "Dublin",
+      }),
+    ]);
+    expect(result).toHaveLength(2);
+  });
+
+  it("falls back to canonical URL, then content, when a source gives no external id", () => {
+    const result = dedupeWithinSource([
+      posting({
+        sourceId: "x",
+        externalId: undefined,
+        url: "https://x.com/j/9?utm_source=a",
+        company: "Acme",
+        location: "Dublin",
+      }),
+      posting({
+        sourceId: "x",
+        externalId: undefined,
+        url: "https://x.com/j/9?utm_source=b",
+        company: "Acme",
+        location: "Dublin",
+      }),
+    ]);
+    expect(result).toHaveLength(1); // same canonical URL (tracking stripped) → one
+  });
+});
+
 describe("normalizePosting", () => {
   it("derives interval and annual figure from prose salary", () => {
     const result = normalizePosting(
-      posting({ salaryText: "$30 per hour", salaryMin: 30, salaryMax: 40 }),
+      posting({ salaryText: "$30 per hour", salaryMin: 30, salaryMax: 40 })
     );
     expect(result.salaryInterval).toBe("hourly");
     expect(result.salaryAnnualMin).toBe(62400);
@@ -201,7 +280,7 @@ describe("normalizePosting", () => {
 
   it("does not override an interval the source stated", () => {
     const result = normalizePosting(
-      posting({ salaryInterval: "yearly", salaryMin: 60000, salaryText: "60000" }),
+      posting({ salaryInterval: "yearly", salaryMin: 60000, salaryText: "60000" })
     );
     expect(result.salaryInterval).toBe("yearly");
     expect(result.salaryAnnualMin).toBe(60000);

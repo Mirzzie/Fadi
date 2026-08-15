@@ -4,7 +4,14 @@ import { describe, expect, it } from "vitest";
 import { scoreJobForUser } from "./job-matching";
 
 const job = (title: string) =>
-  ({ title, location: "Remote", remoteMode: "remote", seniority: "mid", description: "", rawPayload: {} }) as unknown as Job;
+  ({
+    title,
+    location: "Remote",
+    remoteMode: "remote",
+    seniority: "mid",
+    description: "",
+    rawPayload: {},
+  }) as unknown as Job;
 
 const profile = (targetRole: string, roleSynonyms: string[] | null = null) =>
   ({
@@ -21,7 +28,12 @@ const run = (p: CareerProfile, title: string) =>
 
 describe("scoreJobForUser — domain-agnostic role matching", () => {
   it("matches title variants for a non-tech role via Fadi synonyms", () => {
-    const nurse = profile("Registered Nurse", ["registered nurse", "staff nurse", "rn", "charge nurse"]);
+    const nurse = profile("Registered Nurse", [
+      "registered nurse",
+      "staff nurse",
+      "rn",
+      "charge nurse",
+    ]);
     expect(run(nurse, "Staff Nurse").onRole).toBe(true);
     expect(run(nurse, "RN - ICU Night Shift").onRole).toBe(true);
     expect(run(nurse, "Software Engineer").onRole).toBe(false);
@@ -33,7 +45,11 @@ describe("scoreJobForUser — domain-agnostic role matching", () => {
   });
 
   it("works for finance the same way", () => {
-    const fin = profile("Financial Analyst", ["financial analyst", "fp&a analyst", "finance analyst"]);
+    const fin = profile("Financial Analyst", [
+      "financial analyst",
+      "fp&a analyst",
+      "finance analyst",
+    ]);
     expect(run(fin, "FP&A Analyst").onRole).toBe(true);
     expect(run(fin, "Registered Nurse").onRole).toBe(false);
   });
@@ -51,7 +67,11 @@ describe("scoreJobForUser — domain-agnostic role matching", () => {
   it("does NOT match a short role token inside an unrelated word (soc ⊄ aSSOCiate)", () => {
     // Real bug: "SOC Analyst" was matching "Associate Professor in Cybersecurity"
     // because "associate" contains the substring "soc".
-    const soc = profile("SOC Analyst", ["soc analyst", "security operations center analyst", "cybersecurity analyst"]);
+    const soc = profile("SOC Analyst", [
+      "soc analyst",
+      "security operations center analyst",
+      "cybersecurity analyst",
+    ]);
     expect(run(soc, "Associate Professor in Cybersecurity").onRole).toBe(false);
     expect(run(soc, "Data Center Technician").onRole).toBe(false);
     // …but a genuine SOC role still matches.
@@ -68,10 +88,67 @@ describe("scoreJobForUser — domain-agnostic role matching", () => {
       "system admin",
     ]);
     expect(run(sysadmin, "Fire, Life and Safety System Commissioning Engineer").onRole).toBe(false);
-    expect(run(sysadmin, "Fire, Life and Safety System Commissioning Engineer").matchScore).toBeLessThanOrEqual(28);
+    expect(
+      run(sysadmin, "Fire, Life and Safety System Commissioning Engineer").matchScore
+    ).toBeLessThanOrEqual(28);
     // …but a genuine sysadmin role still matches, on the phrase/synonyms.
     expect(run(sysadmin, "Systems Administrator").onRole).toBe(true);
     expect(run(sysadmin, "IT System Administrator - Windows").onRole).toBe(true);
+  });
+
+  it("surfaces IT-infrastructure adjacent roles as field-related even without AI synonyms", () => {
+    // Regression: a live Dublin board full of fresh IT jobs showed NOTHING because the
+    // AI synonym expansion (which would map an IT System Administrator to support / SRE /
+    // systems / network roles) had no provider, so every adjacent posting matched neither
+    // on-role nor field-related and was excluded. The deterministic TECH_FIELD_VOCAB is
+    // the floor that keeps them visible as same-field.
+    const sysadmin = profile("IT System Administrator", null);
+    for (const title of [
+      "Deskside Support Engineer",
+      "Systems Engineer",
+      "Site Reliability Engineer",
+      "Network Engineer",
+      "Cloud Infrastructure Engineer",
+      "IT Support Specialist",
+      "Desktop Support Technician",
+      "Database Administrator",
+    ]) {
+      const r = run(sysadmin, title);
+      expect(r.fieldRelated, title).toBe(true);
+    }
+    // …but a pure product/software role is NOT infrastructure-adjacent → still excluded.
+    expect(run(sysadmin, "Senior Software Engineer (React, GraphQL)").fieldRelated).toBe(false);
+    expect(run(sysadmin, "Registered Nurse").fieldRelated).toBe(false);
+  });
+
+  it("does NOT leak infrastructure vocabulary to non-infra profiles (incl. domain: null)", () => {
+    // Merge blocker (Codex audit): isLikelyTechDomain(null) === true, so the infra vocabulary
+    // was injected for EVERY unknown-domain profile — a nurse/accountant/software-eng was shown
+    // Cloud Infra / Desktop Support / Network Engineer as "same field". The gate now needs
+    // POSITIVE infra evidence, so these must all be excluded.
+    const mk = (targetRole: string, domain: string | null, roleSynonyms: string[] | null) =>
+      ({
+        targetRole,
+        domain,
+        roleSynonyms,
+        careerGoal: "grow",
+        roleCluster: null,
+        location: "Remote",
+        experienceLevel: "mid",
+      }) as unknown as CareerProfile;
+
+    const cases: Array<[CareerProfile, string]> = [
+      [mk("Registered Nurse", null, ["staff nurse", "rn"]), "Cloud Infrastructure Engineer"],
+      [mk("Registered Nurse", "Healthcare", ["staff nurse"]), "Desktop Support Technician"],
+      [mk("Accountant", null, null), "Desktop Support Technician"],
+      [mk("Accountant", "Finance", ["financial accountant"]), "Network Engineer"],
+      [mk("Software Engineer", "Software", null), "Network Engineer"],
+      [mk("Software Engineer", null, null), "Site Reliability Engineer"],
+    ];
+    for (const [p, title] of cases) {
+      const r = run(p, title);
+      expect(r.fieldRelated, `${p.targetRole} (domain=${p.domain}) → ${title}`).toBe(false);
+    }
   });
 
   it("flags same-field roles as fieldRelated (fallback), excluding other functions in the field", () => {
@@ -97,7 +174,11 @@ describe("scoreJobForUser — domain-agnostic role matching", () => {
     } as unknown as CareerProfile;
 
     // Same field, different role → shown as related (not on-role).
-    for (const title of ["Staff Security Engineer, SOAR", "Security Automation Engineer", "Network Security Engineer"]) {
+    for (const title of [
+      "Staff Security Engineer, SOAR",
+      "Security Automation Engineer",
+      "Network Security Engineer",
+    ]) {
       const r = run(soc, title);
       expect(r.onRole, title).toBe(false);
       expect(r.fieldRelated, title).toBe(true);

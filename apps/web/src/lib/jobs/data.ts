@@ -10,14 +10,21 @@ import {
 
 import { getDatabase } from "@/lib/database/client";
 import { getUserDocGenerate } from "@/lib/ai/user-generate";
-import { ensureFreshLiveJobs } from "@/lib/jobs/sync";
+import { getJobSyncStatus, startBackgroundSync, type JobSyncStatus } from "@/lib/jobs/sync";
 import { createJobScorer } from "@/lib/jobs/job-matching";
 import { expandRoleSynonyms } from "@/lib/jobs/role-synonyms";
 import { passesFilters, type JobFilters } from "@/lib/jobs/filters";
 import { getCountry } from "@/lib/jobs/locations";
 import { checkPostingLiveness } from "@/lib/jobs/liveness";
 import { sweepJobsLiveness } from "@/lib/jobs/liveness-sweep";
-import { cosine, embedText, embedTexts, EMBEDDING_MODEL, fuseScore, meanVector } from "@/lib/ai/embeddings";
+import {
+  cosine,
+  embedText,
+  embedTexts,
+  EMBEDDING_MODEL,
+  fuseScore,
+  meanVector,
+} from "@/lib/ai/embeddings";
 import {
   freshTrackVector,
   isSemanticRescue,
@@ -29,6 +36,30 @@ import type { ApplicationStatus, RecommendedJob } from "@/lib/jobs/types";
 // Below this match score a role is noise for this user — hide it rather than
 // pad the list. Saved/applied roles are always kept regardless.
 const MIN_RELEVANCE = 30;
+
+/**
+ * Live status of the background crawl for THIS user's active direction + location, so the
+ * Jobs page can show a "searching the web…" banner and auto-refresh until it finishes.
+ * Mirrors the profile/location that getRecommendedJobsForUser used to fire the crawl.
+ */
+export async function getJobSyncStatusForUser(
+  userId: string,
+  filters?: JobFilters
+): Promise<JobSyncStatus | null> {
+  const db = getDatabase();
+  const careerProfile = await createCareerProfilesRepository(db).getActiveForUser(userId);
+  if (!careerProfile?.targetRole) return null;
+  return getJobSyncStatus(
+    {
+      targetRole: careerProfile.targetRole,
+      skills: [],
+      skillGaps: [],
+      region: careerProfile.location,
+      domain: careerProfile.domain,
+    },
+    { country: filters?.country, city: filters?.city, worldwide: filters?.worldwide }
+  );
+}
 
 export async function getRecommendedJobsForUser(
   userId: string,
@@ -73,14 +104,17 @@ export async function getRecommendedJobsForUser(
     }
   }
 
-  // Pull fresh live postings (Remotive, Arbeitnow, …) into the jobs table,
-  // personalized to the user's target role, before we read+score. TTL-guarded,
-  // best-effort: if every source is down we just score whatever is stored.
+  // Kick off a DEEP live crawl into the jobs table, personalized to the target role —
+  // then DON'T wait for it. Accuracy over speed: the page renders whatever is stored now
+  // (instant), while the crawl keeps browsing the open web in the background and persists
+  // accurate, full-JD results as it goes. The Jobs page reads getJobSyncStatus and shows a
+  // live "searching…" banner that auto-refreshes the board until the run completes.
+  // TTL-guarded inside, so a reload within the window doesn't re-trigger a fresh crawl.
   if (careerProfile?.targetRole && !opts.skipSync) {
-    // Bound the live pull so the page never blocks more than a few seconds on slow
-    // external sources. The sync keeps running and populates for the next load; we
-    // render with whatever's stored now.
-    const sync = ensureFreshLiveJobs(
+    // Await only the fast window-claim + initial-status write (a couple of KV ops) so the
+    // page's own status read below already sees "running" and shows the banner. The heavy
+    // web crawl itself is detached inside and keeps running after this returns.
+    await startBackgroundSync(
       {
         targetRole: careerProfile.targetRole,
         skills: [],
@@ -88,15 +122,11 @@ export async function getRecommendedJobsForUser(
         region: careerProfile.location,
         domain: careerProfile.domain,
       },
-      { country: filters?.country, city: filters?.city, worldwide: filters?.worldwide },
+      { country: filters?.country, city: filters?.city, worldwide: filters?.worldwide }
     );
-    // Wait for the pull so an explicit search shows fresh results on the SAME load (the pull
-    // is now ~3-4s: surfer + crawler are slimmed). Passive/cached loads skip the sync entirely
-    // and never hit this wait. Capped so a stuck external source can't hang the page forever.
-    await Promise.race([sync, new Promise((resolve) => setTimeout(resolve, 6000))]);
   }
 
-  const jobs = await jobsRepository.listActive();
+  const jobs = await jobsRepository.listActiveForUser(userId);
   const jobIds = jobs.map((job) => job.id);
   const [savedJobs, applications] = await Promise.all([
     savedJobsRepository.listForUserByJobIds(userId, jobIds),
@@ -163,7 +193,8 @@ export async function getRecommendedJobsForUser(
   // Relevance gating — NEVER pad with off-role jobs. We'd rather show fewer (or
   // an honest empty state) than surface "Risk Assurance Manager" for an
   // IT-support seeker. Saved/applied roles are always kept.
-  const tracked = (j: (typeof recommendedJobs)[number]) => j.isSaved || Boolean(j.applicationStatus);
+  const tracked = (j: (typeof recommendedJobs)[number]) =>
+    j.isSaved || Boolean(j.applicationStatus);
   const overBar = (j: (typeof recommendedJobs)[number]) => j.matchScore >= MIN_RELEVANCE;
 
   // 1) Strong: on-role AND above the bar.
@@ -217,12 +248,14 @@ export async function getRecommendedJobsForUser(
     // APPLIED to, so the board leans toward what they've actually engaged with. Cold
     // start (no history, or those jobs not embedded yet) → null → zero effect.
     const engagedIds = new Set<string>(
-      [...savedByJobId.keys(), ...applicationByJobId.keys()].filter((id): id is string => id != null),
+      [...savedByJobId.keys(), ...applicationByJobId.keys()].filter(
+        (id): id is string => id != null
+      )
     );
     const prefVec = meanVector(
       [...engagedIds]
         .map((id) => byId.get(id)?.embedding)
-        .filter((v): v is number[] => Array.isArray(v) && v.length > 0),
+        .filter((v): v is number[] => Array.isArray(v) && v.length > 0)
     );
 
     if (trackVec || prefVec) {
@@ -261,7 +294,11 @@ export async function getRecommendedJobsForUser(
             });
           })
           .map((j) => {
-            j.matchScore = fuseScore(metaById.get(j.id)?.lex ?? j.matchScore, trackCosOf(j), prefCosOf(j));
+            j.matchScore = fuseScore(
+              metaById.get(j.id)?.lex ?? j.matchScore,
+              trackCosOf(j),
+              prefCosOf(j)
+            );
             j.matchReason = `Close match by meaning to your ${careerProfile.targetRole ?? "role"} — not an exact title match. Review before applying.`;
             return j;
           })
@@ -274,7 +311,9 @@ export async function getRecommendedJobsForUser(
     // that lack a vector — including the user's engaged (saved/applied) roles, so the
     // taste vector enriches over time. So the NEXT load ranks semantically. Never
     // blocks this response. after() runs post-response in request scope.
-    const engagedActive = [...engagedIds].map((id) => byId.get(id)).filter((j): j is NonNullable<typeof j> => Boolean(j));
+    const engagedActive = [...engagedIds]
+      .map((id) => byId.get(id))
+      .filter((j): j is NonNullable<typeof j> => Boolean(j));
     const needVectors = [...shown, ...rescuePool, ...engagedActive].filter((j) => {
       const v = byId.get(j.id)?.embedding;
       return !(v && v.length > 0);
@@ -286,7 +325,12 @@ export async function getRecommendedJobsForUser(
             await resolveTrackEmbedding(careerProfile, {
               embed: embedText,
               persist: (vec, basis) =>
-                careerProfilesRepository.setEmbedding(careerProfile.id, vec, EMBEDDING_MODEL, basis),
+                careerProfilesRepository.setEmbedding(
+                  careerProfile.id,
+                  vec,
+                  EMBEDDING_MODEL,
+                  basis
+                ),
             });
             const batch = needVectors.slice(0, 24);
             if (batch.length > 0) {
@@ -295,7 +339,7 @@ export async function getRecommendedJobsForUser(
                 batch.map(async (j, i) => {
                   const v = vecs[i];
                   if (v) await jobsRepository.setEmbedding(j.id, v, EMBEDDING_MODEL);
-                }),
+                })
               );
             }
           } catch {
@@ -319,11 +363,15 @@ export async function getRecommendedJobsForUser(
       const closed = await sweepJobsLiveness(
         shown
           .filter((j) => !tracked(j))
-          .map((j) => ({ id: j.id, url: j.url, livenessCheckedAt: byId.get(j.id)?.livenessCheckedAt ?? null })),
+          .map((j) => ({
+            id: j.id,
+            url: j.url,
+            livenessCheckedAt: byId.get(j.id)?.livenessCheckedAt ?? null,
+          })),
         {
           check: checkPostingLiveness,
           persist: (id, state) => jobsRepository.setJobLiveness(id, state),
-        },
+        }
       );
       if (closed.size > 0) shown = shown.filter((j) => !closed.has(j.id));
     } catch {

@@ -52,6 +52,19 @@
     });
   };
 
+  // esc() stops attribute breakout but NOT a `javascript:`/`data:` protocol — those need no
+  // special chars, so a link like `javascript:...` would execute on click under this origin.
+  // safeUrl allows only web + mailto schemes (and protocol-relative/relative paths); anything
+  // else becomes "#". Always wrap a user-supplied href/src with BOTH safeUrl and esc.
+  var safeUrl = function (s) {
+    var v = String(s == null ? "" : s).trim();
+    if (!v) return "";
+    if (/^(https?:|mailto:)/i.test(v)) return v;
+    if (/^(\/\/|\/|\.\/|#)/.test(v)) return v; // protocol-relative / site-relative / anchor
+    if (/^[a-z][a-z0-9+.-]*:/i.test(v)) return "#"; // any OTHER explicit scheme → blocked
+    return v; // bare relative (e.g. "path/x") — no scheme, safe
+  };
+
   var STYLE_ID = "fadi-portfolio-style";
   function injectStyles() {
     if (document.getElementById(STYLE_ID)) return;
@@ -124,7 +137,7 @@
           out += '<div class="fadi-card">';
           out +=
             '<div class="fadi-cover">' +
-            (it.imageUrl ? '<img src="' + esc(it.imageUrl) + '" alt="">' : "") +
+            (it.imageUrl ? '<img src="' + esc(safeUrl(it.imageUrl)) + '" alt="">' : "") +
             "</div>";
           out += '<div class="fadi-body">';
           if (it.tag) out += '<span class="fadi-tag">' + esc(it.tag) + "</span>";
@@ -136,8 +149,8 @@
           if (it.url)
             out +=
               '<p style="margin-top:12px"><a href="' +
-              esc(it.url) +
-              '" target="_blank">View source &rarr;</a></p>';
+              esc(safeUrl(it.url)) +
+              '" target="_blank" rel="noopener noreferrer nofollow">View source &rarr;</a></p>';
           out += "</div></div>";
         });
       } else if (sec === "skill") {

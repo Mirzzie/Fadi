@@ -132,7 +132,7 @@ function containsTerm(haystack: string, term: string): boolean {
 function roleFamilyTerms(
   targetRole: string | null,
   roleCluster?: string[] | null,
-  roleSynonyms?: string[] | null,
+  roleSynonyms?: string[] | null
 ): string[] {
   const roles = [targetRole, ...(roleCluster ?? [])].filter(Boolean) as string[];
   const terms = new Set<string>();
@@ -153,7 +153,10 @@ function roleFamilyTerms(
 
   // Whole-role phrases — the domain-general path (finance, healthcare, trades…).
   for (const r of roles) {
-    const phrase = normalize(r).replace(/[^a-z0-9+#. ]/g, " ").replace(/\s+/g, " ").trim();
+    const phrase = normalize(r)
+      .replace(/[^a-z0-9+#. ]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
     if (phrase.length >= 4) terms.add(phrase);
   }
 
@@ -233,7 +236,7 @@ function fieldTermsFor(
   domain: string | null,
   targetRole: string | null,
   roleCluster: string[] | null,
-  roleSynonyms: string[] | null,
+  roleSynonyms: string[] | null
 ): string[] {
   const terms = new Set<string>();
   const add = (v: string | null | undefined) =>
@@ -244,8 +247,60 @@ function fieldTermsFor(
   add(targetRole);
   for (const r of roleCluster ?? []) add(r);
   for (const s of roleSynonyms ?? []) add(s);
+
+  // Deterministic floor for IT-INFRASTRUCTURE users: the AI synonym expansion that would map an
+  // "IT System Administrator" to adjacent roles (support / systems engineer / SRE …) needs a
+  // provider, and without it these real in-field jobs match nothing and vanish from the board.
+  // This built-in vocabulary keeps them FIELD-RELATED — but ONLY for an infrastructure/support
+  // profile. Gating on isInfrastructureProfile (positive evidence) rather than isLikelyTechDomain
+  // (which treats an unknown domain as tech) is what stops a null-domain nurse or accountant from
+  // being handed "Cloud Infrastructure Engineer" as same-field.
+  if (isInfrastructureProfile(domain, targetRole)) {
+    for (const t of TECH_FIELD_VOCAB) terms.add(t);
+  }
   return [...terms];
 }
+
+// Positive-evidence classifier for an IT-infrastructure / support / operations profile — the
+// ONLY family that should receive TECH_FIELD_VOCAB. Requires an explicit infra/support signal
+// in the domain or target role; unknown/blank → false (a nurse with domain:null must NOT match).
+const INFRA_SIGNAL =
+  /\bit\b|information technology|systems? ?administrat|sys ?admin|infrastructure|help ?desk|service desk|desktop support|deskside|network (?:engineer|admin)|\bdevops\b|site reliability|\bsre\b|it support|it operations|\bit ops\b|cloud engineer|systems? engineer|server admin|it technician|technical support|end[ -]user support/i;
+function isInfrastructureProfile(domain?: string | null, targetRole?: string | null): boolean {
+  const text = `${domain ?? ""} ${targetRole ?? ""}`.trim();
+  return text.length > 0 && INFRA_SIGNAL.test(text);
+}
+
+// DISCRIMINATIVE in-field words for IT/infrastructure job titles — the deterministic fallback
+// when AI synonym expansion isn't available. Deliberately excludes bare role suffixes
+// ("engineer", "developer", "analyst") which would collapse ALL of tech into one field and,
+// e.g., surface a NestJS software role to a SOC analyst. These are the tokens that make a
+// "Systems Engineer" / "Deskside Support Engineer" / "Site Reliability Engineer" read as
+// infrastructure work specifically. Whole-word matched, so "systems" ≠ "system".
+const TECH_FIELD_VOCAB = [
+  "support",
+  "helpdesk",
+  "desktop",
+  "deskside",
+  "technician",
+  "systems",
+  "infrastructure",
+  "network",
+  "networking",
+  "security",
+  "cyber",
+  "cloud",
+  "devops",
+  "sre",
+  "reliability",
+  "platform",
+  "database",
+  "sysadmin",
+  "administrator",
+  "server",
+  "servers",
+  "virtualization",
+];
 
 /** A title whose FUNCTION is a different line of work (sales/academia/recruiting…). */
 function hasDifferentFunction(jobTitle: string): boolean {
@@ -329,7 +384,10 @@ function experienceScore(experienceLevel: string | null, job: Job) {
 
 /** The user's distinctive keyword set — profile-constant, so build it ONCE per scan
  *  (tokenizing the full resume per job was the hot-path waste). */
-function buildProfileKeywords(careerProfile: CareerProfile | null, resume: Resume | null): Set<string> {
+function buildProfileKeywords(
+  careerProfile: CareerProfile | null,
+  resume: Resume | null
+): Set<string> {
   const clusterTokens = (careerProfile?.roleCluster ?? []).flatMap((r) => distinctiveTokens(r));
   return new Set([
     ...distinctiveTokens(careerProfile?.targetRole),
@@ -390,8 +448,17 @@ export function createJobScorer({
   const experienceLevel = careerProfile?.experienceLevel ?? null;
   const locationPref = locationOverride ?? careerProfile?.location ?? null;
 
-  const roleTerms = roleFamilyTerms(targetRole, careerProfile?.roleCluster ?? null, careerProfile?.roleSynonyms ?? null);
-  const fieldTerms = fieldTermsFor(domain, targetRole, careerProfile?.roleCluster ?? null, careerProfile?.roleSynonyms ?? null);
+  const roleTerms = roleFamilyTerms(
+    targetRole,
+    careerProfile?.roleCluster ?? null,
+    careerProfile?.roleSynonyms ?? null
+  );
+  const fieldTerms = fieldTermsFor(
+    domain,
+    targetRole,
+    careerProfile?.roleCluster ?? null,
+    careerProfile?.roleSynonyms ?? null
+  );
   const profileKeywords = buildProfileKeywords(careerProfile, resume);
   const userLvl = userLevel(experienceLevel);
 
@@ -405,7 +472,11 @@ export function createJobScorer({
 
     // Low floor: an unrelated role should score low, not inherit a generous base.
     const score =
-      5 + role.score + locationScore(locationPref, job) + experienceScore(experienceLevel, job) + keywordMatch.score;
+      5 +
+      role.score +
+      locationScore(locationPref, job) +
+      experienceScore(experienceLevel, job) +
+      keywordMatch.score;
     // Career stage: a role ~2+ levels above the candidate isn't a real match — demote.
     const seniority = seniorityFitAt(job.title, job.description, userLvl);
 

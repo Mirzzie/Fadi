@@ -9,7 +9,7 @@ import {
   type JobSourceCoverage,
   type SourceCoverage,
 } from "./coverage";
-import { dedupeJobs, normalizePosting } from "./normalize";
+import { dedupeWithinSource, normalizePosting } from "./normalize";
 import { getConfiguredJobSources, getConfiguredSignalSources, listSourceStatus } from "./registry";
 import { rankSignals, type RelevanceProfile, type ScoredSignal } from "./relevance";
 import type { JobPosting, JobSource, SignalQuery } from "./types";
@@ -69,9 +69,29 @@ export interface LocationFilter {
 
 // Seniority/filler words that hurt search recall (HN/GDELT match poorly on them).
 const KEYWORD_STOPWORDS = new Set([
-  "the", "and", "of", "a", "to", "with", "in", "for", "or",
-  "staff", "senior", "junior", "lead", "principal", "mid", "entry", "level",
-  "fluency", "sense", "depth", "skills", "engineer", "developer",
+  "the",
+  "and",
+  "of",
+  "a",
+  "to",
+  "with",
+  "in",
+  "for",
+  "or",
+  "staff",
+  "senior",
+  "junior",
+  "lead",
+  "principal",
+  "mid",
+  "entry",
+  "level",
+  "fluency",
+  "sense",
+  "depth",
+  "skills",
+  "engineer",
+  "developer",
 ]);
 
 /**
@@ -82,7 +102,7 @@ const KEYWORD_STOPWORDS = new Set([
 function queryFromProfile(
   profile: RelevanceProfile,
   limit = 15,
-  location?: LocationFilter,
+  location?: LocationFilter
 ): SignalQuery {
   const phrases = [
     profile.targetRole,
@@ -151,7 +171,7 @@ function marketCacheKey(profile: RelevanceProfile, opts: { threshold?: number; l
 /** Personalized market intelligence for Fadi's context + the dashboard brief. */
 export async function getMarketIntelligence(
   profile: RelevanceProfile,
-  opts: { threshold?: number; limit?: number } = {},
+  opts: { threshold?: number; limit?: number } = {}
 ): Promise<MarketIntelligence> {
   const cacheKey = marketCacheKey(profile, opts);
   const cached = marketCache.get(cacheKey);
@@ -207,11 +227,21 @@ export function getJobSourceCoverage(domain?: string | null): JobSourceCoverage 
   return decideJobCoverage(domain, sources);
 }
 
+/** Fired as each source settles, so a caller can show live crawl progress. */
+export type SourceProgress = (event: {
+  id: string;
+  status: "ok" | "error";
+  count: number;
+  done: number;
+  total: number;
+}) => void;
+
 /** Live job discovery across configured job sources, deduped by title+company. */
 export async function discoverJobs(
   profile: RelevanceProfile,
   limit = 20,
   location?: LocationFilter,
+  onProgress?: SourceProgress
 ): Promise<JobPosting[]> {
   let sources = getConfiguredJobSources();
   // Domain-aware: a finance/healthcare/trades user shouldn't be fed a tech-only
@@ -231,30 +261,76 @@ export async function discoverJobs(
   }
   const query = queryFromProfile(profile, limit, location);
 
-  // Per-source timeout: one slow source (e.g. the Web Surfer sweeping several boards) must
-  // never stall the whole pull. A source that overruns contributes [] for this pull.
-  // Generous: the browser sources (crawler visits pages, scraper drives Chromium) legitimately
-  // take ~10-20s. The PAGE never waits this long — it renders in a few seconds and the pull
-  // finishes in the background, persisting for the next load. This cap only stops a truly stuck
-  // source from hanging the background pull forever.
-  const withTimeout = (p: Promise<JobPosting[]>): Promise<JobPosting[]> =>
-    Promise.race([
-      p.catch(() => [] as JobPosting[]),
-      new Promise<JobPosting[]>((resolve) => setTimeout(() => resolve([]), 22_000)),
-    ]);
-  const settled = await Promise.allSettled(sources.map((s) => withTimeout(s.fetchJobs(query))));
-  const perSource = settled.map((r) => (r.status === "fulfilled" ? r.value : []));
+  // Per-source budget. The whole pull runs in the BACKGROUND (data.ts fires it without
+  // awaiting), so slowness never blocks the page — the design choice here is accuracy over
+  // speed. The browser legs (crawler visits real pages + extracts full JDs, scraper drives
+  // Chromium) are the ONLY sources returning complete descriptions rather than aggregator
+  // teasers, and a deep crawl legitimately takes a minute+, so they get a long budget. The
+  // fast keyed APIs resolve in <6s; a short cap means one flaky API can't drag the pull. The
+  // cap only stops a truly stuck source from hanging the background run forever.
+  const BROWSER_SOURCES = new Set(["web-crawl", "fadi-scraper", "web-surfer"]);
 
-  // Record what each source returned on this real pull, so the UI can show which
-  // APIs are actually live (vs merely configured) and surface a silently-failing one.
+  // Run one source with its budget, distinguishing the THREE real outcomes — ok / error /
+  // timeout — instead of collapsing failures into an empty "ok". Failures were previously
+  // caught to `[]` BEFORE Promise.allSettled, so every source looked "fulfilled" and the
+  // health UI reported a broken source as "live, 0 jobs". We also clear the timeout handle
+  // (it used to leak a live timer for the full budget) and abort the source on timeout so a
+  // signal-aware source stops wasted work.
+  const runSource = async (
+    s: JobSource
+  ): Promise<{ id: string; status: "ok" | "error"; jobs: JobPosting[] }> => {
+    const ms = BROWSER_SOURCES.has(s.id) ? 120_000 : 12_000;
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timedOut = new Promise<"timeout">((resolve) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        resolve("timeout");
+      }, ms);
+    });
+    try {
+      const outcome = await Promise.race([
+        s.fetchJobs({ ...query, signal: controller.signal }).then((jobs) => ({ jobs })),
+        timedOut,
+      ]);
+      if (outcome === "timeout") {
+        logger.warn("data_sources.source_timeout", { source: s.id, ms });
+        return { id: s.id, status: "error", jobs: [] };
+      }
+      return { id: s.id, status: "ok", jobs: outcome.jobs };
+    } catch (err) {
+      controller.abort();
+      logger.warn("data_sources.source_failed", {
+        source: s.id,
+        error: err instanceof Error ? err.message : "unknown",
+      });
+      return { id: s.id, status: "error", jobs: [] };
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  };
+
+  // Report each source to the caller AS IT SETTLES (live progress) with its REAL status,
+  // while the final dedupe/persist still happens once, after all settle.
+  const total = sources.length;
+  let done = 0;
+  const outcomes = await Promise.all(
+    sources.map(async (s) => {
+      const o = await runSource(s);
+      done += 1;
+      onProgress?.({ id: o.id, status: o.status, count: o.jobs.length, done, total });
+      return o;
+    })
+  );
+  const perSource = outcomes.map((o) => o.jobs);
+
+  // Record what each source returned on this real pull, so the UI can show which sources are
+  // actually live (vs merely configured) and surface a silently-failing one — now that a
+  // timeout/throw is a real "error" rather than a fake success.
   _lastJobSourceRun = {
     at: Date.now(),
     query: `${query.keywords.join("+")}|country=${query.country ?? "any"}|city=${query.city ?? ""}`,
-    sources: settled.map((r, i) => ({
-      id: sources[i]?.id ?? "?",
-      status: r.status === "fulfilled" ? ("ok" as const) : ("error" as const),
-      count: r.status === "fulfilled" ? r.value.length : 0,
-    })),
+    sources: outcomes.map((o) => ({ id: o.id, status: o.status, count: o.jobs.length })),
   };
 
   // Round-robin across sources so EVERY source contributes to the limited set —
@@ -271,16 +347,18 @@ export async function discoverJobs(
   logger.info("data_sources.discover_jobs", {
     configured: sources.map((s) => s.id).join(",") || "none",
     query: `${query.keywords.join("+")}|country=${query.country ?? ""}|city=${query.city ?? ""}`,
-    perSource: settled
-      .map((r, i) => `${sources[i]?.id}:${r.status === "fulfilled" ? r.value.length : "ERR"}`)
+    perSource: outcomes
+      .map((o) => `${o.id}:${o.status === "ok" ? o.jobs.length : "ERR"}`)
       .join(","),
   });
 
-  // Normalize BEFORE dedupe: inferring remote/interval first means a posting that
-  // states "€400/day" and its duplicate that states nothing merge into one entry
-  // that is filterable. Dedupe is first-wins, and the round-robin above interleaves
-  // sources in registry order, so licensed APIs keep attribution over scrapers.
-  return dedupeJobs(jobs.map(normalizePosting)).slice(0, limit);
+  // Normalize, then dedupe ONLY within each source (not across providers): every provider's
+  // posting must survive so it becomes its own occurrence in the DB. Cross-provider merge into
+  // one canonical vacancy happens in the repository's canonical upsert. (Using cross-source
+  // dedupeJobs here was the bug that made the live DB show one occurrence per job.) The
+  // round-robin above interleaves sources in registry order, so within the cap every source is
+  // represented; display limits are applied later, at read time, after aggregation.
+  return dedupeWithinSource(jobs.map(normalizePosting)).slice(0, limit);
 }
 
 /**
@@ -291,7 +369,8 @@ export function summarizeForFadi(intel: MarketIntelligence): string {
   if (intel.signals.length === 0) return "";
 
   const lines = intel.signals.map(
-    (s) => `- ${s.title}${s.url ? ` (${s.url})` : ""} — ${s.reasons[0] ?? "relevant to your profile"}`,
+    (s) =>
+      `- ${s.title}${s.url ? ` (${s.url})` : ""} — ${s.reasons[0] ?? "relevant to your profile"}`
   );
 
   return [

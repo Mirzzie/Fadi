@@ -17,7 +17,10 @@ export const dynamic = "force-dynamic";
 // Clamp any string to `n` chars instead of REJECTING it — a real listing must never be lost
 // because e.g. Indeed's tracking URL runs past a length cap (that caused "Failed: invalid").
 const clamped = (n: number) =>
-  z.preprocess((v) => (typeof v === "string" ? v.slice(0, n) : v == null ? undefined : v), z.string().optional());
+  z.preprocess(
+    (v) => (typeof v === "string" ? v.slice(0, n) : v == null ? undefined : v),
+    z.string().optional()
+  );
 
 const jobSchema = z.object({
   // All optional + clamped; the persist loop keeps only rows with a real title AND company
@@ -32,7 +35,10 @@ const jobSchema = z.object({
 const schema = z.object({
   jobs: z.array(jobSchema).max(120).optional().default([]),
   // Cleaned page text for the AI self-healing fallback when the DOM selectors miss.
-  pageText: z.preprocess((v) => (typeof v === "string" ? v.slice(0, 20_000) : v), z.string().optional()),
+  pageText: z.preprocess(
+    (v) => (typeof v === "string" ? v.slice(0, 20_000) : v),
+    z.string().optional()
+  ),
   source: clamped(60),
 });
 
@@ -53,7 +59,10 @@ export async function POST(req: Request) {
   const origin = req.headers.get("origin");
   const user = await getExtensionUser(req);
   if (!user) {
-    return withCors(NextResponse.json({ ok: false, error: "not_authenticated" }, { status: 401 }), origin);
+    return withCors(
+      NextResponse.json({ ok: false, error: "not_authenticated" }, { status: 401 }),
+      origin
+    );
   }
   let body: unknown;
   try {
@@ -75,9 +84,16 @@ export async function POST(req: Request) {
     // title and a company (doctrine: we never invent a company). If the selectors rotted and
     // produced no usable rows, fall back to Fadi's AI reading the raw page text — that's what
     // makes scraping self-heal instead of silently returning "no jobs".
-    type Item = { title?: string; company?: string; location?: string; url?: string; description?: string };
+    type Item = {
+      title?: string;
+      company?: string;
+      location?: string;
+      url?: string;
+      description?: string;
+    };
     let items: Item[] = parsed.data.jobs;
-    const usable = (list: Item[]) => list.filter((d) => d.title?.trim() && d.company?.trim()).length;
+    const usable = (list: Item[]) =>
+      list.filter((d) => d.title?.trim() && d.company?.trim()).length;
     let usedAi = false;
     if (usable(items) === 0 && parsed.data.pageText?.trim()) {
       items = await aiExtractJobs(parsed.data.pageText, parsed.data.source ?? "job board");
@@ -95,6 +111,7 @@ export async function POST(req: Request) {
         const job = await jobsRepo.upsertSeedJob({
           source: "extension",
           externalId,
+          ownerUserId: user.id, // PRIVATE capture from the user's own browser session
           title,
           company,
           location: d.location ?? null,

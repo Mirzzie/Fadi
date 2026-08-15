@@ -15,6 +15,7 @@ import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
 import { applyIntentFilter, parseJobPrompt, type JobSearchIntent } from "@/lib/jobs/ai-search";
 import { surfForJobs } from "@/lib/jobs/web-surfer";
+import { isSafeFetchUrl } from "@/lib/security/url-guard";
 import { invalidateJobSync } from "@/lib/jobs/sync";
 import { getRecommendedJobsForUser } from "@/lib/jobs/data";
 import type { RecommendedJob } from "@/lib/jobs/types";
@@ -81,7 +82,7 @@ export async function saveJobAction(jobId: string): Promise<JobActionResult> {
     const savedJobsRepository = createSavedJobsRepository(db);
 
     const [job, careerProfile] = await Promise.all([
-      jobsRepository.findById(parsedJobId.data),
+      jobsRepository.findByIdForUser(user.id, parsedJobId.data),
       careerProfilesRepository.getActiveForUser(user.id),
     ]);
     // Score against THIS direction's resume (falls back to the shared one).
@@ -225,7 +226,7 @@ export async function updateApplicationStatusAction(
     const db = getDatabase();
     const jobsRepository = createJobsRepository(db);
     const applicationsRepository = createApplicationsRepository(db);
-    const job = await jobsRepository.findById(parsedJobId.data);
+    const job = await jobsRepository.findByIdForUser(user.id, parsedJobId.data);
 
     if (!job || job.status !== "active") {
       logger.warn("jobs.application_status.job_not_found", {
@@ -306,7 +307,7 @@ export async function saveJobPreferences(input: {
  */
 export async function aiJobSearch(
   prompt: string,
-  opts?: { global?: boolean },
+  opts?: { global?: boolean }
 ): Promise<
   { ok: true; jobs: RecommendedJob[]; intent: JobSearchIntent } | { ok: false; message: string }
 > {
@@ -331,12 +332,22 @@ export async function aiJobSearch(
  * existing fresh live-pull runs for the right place. Role stays the active direction (the spine).
  */
 export async function resolveSearch(
-  prompt: string,
+  prompt: string
 ): Promise<{ country: string | null; city: string | null; remote: boolean }> {
+  // Authenticate BEFORE the (server-funded) AI parse — an unauthenticated caller must never be
+  // able to spend our model budget. Returns an empty resolution rather than throwing.
+  const user = await getCurrentAuthUser();
+  if (!user) return { country: null, city: null, remote: false };
+
   const intent = await parseJobPrompt(prompt);
   // An explicit search should FETCH, not read a 30-min cache. Drop the sync window so the
-  // navigation that follows re-pulls every source fresh for what the user just asked for.
-  invalidateJobSync();
+  // navigation that follows re-pulls fresh for what the user just asked for — SCOPED to this
+  // user's active direction (not a global bump that nukes every user's window), and AWAITED so
+  // the generation increment lands before the client navigates and the new page reads it.
+  const activeRole = (await createCareerProfilesRepository(getDatabase()).getActiveForUser(user.id))
+    ?.targetRole;
+  if (activeRole) await invalidateJobSync(activeRole);
+
   return {
     country: intent.country ?? null,
     city: intent.city ?? null,
@@ -350,7 +361,7 @@ export async function resolveSearch(
  * wall (Cloudflare / login), it says so and points the user at the extension instead.
  */
 export async function surfCareerPage(
-  input: string,
+  input: string
 ): Promise<
   | { ok: true; saved: number; found: number; via: string; company?: string }
   | { ok: false; message: string; blocked?: boolean }
@@ -359,12 +370,26 @@ export async function surfCareerPage(
   if (!user) return { ok: false, message: "Please sign in again." };
 
   const url = input.trim();
-  if (!url) return { ok: false, message: "Paste a company career page or a Greenhouse / Lever board URL." };
+  if (!url)
+    return { ok: false, message: "Paste a company career page or a Greenhouse / Lever board URL." };
+
+  // SSRF guard: this fetches a URL the user typed, server-side. Block non-http(s), localhost,
+  // private ranges, and public hostnames that resolve to internal IPs (cloud metadata etc.) —
+  // the same guard liveness checks already use. Fails closed.
+  if (!(await isSafeFetchUrl(url))) {
+    return {
+      ok: false,
+      message: "That URL can't be fetched. Enter a public company career page or ATS board URL.",
+    };
+  }
 
   const res = await surfForJobs(url);
   if (!res.ok) return { ok: false, message: res.reason, blocked: res.blocked };
   if (res.jobs.length === 0) {
-    return { ok: false, message: "No jobs found on that page. Try the company's Greenhouse or Lever board URL." };
+    return {
+      ok: false,
+      message: "No jobs found on that page. Try the company's Greenhouse or Lever board URL.",
+    };
   }
 
   const db = getDatabase();
@@ -380,6 +405,7 @@ export async function surfCareerPage(
       const job = await jobsRepo.upsertSeedJob({
         source: "web-surfer",
         externalId,
+        ownerUserId: user.id, // PRIVATE: a page the USER chose to surf, not the systematic crawl
         title: j.title,
         company: j.company ?? company ?? "Unknown",
         location: j.location ?? null,

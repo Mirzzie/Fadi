@@ -12,6 +12,13 @@ export interface KvStore {
   get(key: string): Promise<string | null>;
   /** Set with optional TTL in seconds. */
   set(key: string, value: string, ttlSeconds?: number): Promise<void>;
+  /**
+   * Atomic claim: set the key with TTL ONLY if it does not already exist (SET NX EX).
+   * Returns true when THIS caller created it. This is the correct primitive for a
+   * single-winner lock — a separate get()+set() has a race window where two concurrent
+   * requests both see "absent" and both proceed (duplicate crawls).
+   */
+  setNx(key: string, value: string, ttlSeconds: number): Promise<boolean>;
   del(key: string): Promise<void>;
   /**
    * Atomic increment. When the key is created by this call and `ttlSeconds` > 0,
@@ -47,6 +54,14 @@ export class MemoryKv implements KvStore {
     this.store.set(key, { value, expiresAt: ttlSeconds ? Date.now() + ttlSeconds * 1000 : null });
   }
 
+  async setNx(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+    // Atomic on a single-threaded event loop: there is no await between the liveness
+    // check and the write, so two interleaved callers cannot both observe "absent".
+    if (this.live(key)) return false;
+    this.store.set(key, { value, expiresAt: Date.now() + ttlSeconds * 1000 });
+    return true;
+  }
+
   async del(key: string): Promise<void> {
     this.store.delete(key);
   }
@@ -60,7 +75,8 @@ export class MemoryKv implements KvStore {
     }
     const count = (parseInt(e.value, 10) || 0) + 1;
     e.value = String(count);
-    const ttl = e.expiresAt === null ? -1 : Math.max(1, Math.ceil((e.expiresAt - Date.now()) / 1000));
+    const ttl =
+      e.expiresAt === null ? -1 : Math.max(1, Math.ceil((e.expiresAt - Date.now()) / 1000));
     return { count, ttlSeconds: ttl };
   }
 
@@ -78,7 +94,7 @@ export class MemoryKv implements KvStore {
 class UpstashKv implements KvStore {
   constructor(
     private readonly url: string,
-    private readonly token: string,
+    private readonly token: string
   ) {}
 
   private async cmd(...args: (string | number)[]): Promise<unknown> {
@@ -101,6 +117,12 @@ class UpstashKv implements KvStore {
   async set(key: string, value: string, ttlSeconds?: number): Promise<void> {
     if (ttlSeconds) await this.cmd("SET", key, value, "EX", ttlSeconds);
     else await this.cmd("SET", key, value);
+  }
+
+  async setNx(key: string, value: string, ttlSeconds: number): Promise<boolean> {
+    // Redis SET key value NX EX ttl → "OK" when set, null when the key already existed.
+    const r = await this.cmd("SET", key, value, "NX", "EX", ttlSeconds);
+    return r === "OK";
   }
 
   async del(key: string): Promise<void> {

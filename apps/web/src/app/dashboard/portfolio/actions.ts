@@ -72,7 +72,12 @@ async function ensureSite(userId: string, email?: string) {
 }
 
 export async function loadPortfolio(): Promise<
-  Result<{ site: PortfolioSiteView; handle: string; isPublished: boolean; items: PortfolioItemView[] }>
+  Result<{
+    site: PortfolioSiteView;
+    handle: string;
+    isPublished: boolean;
+    items: PortfolioItemView[];
+  }>
 > {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
@@ -176,7 +181,10 @@ export async function seedFromEvidence(): Promise<Result<{ added: number }>> {
     if (!built.ok) return { ok: false, message: built.message };
     evidence = await evidenceRepo.listForUser(user.id);
     if (evidence.length === 0) {
-      return { ok: false, message: "I couldn't find enough in your history to build a portfolio yet." };
+      return {
+        ok: false,
+        message: "I couldn't find enough in your history to build a portfolio yet.",
+      };
     }
   }
 
@@ -217,7 +225,7 @@ export async function syncFromEvidence(): Promise<Result<{ added: number }>> {
   // no longer sneaks back in as a duplicate.
   const seeded = seedItemsFromEvidence(evidence);
   const kept = seeded.filter(
-    (r) => !have.has(r.evidenceItemId) && !existing.some((x) => isSameEntry(r, x)),
+    (r) => !have.has(r.evidenceItemId) && !existing.some((x) => isSameEntry(r, x))
   );
   if (kept.length === 0) return { ok: true, added: 0 };
 
@@ -254,6 +262,20 @@ export async function checkIntegrity(): Promise<Result<IntegrityAiResult>> {
   return { ok: true, ...res };
 }
 
+/**
+ * Allow only web/mailto (or relative) link URLs into portfolio items. Blocks `javascript:`,
+ * `data:`, `vbscript:` and any other explicit scheme — these are published to a PUBLIC snapshot
+ * and rendered into href/src, where a script-scheme link would execute under the Fadi origin.
+ * The public SDK guards on render too (defense in depth); this stops it at the source.
+ */
+function safeLinkUrl(raw?: string | null): string | null {
+  const v = (raw ?? "").trim();
+  if (!v) return null;
+  if (/^(https?:\/\/|mailto:)/i.test(v)) return v;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(v)) return null; // any other explicit scheme → reject
+  return v; // scheme-less relative path
+}
+
 export async function saveItem(input: {
   id?: string;
   section: string;
@@ -275,7 +297,9 @@ export async function saveItem(input: {
 
   const repo = createPortfolioRepository(getDatabase());
   const site = await ensureSite(user.id, user.email);
-  const section = (SECTIONS as readonly string[]).includes(input.section) ? input.section : "custom";
+  const section = (SECTIONS as readonly string[]).includes(input.section)
+    ? input.section
+    : "custom";
 
   const fields = {
     section,
@@ -287,9 +311,9 @@ export async function saveItem(input: {
     bullets: input.bullets.map((b) => b.trim()).filter(Boolean),
     roles: input.roles.filter(Boolean),
     tag: input.tag?.trim() || null,
-    url: input.url?.trim() || null,
-    imageUrl: input.imageUrl?.trim() || null,
-    gallery: input.gallery.filter(Boolean),
+    url: safeLinkUrl(input.url),
+    imageUrl: safeLinkUrl(input.imageUrl),
+    gallery: input.gallery.map((g) => safeLinkUrl(g)).filter((g): g is string => Boolean(g)),
   };
 
   let row;
@@ -361,7 +385,10 @@ export async function enhanceDescription(input: {
 
   try {
     const raw = (await gen.text(system, prompt)) as unknown;
-    const text = String(raw ?? "").trim().replace(/^["']|["']$/g, "").trim();
+    const text = String(raw ?? "")
+      .trim()
+      .replace(/^["']|["']$/g, "")
+      .trim();
     if (!text) return { ok: false, message: "Fadi couldn't draft that — try again." };
     return { ok: true, description: text };
   } catch (err) {

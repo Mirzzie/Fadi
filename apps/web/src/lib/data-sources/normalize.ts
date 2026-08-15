@@ -11,6 +11,8 @@
  * every rule is testable without a network.
  */
 
+import { canonicalizeUrl } from "@careeros/database";
+
 import type { JobPosting } from "./types";
 
 /** JobSpy's `JobType` vocabulary — the canonical set every source maps into. */
@@ -30,8 +32,14 @@ export type JobType =
  */
 const JOB_TYPE_SYNONYMS: Record<JobType, string[]> = {
   fulltime: [
-    "fulltime", "full-time", "full time", "permanent", "vollzeit",
-    "tiempo completo", "temps plein", "voltijds",
+    "fulltime",
+    "full-time",
+    "full time",
+    "permanent",
+    "vollzeit",
+    "tiempo completo",
+    "temps plein",
+    "voltijds",
   ],
   parttime: ["parttime", "part-time", "part time", "teilzeit", "media jornada", "temps partiel"],
   contract: ["contract", "contractor", "contrato", "freelance", "b2b"],
@@ -49,7 +57,11 @@ const JOB_TYPE_SYNONYMS: Record<JobType, string[]> = {
 export function normalizeJobType(raw: string | null | undefined): JobType | null {
   if (!raw) return null;
   // Collapse punctuation so "Full_Time", "FULL-TIME" and "full time" all converge.
-  const text = raw.toLowerCase().replace(/[_\-/]+/g, " ").replace(/\s+/g, " ").trim();
+  const text = raw
+    .toLowerCase()
+    .replace(/[_\-/]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
   if (!text) return null;
 
   for (const [type, synonyms] of Object.entries(JOB_TYPE_SYNONYMS) as [JobType, string[]][]) {
@@ -89,7 +101,7 @@ export type SalaryInterval = keyof typeof PERIODS_PER_YEAR;
  */
 export function annualizeSalary(
   amount: number | null | undefined,
-  interval: SalaryInterval | null | undefined,
+  interval: SalaryInterval | null | undefined
 ): number | null {
   if (amount == null || !Number.isFinite(amount) || amount <= 0) return null;
   if (!interval || !(interval in PERIODS_PER_YEAR)) return null;
@@ -119,10 +131,10 @@ export function inferSalaryInterval(text: string | null | undefined): SalaryInte
   // "a year" is Indeed's own phrasing — omitting it left every Indeed salary
   // unannualized, and therefore invisible to the salary filter.
   if (
-    match(["per year", "yearly", "annually", "annual", "a year", "per annum", "p\\.?a\\.?"], [
-      "year",
-      "yr",
-    ])
+    match(
+      ["per year", "yearly", "annually", "annual", "a year", "per annum", "p\\.?a\\.?"],
+      ["year", "yr"]
+    )
   ) {
     return "yearly";
   }
@@ -161,8 +173,25 @@ export function inferRemote(fields: {
  * "Acme, Inc.", "ACME Inc" and "Acme Limited" collapse to one entity.
  */
 const LEGAL_SUFFIXES = [
-  "inc", "incorporated", "llc", "ltd", "limited", "plc", "gmbh", "bv", "nv",
-  "corp", "corporation", "co", "company", "sa", "srl", "pty", "ag", "as", "ab",
+  "inc",
+  "incorporated",
+  "llc",
+  "ltd",
+  "limited",
+  "plc",
+  "gmbh",
+  "bv",
+  "nv",
+  "corp",
+  "corporation",
+  "co",
+  "company",
+  "sa",
+  "srl",
+  "pty",
+  "ag",
+  "as",
+  "ab",
 ];
 
 export function canonicalCompany(name: string): string {
@@ -187,17 +216,19 @@ export function canonicalCompany(name: string): string {
  * location suffixes, gender tags (m/w/d on German postings), emoji.
  */
 export function canonicalTitle(title: string): string {
-  return title
-    .toLowerCase()
-    // "(m/w/d)", "(f/m/x)" — EU-compliance gender tags, pure noise for matching.
-    .replace(/\([mfwdx](\s*\/\s*[mfwdx])+\)/g, " ")
-    // Requisition IDs: "- REQ12345", "(JR-0092)".
-    .replace(/[-(\[]\s*(req|jr|job|id)[\s#-]*\d+\s*[)\]]?/gi, " ")
-    // Trailing location/department after a pipe or en-dash.
-    .replace(/[|–—]/g, " ")
-    .replace(/[^a-z0-9+#\s]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+  return (
+    title
+      .toLowerCase()
+      // "(m/w/d)", "(f/m/x)" — EU-compliance gender tags, pure noise for matching.
+      .replace(/\([mfwdx](\s*\/\s*[mfwdx])+\)/g, " ")
+      // Requisition IDs: "- REQ12345", "(JR-0092)".
+      .replace(/[-(\[]\s*(req|jr|job|id)[\s#-]*\d+\s*[)\]]?/gi, " ")
+      // Trailing location/department after a pipe or en-dash.
+      .replace(/[|–—]/g, " ")
+      .replace(/[^a-z0-9+#\s]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }
 
 /**
@@ -239,11 +270,40 @@ export function dedupeJobs(jobs: JobPosting[]): JobPosting[] {
   return [...bySignature.values()];
 }
 
+/**
+ * Collapse only a SOURCE's own repeats (a provider returning the same posting twice on one
+ * pull), while PRESERVING the same vacancy surfaced by DIFFERENT providers. This is what the
+ * occurrences model needs: every provider's posting must survive ingestion to become its own
+ * `job_occurrences` row — the cross-provider merge into one canonical vacancy happens later, in
+ * the repository's canonical upsert. Using dedupeJobs() here (cross-source) is exactly the bug
+ * that made the live DB show one occurrence per job. First-wins within a source.
+ */
+export function dedupeWithinSource(jobs: JobPosting[]): JobPosting[] {
+  const seen = new Set<string>();
+  const out: JobPosting[] = [];
+  for (const job of jobs) {
+    // Prefer the provider's STABLE identity so two genuinely-different requisitions from ONE
+    // source (same title/company/location but distinct postings) don't wrongly collapse before
+    // persistence: external/requisition id first, then the canonical apply URL, and only then a
+    // conservative content-key fallback.
+    const identity = job.externalId?.trim()
+      ? `id:${job.externalId.trim()}`
+      : job.url
+        ? `url:${canonicalizeUrl(job.url) ?? job.url}`
+        : `content:${dedupeKey(job)}`;
+    const key = `${job.sourceId}::${identity}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(job);
+  }
+  return out;
+}
+
 /** Copy `field` from source to target only when target lacks it. Key- and value-typed. */
 function fillGap<K extends keyof JobPosting>(
   target: JobPosting,
   source: JobPosting,
-  field: K,
+  field: K
 ): void {
   if (target[field] == null && source[field] != null) target[field] = source[field];
 }
@@ -252,11 +312,26 @@ function fillGap<K extends keyof JobPosting>(
 function mergePostings(primary: JobPosting, secondary: JobPosting): JobPosting {
   const merged: JobPosting = { ...primary };
   const fillable = [
-    "location", "url", "description", "postedAt", "salaryText",
-    "salaryMin", "salaryMax", "salaryCurrency", "salaryInterval", "jobLevel",
+    "location",
+    "url",
+    "postedAt",
+    "salaryText",
+    "salaryMin",
+    "salaryMax",
+    "salaryCurrency",
+    "salaryInterval",
+    "jobLevel",
   ] as const satisfies readonly (keyof JobPosting)[];
 
   for (const field of fillable) fillGap(merged, secondary, field);
+
+  // Description is special: keep the FULLER one, not merely first-wins. Aggregators
+  // like Jooble return a ~270-char teaser; a full-JD source (LinkedIn, Adzuna, our
+  // browser crawler) carries the whole ~4k posting. The user was seeing the teaser
+  // because it arrived first — take whichever body is longer instead.
+  if ((secondary.description?.trim().length ?? 0) > (merged.description?.trim().length ?? 0)) {
+    merged.description = secondary.description;
+  }
 
   if (!merged.remote && secondary.remote) merged.remote = true;
   // Union the tag/skill vocabularies — different boards extract different terms,
