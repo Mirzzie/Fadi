@@ -10,6 +10,14 @@ import { getDatabase } from "@/lib/database/client";
 /** Career PHASE — one product, two modes (never two forks). */
 export type CareerMode = "apply" | "prepare";
 
+/** Current phase for the signed-in user (defaults to "apply"). Read by the shell on mount. */
+export async function getCareerModeAction(): Promise<CareerMode> {
+  const user = await getCurrentAuthUser();
+  if (!user) return "apply";
+  const row = await createProfilesRepository(getDatabase()).getByUserId(user.id);
+  return row?.jobPreferences?.mode ?? "apply";
+}
+
 /**
  * Switch the user's career phase. "apply" leads with the pipeline (actively job-hunting);
  * "prepare" leads with building real, provable evidence + interview practice. Both share the

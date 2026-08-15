@@ -25,7 +25,6 @@ import {
 } from "@careeros/database";
 import { getDatabase } from "@/lib/database/client";
 import { reportStaleness } from "@/lib/career-report/staleness";
-import { CareerModeBanner } from "@/components/dashboard/career-mode-banner";
 import { PrepareFocus } from "@/components/dashboard/prepare-focus";
 import type { CareerMode } from "@/app/dashboard/mode-actions";
 import type { ScoredSignal } from "@/lib/data-sources/relevance";
@@ -187,9 +186,6 @@ export default async function DashboardPage() {
 
   return (
     <AppShell>
-      <div className="mx-auto mb-4 max-w-shell">
-        <CareerModeBanner mode={careerMode} />
-      </div>
       {careerMode === "prepare" && (
         <div className="mx-auto mb-4 max-w-shell">
           <PrepareFocus

@@ -7,6 +7,7 @@ import { FadiLogo } from "@/components/brand/fadi-logo";
 import { stopFadiSpeech } from "@/lib/voice/fadi-speech";
 import { cn } from "@/lib/utils";
 import { ActivityCenter } from "./activity-center";
+import { useCareerMode } from "./career-mode";
 import { useFadi, type FadiState } from "./fadi-presence";
 import { TrackSwitcher } from "./track-switcher";
 import { UserMenu } from "./user-menu";
@@ -26,9 +27,7 @@ export function MenuBar() {
     return () => clearInterval(id);
   }, []);
 
-  const clock = now
-    ? now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-    : "··:··";
+  const clock = now ? now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "··:··";
 
   return (
     <header className="sticky top-0 z-40 flex h-9 items-center justify-between border-b border-border/60 bg-background/80 px-3 text-xs backdrop-blur-md duration-500 animate-in fade-in slide-in-from-top-2">
@@ -39,6 +38,7 @@ export function MenuBar() {
         <FadiStateChip state={displayState} />
         <span className="text-muted-foreground/50">/</span>
         <TrackSwitcher />
+        <ModeSwitch />
       </div>
 
       {/* Spotlight + voice + clock */}
@@ -66,6 +66,36 @@ export function MenuBar() {
   );
 }
 
+/** Career phase toggle — Apply vs Prepare. Reshapes the whole shell (dock + content). Lives next
+ *  to the direction switcher because both are "what am I steering right now" controls. */
+function ModeSwitch() {
+  const { mode, setMode } = useCareerMode();
+  return (
+    <div
+      role="tablist"
+      aria-label="Career phase"
+      className="ml-1 inline-flex rounded-full border border-border/70 bg-muted/40 p-0.5"
+    >
+      {(["apply", "prepare"] as const).map((m) => (
+        <button
+          key={m}
+          type="button"
+          role="tab"
+          aria-selected={mode === m}
+          onClick={() => setMode(m)}
+          className={cn(
+            "rounded-full px-2 py-0.5 font-medium capitalize transition-colors",
+            mode === m
+              ? "bg-primary text-primary-foreground"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+        >
+          {m}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 /** Mute / unmute Fadi's voice (talk-by-default). */
 function VoiceToggle() {
@@ -96,10 +126,14 @@ function VoiceToggle() {
       title={on ? "Fadi's voice is on — mute" : "Unmute Fadi's voice"}
       className={cn(
         "grid size-7 place-items-center rounded-full border border-border/70 transition-colors",
-        on ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground",
+        on ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"
       )}
     >
-      {on ? <Volume2 className="size-3.5" aria-hidden="true" /> : <VolumeX className="size-3.5" aria-hidden="true" />}
+      {on ? (
+        <Volume2 className="size-3.5" aria-hidden="true" />
+      ) : (
+        <VolumeX className="size-3.5" aria-hidden="true" />
+      )}
     </button>
   );
 }
@@ -122,7 +156,7 @@ function FadiStateChip({ state }: { state: FadiState }) {
           "size-1.5 rounded-full",
           busy
             ? "bg-primary shadow-[0_0_6px_var(--color-primary)] animate-pulse"
-            : "bg-emerald-400 shadow-[0_0_6px_var(--color-emerald-400,#34d399)]",
+            : "bg-emerald-400 shadow-[0_0_6px_var(--color-emerald-400,#34d399)]"
         )}
       />
       {STATE_TEXT[state]}

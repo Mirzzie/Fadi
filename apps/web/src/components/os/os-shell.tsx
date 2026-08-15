@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 
+import { CareerModeProvider } from "./career-mode";
 import { Dock } from "./dock";
 import { FadiOrb } from "./fadi-orb";
 import { MenuBar } from "./menu-bar";
@@ -16,7 +17,9 @@ import { FadiPresenceProvider } from "./fadi-presence";
 export function OsShell({ children }: { children: React.ReactNode }) {
   return (
     <FadiPresenceProvider>
-      <OsShellInner>{children}</OsShellInner>
+      <CareerModeProvider>
+        <OsShellInner>{children}</OsShellInner>
+      </CareerModeProvider>
     </FadiPresenceProvider>
   );
 }
@@ -27,10 +30,7 @@ function OsShellInner({ children }: { children: React.ReactNode }) {
   return (
     <div className="relative flex min-h-screen flex-col">
       {/* Calm background — a single soft wash, no grid/scanlines. */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 -z-10 bg-background"
-      >
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 bg-background">
         <div className="absolute inset-0 bg-[radial-gradient(120%_70%_at_50%_-10%,oklch(0.66_0.22_285/0.08),transparent_60%)]" />
       </div>
 
