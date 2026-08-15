@@ -20,10 +20,13 @@ import {
   createCareerProfilesRepository,
   createEvidenceRepository,
   createLinkedInProfilesRepository,
+  createProfilesRepository,
   createResumesRepository,
 } from "@careeros/database";
 import { getDatabase } from "@/lib/database/client";
 import { reportStaleness } from "@/lib/career-report/staleness";
+import { CareerModeBanner } from "@/components/dashboard/career-mode-banner";
+import type { CareerMode } from "@/app/dashboard/mode-actions";
 import type { ScoredSignal } from "@/lib/data-sources/relevance";
 
 export const metadata: Metadata = {
@@ -40,20 +43,34 @@ export default async function DashboardPage() {
   }
 
   const db = getDatabase();
-  const [profileSummary, latestReport, recommendedJobsPreview, momentum, reflection, setup, digest, impact, latestEvidenceAt, activeTrack, linkedin] =
-    await Promise.all([
-      getDashboardProfileSummary(user.id),
-      getLatestCareerReport(user.id),
-      getRecommendedJobsForUser(user.id, 3, undefined, { skipSync: true }),
-      getMomentumSummary(user.id),
-      getMomentumReflection(user.id),
-      getSetupState(user.id),
-      getAgencyDigest(user.id),
-      getFadiImpact(user.id),
-      createEvidenceRepository(db).latestUpdatedAt(user.id),
-      createCareerProfilesRepository(db).getActiveForUser(user.id),
-      createLinkedInProfilesRepository(db).getLatestForUser(user.id),
-    ]);
+  const [
+    profileSummary,
+    latestReport,
+    recommendedJobsPreview,
+    momentum,
+    reflection,
+    setup,
+    digest,
+    impact,
+    latestEvidenceAt,
+    activeTrack,
+    linkedin,
+    profileRow,
+  ] = await Promise.all([
+    getDashboardProfileSummary(user.id),
+    getLatestCareerReport(user.id),
+    getRecommendedJobsForUser(user.id, 3, undefined, { skipSync: true }),
+    getMomentumSummary(user.id),
+    getMomentumReflection(user.id),
+    getSetupState(user.id),
+    getAgencyDigest(user.id),
+    getFadiImpact(user.id),
+    createEvidenceRepository(db).latestUpdatedAt(user.id),
+    createCareerProfilesRepository(db).getActiveForUser(user.id),
+    createLinkedInProfilesRepository(db).getLatestForUser(user.id),
+    createProfilesRepository(db).getByUserId(user.id),
+  ]);
+  const careerMode: CareerMode = profileRow?.jobPreferences?.mode ?? "apply";
 
   // The résumé is per-track (each direction tailors its own), so compare the report
   // against THIS track's résumé — not a change on some other direction.
@@ -99,9 +116,11 @@ export default async function DashboardPage() {
           },
           // Permissive "market pulse": always surface live activity, ranked —
           // so the data pipeline is visible even before a report exists.
-          { threshold: 0, limit: 6 },
+          { threshold: 0, limit: 6 }
         ).then((r) => r.signals),
-        new Promise<typeof EMPTY_SIGNALS>((resolve) => setTimeout(() => resolve(EMPTY_SIGNALS), 2500)),
+        new Promise<typeof EMPTY_SIGNALS>((resolve) =>
+          setTimeout(() => resolve(EMPTY_SIGNALS), 2500)
+        ),
       ])
     : EMPTY_SIGNALS;
   const marketSignals = signalIntel.map((s) => ({
@@ -167,6 +186,9 @@ export default async function DashboardPage() {
 
   return (
     <AppShell>
+      <div className="mx-auto mb-4 max-w-shell">
+        <CareerModeBanner mode={careerMode} />
+      </div>
       <DashboardShell
         userEmail={user.email}
         briefing={briefing}

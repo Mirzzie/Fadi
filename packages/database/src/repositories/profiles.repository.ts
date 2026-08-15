@@ -75,12 +75,13 @@ export function createProfilesRepository(db: Database) {
     async setJobPreferences(
       userId: string,
       prefs: {
+        mode?: "apply" | "prepare";
         modes?: string[];
         types?: string[];
         autoSearch?: boolean;
         agentScope?: "filters" | "broad";
         location?: { country?: string; city?: string; precise?: boolean };
-      },
+      }
     ): Promise<Profile | null> {
       const [profile] = await db
         .update(profiles)
@@ -93,7 +94,7 @@ export function createProfilesRepository(db: Database) {
     /** Store (or clear) the user's BYO Notion integration credentials. */
     async setNotionIntegration(
       userId: string,
-      input: { tokenCiphertext: string | null; databaseId: string | null },
+      input: { tokenCiphertext: string | null; databaseId: string | null }
     ): Promise<Profile | null> {
       const [profile] = await db
         .update(profiles)

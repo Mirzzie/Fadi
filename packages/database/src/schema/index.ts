@@ -164,6 +164,10 @@ export const profiles = pgTable(
     // and (eventually) the background "find jobs while you sleep" agent.
     jobPreferences: jsonb("job_preferences")
       .$type<{
+        /** Career PHASE, career-agnostic: "apply" (actively job-hunting — lead with the pipeline)
+         *  vs "prepare" (building up first — lead with skill-gaps + real evidence + interview
+         *  practice). Two modes of ONE product sharing the same record, not two products. */
+        mode?: "apply" | "prepare";
         modes?: string[];
         types?: string[];
         autoSearch?: boolean;
