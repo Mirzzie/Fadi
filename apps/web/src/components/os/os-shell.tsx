@@ -3,6 +3,7 @@
 import { usePathname } from "next/navigation";
 
 import { CareerModeProvider } from "./career-mode";
+import type { CareerMode } from "@/app/dashboard/mode-actions";
 import { Dock } from "./dock";
 import { FadiOrb } from "./fadi-orb";
 import { MenuBar } from "./menu-bar";
@@ -14,10 +15,16 @@ import { FadiPresenceProvider } from "./fadi-presence";
  * for navigation, a calm background, a ⌘K spotlight, and the ambient Fadi mentor.
  * Deliberately understated — the usefulness is the point, not the UI.
  */
-export function OsShell({ children }: { children: React.ReactNode }) {
+export function OsShell({
+  children,
+  initialMode,
+}: {
+  children: React.ReactNode;
+  initialMode: CareerMode;
+}) {
   return (
     <FadiPresenceProvider>
-      <CareerModeProvider>
+      <CareerModeProvider initialMode={initialMode}>
         <OsShellInner>{children}</OsShellInner>
       </CareerModeProvider>
     </FadiPresenceProvider>

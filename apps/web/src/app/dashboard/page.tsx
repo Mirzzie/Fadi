@@ -20,13 +20,13 @@ import {
   createCareerProfilesRepository,
   createEvidenceRepository,
   createLinkedInProfilesRepository,
-  createProfilesRepository,
   createResumesRepository,
 } from "@careeros/database";
+import { cookies } from "next/headers";
 import { getDatabase } from "@/lib/database/client";
 import { reportStaleness } from "@/lib/career-report/staleness";
 import { PrepareFocus } from "@/components/dashboard/prepare-focus";
-import type { CareerMode } from "@/app/dashboard/mode-actions";
+import { MODE_COOKIE, type CareerMode } from "@/app/dashboard/mode-actions";
 import type { ScoredSignal } from "@/lib/data-sources/relevance";
 
 export const metadata: Metadata = {
@@ -55,7 +55,6 @@ export default async function DashboardPage() {
     latestEvidenceAt,
     activeTrack,
     linkedin,
-    profileRow,
   ] = await Promise.all([
     getDashboardProfileSummary(user.id),
     getLatestCareerReport(user.id),
@@ -68,9 +67,10 @@ export default async function DashboardPage() {
     createEvidenceRepository(db).latestUpdatedAt(user.id),
     createCareerProfilesRepository(db).getActiveForUser(user.id),
     createLinkedInProfilesRepository(db).getLatestForUser(user.id),
-    createProfilesRepository(db).getByUserId(user.id),
   ]);
-  const careerMode: CareerMode = profileRow?.jobPreferences?.mode ?? "apply";
+  // Same source as the shell (the cookie) so the nav and the content never disagree.
+  const careerMode: CareerMode =
+    (await cookies()).get(MODE_COOKIE)?.value === "prepare" ? "prepare" : "apply";
 
   // The résumé is per-track (each direction tailors its own), so compare the report
   // against THIS track's résumé — not a change on some other direction.

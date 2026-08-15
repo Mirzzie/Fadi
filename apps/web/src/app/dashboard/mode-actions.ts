@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 
 import { createProfilesRepository } from "@careeros/database";
 
@@ -10,18 +11,17 @@ import { getDatabase } from "@/lib/database/client";
 /** Career PHASE — one product, two modes (never two forks). */
 export type CareerMode = "apply" | "prepare";
 
-/** Current phase for the signed-in user (defaults to "apply"). Read by the shell on mount. */
-export async function getCareerModeAction(): Promise<CareerMode> {
-  const user = await getCurrentAuthUser();
-  if (!user) return "apply";
-  const row = await createProfilesRepository(getDatabase()).getByUserId(user.id);
-  return row?.jobPreferences?.mode ?? "apply";
-}
+/** Cookie name — the SSR-readable copy so the shell renders the right phase with no flash and no
+ *  hydration mismatch. The DB (jobPreferences.mode) stays the durable source of truth. */
+export const MODE_COOKIE = "fadi_mode";
 
 /**
  * Switch the user's career phase. "apply" leads with the pipeline (actively job-hunting);
  * "prepare" leads with building real, provable evidence + interview practice. Both share the
  * same record — the point of a mode, not a separate product. Career-agnostic.
+ *
+ * Persists to the DB (durable, cross-device) AND a cookie (so the next server render paints the
+ * right phase before any JS runs — the fix for the hydration mismatch).
  */
 export async function setCareerModeAction(mode: CareerMode): Promise<{ ok: boolean }> {
   if (mode !== "apply" && mode !== "prepare") return { ok: false };
@@ -32,6 +32,12 @@ export async function setCareerModeAction(mode: CareerMode): Promise<{ ok: boole
   const repo = createProfilesRepository(db);
   const existing = (await repo.getByUserId(user.id))?.jobPreferences ?? {};
   await repo.setJobPreferences(user.id, { ...existing, mode });
+
+  (await cookies()).set(MODE_COOKIE, mode, {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: "lax",
+  });
   revalidatePath("/dashboard");
   return { ok: true };
 }
