@@ -7,13 +7,7 @@ import { createProfilesRepository } from "@careeros/database";
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
-
-/** Career PHASE — one product, two modes (never two forks). */
-export type CareerMode = "apply" | "prepare";
-
-/** Cookie name — the SSR-readable copy so the shell renders the right phase with no flash and no
- *  hydration mismatch. The DB (jobPreferences.mode) stays the durable source of truth. */
-export const MODE_COOKIE = "fadi_mode";
+import { MODE_COOKIE, type CareerMode } from "./mode";
 
 /**
  * Switch the user's career phase. "apply" leads with the pipeline (actively job-hunting);

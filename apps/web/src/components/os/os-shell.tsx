@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 
 import { CareerModeProvider } from "./career-mode";
-import type { CareerMode } from "@/app/dashboard/mode-actions";
+import type { CareerMode } from "@/app/dashboard/mode";
 import { Dock } from "./dock";
 import { FadiOrb } from "./fadi-orb";
 import { MenuBar } from "./menu-bar";

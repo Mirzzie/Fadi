@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 
 import { OsShell } from "@/components/os/os-shell";
-import { MODE_COOKIE, type CareerMode } from "@/app/dashboard/mode-actions";
+import { MODE_COOKIE, type CareerMode } from "@/app/dashboard/mode";
 
 /** Every authenticated screen renders inside the Fadi chrome (menu bar, dock, wallpaper,
  *  persistent Fadi). Reads the career phase from a cookie server-side so the shell paints the

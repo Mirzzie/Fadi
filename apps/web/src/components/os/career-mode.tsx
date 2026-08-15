@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useState } from "react";
 
-import { setCareerModeAction, type CareerMode } from "@/app/dashboard/mode-actions";
+import { setCareerModeAction } from "@/app/dashboard/mode-actions";
+import type { CareerMode } from "@/app/dashboard/mode";
 
 type Ctx = {
   mode: CareerMode;

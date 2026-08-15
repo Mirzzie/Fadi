@@ -26,7 +26,7 @@ import { cookies } from "next/headers";
 import { getDatabase } from "@/lib/database/client";
 import { reportStaleness } from "@/lib/career-report/staleness";
 import { PrepareFocus } from "@/components/dashboard/prepare-focus";
-import { MODE_COOKIE, type CareerMode } from "@/app/dashboard/mode-actions";
+import { MODE_COOKIE, type CareerMode } from "@/app/dashboard/mode";
 import type { ScoredSignal } from "@/lib/data-sources/relevance";
 
 export const metadata: Metadata = {

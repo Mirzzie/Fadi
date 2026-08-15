@@ -20,7 +20,7 @@ import { Fragment } from "react";
 
 import { cn } from "@/lib/utils";
 import { useCareerMode } from "./career-mode";
-import type { CareerMode } from "@/app/dashboard/mode-actions";
+import type { CareerMode } from "@/app/dashboard/mode";
 
 /** Groups order the dock by the career journey so co-dependent surfaces sit
  *  together: Start → Orient → You → Pursue → Prepare → System. */
