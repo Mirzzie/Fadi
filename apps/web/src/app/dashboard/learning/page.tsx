@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { createLearningCommitmentsRepository } from "@careeros/database";
+import { createCareerProfilesRepository, createLearningCommitmentsRepository } from "@careeros/database";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { LearningShell } from "@/components/learning/learning-shell";
@@ -30,14 +30,20 @@ export default async function LearningPage() {
     redirect("/onboarding");
   }
 
-  const [report, commitments] = await Promise.all([
+  const db = getDatabase();
+  const [report, commitments, track] = await Promise.all([
     getLatestCareerReport(user.id),
-    createLearningCommitmentsRepository(getDatabase()).listForUser(user.id),
+    createLearningCommitmentsRepository(db).listForUser(user.id),
+    createCareerProfilesRepository(db).getActiveForUser(user.id),
   ]);
 
   return (
     <AppShell>
-      <LearningShell report={report} commitments={commitments.map(toCommitmentView)} />
+      <LearningShell
+        report={report}
+        commitments={commitments.map(toCommitmentView)}
+        role={track?.targetRole ?? null}
+      />
     </AppShell>
   );
 }

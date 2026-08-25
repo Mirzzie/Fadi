@@ -4,6 +4,7 @@ import { BookOpen, GraduationCap, Map, MonitorPlay, Target } from "lucide-react"
 import { FadiBadge } from "@/components/ui/fadi-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { CommitmentsList, GapGrowth } from "@/components/learning/gap-growth";
+import { CareerBlueprint } from "@/components/learning/career-blueprint";
 import type { CommitmentView } from "@/lib/learning/commitments-view";
 import type { StoredCareerReport } from "@/lib/career-report/schema";
 import { learningResources } from "@/lib/learning/resources";
@@ -36,9 +37,13 @@ function ResourceLinks({ skill }: { skill: string }) {
   );
 }
 
-type Props = { report: StoredCareerReport | null; commitments?: CommitmentView[] };
+type Props = {
+  report: StoredCareerReport | null;
+  commitments?: CommitmentView[];
+  role?: string | null;
+};
 
-export function LearningShell({ report, commitments = [] }: Props) {
+export function LearningShell({ report, commitments = [], role = null }: Props) {
   const skillGaps = report?.missing_skills ?? [];
   const learningPath = report?.recommended_learning_path ?? [];
   const hasContent = skillGaps.length > 0 || learningPath.length > 0;
@@ -46,11 +51,10 @@ export function LearningShell({ report, commitments = [] }: Props) {
   return (
     <div className="mx-auto max-w-shell space-y-6">
       {/* Header */}
-      <section className="relative overflow-hidden rounded-xl border border-border/60 bg-card p-6">
+      <section className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -right-16 -top-20 size-64 rounded-full opacity-[0.12] blur-3xl"
-          style={{ background: "oklch(0.7 0.17 230)" }}
+          className="pointer-events-none absolute -right-16 -top-24 size-72 rounded-full opacity-[0.12] blur-3xl [background:var(--aurora-1)]"
         />
         <div className="relative flex items-start justify-between gap-4">
           <div className="flex items-start gap-4">
@@ -58,7 +62,7 @@ export function LearningShell({ report, commitments = [] }: Props) {
               <GraduationCap className="size-5 text-primary-foreground" aria-hidden="true" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold tracking-tight">
+              <h2 className="font-heading text-xl font-semibold tracking-tight">
                 Learning{" "}
                 <span className="bg-gradient-to-r from-primary to-[oklch(0.7_0.17_230)] bg-clip-text text-transparent">
                   Hub
@@ -81,6 +85,9 @@ export function LearningShell({ report, commitments = [] }: Props) {
           ) : null}
         </div>
       </section>
+
+      {/* Direction-level plan: the cert ladder + proof-projects + in-demand skills */}
+      <CareerBlueprint role={role} />
 
       {/* In-progress commitments — completing one feeds your Evidence + resume */}
       <CommitmentsList commitments={commitments} />

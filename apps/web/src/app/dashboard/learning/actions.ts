@@ -11,6 +11,7 @@ import {
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
 import { publish } from "@/lib/events/bus";
+import { generateBlueprint, type BlueprintResult } from "@/lib/learning/blueprint";
 import { toCommitmentView, type CommitmentView } from "@/lib/learning/commitments-view";
 import { suggestProjectsForGap, type SuggestResult } from "@/lib/learning/suggest";
 import { logger } from "@/lib/observability/logger";
@@ -18,6 +19,21 @@ import { recordForwardMotion } from "@/lib/resilience/service";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 
 const PATH = "/dashboard/learning";
+
+/**
+ * Direction-level Career Blueprint — the certification ladder + portfolio
+ * proof-projects + in-demand skills to actually become the active role. Its
+ * projects/certs feed the SAME growth loop (commit → complete → evidence).
+ */
+export async function generateBlueprintAction(): Promise<BlueprintResult> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  const rate = await consumeRateLimit({ key: `blueprint:${user.id}`, limit: 8, windowMs: 60 * 60 * 1000 });
+  if (!rate.allowed) {
+    return { ok: false, message: "A few blueprints in an hour is plenty — sit with this one and pick your next cert or project." };
+  }
+  return generateBlueprint(user.id);
+}
 
 /** Gap → 2–3 smallest-real-project suggestions (search queries, never URLs). */
 export async function suggestForGapAction(input: {
