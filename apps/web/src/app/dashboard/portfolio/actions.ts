@@ -77,6 +77,9 @@ export async function loadPortfolio(): Promise<
     handle: string;
     isPublished: boolean;
     items: PortfolioItemView[];
+    /** Proof from Evidence not on the portfolio yet — so the CMS can proactively ask
+     *  the user to pull it in (detect → propose → approve; never auto-mutate). */
+    pendingProof: number;
   }>
 > {
   const user = await getCurrentAuthUser();
@@ -84,12 +87,21 @@ export async function loadPortfolio(): Promise<
   const repo = createPortfolioRepository(getDatabase());
   const site = await ensureSite(user.id, user.email);
   const items = await repo.listItemsForUser(user.id, site.id);
+
+  // Same match logic as syncFromEvidence, but count-only (no writes).
+  const have = new Set(items.map((i) => i.evidenceItemId).filter(Boolean) as string[]);
+  const evidence = await createEvidenceRepository(getDatabase()).listForUser(user.id);
+  const pendingProof = seedItemsFromEvidence(evidence).filter(
+    (r) => !have.has(r.evidenceItemId) && !items.some((x) => isSameEntry(r, x)),
+  ).length;
+
   return {
     ok: true,
     site: toSiteView(site),
     handle: site.handle,
     isPublished: site.isPublished,
     items: items.map(toItemView),
+    pendingProof,
   };
 }
 

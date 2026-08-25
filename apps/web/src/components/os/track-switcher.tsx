@@ -2,10 +2,16 @@
 
 import { Check, ChevronDown, Compass, Loader2, Plus, Target, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -47,7 +53,6 @@ export function TrackSwitcher() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  const wrapRef = useRef<HTMLDivElement>(null);
 
   const active = tracks.find((t) => t.isActive) ?? tracks[0] ?? null;
 
@@ -58,14 +63,6 @@ export function TrackSwitcher() {
   useEffect(() => {
     reload();
   }, []);
-
-  useEffect(() => {
-    function onClick(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
-    }
-    if (open) document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, [open]);
 
   function switchTo(id: string) {
     if (id === active?.id) return setOpen(false);
@@ -99,24 +96,22 @@ export function TrackSwitcher() {
   }
 
   return (
-    <div ref={wrapRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex max-w-[12rem] items-center gap-1.5 rounded-full border border-border/70 bg-muted/40 px-2.5 py-1 font-medium text-foreground transition-colors hover:bg-muted"
-        title="Switch career track"
-      >
-        <Target className="size-3 shrink-0 text-primary" aria-hidden="true" />
-        <span className="truncate">{active?.label ?? "Career track"}</span>
-        {pending ? (
-          <Loader2 className="size-3 shrink-0 animate-spin" aria-hidden="true" />
-        ) : (
-          <ChevronDown className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
-        )}
-      </button>
+    <>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger
+          title="Switch career track"
+          className="flex max-w-[12rem] items-center gap-1.5 rounded-full border border-border/70 bg-muted/40 px-2.5 py-1 font-medium text-foreground transition-colors hover:bg-muted"
+        >
+          <Target className="size-3 shrink-0 text-primary" aria-hidden="true" />
+          <span className="truncate">{active?.label ?? "Career track"}</span>
+          {pending ? (
+            <Loader2 className="size-3 shrink-0 animate-spin" aria-hidden="true" />
+          ) : (
+            <ChevronDown className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+          )}
+        </PopoverTrigger>
 
-      {open ? (
-        <div className="absolute left-0 top-full z-50 mt-1.5 w-72 overflow-hidden rounded-xl border border-border/70 bg-popover/95 p-1 shadow-xl backdrop-blur-md duration-150 animate-in fade-in slide-in-from-top-1">
+        <PopoverContent align="start" sideOffset={6} className="w-72 overflow-hidden p-1">
           <p className="px-2.5 py-1.5 text-[0.7rem] uppercase tracking-wide text-muted-foreground">
             Your career tracks
           </p>
@@ -208,8 +203,8 @@ export function TrackSwitcher() {
               New direction…
             </button>
           </div>
-        </div>
-      ) : null}
+        </PopoverContent>
+      </Popover>
 
       {showNew ? (
         <NewDirectionModal
@@ -221,7 +216,7 @@ export function TrackSwitcher() {
           }}
         />
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -272,26 +267,27 @@ function NewDirectionModal({
     });
   }
 
-  // Portal to <body>: the menu bar's backdrop-blur creates a containing block, so
-  // a `fixed` overlay rendered inside it would be positioned relative to the 36px
-  // bar (pinned to the top, clipped) instead of the viewport.
-  if (typeof document === "undefined") return null;
-
-  return createPortal(
-    <div
-      className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-4 backdrop-blur-sm duration-150 animate-in fade-in"
-      onMouseDown={onClose}
+  // The Dialog primitive owns the portal, backdrop, focus trap, Esc and scroll
+  // lock — things this modal used to hand-roll with createPortal + manual guards.
+  return (
+    <Dialog
+      open
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
     >
-      <div
-        className="flex max-h-[calc(100dvh-2rem)] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-border/70 bg-card text-sm shadow-2xl duration-200 animate-in fade-in zoom-in-95"
-        onMouseDown={(e) => e.stopPropagation()}
+      <DialogContent
+        showCloseButton={false}
+        className="flex max-h-[calc(100dvh-2rem)] w-full flex-col gap-0 overflow-hidden p-0 text-sm sm:max-w-lg"
       >
-        <div className="shrink-0 border-b border-border/60 bg-gradient-to-br from-primary/10 to-transparent px-5 py-4">
-          <h2 className="text-base font-semibold tracking-tight">Start a new direction</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+        <div className="shrink-0 border-b border-border/60 bg-gradient-to-br from-primary/10 to-transparent px-5 py-4 text-left">
+          <DialogTitle className="font-heading text-base font-semibold tracking-tight">
+            Start a new direction
+          </DialogTitle>
+          <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
             Tell me where you&apos;re headed — branch of your field or a whole new one — and I&apos;ll
             spin up a fresh track with its own jobs, documents, and plan.
-          </p>
+          </DialogDescription>
         </div>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-4">
@@ -434,8 +430,7 @@ function NewDirectionModal({
             Create track
           </Button>
         </div>
-      </div>
-    </div>,
-    document.body,
+      </DialogContent>
+    </Dialog>
   );
 }

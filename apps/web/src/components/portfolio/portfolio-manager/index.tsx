@@ -54,11 +54,15 @@ export function PortfolioManager({
   handle,
   isPublished,
   items,
+  pendingProof,
 }: {
   site: PortfolioSiteView;
   handle: string;
   isPublished: boolean;
   items: PortfolioItemView[];
+  /** Count of Evidence proof not yet on the portfolio — drives the proactive
+   *  "pull it in" nudge (detect → propose → approve; never auto-mutate). */
+  pendingProof: number;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -228,8 +232,8 @@ export function PortfolioManager({
       {/* Header — mirrors the original portfolio CMS */}
       <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-amber-400">Portfolio CMS</p>
-          <h1 className="mt-1 text-3xl font-semibold tracking-tight md:text-4xl">Manage content</h1>
+          <p className="text-xs uppercase tracking-[0.3em] text-primary">Portfolio CMS</p>
+          <h1 className="mt-1 font-heading text-3xl font-semibold tracking-tight md:text-4xl">Manage content</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Add, edit, and remove anything on your portfolio. Changes appear live.
           </p>
@@ -238,7 +242,7 @@ export function PortfolioManager({
           <span
             className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider ${
               isPublished
-                ? "border border-amber-500/40 bg-amber-500/10 text-amber-400"
+                ? "border border-primary/40 bg-primary/10 text-primary"
                 : "bg-muted text-muted-foreground"
             }`}
           >
@@ -286,13 +290,36 @@ export function PortfolioManager({
         </div>
       </header>
 
+      {pendingProof > 0 ? (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/25 bg-primary/5 p-4">
+          <div className="flex items-start gap-3">
+            <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
+              <Sparkles className="size-4" aria-hidden="true" />
+            </span>
+            <div>
+              <p className="text-sm font-medium">
+                {pendingProof} {pendingProof === 1 ? "piece" : "pieces"} of proof aren&apos;t on your
+                portfolio yet
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Fadi found {pendingProof === 1 ? "it" : "them"} in your Evidence. Pull{" "}
+                {pendingProof === 1 ? "it" : "them"} in — nothing is added without your click.
+              </p>
+            </div>
+          </div>
+          <Button size="sm" onClick={sync} disabled={pending}>
+            <Sparkles className="size-4" aria-hidden="true" /> Pull in proof
+          </Button>
+        </div>
+      ) : null}
+
       {error && (
         <div className="mb-6 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
         </div>
       )}
       {notice && (
-        <div className="mb-6 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-400">
+        <div className="mb-6 rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-sm text-primary">
           {notice}
         </div>
       )}
@@ -309,7 +336,7 @@ export function PortfolioManager({
       )}
 
       {items.length === 0 && (
-        <div className="mb-6 rounded-xl border border-amber-500/40 bg-amber-500/5 p-6">
+        <div className="mb-6 rounded-xl border border-primary/40 bg-primary/5 p-6">
           <p className="text-lg font-semibold">Let&apos;s build your portfolio</p>
           <p className="mt-1 text-sm text-muted-foreground">
             No blank canvas — Fadi turns your career data into a site in a few clicks.
@@ -317,7 +344,7 @@ export function PortfolioManager({
           <ol className="mt-4 grid gap-3 sm:grid-cols-3">
             <li className="rounded-lg border border-border bg-background/40 p-3">
               <p className="text-sm font-medium">
-                <span className="text-amber-400">1.</span> Add your content
+                <span className="text-primary">1.</span> Add your content
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 Seed it from your Fadi evidence — projects, experience, skills.
@@ -329,7 +356,7 @@ export function PortfolioManager({
             </li>
             <li className="rounded-lg border border-border bg-background/40 p-3">
               <p className="text-sm font-medium">
-                <span className="text-amber-400">2.</span> Pick a look
+                <span className="text-primary">2.</span> Pick a look
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 Choose a template in Settings — Noir &amp; Gold, Aurora, or Minimal.
@@ -340,7 +367,7 @@ export function PortfolioManager({
             </li>
             <li className="rounded-lg border border-border bg-background/40 p-3">
               <p className="text-sm font-medium">
-                <span className="text-amber-400">3.</span> Publish
+                <span className="text-primary">3.</span> Publish
               </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 Go live at your handle — or export it to host on your own domain.
@@ -384,7 +411,7 @@ export function PortfolioManager({
           >
             {SECTION_META[k].label}
             {grouped[k]?.length ? (
-              <span className="ml-2 rounded-full bg-amber-500/20 px-1.5 py-0.5 text-[10px] text-amber-400">
+              <span className="ml-2 rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] text-primary">
                 {grouped[k].length}
               </span>
             ) : null}

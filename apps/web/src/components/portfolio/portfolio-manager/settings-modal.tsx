@@ -136,7 +136,7 @@ export function SettingsModal({
                 type="button"
                 onClick={() => setTemplate(t.id)}
                 className={`overflow-hidden rounded-lg border text-left transition-colors ${
-                  template === t.id ? "border-amber-500" : "border-border hover:border-amber-500/50"
+                  template === t.id ? "border-primary" : "border-border hover:border-primary/50"
                 }`}
               >
                 <div className={`h-12 bg-gradient-to-br ${t.swatch}`} />
@@ -222,7 +222,7 @@ export function SettingsModal({
                 />
               </label>
               {resumeLinks[key] && (
-                <a href={resumeLinks[key]} target="_blank" rel="noreferrer" className="text-amber-400" title="Preview">
+                <a href={resumeLinks[key]} target="_blank" rel="noreferrer" className="text-primary" title="Preview">
                   <FileText className="size-4" />
                 </a>
               )}

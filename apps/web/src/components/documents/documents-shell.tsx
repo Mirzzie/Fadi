@@ -15,7 +15,6 @@ import { useRef, useState, useTransition } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import {
   createDocumentAction,
@@ -93,11 +92,15 @@ export function DocumentsShell({ documents }: { documents: DocView[] }) {
 
   return (
     <div className="mx-auto max-w-shell space-y-6">
-      <section className="relative overflow-hidden rounded-xl border bg-card p-6">
+      <section className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-16 -top-24 size-72 rounded-full opacity-[0.12] blur-3xl [background:var(--aurora-1)]"
+        />
         <div className="relative space-y-4">
           <div>
             <Badge variant="secondary">Document studio</Badge>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight">
+            <h2 className="mt-3 font-heading text-2xl font-semibold tracking-tight">
               Your{" "}
               <span className="bg-gradient-to-r from-primary to-[oklch(0.7_0.17_230)] bg-clip-text text-transparent">
                 documents
@@ -144,57 +147,69 @@ export function DocumentsShell({ documents }: { documents: DocView[] }) {
         </div>
       </section>
 
-      {documents.length === 0 ? (
-        <Card>
-          <CardContent className="py-10 text-center text-sm text-muted-foreground">
-            No documents yet. Create one above, or ask Fadi to draft a resume for a specific role.
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {documents.map((doc) => {
-            const meta = KIND_META[doc.kind] ?? { label: doc.kind, icon: FileText };
-            return (
-              <Card key={doc.id} className="group relative">
-                <CardContent className="p-4">
-                  <button
-                    type="button"
-                    onClick={() => router.push(`/dashboard/documents/${doc.id}`)}
-                    className="block w-full text-left"
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="grid size-7 place-items-center rounded-md bg-primary/10 text-primary">
-                        <meta.icon className="size-4" aria-hidden="true" />
-                      </span>
-                      <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                        {meta.label}
-                      </span>
-                    </div>
-                    <p className="mt-2 font-medium leading-tight">{doc.title}</p>
-                    <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                      {doc.preview || "Empty — open to start writing."}
-                    </p>
-                    <p className="mt-2 text-[0.7rem] text-muted-foreground">
-                      Updated {formatUpdated(doc.updatedAt)}
-                    </p>
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Delete document"
-                    onClick={() => remove(doc.id)}
-                    disabled={pending}
-                    className={cn(
-                      "absolute right-2 top-2 grid size-7 place-items-center rounded-md text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100",
-                    )}
-                  >
-                    <Trash2 className="size-3.5" aria-hidden="true" />
-                  </button>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
-      )}
+      {/* unimad-style gallery: a "New" tile leads, then each document as a card with a
+          faux paper-preview header — scannable at a glance. */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <button
+          type="button"
+          onClick={() => create("resume")}
+          disabled={pending}
+          className="group flex min-h-50 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card/40 text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
+        >
+          <span className="grid size-12 place-items-center rounded-full border border-border bg-muted/50 transition-colors group-hover:border-primary/40 group-hover:bg-primary/10">
+            <Plus className="size-6" aria-hidden="true" />
+          </span>
+          <span className="text-sm font-medium">New document</span>
+        </button>
+
+        {documents.map((doc) => {
+          const meta = KIND_META[doc.kind] ?? { label: doc.kind, icon: FileText };
+          return (
+            <div
+              key={doc.id}
+              className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-colors hover:border-primary/40"
+            >
+              <button
+                type="button"
+                onClick={() => router.push(`/dashboard/documents/${doc.id}`)}
+                className="block w-full text-left"
+              >
+                {/* faux page preview */}
+                <div className="h-32 overflow-hidden border-b border-border/60 bg-gradient-to-b from-muted/50 to-card px-4 py-3">
+                  <p className="line-clamp-5 text-[0.6rem] leading-relaxed text-muted-foreground/70">
+                    {doc.preview || "Empty — open to start writing."}
+                  </p>
+                </div>
+                <div className="p-4">
+                  <div className="flex items-center gap-2">
+                    <span className="grid size-6 place-items-center rounded-md bg-primary/10 text-primary">
+                      <meta.icon className="size-3.5" aria-hidden="true" />
+                    </span>
+                    <span className="text-[0.65rem] uppercase tracking-wide text-muted-foreground">
+                      {meta.label}
+                    </span>
+                  </div>
+                  <p className="mt-1.5 truncate font-heading text-sm font-semibold">{doc.title}</p>
+                  <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                    Updated {formatUpdated(doc.updatedAt)}
+                  </p>
+                </div>
+              </button>
+              <button
+                type="button"
+                aria-label="Delete document"
+                onClick={() => remove(doc.id)}
+                disabled={pending}
+                className={cn(
+                  "absolute right-2 top-2 grid size-7 place-items-center rounded-md bg-card/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100",
+                )}
+              >
+                <Trash2 className="size-3.5" aria-hidden="true" />
+              </button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }

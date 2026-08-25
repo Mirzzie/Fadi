@@ -1,4 +1,4 @@
-import { CheckCircle2 } from "lucide-react";
+import { Check } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 
@@ -13,97 +13,105 @@ type AuthShellProps = {
   socialProviders?: SocialProvider[];
 };
 
-const signUpFadiPoints = [
-  "Analyze your resume and LinkedIn profile",
+const signUpPoints = [
+  "Turn your real evidence into tailored applications",
   "Surface jobs that match your actual skills",
-  "Build a learning path to close your gaps",
+  "Close your gaps with a clear learning path",
   "Track every application in one place",
 ];
 
-const signInFadiPoints = [
-  "Check for new job matches since your last visit",
-  "Review any updated career recommendations",
-  "Continue your active learning path",
-  "See what's changed in your target market",
+const signInPoints = [
+  "New job matches since your last visit",
+  "Updated recommendations for your target market",
+  "Your active learning path, continued",
+  "Everything, in one calm workspace",
 ];
 
-/** Holographic Fadi sign-in / sign-up — entering the OS. Forced-dark so the
- *  JARVIS aesthetic reads regardless of the visitor's saved theme. */
+/**
+ * Entering the OS — the sign-in / sign-up surface. Same calm system as the rest of
+ * Fadi: a soft aurora wallpaper, one clean card, one clear action. Theme-aware
+ * (follows the visitor's light/dark preference) — simple, modern, for everyone.
+ */
 export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
   const isSignUp = mode === "sign-up";
-  const fadiPoints = isSignUp ? signUpFadiPoints : signInFadiPoints;
+  const points = isSignUp ? signUpPoints : signInPoints;
 
   return (
-    <div className="dark relative flex min-h-screen flex-col overflow-hidden bg-[oklch(0.09_0.03_245)] text-foreground">
-      {/* Living holographic wallpaper */}
-      <div aria-hidden="true" className="pointer-events-none fixed inset-0">
-        <div className="absolute inset-0 bg-[radial-gradient(70%_50%_at_50%_-10%,oklch(0.66_0.22_285/0.2),transparent_60%)]" />
-        <div className="holo-grid absolute inset-0 opacity-50" />
-        <div className="holo-scanlines absolute inset-0 opacity-40" />
-        <div className="absolute -left-32 top-1/4 size-[520px] rounded-full opacity-[0.14] blur-3xl" style={{ background: "oklch(0.72 0.19 192)" }} />
-        <div className="absolute -right-24 bottom-0 size-[480px] rounded-full opacity-[0.12] blur-3xl" style={{ background: "oklch(0.66 0.22 285)" }} />
+    <div className="relative flex min-h-screen flex-col overflow-hidden bg-background text-foreground">
+      {/* Soft aurora wallpaper — the ambient Fadi glow, kept quiet so it never fights the form. */}
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 aurora-bg">
+        <div className="absolute -left-40 top-1/4 size-[520px] rounded-full opacity-[0.10] blur-3xl [background:var(--aurora-1)]" />
+        <div className="absolute -right-32 bottom-0 size-[460px] rounded-full opacity-[0.10] blur-3xl [background:var(--aurora-2)]" />
       </div>
 
       {/* Header */}
       <header className="relative z-10 px-4 py-5 sm:px-8">
         <Link href="/" className="inline-flex items-center gap-2.5">
           <FadiLogo className="size-8" />
-          <span className="font-semibold tracking-tight">Fadi</span>
+          <span className="font-heading text-lg font-semibold tracking-tight">Fadi</span>
         </Link>
       </header>
 
       {/* Main */}
       <main className="relative z-10 flex flex-1 items-center justify-center px-4 py-10 sm:px-6">
         <div className="grid w-full max-w-4xl gap-12 lg:grid-cols-[1fr_420px] lg:items-center">
-          {/* Left — Fadi intro */}
+          {/* Left — the invitation */}
           <div className="hidden flex-col items-start gap-7 lg:flex">
-            <FadiCore state="idle" size={132} />
+            <FadiCore state="idle" size={120} />
             <div className="space-y-3">
-              <p className="text-xs uppercase tracking-[0.3em] text-primary/80">Fadi · Honest Career Mentor</p>
-              <h1 className="text-glow text-3xl font-semibold tracking-tight">
-                {isSignUp ? "Your career agent is ready." : "Welcome back. Fadi's been working."}
+              <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-primary">
+                Your career, as one system
+              </p>
+              <h1 className="font-heading text-4xl font-semibold leading-[1.05] tracking-tight text-balance">
+                {isSignUp ? "Everything you need, in one place." : "Welcome back."}
               </h1>
               <p className="max-w-md leading-relaxed text-muted-foreground">
                 {isSignUp
-                  ? "Create your account and Fadi immediately begins analyzing your profile, finding opportunities, and building your career intelligence."
-                  : "Sign in and Fadi will brief you on everything it found since you were last here."}
+                  ? "Evidence in, applications out — nothing invented. Fadi helps you claim every true thing at its full strength."
+                  : "Pick up exactly where you left off. Fadi kept working while you were away."}
               </p>
             </div>
 
             <ul className="space-y-2.5">
-              {fadiPoints.map((point) => (
+              {points.map((point) => (
                 <li key={point} className="flex items-start gap-3 text-sm">
-                  <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
+                  <span
+                    className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-success/15 text-success"
+                    aria-hidden="true"
+                  >
+                    <Check className="size-3" strokeWidth={3} />
+                  </span>
                   <span className="text-muted-foreground">{point}</span>
                 </li>
               ))}
             </ul>
 
-            <div className="glass-holo rounded-xl p-4">
+            <div className="rounded-xl border border-border bg-card/60 p-4 shadow-sm">
               <p className="text-xs leading-relaxed text-muted-foreground">
-                <span className="font-medium text-primary">Fadi never acts without your approval.</span> Every external
-                action — applications, messages, profile updates — requires your explicit sign-off.
+                <span className="font-medium text-foreground">Private by default.</span> Every external action —
+                applications, messages, profile updates — needs your explicit sign-off. Nothing leaves the system
+                without you.
               </p>
             </div>
           </div>
 
-          {/* Right — Form */}
-          <div className="glass-holo glow-edge w-full rounded-2xl p-6">
+          {/* Right — the form card */}
+          <div className="w-full rounded-2xl border border-border bg-card p-6 shadow-lg">
             <div className="mb-4 flex items-center gap-3 lg:hidden">
-              <FadiCore state="idle" size={44} />
-              <span className="font-semibold tracking-tight">Fadi</span>
+              <FadiCore state="idle" size={40} />
+              <span className="font-heading font-semibold tracking-tight">Fadi</span>
             </div>
-            <h2 className="text-xl font-semibold tracking-tight">
-              {isSignUp ? "Create your account" : "Welcome back"}
+            <h2 className="font-heading text-xl font-semibold tracking-tight">
+              {isSignUp ? "Create your account" : "Sign in"}
             </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              {isSignUp ? "Boot up your first Career Intelligence Report." : "Return to your Fadi workspace."}
+              {isSignUp ? "Start with your real evidence." : "Return to your workspace."}
             </p>
             <div className="mt-5 space-y-5">
               <SocialButtons providers={socialProviders} />
               <Suspense
                 fallback={
-                  <div className="rounded-lg border border-border/60 p-3 text-sm text-muted-foreground">Loading…</div>
+                  <div className="rounded-lg border border-border p-3 text-sm text-muted-foreground">Loading…</div>
                 }
               >
                 <AuthForm mode={mode} />

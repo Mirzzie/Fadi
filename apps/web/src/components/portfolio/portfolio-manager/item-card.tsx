@@ -33,7 +33,7 @@ export function ItemCard({
       onDragEnd={onDragEnd}
       onDragOver={(e) => e.preventDefault()}
       onDrop={onDrop}
-      className={`flex items-start gap-3 rounded-md border border-border bg-muted/20 p-4 transition-colors hover:border-amber-500/50 ${
+      className={`flex items-start gap-3 rounded-md border border-border bg-muted/20 p-4 transition-colors hover:border-primary/50 ${
         dragging ? "opacity-50" : ""
       }`}
     >
@@ -61,7 +61,7 @@ export function ItemCard({
             </span>
           )}
           {item.tag && (
-            <span className="rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[10px] text-amber-400">
+            <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] text-primary">
               {item.tag}
             </span>
           )}

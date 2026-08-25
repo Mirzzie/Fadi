@@ -78,7 +78,7 @@ export function NicheFinder() {
       <header className="space-y-1">
         <div className="flex items-center gap-2">
           <Compass className="size-5 text-primary" aria-hidden="true" />
-          <h1 className="text-xl font-semibold tracking-tight">Niche Finder</h1>
+          <h1 className="font-heading text-xl font-semibold tracking-tight">Niche Finder</h1>
         </div>
         <p className="text-sm text-muted-foreground">
           Torn between paths? Tell me where you stand. I&apos;ll pull live demand data and give you the
@@ -172,7 +172,7 @@ function Results({ result, onReset }: { result: Result; onReset: () => void }) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Compass className="size-5 text-primary" aria-hidden="true" />
-          <h1 className="text-xl font-semibold tracking-tight">Your niche reality check</h1>
+          <h1 className="font-heading text-xl font-semibold tracking-tight">Your niche reality check</h1>
         </div>
         <Button variant="ghost" size="sm" onClick={onReset}>
           Start over

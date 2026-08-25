@@ -125,7 +125,7 @@ export function DeveloperModal({
           HTML — can read it over this public, CORS-open JSON API, or embed it with one line.
         </p>
         {!published && (
-          <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
+          <div className="rounded-md border border-primary/40 bg-primary/10 px-3 py-2 text-xs text-primary">
             Heads up: the API only returns content while your site is <strong>Published</strong>.
             It’s currently a draft.
           </div>
@@ -160,7 +160,7 @@ export function DeveloperModal({
               <button
                 type="button"
                 onClick={() => copy(s.code, s.label)}
-                className="text-xs text-amber-400 hover:underline"
+                className="text-xs text-primary hover:underline"
               >
                 {copied === s.label ? "Copied!" : "Copy"}
               </button>

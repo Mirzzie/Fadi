@@ -155,7 +155,7 @@ export function ItemEditor({
               type="button"
               onClick={enhance}
               disabled={enhancing}
-              className="inline-flex items-center gap-1 text-xs text-amber-400 hover:underline disabled:opacity-50"
+              className="inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50"
               title="Rewrite in your portfolio voice — grounded only in this item's facts"
             >
               {enhancing ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
@@ -259,7 +259,7 @@ export function ItemEditor({
             {form.roles.map((r) => (
               <span
                 key={r}
-                className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-400"
+                className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs text-primary"
               >
                 {r}
                 <button type="button" onClick={() => set({ roles: form.roles.filter((v) => v !== r) })}>
@@ -288,7 +288,7 @@ export function ItemEditor({
                   key={r.value}
                   type="button"
                   onClick={() => addRole(r.value)}
-                  className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:border-amber-500/50"
+                  className="rounded-full border border-border px-2 py-0.5 text-[11px] text-muted-foreground hover:border-primary/50"
                 >
                   + {r.label}
                 </button>

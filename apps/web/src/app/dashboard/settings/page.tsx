@@ -42,7 +42,7 @@ export default async function SettingsPage() {
               <Cpu className="size-5 text-primary-foreground" aria-hidden="true" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold tracking-tight">
+              <h2 className="font-heading text-xl font-semibold tracking-tight">
                 AI{" "}
                 <span className="bg-gradient-to-r from-primary to-[oklch(0.7_0.17_230)] bg-clip-text text-transparent">
                   provider

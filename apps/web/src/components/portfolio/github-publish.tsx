@@ -152,7 +152,7 @@ export function GithubPublishPanel({ isPublished }: { isPublished: boolean }) {
           </p>
 
           {!isPublished && (
-            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-400">
+            <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
               Your site is a draft. Publish it inside Fadi first, then it can go to GitHub.
             </div>
           )}
@@ -192,7 +192,7 @@ export function GithubPublishPanel({ isPublished }: { isPublished: boolean }) {
           </p>
 
           {inspect && (inspect.hasIndex || inspect.foreign.length > 0) && (
-            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+            <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
               <p>
                 <strong>Heads up:</strong> this repo already has content. Publishing your portfolio
                 site <strong>replaces the whole repository</strong> with it
@@ -233,7 +233,7 @@ export function GithubPublishPanel({ isPublished }: { isPublished: boolean }) {
       {status && (
         <div
           className={`flex items-start gap-2 rounded-md px-3 py-2 text-sm ${
-            status.ok ? "bg-emerald-500/10 text-emerald-400" : "bg-destructive/10 text-destructive"
+            status.ok ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
           }`}
         >
           {status.ok ? (

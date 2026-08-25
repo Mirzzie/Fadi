@@ -32,8 +32,8 @@ type DocView = { id: string; kind: string; title: string; applicationId: string 
 const COLUMNS: { status: ApplicationStatus; label: string; tint: string }[] = [
   { status: "interested", label: "Interested", tint: "bg-muted/50" },
   { status: "applied", label: "Applied", tint: "bg-primary/10" },
-  { status: "interviewing", label: "Interviewing", tint: "bg-amber-500/10" },
-  { status: "offer", label: "Offer", tint: "bg-emerald-500/10" },
+  { status: "interviewing", label: "Interviewing", tint: "bg-warning/10" },
+  { status: "offer", label: "Offer", tint: "bg-success/10" },
   { status: "rejected", label: "Rejected", tint: "bg-destructive/10" },
 ];
 

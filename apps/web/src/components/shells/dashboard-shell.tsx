@@ -4,7 +4,9 @@ import {
   ArrowUpRight,
   BriefcaseBusiness,
   GraduationCap,
+  MessageSquareQuote,
   Pencil,
+  Plus,
   Sparkles,
   Target,
   TrendingUp,
@@ -21,6 +23,7 @@ import type { SetupState } from "@/lib/guidance/setup";
 import { matchAccent } from "@/lib/jobs/match-accent";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { cn } from "@/lib/utils";
 import type { DashboardProfileSummary, StoredCareerReport } from "@/lib/career-report/schema";
 import type { RecommendedJob } from "@/lib/jobs/types";
 import type { MomentumSummary } from "@/lib/resilience/service";
@@ -37,12 +40,6 @@ function toMomentumView(m: MomentumSummary): MomentumView {
     qualityApplicationsThisPeriod: m.qualityApplicationsThisPeriod,
   };
 }
-
-// Rich banner gradient — violet/indigo with a teal undertone, readable under white.
-const DASH_BANNER =
-  "radial-gradient(80% 130% at 100% 0%, oklch(0.5 0.2 288) 0%, transparent 55%)," +
-  "radial-gradient(90% 130% at 0% 100%, oklch(0.48 0.16 232) 0%, transparent 55%)," +
-  "linear-gradient(120deg, oklch(0.3 0.11 288), oklch(0.24 0.07 252))";
 
 type MarketSignal = {
   kind: "news" | "skill_trend" | "labor";
@@ -94,25 +91,27 @@ export function DashboardShell({
       {/* Fadi greets you first — his proactive, spoken briefing. */}
       {briefing ? <FadiBriefing briefing={briefing} /> : null}
 
-      {/* Mission Control hero — greeting + the live opportunities Fadi has lined up */}
-      <section
-        className="relative overflow-hidden rounded-2xl border border-white/10 p-6 sm:p-8"
-        style={{ backgroundImage: DASH_BANNER }}
-      >
+      {/* Mission Control hero — greeting + the live opportunities Fadi has lined up.
+          Theme-aware, on Fadi's own teal/aurora (was a heavy dark violet banner). */}
+      <section className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+        {/* Soft aurora identity — quiet, so it never fights the content. */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -right-16 -top-20 size-72 rounded-full opacity-30 blur-3xl"
-          style={{ background: "oklch(0.66 0.22 300)" }}
+          className="pointer-events-none absolute -right-16 -top-24 size-72 rounded-full opacity-[0.12] blur-3xl [background:var(--aurora-2)]"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -bottom-24 -left-10 size-64 rounded-full opacity-[0.10] blur-3xl [background:var(--aurora-1)]"
         />
         <div className="relative">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-medium text-white/90">
-            <Sparkles className="size-3" aria-hidden="true" />
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
+            <Sparkles className="size-3 text-primary" aria-hidden="true" />
             Mission Control
           </span>
-          <h2 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+          <h2 className="mt-4 font-heading text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
             {greeting ?? "Your career, run by Fadi"}
           </h2>
-          <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/70 sm:text-base">
+          <p className="mt-3 max-w-xl leading-relaxed text-muted-foreground">
             {subline ??
               "Review your profile, generate your Career Intelligence Report, and act on what matters — Fadi keeps the rest moving."}
           </p>
@@ -124,15 +123,15 @@ export function DashboardShell({
                 <Link
                   key={`${opp.label}-${opp.detail}-${i}`}
                   href={opp.href}
-                  className="group rounded-xl border border-white/15 bg-white/5 p-3 text-left backdrop-blur transition-colors hover:border-white/35 hover:bg-white/10"
+                  className="group rounded-xl border border-border bg-muted/40 p-3 text-left transition-colors hover:border-primary/40 hover:bg-muted"
                 >
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-white/80">
+                    <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-primary">
                       {opp.label}
                     </p>
-                    <ArrowUpRight className="size-3.5 shrink-0 text-white/50 transition-colors group-hover:text-white" aria-hidden="true" />
+                    <ArrowUpRight className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" aria-hidden="true" />
                   </div>
-                  <p className="mt-1 line-clamp-2 text-sm text-white">{opp.detail}</p>
+                  <p className="mt-1 line-clamp-2 text-sm text-foreground">{opp.detail}</p>
                 </Link>
               ))}
             </div>
@@ -141,20 +140,94 @@ export function DashboardShell({
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <Link
               href="#career-report"
-              className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[oklch(0.64_0.25_300)] to-[oklch(0.6_0.2_262)] px-5 py-2.5 text-sm font-semibold text-white shadow-[0_8px_30px_-8px_oklch(0.6_0.24_300/0.7)] transition-transform hover:-translate-y-0.5"
+              className={cn(buttonVariants({ size: "lg" }), "h-10 rounded-full px-5 text-sm font-semibold")}
             >
               Generate report
               <ArrowRight className="size-4" aria-hidden="true" />
             </Link>
             <Link
               href="/dashboard/jobs"
-              className="inline-flex items-center rounded-full border border-white/25 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+              className={cn(
+                buttonVariants({ variant: "outline", size: "lg" }),
+                "h-10 rounded-full px-5 text-sm font-semibold",
+              )}
             >
               Browse jobs
             </Link>
             {userEmail ? (
-              <span className="text-xs text-white/40">Signed in as {userEmail}</span>
+              <span className="text-xs text-muted-foreground">Signed in as {userEmail}</span>
             ) : null}
+          </div>
+        </div>
+      </section>
+
+      {/* Quick actions — the unimad-style hub row: add an application, see the tracker,
+          prepare for interviews. One clear thing to do in each. */}
+      <section className="grid gap-4 lg:grid-cols-3">
+        {/* Add an application */}
+        <div className="flex flex-col rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <h3 className="font-heading text-base font-semibold">Add an application</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Paste a job URL to save it straight to your tracker.
+          </p>
+          <div className="mt-auto pt-4">
+            <Link
+              href="/dashboard/applications"
+              className={cn(buttonVariants(), "w-full rounded-full")}
+            >
+              <Plus className="size-4" aria-hidden="true" />
+              Add to tracker
+            </Link>
+          </div>
+        </div>
+
+        {/* Tracker stats */}
+        <div className="flex flex-col rounded-2xl border border-border bg-card p-5 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Quality applications · this {momentum.cadencePeriod}
+          </p>
+          <div className="mt-1 font-heading text-3xl font-semibold tabular-nums">
+            {momentum.qualityApplicationsThisPeriod ?? 0}
+            <span className="text-base font-medium text-muted-foreground">
+              /{momentum.cadenceTarget ?? 0}
+            </span>
+          </div>
+          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-primary to-[oklch(0.66_0.22_285)]"
+              style={{
+                width: `${Math.min(100, Math.round(((momentum.qualityApplicationsThisPeriod ?? 0) / Math.max(momentum.cadenceTarget ?? 0, 1)) * 100))}%`,
+              }}
+            />
+          </div>
+          <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{momentum.cadenceMessage}</p>
+          <div className="mt-auto pt-4">
+            <Link
+              href="/dashboard/applications"
+              className="text-sm font-medium text-primary underline-offset-4 hover:underline"
+            >
+              View tracker →
+            </Link>
+          </div>
+        </div>
+
+        {/* Prepare for interviews — accent card */}
+        <div className="flex flex-col rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/12 to-[oklch(0.55_0.2_285)]/10 p-5 shadow-sm">
+          <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-primary/25 bg-card/60 px-2.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-primary">
+            Next up
+          </span>
+          <h3 className="mt-2 font-heading text-base font-semibold">Prepare for interviews</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Simulate real questions, refine your answers, and get structured feedback.
+          </p>
+          <div className="mt-auto pt-4">
+            <Link
+              href="/dashboard/interview"
+              className={cn(buttonVariants(), "w-full rounded-full")}
+            >
+              <MessageSquareQuote className="size-4" aria-hidden="true" />
+              Start practice interview
+            </Link>
           </div>
         </div>
       </section>
@@ -315,18 +388,20 @@ export function DashboardShell({
           {recommendedJobsPreview.length > 0 ? (
             <div className="grid gap-3 md:grid-cols-3">
               {recommendedJobsPreview.map((job) => (
-                // Clickable — opens the same workspace the Jobs page uses (fit-check →
-                // draft → apply). These used to be dead <div>s: a recommended role you
-                // couldn't click is worse than no recommendation.
-                <Link
+                // unimad-style role card: logo tile, meta, and a Prepare / Apply-now
+                // button pair — both open the workspace the Jobs page uses (fit-check
+                // → draft → apply).
+                <div
                   key={job.id}
-                  href={`/dashboard/applications/${job.id}/workspace`}
-                  className="block rounded-md border p-3 transition-colors hover:border-primary/40 hover:bg-muted/40"
+                  className="flex flex-col rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-sm font-medium">{job.title}</h3>
-                      <p className="text-sm text-muted-foreground">{job.company}</p>
+                  <div className="flex items-start gap-3">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-primary to-[oklch(0.5_0.2_285)] font-heading text-sm font-bold text-primary-foreground">
+                      {job.company?.slice(0, 1)?.toUpperCase() ?? "?"}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="truncate text-sm font-semibold">{job.title}</h3>
+                      <p className="truncate text-xs text-muted-foreground">{job.company}</p>
                     </div>
                     <span
                       style={matchAccent(job.matchScore).style}
@@ -335,10 +410,24 @@ export function DashboardShell({
                       {job.matchScore}%
                     </span>
                   </div>
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {[job.location, job.remoteMode, job.seniority].filter(Boolean).join(" / ")}
+                  <p className="mt-2 line-clamp-1 text-xs text-muted-foreground">
+                    {[job.location, job.remoteMode, job.seniority].filter(Boolean).join(" · ")}
                   </p>
-                </Link>
+                  <div className="mt-3 flex gap-2">
+                    <Link
+                      href={`/dashboard/applications/${job.id}/workspace`}
+                      className={cn(buttonVariants({ variant: "outline", size: "sm" }), "flex-1 rounded-full")}
+                    >
+                      Prepare
+                    </Link>
+                    <Link
+                      href={`/dashboard/applications/${job.id}/workspace`}
+                      className={cn(buttonVariants({ size: "sm" }), "flex-1 rounded-full")}
+                    >
+                      Apply now
+                    </Link>
+                  </div>
+                </div>
               ))}
             </div>
           ) : (
@@ -533,7 +622,7 @@ function StatCard({
     <Card className="p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-3xl font-semibold tabular-nums">{value}</div>
+          <div className="font-heading text-3xl font-semibold tabular-nums">{value}</div>
           <p className="mt-1 text-sm font-medium">{label}</p>
           <p className="text-xs capitalize text-muted-foreground">{sub}</p>
         </div>

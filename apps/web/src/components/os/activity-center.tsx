@@ -4,7 +4,7 @@ import { Bell, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { cn } from "@/lib/utils";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useFadi } from "./fadi-presence";
 
 type Finding = {
@@ -37,7 +37,6 @@ export function ActivityCenter() {
   const [open, setOpen] = useState(false);
   const [findings, setFindings] = useState<Finding[]>([]);
   const [unseen, setUnseen] = useState(0);
-  const ref = useRef<HTMLDivElement>(null);
   const nudgedFor = useRef<string | null>(null);
 
   // Pull the feed; the freshest unseen finding becomes the orb nudge. The OS
@@ -79,23 +78,6 @@ export function ActivityCenter() {
     };
   }, [load]);
 
-  // Close on outside click / Esc.
-  useEffect(() => {
-    if (!open) return;
-    function onClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("mousedown", onClick);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onClick);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
   const markSeen = useCallback(() => {
     if (unseen === 0) return;
     setUnseen(0);
@@ -105,24 +87,17 @@ export function ActivityCenter() {
     void fetch("/api/fadi/activity", { method: "POST" });
   }, [unseen, dismissNudge]);
 
-  function toggle() {
-    const next = !open;
-    setOpen(next);
-    if (next) markSeen();
-  }
-
   return (
-    <div ref={ref} className="relative flex items-center">
-      <button
-        type="button"
-        onClick={toggle}
-        aria-haspopup="menu"
-        aria-expanded={open}
+    <Popover
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) markSeen();
+      }}
+    >
+      <PopoverTrigger
         aria-label={unseen > 0 ? `Activity — ${unseen} new` : "Activity"}
-        className={cn(
-          "relative grid size-7 place-items-center rounded-full border border-border/70 bg-muted/40 text-muted-foreground transition-colors hover:text-foreground",
-          open && "text-foreground ring-1 ring-inset ring-primary/30",
-        )}
+        className="relative grid size-7 place-items-center rounded-full border border-border/70 bg-muted/40 text-muted-foreground transition-colors hover:text-foreground data-popup-open:text-foreground data-popup-open:ring-1 data-popup-open:ring-inset data-popup-open:ring-primary/30"
       >
         <Bell className="size-3.5" aria-hidden="true" />
         {unseen > 0 ? (
@@ -130,57 +105,52 @@ export function ActivityCenter() {
             {unseen > 9 ? "9+" : unseen}
           </span>
         ) : null}
-      </button>
+      </PopoverTrigger>
 
-      {open ? (
-        <div
-          role="menu"
-          className="absolute right-0 top-9 z-50 w-80 overflow-hidden rounded-xl border border-border/70 bg-card/95 text-sm shadow-xl backdrop-blur-md duration-150 animate-in fade-in slide-in-from-top-1"
-        >
-          <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2">
-            <Sparkles className="size-3.5 text-primary" aria-hidden="true" />
-            <span className="text-xs font-semibold">Fadi activity</span>
-          </div>
-          {findings.length > 0 ? (
-            <ul className="max-h-80 divide-y divide-border/40 overflow-y-auto">
-              {findings.map((f) => {
-                const body = (
-                  <>
-                    <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-primary">
-                      {KIND_LABEL[f.kind] ?? f.kind}
-                    </p>
-                    <p className="mt-0.5 line-clamp-2 text-foreground">{f.title}</p>
-                    {f.detail ? (
-                      <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{f.detail}</p>
-                    ) : null}
-                    <p className="mt-1 text-[0.65rem] text-muted-foreground/70">{relativeTime(f.createdAt)}</p>
-                  </>
-                );
-                return (
-                  <li key={f.id}>
-                    {f.href ? (
-                      <Link
-                        href={f.href}
-                        onClick={() => setOpen(false)}
-                        className="block px-3 py-2.5 transition-colors hover:bg-muted/50"
-                      >
-                        {body}
-                      </Link>
-                    ) : (
-                      <div className="px-3 py-2.5">{body}</div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          ) : (
-            <p className="px-3 py-6 text-center text-xs text-muted-foreground">
-              Nothing yet. Fadi will log what it finds while you&apos;re away.
-            </p>
-          )}
+      <PopoverContent align="end" sideOffset={8} className="w-80 overflow-hidden p-0 text-sm">
+        <div className="flex items-center gap-2 border-b border-border/60 px-3 py-2">
+          <Sparkles className="size-3.5 text-primary" aria-hidden="true" />
+          <span className="text-xs font-semibold">Fadi activity</span>
         </div>
-      ) : null}
-    </div>
+        {findings.length > 0 ? (
+          <ul className="max-h-80 divide-y divide-border/40 overflow-y-auto">
+            {findings.map((f) => {
+              const body = (
+                <>
+                  <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-primary">
+                    {KIND_LABEL[f.kind] ?? f.kind}
+                  </p>
+                  <p className="mt-0.5 line-clamp-2 text-foreground">{f.title}</p>
+                  {f.detail ? (
+                    <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{f.detail}</p>
+                  ) : null}
+                  <p className="mt-1 text-[0.65rem] text-muted-foreground/70">{relativeTime(f.createdAt)}</p>
+                </>
+              );
+              return (
+                <li key={f.id}>
+                  {f.href ? (
+                    <Link
+                      href={f.href}
+                      onClick={() => setOpen(false)}
+                      className="block px-3 py-2.5 transition-colors hover:bg-muted/50"
+                    >
+                      {body}
+                    </Link>
+                  ) : (
+                    <div className="px-3 py-2.5">{body}</div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="px-3 py-6 text-center text-xs text-muted-foreground">
+            Nothing yet. Fadi will log what it finds while you&apos;re away.
+          </p>
+        )}
+      </PopoverContent>
+    </Popover>
   );
 }
 

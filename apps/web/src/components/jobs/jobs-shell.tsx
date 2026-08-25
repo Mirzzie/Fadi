@@ -26,17 +26,16 @@ export function JobsShell({
 }: JobsShellProps) {
   return (
     <div className="mx-auto max-w-shell space-y-6">
-      <section className="relative overflow-hidden rounded-xl border bg-card p-6">
+      <section className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute -right-16 -top-24 size-72 rounded-full opacity-[0.12] blur-3xl"
-          style={{ background: "oklch(0.72 0.19 192)" }}
+          className="pointer-events-none absolute -right-16 -top-24 size-72 rounded-full opacity-[0.12] blur-3xl [background:var(--aurora-1)]"
         />
         <div className="relative space-y-5">
           <div className="max-w-3xl">
             <Badge variant="secondary">Live job discovery</Badge>
             <div className="mt-4 space-y-3">
-              <h2 className="text-3xl font-semibold tracking-tight">
+              <h2 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
                 Recommended{" "}
                 <span className="bg-gradient-to-r from-primary to-[oklch(0.7_0.17_230)] bg-clip-text text-transparent">
                   jobs
@@ -70,9 +69,14 @@ export function JobsShell({
             <Card key={job.id}>
               <CardHeader className="gap-3">
                 <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="space-y-2">
-                    <CardTitle>{job.title}</CardTitle>
-                    <CardDescription>{job.company}</CardDescription>
+                  <div className="flex items-start gap-3">
+                    <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-primary to-[oklch(0.5_0.2_285)] font-heading text-base font-bold text-primary-foreground">
+                      {job.company?.slice(0, 1)?.toUpperCase() ?? "?"}
+                    </span>
+                    <div className="space-y-1">
+                      <CardTitle>{job.title}</CardTitle>
+                      <CardDescription>{job.company}</CardDescription>
+                    </div>
                   </div>
                   <div
                     style={matchAccent(job.matchScore).style}

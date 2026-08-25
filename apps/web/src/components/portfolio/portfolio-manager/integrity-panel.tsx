@@ -11,7 +11,7 @@ const SEVERITY: Record<
 > = {
   contradiction: { label: "Contradiction", cls: "border-destructive/40 bg-destructive/10 text-destructive", Icon: ShieldAlert },
   timeline: { label: "Timeline", cls: "border-orange-500/40 bg-orange-500/10 text-orange-400", Icon: Clock },
-  duplicate: { label: "Duplicate", cls: "border-amber-500/40 bg-amber-500/10 text-amber-400", Icon: Copy },
+  duplicate: { label: "Duplicate", cls: "border-warning/40 bg-warning/10 text-warning", Icon: Copy },
   anomaly: { label: "Anomaly", cls: "border-yellow-500/40 bg-yellow-500/10 text-yellow-500", Icon: AlertTriangle },
   info: { label: "Note", cls: "border-border bg-muted/40 text-muted-foreground", Icon: Info },
 };
@@ -41,13 +41,13 @@ export function IntegrityPanel({
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {clean ? (
-            <ShieldCheck className="size-4 text-emerald-500" aria-hidden="true" />
+            <ShieldCheck className="size-4 text-success" aria-hidden="true" />
           ) : (
-            <ShieldAlert className="size-4 text-amber-400" aria-hidden="true" />
+            <ShieldAlert className="size-4 text-warning" aria-hidden="true" />
           )}
           <h3 className="text-sm font-semibold">Integrity check</h3>
           {!clean && (
-            <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] text-amber-400">
+            <span className="rounded-full bg-warning/20 px-2 py-0.5 text-[10px] text-warning">
               {findings.length}
             </span>
           )}
@@ -87,7 +87,7 @@ export function IntegrityPanel({
                   </p>
                 )}
                 {f.suggestion && (
-                  <p className="mt-1 text-[11px] text-amber-400">Suggested fix: {f.suggestion}</p>
+                  <p className="mt-1 text-[11px] text-warning">Suggested fix: {f.suggestion}</p>
                 )}
               </li>
             );
