@@ -1,7 +1,7 @@
-import { and, desc, eq, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, isNull } from "drizzle-orm";
 
 import type { Database } from "../client";
-import { resumes, type Resume } from "../schema/index";
+import { careerProfiles, resumes, type Resume } from "../schema/index";
 
 export type CreateResumeInput = {
   profileId?: string | null;
@@ -28,10 +28,13 @@ export function createResumesRepository(db: Database) {
     },
 
     /**
-     * Latest resume for a career direction. Prefers a resume tagged to THIS track;
-     * falls back to a legacy/shared (untagged) resume so a direction without its own
-     * still shows something until the user saves one. Career history (LinkedIn) stays
-     * shared per-user — only the role-tailored resume is per-track.
+     * Latest resume for a career direction. Prefers a resume tagged to THIS track.
+     * Directions are ISOLATED: a direction never borrows another's tailored resume.
+     * The one exception is the user's PRIMARY (oldest) direction, which inherits a
+     * legacy/shared (untagged) resume — so pre-tracks users aren't broken — while
+     * newer/exploratory directions with no resume of their own return null (the UI
+     * then shows an honest "set up this direction" state). Career history (LinkedIn)
+     * stays shared per-user; only the role-tailored resume is per-track.
      */
     async getLatestForTrack(userId: string, careerProfileId: string | null): Promise<Resume | null> {
       if (careerProfileId) {
@@ -42,6 +45,16 @@ export function createResumesRepository(db: Database) {
           .orderBy(desc(resumes.createdAt))
           .limit(1);
         if (tracked) return tracked;
+
+        // No resume of its own — only the primary (oldest) direction may inherit the
+        // legacy untagged resume; any other direction stays isolated (returns null).
+        const [primary] = await db
+          .select({ id: careerProfiles.id })
+          .from(careerProfiles)
+          .where(eq(careerProfiles.userId, userId))
+          .orderBy(asc(careerProfiles.createdAt))
+          .limit(1);
+        if (primary && primary.id !== careerProfileId) return null;
       }
       const [legacy] = await db
         .select()
