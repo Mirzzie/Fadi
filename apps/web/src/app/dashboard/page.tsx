@@ -19,6 +19,7 @@ import { getMarketIntelligence } from "@/lib/data-sources/service";
 import {
   createCareerProfilesRepository,
   createEvidenceRepository,
+  createLearningCommitmentsRepository,
   createLinkedInProfilesRepository,
   createResumesRepository,
 } from "@careeros/database";
@@ -86,6 +87,12 @@ export default async function DashboardPage() {
     latestResumeAt: trackResume?.updatedAt ?? null,
     latestLinkedInAt: linkedin?.updatedAt ?? null,
   });
+
+  // Open builds in the ACTIVE direction's Prepare plan — the weekly pull-back hook.
+  // These are commitments (often autopsy-prescribed) not yet completed into evidence.
+  const openBuilds = (await createLearningCommitmentsRepository(db).listForUser(user.id)).filter(
+    (c) => c.status === "committed" && c.careerProfileId === (activeTrack?.id ?? null),
+  ).length;
 
   // Gate on the summary we already loaded — no separate profiles round-trip.
   if (onboardingStatusOf(profileSummary) !== "completed") {
@@ -210,6 +217,7 @@ export default async function DashboardPage() {
         reflection={reflection}
         marketSignals={marketSignals}
         setup={setup}
+        openBuilds={openBuilds}
       />
       <div className="mx-auto mt-4 max-w-shell">
         <FadiImpactCard impact={impact} />

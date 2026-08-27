@@ -4,6 +4,7 @@ import {
   ArrowUpRight,
   BriefcaseBusiness,
   GraduationCap,
+  Hammer,
   MessageSquareQuote,
   Pencil,
   Plus,
@@ -69,6 +70,8 @@ type DashboardShellProps = {
   reflection?: MomentumReflection | null;
   marketSignals: MarketSignal[];
   setup?: SetupState | null;
+  /** Open (not-yet-completed) builds in the active direction's Prepare plan. */
+  openBuilds?: number;
 };
 
 export function DashboardShell({
@@ -85,6 +88,7 @@ export function DashboardShell({
   reflection,
   marketSignals,
   setup,
+  openBuilds = 0,
 }: DashboardShellProps) {
   return (
     <div className="mx-auto max-w-shell space-y-8">
@@ -160,6 +164,33 @@ export function DashboardShell({
           </div>
         </div>
       </section>
+
+      {/* The loop's pull-back: builds waiting in the active direction's Prepare plan
+          (often prescribed by a rejection autopsy). A reason to come back and finish one. */}
+      {openBuilds > 0 ? (
+        <Link
+          href="/dashboard/learning"
+          className="group flex items-center justify-between gap-3 rounded-2xl border border-primary/25 bg-primary/5 p-4 transition-colors hover:bg-primary/10"
+        >
+          <div className="flex items-center gap-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
+              <Hammer className="size-5" aria-hidden="true" />
+            </span>
+            <div>
+              <p className="text-sm font-semibold">
+                {openBuilds} build{openBuilds === 1 ? "" : "s"} waiting in your Prepare plan
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Finish one to turn it into real proof for your next application.
+              </p>
+            </div>
+          </div>
+          <ArrowRight
+            className="size-4 shrink-0 text-primary transition-transform group-hover:translate-x-0.5"
+            aria-hidden="true"
+          />
+        </Link>
+      ) : null}
 
       {/* Quick actions — the unimad-style hub row: add an application, see the tracker,
           prepare for interviews. One clear thing to do in each. */}
