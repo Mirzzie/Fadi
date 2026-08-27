@@ -18,20 +18,29 @@ import { FadiPresenceProvider } from "./fadi-presence";
 export function OsShell({
   children,
   initialMode,
+  activeTrackKey,
 }: {
   children: React.ReactNode;
   initialMode: CareerMode;
+  /** Id of the active career direction — changes on switch to remount page content. */
+  activeTrackKey: string;
 }) {
   return (
     <FadiPresenceProvider>
       <CareerModeProvider initialMode={initialMode}>
-        <OsShellInner>{children}</OsShellInner>
+        <OsShellInner activeTrackKey={activeTrackKey}>{children}</OsShellInner>
       </CareerModeProvider>
     </FadiPresenceProvider>
   );
 }
 
-function OsShellInner({ children }: { children: React.ReactNode }) {
+function OsShellInner({
+  children,
+  activeTrackKey,
+}: {
+  children: React.ReactNode;
+  activeTrackKey: string;
+}) {
   const pathname = usePathname();
 
   return (
@@ -43,8 +52,9 @@ function OsShellInner({ children }: { children: React.ReactNode }) {
 
       <MenuBar />
       <main className="flex-1 px-3 pb-24 pt-4 sm:px-6">
-        {/* Keyed by route so each navigation fades in gently. */}
-        <div key={pathname} className="duration-200 animate-in fade-in">
+        {/* Keyed by route AND active direction: navigation fades in gently, and switching
+            tracks remounts the page so client state re-seeds from the new direction's data. */}
+        <div key={`${pathname}:${activeTrackKey}`} className="duration-200 animate-in fade-in">
           {children}
         </div>
       </main>
