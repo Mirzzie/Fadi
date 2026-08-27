@@ -189,7 +189,14 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
       const commitments = await createLearningCommitmentsRepository(db).listForUser(userId, 10);
       const staleMs = 3 * 24 * 60 * 60 * 1000;
       const stale = commitments
-        .filter((c) => c.status === "committed" && Date.now() - new Date(c.createdAt).getTime() > staleMs)
+        .filter(
+          (c) =>
+            c.status === "committed" &&
+            // Only the ACTIVE direction's commitments — don't nudge about a build
+            // that belongs to a track the user isn't currently pursuing.
+            c.careerProfileId === (track?.id ?? null) &&
+            Date.now() - new Date(c.createdAt).getTime() > staleMs,
+        )
         .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())[0];
       if (stale && !seenTitles.has(`Still on “${stale.title}”?`)) {
         findings.push({
