@@ -13,6 +13,7 @@ import {
   submitRejectionAutopsy,
   type RejectionStage,
 } from "@/app/dashboard/applications/actions";
+import { commitToProjectAction } from "@/app/dashboard/learning/actions";
 import type { RejectionInsight } from "@/lib/resilience/autopsy";
 
 type AutopsyPrompt = { key: string; question: string };
@@ -68,9 +69,29 @@ export function ApplicationOutcomePanel({
     insight: RejectionInsight;
   } | null>(null);
 
+  // Which autopsy moves the user has pushed into their Prepare plan (by index).
+  const [addedSteps, setAddedSteps] = useState<Set<number>>(new Set());
+
   // The "stage" prompt is captured up front with the chips below, so the autopsy
   // form only needs the reflective questions.
   const reflectivePrompts = autopsyPrompts.filter((p) => p.key !== "stage");
+
+  // The cycle's turn: a "no" → autopsy → prescribed move → a tracked commitment in
+  // Prepare (scoped to the active direction) → the next build. Closes Apply→Prepare.
+  function addStepToPlan(index: number, step: string) {
+    if (!reward) return;
+    const gap = reward.insight.pattern?.name ?? "From a rejection autopsy";
+    startTransition(async () => {
+      const res = await commitToProjectAction({
+        gap,
+        title: step,
+        kind: "project",
+        detail: `Prescribed by Fadi's rejection autopsy — ${jobTitle} at ${jobCompany}.`,
+      });
+      if (res.ok) setAddedSteps((prev) => new Set(prev).add(index));
+      else setError(res.message ?? "Couldn't add that to your plan.");
+    });
+  }
 
   function handleMarkApplied() {
     setError(null);
@@ -244,13 +265,37 @@ export function ApplicationOutcomePanel({
                 Your sharper next application
               </div>
               <ul className="space-y-1.5">
-                {reward.insight.sharperNextApplication.map((step, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                    <ArrowRight className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden="true" />
-                    <span>{step}</span>
-                  </li>
-                ))}
+                {reward.insight.sharperNextApplication.map((step, i) => {
+                  const added = addedSteps.has(i);
+                  return (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <ArrowRight className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden="true" />
+                      <span className="flex-1 text-muted-foreground">{step}</span>
+                      <Button
+                        type="button"
+                        size="xs"
+                        variant={added ? "ghost" : "outline"}
+                        disabled={pending || added}
+                        onClick={() => addStepToPlan(i, step)}
+                        className="shrink-0"
+                      >
+                        {added ? (
+                          <>
+                            <CheckCircle2 className="size-3.5 text-success" aria-hidden="true" />
+                            Added
+                          </>
+                        ) : (
+                          "Add to plan"
+                        )}
+                      </Button>
+                    </li>
+                  );
+                })}
               </ul>
+              <p className="text-xs text-muted-foreground">
+                Adding a move turns it into a commitment in your Prepare plan for this direction — the
+                loop from a “no” to your next build.
+              </p>
             </div>
           ) : null}
 
