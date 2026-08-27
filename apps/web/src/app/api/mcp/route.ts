@@ -11,6 +11,7 @@ import {
   type McpDeps,
 } from "@/lib/mcp/server";
 import { envTokenMatches, resolveMcpToken } from "@/lib/mcp/tokens";
+import { getFadiToolAnnotations, listFadiResources, readFadiResource } from "@/lib/mcp/catalog";
 
 /**
  * Fadi MCP endpoint — exposes Fadi's career tools to any MCP client
@@ -65,8 +66,10 @@ export async function POST(req: Request): Promise<Response> {
   const generate = await getUserDocGenerate(userId);
   const ctx: FadiToolContext = { userId, generate: generate ?? undefined };
   const deps: McpDeps = {
-    listTools: () => getFadiTools().map(toMcpTool),
+    listTools: () => getFadiTools().map((t) => toMcpTool(t, getFadiToolAnnotations(t.name))),
     callTool: (name, args) => executeFadiTool(name, args, ctx),
+    listResources: listFadiResources,
+    readResource: (uri) => readFadiResource(userId, uri),
   };
 
   const messages = Array.isArray(payload) ? (payload as JsonRpcRequest[]) : [payload as JsonRpcRequest];

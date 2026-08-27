@@ -501,7 +501,7 @@ export async function executeFadiTool(
 ): Promise<FadiToolResult> {
   const tool = getFadiTool(name);
   if (!tool) {
-    return { summary: `Unknown tool "${name}".`, view: "none" };
+    return { summary: `Unknown tool "${name}".`, view: "none", isError: true };
   }
   return tool.execute(args, ctx);
 }

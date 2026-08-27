@@ -26,6 +26,13 @@ export interface FadiToolResult {
   data?: unknown;
   /** Render hint for the chat UI. */
   view?: FadiToolView;
+  /**
+   * True when this result represents a genuine FAILURE (the tool couldn't do its
+   * job — e.g. unknown tool). Surfaced to MCP clients as `result.isError: true` so
+   * strict clients can branch on it. NOT set for soft/guidance responses ("your
+   * evidence pool is empty yet") — those are successful, informative answers.
+   */
+  isError?: boolean;
 }
 
 import type { ZodSchema } from "zod";
