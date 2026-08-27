@@ -406,6 +406,7 @@ export function DashboardShell({
       {/* Zone: What's out there */}
       <section className="space-y-3">
         <ZoneHeading>What&apos;s out there</ZoneHeading>
+        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <Card id="recommended-jobs">
         <CardHeader className="flex flex-row items-start gap-4 space-y-0">
           <div className="grid size-10 place-items-center rounded-md bg-primary/10 text-primary">
@@ -424,7 +425,7 @@ export function DashboardShell({
         </CardHeader>
         <CardContent>
           {recommendedJobsPreview.length > 0 ? (
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3">
               {recommendedJobsPreview.map((job) => (
                 // unimad-style role card: logo tile, meta, and a Prepare / Apply-now
                 // button pair — both open the workspace the Jobs page uses (fit-check
@@ -477,6 +478,7 @@ export function DashboardShell({
       </Card>
 
         <MarketSignalsCard signals={marketSignals} />
+        </div>
       </section>
     </div>
   );
