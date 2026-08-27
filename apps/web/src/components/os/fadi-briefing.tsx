@@ -1,7 +1,6 @@
 "use client";
 
 import { Sparkles, Square, Volume2 } from "lucide-react";
-import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import type { Briefing } from "@/lib/agents/briefing";
@@ -74,22 +73,9 @@ export function FadiBriefing({ briefing }: { briefing: Briefing }) {
         ) : null}
       </div>
 
+      {/* Just the spoken open. The actionable items live once, in the Mission Control hero
+          below — the briefing used to repeat them as tiles, doubling the top of the page. */}
       <p className="mt-3 text-sm leading-relaxed text-foreground/90">{briefing.text}</p>
-
-      {briefing.items.length > 0 ? (
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {briefing.items.map((it, i) => (
-            <Link
-              key={`${it.label}-${i}`}
-              href={it.href}
-              className="group rounded-xl border border-border/60 bg-card/60 p-3 transition-colors hover:border-primary/40"
-            >
-              <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-primary">{it.label}</p>
-              <p className="mt-0.5 line-clamp-2 text-sm text-foreground">{it.detail}</p>
-            </Link>
-          ))}
-        </div>
-      ) : null}
     </section>
   );
 }

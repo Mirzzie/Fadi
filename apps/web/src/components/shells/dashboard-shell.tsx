@@ -309,90 +309,97 @@ export function DashboardShell({
         {reflection ? <MomentumReflectionCard reflection={reflection} /> : null}
       </section>
 
-      {/* Zone: Your profile & report */}
+      {/* Zone: Your profile & report — compact. The full report lives on /dashboard/report
+          so the dashboard stays a launchpad, not a document. */}
       <section className="space-y-3">
         <ZoneHeading>Your profile &amp; report</ZoneHeading>
-        <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-        <Card id="career-report">
-          <CardHeader className="flex flex-row items-start gap-4 space-y-0">
-            <div className="grid size-10 place-items-center rounded-md bg-primary/10 text-primary">
-              <Target className="size-5" aria-hidden="true" />
-            </div>
-            <div>
-              <CardTitle>Onboarding profile summary</CardTitle>
-              <CardDescription>
-                The data Fadi will use for your first report.
-              </CardDescription>
-            </div>
-            <Link
-              href="/dashboard/profile"
-              className={`${buttonVariants({ variant: "outline", size: "sm" })} ml-auto shrink-0`}
-            >
-              <Pencil className="size-3.5" aria-hidden="true" />
-              Edit
-            </Link>
-          </CardHeader>
-          <CardContent>
-            {profileSummary ? (
-              <div className="space-y-4">
+        <div className="grid gap-4 lg:grid-cols-2">
+          {/* Profile — slim; the full LinkedIn/résumé text lives on the Profile page */}
+          <Card>
+            <CardHeader className="flex flex-row items-start gap-4 space-y-0">
+              <div className="grid size-10 place-items-center rounded-md bg-primary/10 text-primary">
+                <Target className="size-5" aria-hidden="true" />
+              </div>
+              <div>
+                <CardTitle>Profile</CardTitle>
+                <CardDescription>The direction Fadi is building from.</CardDescription>
+              </div>
+              <Link
+                href="/dashboard/profile"
+                className={`${buttonVariants({ variant: "outline", size: "sm" })} ml-auto shrink-0`}
+              >
+                <Pencil className="size-3.5" aria-hidden="true" />
+                Edit
+              </Link>
+            </CardHeader>
+            <CardContent>
+              {profileSummary ? (
                 <SummaryGrid profileSummary={profileSummary} />
-                <PreviewBlock
-                  title="LinkedIn context"
-                  value={profileSummary.linkedInProfilePreview}
-                />
-                <PreviewBlock title="Resume text" value={profileSummary.resumePreview} />
-              </div>
-            ) : (
-              <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                Complete onboarding before generating a report.
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              ) : (
+                <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                  Complete onboarding before generating a report.
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-start gap-4 space-y-0">
-            <div className="grid size-10 place-items-center rounded-md bg-primary/10 text-primary">
-              <Sparkles className="size-5" aria-hidden="true" />
-            </div>
-            <div>
-              <CardTitle>Career Intelligence Report</CardTitle>
-              <CardDescription>
-                Generate structured insights from your onboarding profile, LinkedIn context, resume,
-                and goals.
-              </CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
-              AI recommendations may be imperfect. Review every suggestion before making career,
-              learning, or application decisions.
-            </div>
-            <GenerateReportButton />
-            {latestReport && reportStale?.stale ? (
-              // Living projection: the report knows when it's out of date with the
-              // evidence it was built from, and says so — rather than silently drifting.
-              // It does NOT auto-regenerate (that would spend the user's AI budget
-              // without asking); the "Generate report" action above is the one click.
-              <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
-                <span className="font-medium text-amber-700 dark:text-amber-400">
-                  This report is out of date.
-                </span>{" "}
-                <span className="text-muted-foreground">
-                  {reportStale.reason} Regenerate it to reflect your latest history.
-                </span>
+          {/* Career report — compact summary; "View full" opens the dedicated page */}
+          <Card id="career-report">
+            <CardHeader className="flex flex-row items-start gap-4 space-y-0">
+              <div className="grid size-10 place-items-center rounded-md bg-primary/10 text-primary">
+                <Sparkles className="size-5" aria-hidden="true" />
               </div>
-            ) : null}
-            {latestReport ? (
-              <CareerReportView report={latestReport} />
-            ) : (
-              <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-                No report generated yet. Use the action above to create your first Career
-                Intelligence Report.
+              <div className="flex-1">
+                <CardTitle>Career Intelligence Report</CardTitle>
+                <CardDescription>Your readiness, strengths, and gaps.</CardDescription>
               </div>
-            )}
-          </CardContent>
-        </Card>
+              {latestReport ? (
+                <Link
+                  href="/dashboard/report"
+                  className={`${buttonVariants({ variant: "outline", size: "sm" })} shrink-0`}
+                >
+                  View full
+                  <ArrowRight className="size-3.5" aria-hidden="true" />
+                </Link>
+              ) : null}
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {latestReport ? (
+                <>
+                  {reportStale?.stale ? (
+                    <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
+                      <span className="font-medium text-amber-700 dark:text-amber-400">
+                        This report is out of date.
+                      </span>{" "}
+                      <span className="text-muted-foreground">
+                        {reportStale.reason} Regenerate it to reflect your latest history.
+                      </span>
+                    </div>
+                  ) : null}
+                  {latestReport.strengths[0] ? (
+                    <ReportHighlight label="Top strength" title={latestReport.strengths[0].title} />
+                  ) : null}
+                  {latestReport.missing_skills[0] ? (
+                    <ReportHighlight
+                      label="Top gap to close"
+                      title={latestReport.missing_skills[0].title}
+                    />
+                  ) : null}
+                  <p className="text-xs capitalize text-muted-foreground">
+                    Target role fit: {latestReport.target_role_fit?.rating ?? "unclear"}
+                  </p>
+                </>
+              ) : (
+                <>
+                  <div className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
+                    Generate structured insights from your profile, résumé, and goals — your
+                    strengths, gaps, and next steps, in one place.
+                  </div>
+                  <GenerateReportButton />
+                </>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </section>
 
@@ -580,60 +587,12 @@ function SummaryGrid({ profileSummary }: { profileSummary: DashboardProfileSumma
   );
 }
 
-function PreviewBlock({ title, value }: { title: string; value: string | null }) {
+/** One compact highlight (top strength / top gap) on the dashboard's report summary card. */
+function ReportHighlight({ label, title }: { label: string; title: string }) {
   return (
-    <div className="rounded-md border p-3">
-      <h3 className="text-sm font-medium">{title}</h3>
-      <p className="mt-2 text-sm text-muted-foreground">{value || "Not provided"}</p>
-    </div>
-  );
-}
-
-function CareerReportView({ report }: { report: StoredCareerReport }) {
-  return (
-    <div className="space-y-4">
-      <div className="rounded-md border p-4">
-        <h3 className="font-medium">Career summary</h3>
-        <p className="mt-2 text-sm text-muted-foreground">{report.career_summary}</p>
-      </div>
-      <ReportList title="Strengths" items={report.strengths} />
-      <ReportList title="Missing skills" items={report.missing_skills} />
-      <div className="rounded-md border p-4">
-        <h3 className="font-medium">Target role fit</h3>
-        <p className="mt-1 text-sm capitalize text-muted-foreground">
-          Rating: {report.target_role_fit?.rating ?? "unclear"}
-        </p>
-        <p className="mt-2 text-sm text-muted-foreground">{report.target_role_fit?.explanation}</p>
-      </div>
-      <ReportList title="Recommended next steps" items={report.recommended_actions} />
-      <ReportList title="Learning recommendations" items={report.recommended_learning_path} />
-      <p className="text-xs text-muted-foreground">
-        Generated{" "}
-        {report.generated_at ? new Date(report.generated_at).toLocaleString() : "recently"}
-        {report.model_name ? ` using ${report.model_name}` : ""}.
-      </p>
-    </div>
-  );
-}
-
-function ReportList({
-  title,
-  items,
-}: {
-  title: string;
-  items: Array<{ title: string; detail: string }>;
-}) {
-  return (
-    <div className="rounded-md border p-4">
-      <h3 className="font-medium">{title}</h3>
-      <ul className="mt-3 space-y-3">
-        {items.map((item) => (
-          <li key={`${title}-${item.title}`} className="text-sm">
-            <p className="font-medium">{item.title}</p>
-            <p className="text-muted-foreground">{item.detail}</p>
-          </li>
-        ))}
-      </ul>
+    <div className="rounded-md border bg-muted/20 p-3">
+      <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-sm font-medium">{title}</p>
     </div>
   );
 }
