@@ -235,6 +235,13 @@ export const careerProfiles = pgTable(
     index("career_profiles_analysis_status_idx").on(table.analysisStatus),
     index("career_profiles_user_created_at_idx").on(table.userId, table.createdAt),
     index("career_profiles_user_active_idx").on(table.userId, table.isActive),
+    // Hard invariant: at most ONE active track per user. Everything track-scoped
+    // (report, resume, learning gaps) keys off the single active track, so a
+    // second active row silently leaks another direction's data. Enforce it in
+    // the DB, not just app code.
+    uniqueIndex("career_profiles_one_active_per_user")
+      .on(table.userId)
+      .where(sql`${table.isActive}`),
   ]
 );
 

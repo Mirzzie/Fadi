@@ -73,14 +73,16 @@ export async function completeOnboardingAction(
       onboardingCompleted: false,
     });
 
-    await careerProfilesRepository.createForUser(user.id, {
-      profileId: profile.id,
+    // Onboarding shapes the user's ACTIVE direction. Update-or-create: the first
+    // run creates the active track; any re-run UPDATES the existing active track
+    // instead of spawning a NEW active one. The old createForUser({makeActive:true})
+    // spawned a duplicate active track on every re-run, silently stealing "active"
+    // from a direction the user had switched to (and littering duplicate tracks).
+    await careerProfilesRepository.updateActiveForUser(user.id, {
       targetRole: parsed.targetRole,
       location: parsed.locationPreference,
       experienceLevel: parsed.experienceLevel,
       careerGoal: parsed.careerGoals,
-      // The first track a user creates is their active one.
-      makeActive: true,
     });
 
     const linkedInText = parsed.linkedInProfile?.trim();
