@@ -41,7 +41,11 @@ export default async function LearningPage() {
     <AppShell>
       <LearningShell
         report={report}
-        commitments={commitments.map(toCommitmentView)}
+        // Only THIS direction's commitments — a commitment is per-track, so another
+        // direction's builds (e.g. a cyber SIEM project) must not show under DevOps.
+        commitments={commitments
+          .filter((c) => c.careerProfileId === (track?.id ?? null))
+          .map(toCommitmentView)}
         role={track?.targetRole ?? null}
       />
     </AppShell>

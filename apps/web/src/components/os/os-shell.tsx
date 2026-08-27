@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 
-import { CareerModeProvider } from "./career-mode";
+import { CareerModeProvider, useCareerMode } from "./career-mode";
 import type { CareerMode } from "@/app/dashboard/mode";
 import { Dock } from "./dock";
 import { FadiOrb } from "./fadi-orb";
@@ -42,6 +42,7 @@ function OsShellInner({
   activeTrackKey: string;
 }) {
   const pathname = usePathname();
+  const { mode } = useCareerMode();
 
   return (
     <div className="relative flex min-h-screen flex-col">
@@ -52,9 +53,13 @@ function OsShellInner({
 
       <MenuBar />
       <main className="flex-1 px-3 pb-24 pt-4 sm:px-6">
-        {/* Keyed by route AND active direction: navigation fades in gently, and switching
-            tracks remounts the page so client state re-seeds from the new direction's data. */}
-        <div key={`${pathname}:${activeTrackKey}`} className="duration-200 animate-in fade-in">
+        {/* Keyed by route + active direction + phase. Any of the three changing remounts the
+            page so its content follows — client state re-seeds and the switch is felt. The
+            transition (fade + a small rise) matches the shell's own dock/menu motion. */}
+        <div
+          key={`${pathname}:${activeTrackKey}:${mode}`}
+          className="duration-300 animate-in fade-in slide-in-from-bottom-1 motion-reduce:animate-none"
+        >
           {children}
         </div>
       </main>
