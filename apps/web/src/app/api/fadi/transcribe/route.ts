@@ -34,17 +34,7 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "Too much dictation too fast — pause a moment and continue." }, { status: 429 });
   }
 
-  // Find the user's Whisper-capable provider (Groq or OpenAI), primary first.
-  const configs = await getUserProviderConfigs(user.id);
-  const cfg = configs.find((c) => c.id === "groq" || c.id === "openai");
-  const provider = cfg ? createUserProvider(cfg) : null;
-  if (!provider?.isConfigured || !provider.transcribe) {
-    return Response.json(
-      { error: "Add a Groq or OpenAI key in Settings → AI provider to use voice." },
-      { status: 422 },
-    );
-  }
-
+  // Read + validate the audio upload first.
   let file: File | null = null;
   try {
     const form = await req.formData();
@@ -60,6 +50,32 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "That recording is too long — keep dictation to short takes." }, { status: 413 });
   }
 
+  // Prefer a local, keyless Whisper server (faster-whisper) when configured — fully
+  // local, $0, and works on Linux where the browser speech API doesn't.
+  const localBase = process.env.FADI_STT_LOCAL_BASE?.trim();
+  if (localBase) {
+    try {
+      const text = await transcribeLocal(file, localBase);
+      return Response.json({ text });
+    } catch (err) {
+      logger.error("fadi.transcribe.local_failed", {
+        userId: user.id,
+        error: err instanceof Error ? err.message : "unknown",
+      });
+      // fall through to the user's cloud key, if they have one
+    }
+  }
+
+  // Cloud fallback — the user's own Whisper-capable provider (Groq/OpenAI).
+  const configs = await getUserProviderConfigs(user.id);
+  const cfg = configs.find((c) => c.id === "groq" || c.id === "openai");
+  const provider = cfg ? createUserProvider(cfg) : null;
+  if (!provider?.isConfigured || !provider.transcribe) {
+    return Response.json(
+      { error: "Voice needs a local Whisper server (FADI_STT_LOCAL_BASE) or a Groq/OpenAI key in Settings." },
+      { status: 422 },
+    );
+  }
   try {
     const text = await provider.transcribe(file);
     return Response.json({ text: text.trim() });
@@ -71,4 +87,20 @@ export async function POST(req: NextRequest) {
     });
     return Response.json({ error: "Couldn't transcribe that. Try again." }, { status: 500 });
   }
+}
+
+/** Transcribe via a local, keyless OpenAI-compatible Whisper server (faster-whisper). */
+async function transcribeLocal(file: File, base: string): Promise<string> {
+  const fd = new FormData();
+  fd.append("file", file, file.name || "audio.webm");
+  fd.append("model", process.env.FADI_STT_LOCAL_MODEL || "Systran/faster-whisper-small.en");
+  fd.append("response_format", "json");
+  const res = await fetch(`${base}/audio/transcriptions`, {
+    method: "POST",
+    body: fd,
+    signal: AbortSignal.timeout(60000), // CPU transcription can take a few seconds
+  });
+  if (!res.ok) throw new Error(`local whisper ${res.status}`);
+  const data = (await res.json()) as { text?: string };
+  return (data.text ?? "").trim();
 }
