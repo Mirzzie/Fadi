@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { BookmarkPlus, Check, ChevronRight, Mic, Square, Volume2, Wand2 } from "lucide-react";
+import { useEffect, useRef, useState, useTransition } from "react";
+import { BookmarkPlus, Check, ChevronRight, Headphones, Mic, Square, Volume2, Wand2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { speakFadi } from "@/lib/voice/fadi-speech";
+import { speakFadi, subscribeFadiSpeaking } from "@/lib/voice/fadi-speech";
 import { useSpeechInput } from "@/lib/voice/use-speech-input";
 import { INTERVIEWER_PERSONAS } from "@/lib/interview/personas";
 import type { AnswerScore, MockQuestion } from "@/lib/interview/mock";
@@ -28,6 +28,7 @@ export function MockInterview({ defaults }: { defaults: Defaults }) {
   const [score, setScore] = useState<AnswerScore | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [convo, setConvo] = useState(false);
   const [pending, startTransition] = useTransition();
 
   // $0, private, in-browser speech-to-text (Web Speech API) — no API key, nothing
@@ -38,6 +39,43 @@ export function MockInterview({ defaults }: { defaults: Defaults }) {
       if (isFinal && t.trim()) setAnswer((prev) => (prev ? `${prev} ${t}` : t));
     },
   });
+
+  // Conversation mode = the "live talk" loop, all $0 (browser TTS + STT): Fadi speaks
+  // each new question aloud, then auto-starts listening when he finishes; and speaks a
+  // one-line verdict when a score lands. Manual controls stay for anyone who prefers them.
+  const spokeForIdx = useRef(-1);
+  useEffect(() => {
+    if (!convo || !questions) return;
+    if (spokeForIdx.current === idx) return;
+    spokeForIdx.current = idx;
+    let started = false;
+    let done = false;
+    void speakFadi(questions[idx].question);
+    // Auto-listen once Fadi finishes speaking the question (true → false transition).
+    const unsub = subscribeFadiSpeaking((speaking) => {
+      if (speaking) started = true;
+      else if (started && !done) {
+        done = true;
+        unsub();
+        if (voice.isSupported && voice.state === "idle") voice.start();
+      }
+    });
+    return () => {
+      done = true;
+      unsub();
+    };
+    // voice is intentionally omitted — it changes every render; we only re-run per question.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [convo, idx, questions]);
+
+  // Speak a short spoken verdict when a fresh score arrives (conversation mode).
+  const spokenScore = useRef<AnswerScore | null>(null);
+  useEffect(() => {
+    if (!convo || !score || spokenScore.current === score) return;
+    spokenScore.current = score;
+    const tip = score.improvements[0] ?? score.strengths[0] ?? "";
+    void speakFadi(`${score.overall.toFixed(1)} out of 5. ${tip}`);
+  }, [convo, score]);
 
   function start() {
     setError(null);
@@ -164,10 +202,21 @@ export function MockInterview({ defaults }: { defaults: Defaults }) {
         <Badge variant="secondary" className="mt-0.5 shrink-0 text-[0.6rem] capitalize">{q.kind}</Badge>
         <p className="text-base font-medium">{q.question}</p>
       </div>
-      <Button size="sm" variant="outline" onClick={() => void speakFadi(q.question)}>
-        <Volume2 className="size-4" aria-hidden="true" />
-        Hear it
-      </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button size="sm" variant="outline" onClick={() => void speakFadi(q.question)}>
+          <Volume2 className="size-4" aria-hidden="true" />
+          Hear it
+        </Button>
+        <Button
+          size="sm"
+          variant={convo ? "default" : "outline"}
+          onClick={() => setConvo((v) => !v)}
+          title="Fadi speaks questions and verdicts aloud and auto-listens for your answer"
+        >
+          <Headphones className="size-4" aria-hidden="true" />
+          {convo ? "Conversation: on" : "Conversation mode"}
+        </Button>
+      </div>
 
       <div className="space-y-2">
         <div className="flex items-center justify-between">
