@@ -9,9 +9,34 @@ import { getUserProviderConfigs } from "@/lib/ai/user-settings";
  * key is set — the client then falls back to the browser voice, so nothing breaks.
  */
 
-type TtsSpec = { base: string; model: string; voice: string; format: string; contentType: string };
+type TtsSpec = {
+  base: string;
+  model: string;
+  voice: string;
+  format: string;
+  contentType: string;
+  apiKey: string;
+};
 
-function specFor(id: string): TtsSpec | null {
+/**
+ * Local, keyless, OpenAI-compatible TTS (Kokoro-FastAPI, default :8880). Preferred
+ * when FADI_TTS_LOCAL_BASE is set — fully local, $0, and it needs NO system voice,
+ * so it's the fix for machines with none (e.g. Linux without speech-dispatcher).
+ */
+function localSpec(): TtsSpec | null {
+  const base = process.env.FADI_TTS_LOCAL_BASE?.trim();
+  if (!base) return null;
+  return {
+    base,
+    model: process.env.FADI_TTS_LOCAL_MODEL || "kokoro",
+    voice: process.env.FADI_TTS_LOCAL_VOICE || "am_michael", // warm male Kokoro voice
+    format: "mp3",
+    contentType: "audio/mpeg",
+    apiKey: "local", // Kokoro-FastAPI ignores auth; the header just needs to exist.
+  };
+}
+
+function specFor(id: string): Omit<TtsSpec, "apiKey"> | null {
   if (id === "openai") {
     return {
       base: "https://api.openai.com/v1",
@@ -40,25 +65,33 @@ export async function synthesizeFadiSpeech(
   const input = text.trim().slice(0, 1200); // keep requests snappy
   if (!input) return null;
 
-  // The user's configured providers, primary first; only the TTS-capable ones.
-  const configs = await getUserProviderConfigs(userId);
-  const candidates = configs.filter((c) => (c.id === "openai" || c.id === "groq") && c.apiKey);
+  // Ordered backends to try. Local Kokoro first (when configured): local, $0, and
+  // works with no system voice. Then the user's own cloud key(s), if any.
+  const specs: TtsSpec[] = [];
+  const local = localSpec();
+  if (local) specs.push(local);
 
-  for (const cfg of candidates) {
-    const spec = specFor(cfg.id);
-    if (!spec) continue;
+  const configs = await getUserProviderConfigs(userId);
+  for (const cfg of configs) {
+    if ((cfg.id === "openai" || cfg.id === "groq") && cfg.apiKey) {
+      const spec = specFor(cfg.id);
+      if (spec) specs.push({ ...spec, apiKey: cfg.apiKey });
+    }
+  }
+
+  for (const spec of specs) {
     try {
       const res = await fetch(`${spec.base}/audio/speech`, {
         method: "POST",
-        headers: { Authorization: `Bearer ${cfg.apiKey}`, "Content-Type": "application/json" },
+        headers: { Authorization: `Bearer ${spec.apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({ model: spec.model, voice: spec.voice, input, response_format: spec.format }),
-        signal: AbortSignal.timeout(20000),
+        signal: AbortSignal.timeout(30000), // local CPU TTS can be a touch slower than cloud
       });
       if (!res.ok) continue;
       const audio = await res.arrayBuffer();
       if (audio.byteLength > 0) return { audio, contentType: spec.contentType };
     } catch {
-      // try the next provider
+      // try the next backend
     }
   }
   return null;
