@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { speakFadi } from "@/lib/voice/fadi-speech";
-import { useGroqVoice } from "@/lib/voice/use-groq-voice";
+import { useSpeechInput } from "@/lib/voice/use-speech-input";
 import { INTERVIEWER_PERSONAS } from "@/lib/interview/personas";
 import type { AnswerScore, MockQuestion } from "@/lib/interview/mock";
 import { saveMockAnswerAsStory, scoreMockAnswer, startMockInterview } from "@/app/dashboard/interview/actions";
@@ -30,8 +30,13 @@ export function MockInterview({ defaults }: { defaults: Defaults }) {
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  const voice = useGroqVoice({
-    onTranscript: (t) => setAnswer((prev) => (prev ? `${prev} ${t}` : t)),
+  // $0, private, in-browser speech-to-text (Web Speech API) — no API key, nothing
+  // leaves the browser (Chrome routes STT to Google; swap in self-hosted Whisper
+  // later for full privacy). Only append FINAL results so interim words don't spam.
+  const voice = useSpeechInput({
+    onTranscript: (t, isFinal) => {
+      if (isFinal && t.trim()) setAnswer((prev) => (prev ? `${prev} ${t}` : t));
+    },
   });
 
   function start() {
@@ -170,16 +175,16 @@ export function MockInterview({ defaults }: { defaults: Defaults }) {
           {voice.isSupported ? (
             <Button
               size="sm"
-              variant={voice.state === "recording" ? "default" : "outline"}
-              onClick={() => (voice.state === "recording" ? voice.stop() : voice.start())}
-              disabled={voice.state === "transcribing"}
+              variant={voice.state === "listening" ? "default" : "outline"}
+              onClick={() => (voice.state === "listening" ? voice.stop() : voice.start())}
+              disabled={voice.state === "processing"}
             >
-              {voice.state === "recording" ? (
+              {voice.state === "listening" ? (
                 <><Square className="size-3.5" aria-hidden="true" /> Stop</>
-              ) : voice.state === "transcribing" ? (
-                "Transcribing…"
+              ) : voice.state === "processing" ? (
+                "…"
               ) : (
-                <><Mic className="size-3.5" aria-hidden="true" /> Record</>
+                <><Mic className="size-3.5" aria-hidden="true" /> Speak</>
               )}
             </Button>
           ) : null}
@@ -188,8 +193,13 @@ export function MockInterview({ defaults }: { defaults: Defaults }) {
           rows={5}
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
-          placeholder="Speak your answer (Record), or type it here."
+          placeholder="Speak your answer (Speak), or type it here."
         />
+        {voice.state === "listening" ? (
+          <p className="text-xs text-primary">
+            Listening… <span className="text-muted-foreground">{voice.interimTranscript}</span>
+          </p>
+        ) : null}
       </div>
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
