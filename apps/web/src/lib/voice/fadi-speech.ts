@@ -13,6 +13,12 @@ let audioEl: HTMLAudioElement | null = null;
 let speaking = false;
 const listeners = new Set<Listener>();
 
+// Once the cloud TTS endpoint returns a hard failure (no/expired key → 503), stop
+// hitting it on every utterance — flip to the browser voice for the rest of the session.
+let cloudTtsDown = false;
+// Warn exactly once when the platform has no speech voice at all (common on Linux).
+let warnedNoVoices = false;
+
 function emit(next: boolean) {
   if (next === speaking) return;
   speaking = next;
@@ -74,7 +80,17 @@ function browserFallback(text: string) {
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   const voice = pickMaleVoice();
-  if (voice) utterance.voice = voice;
+  if (voice) {
+    utterance.voice = voice;
+  } else if (!warnedNoVoices && window.speechSynthesis.getVoices().length === 0) {
+    // No system voice at all — the browser will make no sound. Say why, once.
+    warnedNoVoices = true;
+    console.warn(
+      "[Fadi] No system text-to-speech voice is available, so Fadi can't speak aloud. " +
+        "On Linux, install a speech engine (e.g. `sudo pacman -S speech-dispatcher espeak-ng`) " +
+        "and restart the browser — or switch on the upcoming local Kokoro voice.",
+    );
+  }
   utterance.rate = 1.0;
   utterance.onstart = () => emit(true);
   utterance.onend = () => emit(false);
@@ -88,29 +104,37 @@ export async function speakFadi(text: string): Promise<void> {
   if (!clean || typeof window === "undefined") return;
   stopFadiSpeech();
 
-  try {
-    const res = await fetch("/api/fadi/speak", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: clean }),
-    });
-    if (res.ok) {
-      const url = URL.createObjectURL(await res.blob());
-      const el = new Audio(url);
-      audioEl = el;
-      el.onplay = () => emit(true);
-      const done = () => {
-        emit(false);
-        URL.revokeObjectURL(url);
-        if (audioEl === el) audioEl = null;
-      };
-      el.onended = done;
-      el.onerror = done;
-      await el.play(); // may reject if autoplay isn't unlocked → fall through
-      return;
+  // Skip the cloud endpoint once it's known-down, so we don't fire a failing request
+  // (and log a 503) on every single utterance.
+  if (!cloudTtsDown) {
+    try {
+      const res = await fetch("/api/fadi/speak", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: clean }),
+      });
+      if (res.ok) {
+        const url = URL.createObjectURL(await res.blob());
+        const el = new Audio(url);
+        audioEl = el;
+        el.onplay = () => emit(true);
+        const done = () => {
+          emit(false);
+          URL.revokeObjectURL(url);
+          if (audioEl === el) audioEl = null;
+        };
+        el.onended = done;
+        el.onerror = done;
+        await el.play(); // may reject if autoplay isn't unlocked → fall through
+        return;
+      }
+      // A hard non-OK (e.g. 503: no/expired TTS key) means the cloud voice is
+      // unavailable this session — don't retry it every time.
+      cloudTtsDown = true;
+    } catch {
+      // Network error or an autoplay block — fall back this once, but DON'T disable
+      // the cloud path (autoplay unlocks after a user gesture; the key may be fine).
     }
-  } catch {
-    /* no cloud key, network error, or autoplay block → browser voice */
   }
   browserFallback(clean);
 }
