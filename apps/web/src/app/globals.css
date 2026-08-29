@@ -2,6 +2,12 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* The public portfolio renderer lives in a separate workspace package, which
+   Tailwind's auto-source detection does NOT scan. Without this, classes used only
+   there (e.g. the welcome-gate card bg, backdrop, and borders) never get generated
+   — the modal renders transparent/overlapping. Point Tailwind at the package. */
+@source "../../../../packages/portfolio/src";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
