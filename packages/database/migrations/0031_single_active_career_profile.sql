@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "career_profiles_one_active_per_user" ON "career_profiles" USING btree ("user_id") WHERE "career_profiles"."is_active";

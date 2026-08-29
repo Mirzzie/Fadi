@@ -218,6 +218,13 @@
       "when": 1786652977093,
       "tag": "0030_jobs_identity_and_occurrences",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1788021648811,
+      "tag": "0031_single_active_career_profile",
+      "breakpoints": true
     }
   ]
 }
