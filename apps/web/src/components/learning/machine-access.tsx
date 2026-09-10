@@ -307,6 +307,35 @@ function PendingAction({
         </pre>
       ))}
 
+      {/*
+        WHAT THE MACHINE SAYS WILL HAPPEN, as opposed to what the action intends.
+
+        "Start nginx" reads identically whether the image is on disk or about to come down
+        a metered connection, and whether the name is free or already taken. These lines
+        are that difference, and they are why this is an informed approval rather than a
+        polite one.
+      */}
+      {w.preflight.length > 0 ? (
+        <ul className="space-y-0.5">
+          {w.preflight.map((note) => (
+            <li
+              key={note.text}
+              className={
+                "flex items-start gap-1.5 text-[11px] " +
+                (note.kind === "warn"
+                  ? "text-amber-500"
+                  : note.kind === "unknown"
+                    ? "text-muted-foreground italic"
+                    : "text-muted-foreground")
+              }
+            >
+              <span aria-hidden="true">{note.kind === "warn" ? "!" : note.kind === "unknown" ? "?" : "·"}</span>
+              <span>{note.text}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
       <p className="text-[11px] text-muted-foreground">
         Asked by {ACTOR_LABEL[w.actor] ?? w.actor}
         {w.origin ? " (" + w.origin + ")" : ""}.

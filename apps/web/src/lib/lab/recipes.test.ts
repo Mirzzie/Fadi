@@ -159,11 +159,34 @@ describe("the prefix cannot be escaped", () => {
 });
 
 describe("proposing runs nothing", () => {
-  it("touches the machine only after a person approves", async () => {
+  it("CHANGES nothing on the machine before a person approves", async () => {
     const res = await propose_({ image: "nginx", name: "web", port: 8080 });
     expect(res.ok).toBe(true);
-    // The whole asymmetry in one assertion.
-    expect(execFileMock).not.toHaveBeenCalled();
+
+    // This assertion used to be "execFile is never called", which stopped being true when
+    // preflight arrived — proposing now READS the machine so the prompt can say what will
+    // actually change. The invariant that matters was never "calls nothing"; it is
+    // "changes nothing", so that is what is asserted, precisely rather than loosely.
+    const mutating = ["run", "rm", "stop", "start", "create", "kill", "exec", "pull", "build"];
+    for (const call of execFileMock.mock.calls) {
+      const args = call[1] as string[];
+      expect(args.some((a) => mutating.includes(a)), args.join(" ")).toBe(false);
+    }
+  });
+
+  it("preflight can only ever look — no mutating verb exists in the file", async () => {
+    // Structural, because preflight runs WITHOUT approval: it is what makes approval
+    // informed, so it must never be able to change anything. A behavioural test would pass
+    // on a version that had grown one dangerous branch nobody exercised.
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const src = readFileSync(join(process.cwd(), "src/lib/lab/preflight.ts"), "utf8");
+
+    for (const verb of ['"run"', '"rm"', '"stop"', '"start"', '"create"', '"exec"', '"pull"', '"kill"', '"build"']) {
+      expect(src, "preflight must not contain " + verb).not.toContain(verb);
+    }
+    expect(src).not.toMatch(/writeFile|unlink|rmdir|mkdir/);
+    expect(src).not.toMatch(/\bspawn\s*\(|shell\s*:\s*true/);
   });
 
   it("records a proposal as something that did NOT happen", async () => {

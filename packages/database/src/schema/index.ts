@@ -1221,6 +1221,19 @@ export const labActionRequests = pgTable(
     summary: text("summary").notNull(),
     /** How to undo it, shown in the same breath. */
     reversal: text("reversal"),
+    /**
+     * WHAT WILL ACTUALLY CHANGE, checked against the machine before asking.
+     *
+     * Approving a description is not approving an effect. "Start nginx" reads the same
+     * whether the image is already here or about to be pulled over a metered connection,
+     * whether the name is free or already taken, whether the port is in use. These notes
+     * are the difference, read from the machine at the moment of proposing.
+     *
+     * Stored rather than recomputed on every render: the prompt lives minutes, the panel
+     * polls every fifteen seconds, and re-running docker inspect that often to keep a
+     * sentence fresh would be worse than saying when it was checked.
+     */
+    preflight: jsonb("preflight").notNull().default([]),
     /** Who asked: user | model | mcp | agent. */
     actor: text("actor").notNull(),
     origin: text("origin"),

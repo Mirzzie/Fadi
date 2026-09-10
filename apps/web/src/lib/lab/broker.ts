@@ -593,6 +593,8 @@ export type Proposal =
       policy: Policy;
       /** What the person must type, when the policy says typing. */
       confirmToken: string;
+      /** What the machine says will actually change. */
+      preflight: Array<{ kind: string; text: string }>;
     }
   | { ok: false; message: string };
 
@@ -727,6 +729,16 @@ export async function proposeAction(input: {
   const commands = recipe.render(params);
   const argv = commands.map(displayOf);
 
+  // Asked BEFORE the prompt is written, so what the person reads includes what the machine
+  // says will happen — not only what the recipe intends. Read-only, and never a reason to
+  // refuse: a machine that will not answer is a missing note, not a blocked action.
+  const { preflightFor } = await import("./preflight");
+  const preflight = await preflightFor({
+    userId: input.userId,
+    recipe: input.recipe,
+    params,
+  });
+
   const row = await requests.propose({
     userId: input.userId,
     recipe: input.recipe,
@@ -734,6 +746,7 @@ export async function proposeAction(input: {
     argv,
     summary: recipe.summary(params),
     reversal: recipe.reversal(params),
+    preflight,
     actor: input.actor,
     origin: input.origin,
     // The policy sets the lifetime: what cannot be undone gets less time to sit on screen
@@ -766,6 +779,7 @@ export async function proposeAction(input: {
     argv,
     policy,
     confirmToken: recipe.confirmToken(params),
+    preflight,
   };
 }
 

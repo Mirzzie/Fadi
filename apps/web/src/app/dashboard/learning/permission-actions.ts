@@ -214,6 +214,8 @@ export type PendingActionView = {
   confirmToken: string;
   blast: string;
   reversibility: string;
+  /** What the machine said would change, checked when this was proposed. */
+  preflight: Array<{ kind: string; text: string }>;
 };
 
 export async function listPendingActions(): Promise<{
@@ -251,6 +253,7 @@ export async function listPendingActions(): Promise<{
         expiresAt: r.expiresAt.toISOString(),
         confirm: policy.confirm,
         confirmToken: recipe && params ? recipe.confirmToken(params) : "",
+        preflight: (r.preflight as Array<{ kind: string; text: string }>) ?? [],
         blast: policy.blast,
         reversibility: policy.reversibility,
       };
