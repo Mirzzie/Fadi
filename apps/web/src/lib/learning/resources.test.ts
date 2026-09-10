@@ -24,36 +24,62 @@ describe("learningResources", () => {
     expect(learningResources("Service Management").roadmap).toBe("https://roadmap.sh/devops");
   });
 
-  it("KNOWN AMBIGUITY: 'analyst' wins over 'support', so a service-desk analyst gets data-analyst", () => {
-    // Pinning current behaviour, NOT endorsing it. The `analyst` rule precedes the
-    // support→devops rule, so "Service Desk Analyst" routes to the data-analytics
-    // roadmap — plausibly wrong for an IT service-desk role. Left as-is deliberately:
-    // reordering to fix this would misroute genuine data analysts, and which matters
-    // more is a product call, not a bug fix. This test exists so the tradeoff is
-    // visible and any future reorder is a conscious change, not an accident.
-    expect(learningResources("Service Desk Analyst").roadmap).toBe(
-      "https://roadmap.sh/data-analyst",
+  it("RESOLVED (was a pinned ambiguity): a service-desk analyst now routes to devops", () => {
+    // This used to assert data-analyst, pinned with a comment calling it "plausibly
+    // wrong": the bare `analyst` rule outranked the support→devops rule. Requiring
+    // discriminative tokens ("data analyst", not bare "analyst") fixes it as a side
+    // effect — the IT service-desk role now gets the IT roadmap, and a genuine data
+    // analyst still matches on "data analyst".
+    expect(learningResources("Service Desk Analyst").roadmap).toBe("https://roadmap.sh/devops");
+    expect(learningResources("Data Analyst").roadmap).toBe("https://roadmap.sh/data-analyst");
+  });
+
+  it("offers NO roadmap for a skill outside software — an absent link beats a wrong one", () => {
+    // roadmap.sh is entirely software. Sending a nurse, a site engineer or a teacher
+    // there told them the tool was not built for them; the old fallback did exactly that.
+    expect(learningResources("underwater basket weaving").roadmap).toBeNull();
+    expect(learningResources("Venepuncture").roadmap).toBeNull();
+    expect(learningResources("Structural steel design").roadmap).toBeNull();
+    expect(learningResources("Phonics instruction").roadmap).toBeNull();
+  });
+
+  it("phrases practice the way the field actually practises", () => {
+    // Software builds things; clinical, teaching and legal skills are practised
+    // through worked examples. "Build a venepuncture project" is nonsense.
+    expect(learningResources("Kubernetes").practice).toContain(
+      encodeURIComponent("build a Kubernetes project"),
+    );
+    expect(learningResources("Venepuncture").practice).toContain(
+      encodeURIComponent("Venepuncture practice exercises worked examples"),
     );
   });
 
-  it("falls back to the roadmap index for an unrecognised skill", () => {
-    expect(learningResources("underwater basket weaving").roadmap).toBe(
-      "https://roadmap.sh/roadmaps",
-    );
+  it("still serves the field-neutral links for any career", () => {
+    for (const skill of ["Venepuncture", "Structural steel design", "Safeguarding"]) {
+      const l = learningResources(skill);
+      expect(l.youtube).toMatch(/^https:\/\//);
+      expect(l.courses).toMatch(/^https:\/\//);
+      expect(l.practice).toMatch(/^https:\/\//);
+    }
   });
 
   it("URL-encodes the skill into the search links", () => {
-    const links = learningResources("C++ & data");
-    expect(links.youtube).toContain(encodeURIComponent("C++ & data full course tutorial"));
-    expect(links.courses).toContain(encodeURIComponent("C++ & data"));
-    expect(links.project).toContain(encodeURIComponent("build a C++ & data project"));
+    // Uses a skill that genuinely matches software, so the "build a project" phrasing
+    // is exercised alongside the encoding.
+    const links = learningResources("C++ & Docker");
+    expect(links.youtube).toContain(encodeURIComponent("C++ & Docker full course tutorial"));
+    expect(links.courses).toContain(encodeURIComponent("C++ & Docker"));
+    expect(links.practice).toContain(encodeURIComponent("build a C++ & Docker project"));
     // Never emit a raw space or ampersand that would break the URL.
     expect(links.courses).not.toMatch(/[ &]/);
   });
 
-  it("always returns all four resource links", () => {
+  it("always returns the four resource keys; only roadmap may be null", () => {
     const links = learningResources("anything");
-    expect(Object.keys(links).sort()).toEqual(["courses", "project", "roadmap", "youtube"]);
-    for (const url of Object.values(links)) expect(url).toMatch(/^https:\/\//);
+    expect(Object.keys(links).sort()).toEqual(["courses", "practice", "roadmap", "youtube"]);
+    for (const [key, url] of Object.entries(links)) {
+      if (key === "roadmap" && url === null) continue;
+      expect(url).toMatch(/^https:\/\//);
+    }
   });
 });

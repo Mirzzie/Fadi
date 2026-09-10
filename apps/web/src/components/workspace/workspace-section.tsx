@@ -7,6 +7,7 @@ import {
   ClipboardCheck,
   Flag,
   Gauge,
+  ListOrdered,
   MessageSquareQuote,
   PenLine,
   type LucideIcon,
@@ -25,6 +26,7 @@ const ICONS: Record<string, LucideIcon> = {
   interview: MessageSquareQuote,
   company: Building2,
   outcome: Flag,
+  lead: ListOrdered,
 };
 
 export type WorkspaceSectionIcon = keyof typeof ICONS;

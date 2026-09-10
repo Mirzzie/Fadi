@@ -48,7 +48,10 @@ export async function POST(req: Request) {
     return withCors(NextResponse.json({ ok: false, error: "invalid" }, { status: 400 }), origin);
   }
   try {
-    await createEvidenceRepository(getDatabase()).create(user.id, {
+    // Through the gate, like every other door. Capturing the same win twice from two
+    // pages is the extension's most likely failure mode, not its rarest.
+    const { admitEvidence } = await import("@/lib/identity/admit");
+    await admitEvidence(user.id, {
       kind: "achievement",
       title: parsed.data.title,
       detail: parsed.data.detail,

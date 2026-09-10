@@ -14,10 +14,13 @@ import { cn } from "@/lib/utils";
  *  button below — one concept, one control, no duplicate.) */
 function ResourceLinks({ skill }: { skill: string }) {
   const r = learningResources(skill);
+  // roadmap.sh is software-only, so it is offered ONLY when the skill actually
+  // matches one. Every other field gets the neutral links without a dead end.
   const items = [
-    { href: r.roadmap, label: "Roadmap", icon: Map },
+    ...(r.roadmap ? [{ href: r.roadmap, label: "Roadmap", icon: Map }] : []),
     { href: r.youtube, label: "Tutorials", icon: MonitorPlay },
     { href: r.courses, label: "Free courses", icon: GraduationCap },
+    { href: r.practice, label: "Practise it", icon: GraduationCap },
   ];
   return (
     <div className="mt-3 flex flex-wrap gap-1.5">

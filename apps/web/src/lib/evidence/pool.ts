@@ -80,7 +80,7 @@ const MIN_FUZZY = 5;
  * one would smuggle in a "tech" assumption this platform must never make). Genuine
  * synonymy is the model's job at extract time — see `marketTags`.
  */
-function termMatches(token: string, trackTerms: ReadonlySet<string>): boolean {
+export function termMatches(token: string, trackTerms: ReadonlySet<string>): boolean {
   if (trackTerms.has(token)) return true;
   for (const term of trackTerms) {
     const [short, long] = token.length <= term.length ? [token, term] : [term, token];
@@ -93,12 +93,19 @@ function termMatches(token: string, trackTerms: ReadonlySet<string>): boolean {
   return false;
 }
 
-function tokens(text: string): string[] {
+export function tokens(text: string): string[] {
   return text
     .toLowerCase()
     .replace(/[^a-z0-9+#.\s-]/g, " ")
     .split(/[\s-]+/)
-    .map((w) => w.trim())
+    // Interior dots are meaningful ("node.js", ".net") so the character class keeps
+    // them — but a TRAILING dot is only ever sentence punctuation, and leaving it on
+    // silently breaks exact matching for every short acronym that ends a sentence.
+    // "…in our SIEM." tokenised to "siem.", which never equals the market tag "siem"
+    // and is too short (4 < MIN_FUZZY) to fuzzy-match, so the hit was lost outright.
+    // Costs any acronym-heavy field its best matches: SIEM/SQL/AWS, and equally
+    // ICU/CPR/PPE/VAT.
+    .map((w) => w.trim().replace(/\.+$/, ""))
     .filter((w) => w.length > 2 && !STOP.has(w));
 }
 
@@ -266,6 +273,11 @@ export type ExtractResult =
   | { ok: true; items: EvidenceView[] }
   | { ok: false; reason: "no_evidence" | "no_provider" | "empty"; message: string };
 
+// The marker lives with the gate that sets it (lib/identity/admit), so there is one
+// definition rather than two that can drift.
+import { UNCONFIRMED_LINK } from "@/lib/identity/admit";
+export { UNCONFIRMED_LINK };
+
 export async function extractEvidencePool(userId: string): Promise<ExtractResult> {
   const [{ getCareerReportContext }, { composeCareerEvidence }, { getUserDocGenerate }, { createEvidenceRepository }, { getDatabase }] =
     await Promise.all([
@@ -310,21 +322,32 @@ export async function extractEvidencePool(userId: string): Promise<ExtractResult
     return { ok: false, reason: "empty", message: "Not enough concrete detail in your history yet — add more to your LinkedIn/résumé and try again." };
   }
 
-  const repo = createEvidenceRepository(getDatabase());
-  const created = await repo.createMany(
+  // ONE GATE (lib/identity/admit). This function used to carry its own copy of the
+  // resolve-before-create logic, which is how it drifted: the copy here only suppressed
+  // a confident "same" while every real duplicate scored "maybe". Extraction now hands
+  // candidates to the same gate the extension, the manual form and the learning path
+  // use, so a duplicate is impossible to create through one door and not another.
+  const { admitEvidenceBatch } = await import("@/lib/identity/admit");
+  const { created, absorbed, uncertain } = await admitEvidenceBatch(
     userId,
     clean.map((i) => ({
       kind: normKind(i.kind),
-      title: i.title.trim(),
-      organization: i.organization?.trim() || null,
-      period: i.period?.trim() || null,
-      detail: (i.detail ?? "").trim(),
-      metrics: i.metrics?.trim() || null,
-      tags: (i.tags ?? []).map((t) => t.toLowerCase().trim()).filter(Boolean).slice(0, 8),
-      marketTags: (i.marketTags ?? []).map((t) => t.toLowerCase().trim()).filter(Boolean).slice(0, 8),
+      title: i.title,
+      organization: i.organization ?? null,
+      period: i.period ?? null,
+      detail: i.detail ?? null,
+      metrics: i.metrics ?? null,
+      tags: i.tags ?? [],
+      marketTags: i.marketTags ?? [],
       origin: "ai",
     })),
   );
+
+  if (absorbed > 0) {
+    const { logger } = await import("@/lib/observability/logger");
+    logger.info("evidence.rewordings_absorbed", { userId, count: absorbed, uncertain });
+  }
+
   return { ok: true, items: created.map(toEvidenceView) };
 }
 

@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
+
+import { hasArtifact, unbackedSkills } from "@careeros/portfolio";
 import { useRouter } from "next/navigation";
 import {
   Code2,
@@ -12,8 +14,10 @@ import {
   Plus,
   Rocket,
   Settings,
+  ShieldCheck,
   Sparkles,
   Upload,
+  Crosshair,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -21,6 +25,7 @@ import { GithubPublishPanel } from "@/components/portfolio/github-publish";
 import { HistoryCapture } from "@/components/evidence/history-capture";
 import {
   checkIntegrity,
+  confirmPortfolioItems,
   deleteItem,
   exportPortfolio,
   importPortfolio,
@@ -31,9 +36,11 @@ import {
   setSitePublished,
   syncFromEvidence,
   updateSiteSettings,
+  listDismissed,
+  undismissFact,
 } from "@/app/dashboard/portfolio/actions";
 import {
-  findDuplicates,
+  findAllDuplicates,
   type IntegrityFinding,
   type PortfolioItemView,
   type PortfolioSiteView,
@@ -43,6 +50,8 @@ import { DeveloperModal } from "./developer-modal";
 import { IntegrityPanel } from "./integrity-panel";
 import { ItemCard } from "./item-card";
 import { ItemEditor } from "./item-editor";
+import { AudienceModal } from "./audience-modal";
+import { FocusModal } from "./focus-modal";
 import { Modal } from "./modal";
 import { SettingsModal } from "./settings-modal";
 import { SECTION_KEYS, SECTION_META, emptyForm, toForm, type ItemForm } from "./shared";
@@ -73,6 +82,23 @@ export function PortfolioManager({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [devOpen, setDevOpen] = useState(false);
   const [githubOpen, setGithubOpen] = useState(false);
+  const [focusOpen, setFocusOpen] = useState(false);
+  const [audienceOpen, setAudienceOpen] = useState(false);
+  // What the user told Sync to stop bringing back. A decision they cannot reverse is
+  // a trap, so it is listed and undoable rather than buried in a jsonb column.
+  const [dismissed, setDismissed] = useState<{ factId: string; title: string }[]>([]);
+  useEffect(() => {
+    void listDismissed().then((r) => setDismissed(r.ok ? r.dismissed : []));
+  }, [items]);
+
+  // The work-index template refuses to list a skill no work backs, and shows a case
+  // with no artefact as a gap. Both are deliberate — but the owner has to be able to
+  // SEE them, or the page quietly gets thinner than they realise.
+  const unbacked = useMemo(() => unbackedSkills(items), [items]);
+  const unproven = useMemo(
+    () => items.filter((i) => i.section === "project" && !hasArtifact(i)),
+    [items],
+  );
   const [dragId, setDragId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -81,7 +107,10 @@ export function PortfolioManager({
   // exact content it ran against, so a later edit invalidates it — derived, no effect needed.
   const [checking, setChecking] = useState(false);
   const [ai, setAi] = useState<{ key: string; findings: IntegrityFinding[]; note: string | null } | null>(null);
-  const dupFindings = useMemo(() => findDuplicates(items), [items]);
+  // findAllDuplicates, not findDuplicates: the section-scoped pass alone cannot see
+  // a job that was also written up as a project, which is where every real duplicate
+  // in this portfolio was hiding.
+  const dupFindings = useMemo(() => findAllDuplicates(items), [items]);
   const titleById = useMemo(() => new Map(items.map((i) => [i.id, i.title])), [items]);
   const itemsKey = useMemo(
     () => items.map((i) => `${i.id}:${i.title}:${i.subtitle ?? ""}:${i.dateRange ?? ""}`).join("|"),
@@ -142,7 +171,10 @@ export function PortfolioManager({
       }
       setNotice(
         r.added > 0
-          ? `Added ${r.added} item${r.added === 1 ? "" : "s"} from your evidence.`
+          ? `Added ${r.added} item${r.added === 1 ? "" : "s"} from your evidence.` +
+            (r.nearMatches > 0
+              ? ` Held back ${r.nearMatches} that already look like work on your site — Fadi will ask about ${r.nearMatches === 1 ? "it" : "them"} rather than adding a second copy.`
+              : "")
           : "You're all synced — no new evidence to add.",
       );
       router.refresh();
@@ -260,6 +292,15 @@ export function PortfolioManager({
           >
             <ExternalLink className="size-4" /> Preview site
           </Button>
+          <Button size="sm" variant="outline" onClick={() => setAudienceOpen(true)}>
+            <Eye className="size-4" aria-hidden="true" />
+            Who&apos;s looking
+          </Button>
+          {/* One direction, one claim — the antidote to a site that spans four. */}
+          <Button size="sm" variant="outline" onClick={() => setFocusOpen(true)} disabled={items.length === 0}>
+            <Crosshair className="size-4" aria-hidden="true" />
+            Focus
+          </Button>
           <Button size="sm" variant="outline" onClick={() => setGithubOpen(true)}>
             <Rocket className="size-4" /> Host on the web
           </Button>
@@ -313,6 +354,60 @@ export function PortfolioManager({
         </div>
       ) : null}
 
+      {dismissed.length > 0 && (
+        <div className="mb-6 rounded-2xl border border-border bg-muted/20 p-4">
+          <p className="text-sm font-medium">
+            Not shown, by your choice ({dismissed.length})
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Sync will not bring these back — including if the same work turns up again worded
+            differently.
+          </p>
+          <ul className="mt-2 flex flex-wrap gap-2">
+            {dismissed.map((d) => (
+              <li key={d.factId}>
+                <button
+                  type="button"
+                  onClick={() =>
+                    run(async () => {
+                      await undismissFact({ factId: d.factId });
+                      return { ok: true };
+                    })
+                  }
+                  className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground hover:border-primary/50 hover:text-foreground"
+                  title="Allow Sync to offer this again"
+                >
+                  {d.title} <span className="opacity-60">· undo</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {(unproven.length > 0 || unbacked.length > 0) && (
+        <div className="mb-6 space-y-2 rounded-2xl border border-warning/30 bg-warning/5 p-4">
+          <p className="text-sm font-medium">What your public page is missing</p>
+          {unproven.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              <span className="text-foreground">{unproven.length} project{unproven.length === 1 ? " has" : "s have"} no artefact</span>{" "}
+              — {unproven.slice(0, 4).map((i) => i.title).join(", ")}
+              {unproven.length > 4 ? `, +${unproven.length - 4} more` : ""}. They show as an honest
+              gap rather than padded prose. A screenshot, diagram, repo or write-up fixes each one.
+            </p>
+          )}
+          {unbacked.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              <span className="text-foreground">{unbacked.length} skill{unbacked.length === 1 ? " is" : "s are"} unbacked</span>{" "}
+              — {unbacked.slice(0, 6).join(", ")}
+              {unbacked.length > 6 ? `, +${unbacked.length - 6} more` : ""}. These are hidden from
+              visitors on purpose: a skill no work demonstrates is a claim. Tag the work that proves
+              each one and it appears in the filter.
+            </p>
+          )}
+        </div>
+      )}
+
       {error && (
         <div className="mb-6 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {error}
@@ -324,8 +419,57 @@ export function PortfolioManager({
         </div>
       )}
 
+      {/* WAITING FOR A LOOK.
+          The gate keeps automatically-collected rows off the public site — which is
+          only honest if the owner can see what is being held and why. A gate the user
+          cannot see is just a feature that loses their work. */}
+      {(() => {
+        const waiting = items.filter((i) => i.confirmedAt === null);
+        if (waiting.length === 0) return null;
+        return (
+          <div className="mb-6 rounded-xl border border-primary/30 bg-primary/5 p-4">
+            <div className="flex flex-wrap items-center gap-2">
+              <ShieldCheck className="size-4 text-primary" aria-hidden="true" />
+              <h3 className="text-sm font-semibold">
+                {waiting.length} {waiting.length === 1 ? "item is" : "items are"} waiting for you
+              </h3>
+            </div>
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              Fadi collected {waiting.length === 1 ? "this" : "these"} automatically, so
+              {waiting.length === 1 ? " it is" : " they are"} not on your public site yet. Your live
+              site only ever shows what you have looked at — which is what lets the rest of Fadi keep
+              changing without putting it at risk.
+            </p>
+            <p className="mt-2 text-xs">
+              {waiting.slice(0, 6).map((i) => i.title).join(" · ")}
+              {waiting.length > 6 ? ` +${waiting.length - 6} more` : ""}
+            </p>
+            <div className="mt-3 flex justify-end">
+              <Button
+                size="sm"
+                disabled={pending}
+                onClick={() =>
+                  run(() => confirmPortfolioItems({ ids: waiting.map((i) => i.id) }))
+                }
+              >
+                <ShieldCheck className="size-4" aria-hidden="true" />
+                Put {waiting.length === 1 ? "it" : "them"} on my site
+              </Button>
+            </div>
+          </div>
+        );
+      })()}
+
       {items.length > 0 && (
         <IntegrityPanel
+          onResolve={({ dropId, mode }) =>
+            run(() =>
+              mode === "delete"
+                ? deleteItem({ id: dropId })
+                : setItemPublished({ id: dropId, published: false }),
+            )
+          }
+          resolving={pending}
           findings={allFindings}
           checking={checking}
           aiRan={Boolean(aiValid)}
@@ -485,6 +629,12 @@ export function PortfolioManager({
 
       {devOpen && (
         <DeveloperModal handle={handle} published={isPublished} onClose={() => setDevOpen(false)} />
+      )}
+
+      {audienceOpen && <AudienceModal onClose={() => setAudienceOpen(false)} />}
+
+      {focusOpen && (
+        <FocusModal onClose={() => setFocusOpen(false)} onDone={() => router.refresh()} />
       )}
 
       {githubOpen && (

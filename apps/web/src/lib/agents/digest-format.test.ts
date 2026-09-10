@@ -50,3 +50,32 @@ describe("composeDigestSubline", () => {
     expect(line).not.toContain("roles");
   });
 });
+
+describe("coherence findings in the digest", () => {
+  const gap = {
+    kind: "portfolio_gap",
+    title: "IT Support Consultant isn't on your portfolio",
+    detail: "Your résumé has this at Spark Technomedia (Jan 2026 – Aug 2026).",
+  };
+  const dupe = { kind: "portfolio_duplicate", title: "Two entries look like the same project", detail: null };
+
+  it("files them under the user's own record, not under market news", () => {
+    const msg = composeDigestMessage([gap, dupe]);
+
+    expect(msg).toContain("Your own record");
+    expect(msg).toContain("IT Support Consultant");
+    expect(msg).not.toContain("Bigger picture");
+  });
+
+  it("counts them in the spoken subline", () => {
+    expect(composeDigestSubline([gap, dupe])).toMatch(/2 things to fix in your own record/);
+  });
+
+  it("says so plainly when a pass found nothing", () => {
+    // The old subline built a sentence around an empty list: "I found . The details
+    // are in our chat." Nothing found is a real result and has to read like one.
+    expect(composeDigestSubline([])).toBe(
+      "While you were away I ran a pass and found nothing new.",
+    );
+  });
+});

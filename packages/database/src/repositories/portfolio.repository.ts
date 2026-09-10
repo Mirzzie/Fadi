@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
 
 import type { Database } from "../client";
 import {
@@ -150,15 +150,31 @@ export function createPortfolioRepository(db: Database) {
           | "gallery"
           | "sortOrder"
           | "isPublished"
+          | "confirmedAt"
         >
       >,
     ): Promise<PortfolioItem | null> {
+      // EDITING IS CONFIRMING. The owner had the row open and changed it, so there is
+      // nothing further to ask — requiring a second, separate confirmation for work
+      // they just did by hand would be the kind of ceremony that trains people to
+      // click past it.
       const [updated] = await db
         .update(portfolioItems)
-        .set({ ...patch, updatedAt: new Date() })
+        .set({ confirmedAt: new Date(), ...patch, updatedAt: new Date() })
         .where(and(eq(portfolioItems.id, id), eq(portfolioItems.userId, userId)))
         .returning();
       return updated ?? null;
+    },
+
+    /** Confirm rows that arrived automatically — the one action the gate needs. */
+    async confirmItems(userId: string, ids: string[]): Promise<number> {
+      if (ids.length === 0) return 0;
+      const rows = await db
+        .update(portfolioItems)
+        .set({ confirmedAt: new Date(), updatedAt: new Date() })
+        .where(and(eq(portfolioItems.userId, userId), inArray(portfolioItems.id, ids)))
+        .returning({ id: portfolioItems.id });
+      return rows.length;
     },
 
     async deleteItem(userId: string, id: string): Promise<void> {
@@ -221,10 +237,19 @@ export function createPortfolioRepository(db: Database) {
         .limit(1);
       if (!site) return null;
 
+      // THE PUBLISH GATE. Published AND confirmed — a row that arrived automatically
+      // and has never been looked at does not reach a stranger, however much the rest
+      // of the platform is still moving underneath it.
       const items = await db
         .select()
         .from(portfolioItems)
-        .where(and(eq(portfolioItems.siteId, site.id), eq(portfolioItems.isPublished, true)))
+        .where(
+          and(
+            eq(portfolioItems.siteId, site.id),
+            eq(portfolioItems.isPublished, true),
+            isNotNull(portfolioItems.confirmedAt),
+          ),
+        )
         .orderBy(asc(portfolioItems.section), asc(portfolioItems.sortOrder));
 
       return { site, items };

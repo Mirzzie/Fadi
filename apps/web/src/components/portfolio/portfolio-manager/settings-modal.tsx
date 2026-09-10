@@ -10,10 +10,33 @@ import { Textarea } from "@/components/ui/textarea";
 import { uploadPortfolioMedia } from "@/lib/portfolio/upload";
 import type { PortfolioSiteView } from "@careeros/portfolio";
 
+import { DEFAULT_LABELS, LABEL_KEYS, labelsFor } from "@careeros/portfolio";
+
 import { Modal } from "./modal";
 import { RESUME_KEYS } from "./shared";
 
-/** Site-level settings: title/handle, template, profile, contact, and per-role résumés. */
+/** Human names for each editable heading, so the form isn't a list of code keys. */
+const LABEL_TITLES: Record<string, string> = {
+  featured: "Featured work heading",
+  skills: "Skills section heading",
+  skillsHint: "Skills section hint",
+  history: "Work history heading",
+  historyHint: "Work history hint",
+  education: "Education heading",
+  certifications: "Certifications heading",
+  beyond: "Hobbies heading",
+  beyondHint: "Hobbies hint",
+  note: "Feedback heading",
+  noteHint: "Feedback hint",
+  contact: "Contact heading",
+  caseCta: "Case link — button text",
+  detailCta: "Detail link — button text",
+  bookingCta: "Booking button text",
+  contactCta: "Contact button text",
+  gap: "Label for work with no proof yet",
+};
+
+/** Site-level settings: title/handle, profile, contact, page wording, and per-role résumés. */
 export function SettingsModal({
   site,
   handle,
@@ -29,7 +52,9 @@ export function SettingsModal({
     handle: string;
     title: string;
     headline?: string;
+    bookingUrl?: string;
     template?: string;
+    labels?: Record<string, string>;
     resumeLinks?: Record<string, string>;
     profile?: Record<string, unknown>;
   }) => void;
@@ -44,7 +69,14 @@ export function SettingsModal({
   const [title, setTitle] = useState(site.title);
   const [handleInput, setHandleInput] = useState(handle);
   const [headline, setHeadline] = useState(site.headline ?? "");
-  const [template, setTemplate] = useState(site.template || "noir-gold");
+  const [bookingUrl, setBookingUrl] = useState(
+    ((site.profile as { bookingUrl?: string } | undefined)?.bookingUrl ?? ""),
+  );
+  // Every heading on the public page, editable. Seeded with what the page currently
+  // shows so the fields are never mysteriously blank.
+  const [labels, setLabels] = useState<Record<string, string>>(() => ({
+    ...labelsFor(site.theme as Record<string, unknown> | undefined),
+  }));
   const [resumeLinks, setResumeLinks] = useState<Record<string, string>>(site.resumeLinks ?? {});
   const [name, setName] = useState(p.name ?? "");
   const [location, setLocation] = useState(p.location ?? "");
@@ -79,13 +111,14 @@ export function SettingsModal({
       handle: handleInput,
       title,
       headline,
-      template,
+      labels,
       resumeLinks,
       profile: {
         name: name.trim(),
         location: location.trim(),
         bio: bio.trim(),
         email: email.trim(),
+        bookingUrl: bookingUrl.trim(),
         links: linksText.split("\n").map((l) => l.trim()).filter(Boolean),
       },
     });
@@ -121,31 +154,15 @@ export function SettingsModal({
         </div>
         <div className="space-y-1.5">
           <Label>Headline</Label>
-          <Input value={headline} onChange={(e) => setHeadline(e.target.value)} placeholder="e.g. IT Support · Cloud · Cybersecurity" />
-        </div>
-        <div className="space-y-1.5">
-          <Label>Template</Label>
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { id: "noir-gold", name: "Noir & Gold", swatch: "from-[#c9a84c]/40 to-zinc-900" },
-              { id: "aurora", name: "Aurora", swatch: "from-teal-400/40 to-violet-500/30" },
-              { id: "minimal", name: "Minimal", swatch: "from-zinc-700 to-zinc-900" },
-            ].map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTemplate(t.id)}
-                className={`overflow-hidden rounded-lg border text-left transition-colors ${
-                  template === t.id ? "border-primary" : "border-border hover:border-primary/50"
-                }`}
-              >
-                <div className={`h-12 bg-gradient-to-br ${t.swatch}`} />
-                <div className="px-2 py-1.5 text-xs">{t.name}</div>
-              </button>
-            ))}
-          </div>
+          <Input
+            value={headline}
+            onChange={(e) => setHeadline(e.target.value)}
+            placeholder="e.g. IT Operations &amp; Security Engineer"
+          />
           <p className="text-[11px] text-muted-foreground">
-            Same content, different look. Change it anytime — your data stays put.
+            One position, not a list. A headline that claims three disciplines at once reads as
+            unfocused to a recruiter or an examiner — the strongest thing you can do here is pick
+            the role you are applying for and say it plainly.
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -158,6 +175,19 @@ export function SettingsModal({
             <Input value={location} onChange={(e) => setLocation(e.target.value)} />
           </div>
         </div>
+        <div className="space-y-1.5">
+          <Label>Booking link (Calendly, Cal.com…)</Label>
+          <Input
+            value={bookingUrl}
+            onChange={(e) => setBookingUrl(e.target.value)}
+            placeholder="https://calendly.com/you/30min"
+          />
+          <p className="text-[11px] text-muted-foreground">
+            Adds a “Book a call” button to your site. A reader who wants to talk can take a slot
+            instead of composing an email and waiting — and the click is recorded as real interest.
+          </p>
+        </div>
+
         <div className="space-y-1.5">
           <Label>Contact email</Label>
           <Input
@@ -187,6 +217,33 @@ export function SettingsModal({
           <Label>Links (one per line)</Label>
           <Textarea rows={2} value={linksText} onChange={(e) => setLinksText(e.target.value)} placeholder={"https://github.com/you\nhttps://linkedin.com/in/you"} />
         </div>
+
+        <details className="rounded-lg border border-border p-3">
+          <summary className="cursor-pointer text-sm font-medium">
+            Page wording
+            <span className="ml-2 font-normal text-muted-foreground">
+              — rename any heading on your public page
+            </span>
+          </summary>
+          <div className="mt-3 grid gap-2.5">
+            {LABEL_KEYS.map((k) => (
+              <label key={k} className="grid gap-1">
+                <span className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                  {LABEL_TITLES[k] ?? k}
+                </span>
+                <Input
+                  value={labels[k] ?? ""}
+                  placeholder={DEFAULT_LABELS[k]}
+                  onChange={(e) => setLabels((prev) => ({ ...prev, [k]: e.target.value }))}
+                />
+              </label>
+            ))}
+            <p className="text-[11px] text-muted-foreground">
+              Clear a field to return it to the default. These are the words a visitor reads, so
+              use whatever your own field actually calls things.
+            </p>
+          </div>
+        </details>
 
         <div className="space-y-2 border-t border-border pt-4">
           <Label>Résumés per position</Label>

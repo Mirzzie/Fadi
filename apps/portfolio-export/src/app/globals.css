@@ -1,5 +1,12 @@
 @import "tailwindcss";
 
+/* Tailwind v4 scans ONLY what it is pointed at — it does not follow imports into sibling
+   workspace packages. The page renders <PortfolioTemplate> from @careeros/portfolio, so
+   without this line the whole template's classes are absent from the build: the export
+   deploys with valid-but-nearly-empty CSS and the live site is unstyled while every asset
+   returns 200. apps/web has the same line, which is why the preview looked right and only
+   the published site was broken. */
+@source "../../../../packages/portfolio/src";
 @source "../../../web/src/components/portfolio";
 @source "../";
 

@@ -1,0 +1,19 @@
+name = "fadi-portfolio-collector"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+# Free plan. No credit card, and since Sept 2026 the free tier fails closed rather
+# than billing — so this cannot generate a surprise charge.
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "fadi-portfolio-analytics"
+# Not a secret (unusable without your Cloudflare account credentials), which is why
+# Cloudflare's own docs commit it. IF YOU FORKED THIS REPO: replace it with your own
+# from `npx wrangler d1 create fadi-portfolio-analytics`, or the deploy will fail.
+database_id = "5be2fd17-d391-4273-87a2-801c843e15fd"
+
+# Secrets are NOT set here (this file is committed). Set them with:
+#   npx wrangler secret put VISITOR_SALT     — any long random string
+#   npx wrangler secret put EXPORT_TOKEN     — any long random string; Fadi uses it to pull

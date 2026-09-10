@@ -14,6 +14,7 @@ import {
 } from "@/lib/resilience/service";
 import type { RejectionInsight } from "@/lib/resilience/autopsy";
 import { evaluateFit, type FitResult } from "@/lib/jobs/fit";
+import { leadEvidenceForRole, type LeadDecision } from "@/lib/evidence/lead";
 import { prepareInterviewForJob, type PrepResult } from "@/lib/interview/jd-prep";
 import { prepareCompanyBrief, type BriefResult } from "@/lib/interview/company-brief";
 import {
@@ -411,5 +412,40 @@ export async function submitRejectionAutopsy(input: {
       error: error instanceof Error ? error.message : "unknown",
     });
     return { ok: false, message: "Something went wrong saving your reflection. Please try again." };
+  }
+}
+
+export type LeadEvidenceResult =
+  | { ok: true; decision: LeadDecision }
+  | { ok: false; message: string };
+
+/**
+ * "What should lead for THIS role?" — the complement to the fit gate.
+ *
+ * The fit gate answers whether to apply at all. This answers the question that
+ * actually shapes the application once you've decided to: which of your evidence
+ * goes first, what supports it, and what you deliberately hold back so the claim
+ * stays sharp. Grounded entirely in evidence the user already owns — it reorders,
+ * never invents, and never deletes.
+ */
+export async function chooseLeadEvidenceForJob(input: {
+  jobTitle: string;
+  jobDescription: string;
+}): Promise<LeadEvidenceResult> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  try {
+    const decision = await leadEvidenceForRole(user.id, {
+      title: input.jobTitle,
+      description: input.jobDescription,
+    });
+    return { ok: true, decision };
+  } catch (error) {
+    logger.error("applications.lead_evidence_failed", {
+      userId: user.id,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return { ok: false, message: "Couldn't work out what should lead. Try again." };
   }
 }

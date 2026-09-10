@@ -28,6 +28,12 @@ export type PortfolioItemView = {
   imageUrl: string | null;
   gallery: string[];
   isPublished: boolean;
+  /**
+   * Null = collected automatically and not yet looked at, so it is NOT on the public
+   * site. The manager shows these plainly; hiding them would trade one silent failure
+   * for another.
+   */
+  confirmedAt?: string | null;
 };
 
 // Interchange shape — matches the standalone portfolio's export JSON (snake_case)
@@ -88,6 +94,7 @@ export function toItemView(item: PortfolioItem): PortfolioItemView {
     imageUrl: item.imageUrl,
     gallery: item.gallery ?? [],
     isPublished: item.isPublished,
+    confirmedAt: item.confirmedAt ? new Date(item.confirmedAt).toISOString() : null,
   };
 }
 
