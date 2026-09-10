@@ -73,6 +73,25 @@ export function canonicalJobKey(
   return `${canonicalCompany(company)}|${norm(title)}|${canonicalCity(location)}`;
 }
 
+/**
+ * Conservative default identity for one provider occurrence.
+ *
+ * Company + title + city can suggest possible duplicates, but it cannot safely
+ * merge vacancies: one employer can advertise two requisitions with the same title
+ * in the same city. A stable provider id keeps those records apart. Callers with a
+ * verified cross-source identity may still pass `canonicalKey` explicitly.
+ */
+export function canonicalOccurrenceJobKey(
+  company: string | null | undefined,
+  title: string | null | undefined,
+  location: string | null | undefined,
+  source: string,
+  externalId: string,
+): string {
+  const content = canonicalJobKey(company, title, location);
+  return `${content}|source:${encodeURIComponent(source.trim().toLowerCase())}|id:${encodeURIComponent(externalId.trim())}`;
+}
+
 // UNAMBIGUOUS tracking params — safe to drop on ANY host. Deliberately excludes generic names
 // like `source`, `from`, `ref`, `src` which are real functional inputs on some ATS boards.
 // Host-specific noise (Indeed's rotating `bb`/`xkcb`/`fccid`/`vjs`) never reaches here because

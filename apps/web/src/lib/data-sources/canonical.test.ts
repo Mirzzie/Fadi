@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { canonicalizeUrl, canonicalJobKey } from "@careeros/database";
+import { canonicalizeUrl, canonicalJobKey, canonicalOccurrenceJobKey } from "@careeros/database";
 
 describe("canonicalJobKey", () => {
   it("collapses legal-suffix and punctuation variants of the same company", () => {
@@ -22,6 +22,24 @@ describe("canonicalJobKey", () => {
     expect(canonicalJobKey("Acme", "Software Engineer", "Dublin")).not.toBe(
       canonicalJobKey("Acme", "Software Engineer", "London")
     );
+  });
+});
+
+describe("canonicalOccurrenceJobKey", () => {
+  it("D12: preserves distinct requisitions with the same company, title and city", () => {
+    const first = canonicalOccurrenceJobKey("Acme", "Support Engineer", "Dublin", "board", "req-1");
+    const second = canonicalOccurrenceJobKey("Acme", "Support Engineer", "Dublin", "board", "req-2");
+
+    expect(first).not.toBe(second);
+  });
+
+  it("normalizes the source name but preserves the provider identifier", () => {
+    expect(
+      canonicalOccurrenceJobKey("Acme", "Support Engineer", "Dublin", " Board ", "Req-A"),
+    ).toBe(canonicalOccurrenceJobKey("Acme", "Support Engineer", "Dublin", "board", "Req-A"));
+    expect(
+      canonicalOccurrenceJobKey("Acme", "Support Engineer", "Dublin", "board", "Req-A"),
+    ).not.toBe(canonicalOccurrenceJobKey("Acme", "Support Engineer", "Dublin", "board", "req-a"));
   });
 });
 

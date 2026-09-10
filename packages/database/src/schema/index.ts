@@ -384,8 +384,9 @@ export const jobs = pgTable(
      */
     ownerUserId: uuid("owner_user_id").references(() => users.id, { onDelete: "cascade" }),
     /**
-     * Cross-source canonical identity (normalized company + title + city — see canonical.ts).
-     * THE dedupe key: one row per real vacancy per scope (public, or per private owner).
+     * Conservative vacancy identity. Automatic ingestion includes source + external id;
+     * a caller may provide a verified cross-source key. Company/title/city alone is a
+     * similarity signal and must not merge two distinct requisitions automatically.
      */
     canonicalKey: text("canonical_key").notNull(),
     title: text("title").notNull(),
@@ -417,10 +418,9 @@ export const jobs = pgTable(
     // Provenance lookup only — NOT unique. canonical_key is now THE dedupe identity; keeping a
     // unique here would spuriously reject a genuinely-new posting whose source recycles an id.
     index("jobs_source_external_id_idx").on(table.source, table.externalId),
-    // Dedupe identity is SCOPED: one canonical row per vacancy in the public catalog, and one
-    // per (owner, vacancy) for private captures — so a paste can't collide with the global
-    // catalog or with another user's private row. Two partial uniques, since a full unique on
-    // canonical_key alone would wrongly merge a user's private capture into the public row.
+    // Identity is SCOPED: one row per conservative key in the public catalog, and one
+    // per owner for private captures. Two partial indexes keep a paste from colliding
+    // with the public catalog or another user's private row.
     uniqueIndex("jobs_public_canonical_key_idx")
       .on(table.canonicalKey)
       .where(sql`${table.ownerUserId} is null`),
