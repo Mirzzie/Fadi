@@ -93,7 +93,7 @@ export function MachineAccess() {
         <span className="text-[11px] text-muted-foreground">
           {live.length === 0
             ? "Nothing is allowed right now."
-            : live.length + " capability" + (live.length === 1 ? "" : " capabilities") + " allowed"}
+            : live.length + (live.length === 1 ? " capability" : " capabilities") + " allowed"}
         </span>
         {live.length > 0 ? (
           <Button

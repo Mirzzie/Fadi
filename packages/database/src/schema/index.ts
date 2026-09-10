@@ -1261,6 +1261,20 @@ export const projectSteps = pgTable(
     produces: text("produces"),
     /** pending | done | skipped */
     status: text("status").notNull().default("pending"),
+    /**
+     * HOW it was completed — the distinction that keeps this honest.
+     *
+     *   attested  — the person clicked Done and recorded nothing. It happened, they say.
+     *   evidenced — they recorded what it produced. Still their claim, but there is
+     *               something to point at.
+     *   verified  — Fadi checked it against the machine itself.
+     *
+     * Without this column a run of six empty clicks is indistinguishable from six
+     * evenings of work, and the platform would go on to describe the first as
+     * achievement. "Never invent. Always claim." starts here: an attested step is a
+     * memory, and a memory is not evidence.
+     */
+    completion: text("completion"),
     /** The user's own note, or a path/link to what they produced. */
     artifact: text("artifact"),
     completedAt: timestamp("completed_at", { withTimezone: true }),

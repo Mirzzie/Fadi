@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Check, ChevronRight, Hammer, Loader2, Target } from "lucide-react";
+import { Check, ChevronRight, Hammer, Loader2, Target, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,8 @@ import {
   completeStepAction,
   listProjectRuns,
   planProjectAction,
+  reopenStepAction,
+  stopProjectRun,
   type RunView,
 } from "@/app/dashboard/learning/lab-actions";
 
@@ -82,14 +84,34 @@ function RunCard({ run, onChanged, pending }: { run: RunView; onChanged: () => v
         <span className="ml-auto font-mono text-[11px] tabular-nums text-muted-foreground">
           {done}/{run.steps.length}
         </span>
+        {/* A way out. A plan you cannot stop following is a plan that turns into guilt —
+            and the platform has no business holding someone to a project it suggested. */}
+        <StopProject run={run} onChanged={onChanged} />
       </div>
 
-      {/* Progress you can see, without a list you have to face. */}
-      <div className="mt-2 flex gap-1" aria-label={`${done} of ${run.steps.length} steps done`}>
+      {/* Progress you can see, without a list you have to face.
+
+          A step you ticked and a step that produced something are drawn differently. A
+          solid bar across six empty clicks is the same false claim as the copy underneath
+          it, just in a medium that is easier to believe. */}
+      <div className="mt-2 flex gap-1" aria-label={`${done} of ${run.steps.length} steps done, ${run.evidencedCount} with something to show`}>
         {run.steps.map((s) => (
           <span
             key={s.id}
-            className={`h-1 flex-1 rounded-full ${s.status === "done" ? "bg-primary" : "bg-border"}`}
+            title={
+              s.status !== "done"
+                ? "Not started"
+                : s.completion === "attested"
+                  ? "Marked done — nothing recorded"
+                  : "Produced: " + (s.artifact ?? "")
+            }
+            className={`h-1 flex-1 rounded-full ${
+              s.status !== "done"
+                ? "bg-border"
+                : s.completion === "attested"
+                  ? "bg-primary/30"
+                  : "bg-primary"
+            }`}
           />
         ))}
       </div>
@@ -137,15 +159,122 @@ function RunCard({ run, onChanged, pending }: { run: RunView; onChanged: () => v
           </div>
           {/* Recording the artefact is what makes this evidence later, so it is asked
               for every time rather than at the end when nobody remembers. */}
+          {/* Not called "optional" any more. It is still allowed to be empty — sometimes
+              you did the thing and there is genuinely nothing to paste — but the sentence
+              now says what an empty one costs, at the moment the choice is made rather
+              than at the end when the project claims to be evidence. */}
           <p className="mt-1.5 text-[11px] text-muted-foreground">
-            Optional, but this is what turns the finished project into something you can show.
+            {artifact.trim()
+              ? "This is what makes the step showable later."
+              : "Leave it empty and this step is marked done on your word alone — it won't count as evidence."}
           </p>
         </div>
       ) : (
-        <p className="mt-3 text-xs text-emerald-400">
-          Every step is done. Finishing this will fold what you produced into your evidence.
-        </p>
+        /*
+          THE HONEST ENDING.
+
+          This used to say "finishing this will fold what you produced into your evidence"
+          regardless of whether anything was produced — so six empty clicks ended in a
+          promise of achievement. Fadi does not get to describe a memory as a result.
+        */
+        <div className="mt-3 space-y-1.5">
+          {run.evidencedCount === 0 ? (
+            <>
+              <p className="text-xs text-amber-400">
+                All {run.steps.length} steps are ticked, but nothing was recorded against any of
+                them — so there is nothing here to show anyone, and none of it becomes evidence.
+              </p>
+              <p className="text-[11px] text-muted-foreground">
+                If you did the work, reopen a step and paste what it produced: a path, a repo, a
+                screenshot, a command and its output. If you didn&apos;t, drop the project — that
+                is a normal thing to do and it costs you nothing.
+              </p>
+              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                {run.steps.map((st) => (
+                  <Button
+                    key={st.id}
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[10px]"
+                    disabled={saving || pending}
+                    onClick={() =>
+                      start(async () => {
+                        await reopenStepAction({ stepId: st.id });
+                        onChanged();
+                      })
+                    }
+                  >
+                    Reopen step {st.ordinal}
+                  </Button>
+                ))}
+              </div>
+            </>
+          ) : run.evidencedCount < run.steps.length ? (
+            <p className="text-xs text-emerald-400">
+              Every step is done. {run.evidencedCount} of {run.steps.length} left something behind —
+              only those become evidence.
+            </p>
+          ) : (
+            <p className="text-xs text-emerald-400">
+              Every step is done and every one produced something. All of it can become evidence.
+            </p>
+          )}
+        </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Stopping a project, with the two verbs kept apart.
+ *
+ * "Drop it" keeps the plan and marks it abandoned — how "I tried this and it wasn't for
+ * me" stays visible instead of becoming an unexplained gap. "Delete" removes it, for a
+ * plan generated by mistake, because refusing that is the platform deciding it knows
+ * better than the person whose account it is.
+ */
+function StopProject({ run, onChanged }: { run: RunView; onChanged: () => void }) {
+  const [asking, setAsking] = useState(false);
+  const [busy, start] = useTransition();
+
+  if (!asking) {
+    return (
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-6 px-2 text-[10px] text-muted-foreground"
+        onClick={() => setAsking(true)}
+      >
+        <X className="size-3" aria-hidden="true" />
+        Stop
+      </Button>
+    );
+  }
+
+  return (
+    <div className="flex w-full flex-wrap items-center gap-1.5 pt-1">
+      <span className="text-[11px] text-muted-foreground">Stop &ldquo;{run.title}&rdquo;?</span>
+      <Button
+        size="sm"
+        variant="outline"
+        className="h-6 px-2 text-[10px]"
+        disabled={busy}
+        onClick={() => start(async () => { await stopProjectRun({ runId: run.id, mode: "abandon" }); onChanged(); })}
+      >
+        Drop it, keep the record
+      </Button>
+      <Button
+        size="sm"
+        variant="destructive"
+        className="h-6 px-2 text-[10px]"
+        disabled={busy}
+        onClick={() => start(async () => { await stopProjectRun({ runId: run.id, mode: "delete" }); onChanged(); })}
+      >
+        Delete it entirely
+      </Button>
+      <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setAsking(false)}>
+        Cancel
+      </Button>
     </div>
   );
 }
