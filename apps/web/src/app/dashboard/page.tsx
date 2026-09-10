@@ -213,15 +213,21 @@ export default async function DashboardPage() {
         latestReport={latestReport}
         reportStale={reportStale}
         recommendedJobsPreview={recommendedJobsPreview}
+        mode={careerMode}
         momentum={momentum}
         reflection={reflection}
         marketSignals={marketSignals}
         setup={setup}
         openBuilds={openBuilds}
       />
-      <div className="mx-auto mt-4 max-w-shell">
-        <FadiImpactCard impact={impact} />
-      </div>
+      {/* What Fadi has done for you — tracked roles, closed postings caught, applications
+          saved. Every number in it is a fact about the PIPELINE, so it belongs to Apply.
+          In Prepare it was answering a question nobody in that phase is asking. */}
+      {careerMode === "apply" && (
+        <div className="mx-auto mt-4 max-w-shell">
+          <FadiImpactCard impact={impact} />
+        </div>
+      )}
     </AppShell>
   );
 }
