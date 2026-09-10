@@ -1020,6 +1020,59 @@ export const portfolioSites = pgTable(
   ]
 );
 
+/**
+ * WHAT THE USER ACTUALLY HAS TO WORK WITH.
+ *
+ * Fadi can name a skill gap and point at a roadmap, and then it stops. It has never
+ * known that this person owns a 24 GB laptop, a Proxmox box, a Raspberry Pi and an
+ * ESP32 — so every suggestion it makes is generic advice that someone else has to
+ * translate into "and what do I run it on?".
+ *
+ * Declared, never discovered. Fadi does not scan a network or probe for machines; a
+ * resource exists here because its owner described it. That is a privacy position and
+ * also a correctness one — an inventory someone typed is an inventory they understand.
+ */
+export const labResources = pgTable(
+  "lab_resources",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** laptop | server | hypervisor | sbc | microcontroller | cloud | account */
+    kind: text("kind").notNull(),
+    /** The owner's own name for it — "the ThinkPad", "Proxmox box". */
+    label: text("label").notNull(),
+    /**
+     * x86_64 | arm64 | mcu. NOT cosmetic: an x86 VM will not run on a Raspberry Pi,
+     * and a lab plan that ignores this proposes something impossible and wastes an
+     * evening. Getting it wrong is the exact class of problem worth preventing rather
+     * than discovering halfway through.
+     */
+    arch: text("arch").notNull().default("x86_64"),
+    memoryMb: integer("memory_mb"),
+    diskGb: integer("disk_gb"),
+    /** none | containers | vms | nested — how heavy a lab this can actually host. */
+    virtualization: text("virtualization").notNull().default("none"),
+    /** Reachable at 3am, or closed in a bag? Decides what can be a persistent service. */
+    alwaysOn: boolean("always_on").notNull().default(false),
+    /** Free-form: "Windows 10 Server + Kali under VMware", "Proxmox VE 8". */
+    notes: text("notes"),
+    /** read = capture only. provision = Fadi may create things. Earned, never default. */
+    scopes: jsonb("scopes").$type<string[]>().notNull().default(["read"]),
+    /** Same encrypted-at-rest pattern as the GitHub PAT; never redisplayed. */
+    secretCiphertext: text("secret_ciphertext"),
+    secretHint: text("secret_hint"),
+    endpoint: text("endpoint"),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [index("lab_resources_user_idx").on(table.userId)],
+);
+
+export type LabResource = typeof labResources.$inferSelect;
+export type NewLabResource = typeof labResources.$inferInsert;
+
 export const portfolioItems = pgTable(
   "portfolio_items",
   {
