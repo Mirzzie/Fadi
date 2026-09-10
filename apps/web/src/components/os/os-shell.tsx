@@ -9,6 +9,7 @@ import { FadiOrb } from "./fadi-orb";
 import { MenuBar } from "./menu-bar";
 import { CommandBar } from "./command-bar";
 import { FadiPresenceProvider } from "./fadi-presence";
+import { PendingActionsProvider } from "./pending-actions";
 
 /**
  * The chrome that wraps every authenticated screen: a top menu bar, a bottom dock
@@ -27,9 +28,13 @@ export function OsShell({
 }) {
   return (
     <FadiPresenceProvider>
-      <CareerModeProvider initialMode={initialMode}>
-        <OsShellInner activeTrackKey={activeTrackKey}>{children}</OsShellInner>
-      </CareerModeProvider>
+      {/* Owns the queue of actions waiting on the user, so a decision exists everywhere in
+          the app rather than only on the page that happened to ask for it. */}
+      <PendingActionsProvider>
+        <CareerModeProvider initialMode={initialMode}>
+          <OsShellInner activeTrackKey={activeTrackKey}>{children}</OsShellInner>
+        </CareerModeProvider>
+      </PendingActionsProvider>
     </FadiPresenceProvider>
   );
 }

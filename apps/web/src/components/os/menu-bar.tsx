@@ -7,6 +7,7 @@ import { FadiLogo } from "@/components/brand/fadi-logo";
 import { stopFadiSpeech } from "@/lib/voice/fadi-speech";
 import { cn } from "@/lib/utils";
 import { ActivityCenter } from "./activity-center";
+import { ApprovalCenter } from "./approval-center";
 import { useCareerMode } from "./career-mode";
 import { useFadi, type FadiState } from "./fadi-presence";
 import { TrackSwitcher } from "./track-switcher";
@@ -58,6 +59,10 @@ export function MenuBar() {
         </button>
 
         <VoiceToggle />
+        {/* Decisions before notifications. The approval queue sits to the LEFT of the bell
+            because it blocks and the bell does not, and it is absent entirely when nothing
+            is waiting rather than showing a zero. */}
+        <ApprovalCenter />
         <ActivityCenter />
         <span className="tabular-nums text-muted-foreground">{clock}</span>
         <UserMenu />
