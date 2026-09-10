@@ -170,10 +170,23 @@ export function ProfileForm({
         {/* 1. Start over — wipe data, keep the login. */}
         <div>
           <h3 className="text-sm font-semibold text-destructive">Delete my data &amp; start over</h3>
+          {/* THE LIST HAS TO BE COMPLETE. It named profile, reports, evidence,
+              applications, momentum and AI settings — and omitted the portfolio, which
+              this also erases: every item, the site, the handle, the custom wording and
+              the GitHub connection. An irreversible action described incompletely is
+              worse than one described bluntly. */}
           <p className="mt-1 text-sm text-muted-foreground">
-            Permanently removes your profile, reports, evidence, applications, momentum, and AI
-            settings — then signs you out. <strong>Your login stays</strong>, so you can sign back
-            in and start a fresh search. This can&apos;t be undone.
+            Permanently removes your profile, reports, evidence, applications, momentum, AI
+            settings <strong>and your entire portfolio</strong> — every item, your public page
+            and its handle, your custom wording, and the GitHub connection. Then it signs you
+            out. <strong>Your login stays</strong>, so you can sign back in and start fresh.
+            This can&apos;t be undone.
+          </p>
+          <p className="mt-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
+            Your published site on GitHub Pages keeps serving — Fadi just stops knowing about
+            it. Uploaded images stay on Cloudinary, but the links to them live here and go with
+            everything else. <strong>Export your portfolio first</strong> (Portfolio → Export) if
+            there is anything in it you would miss.
           </p>
           {confirming === "data" ? (
             <div className="mt-3 space-y-3">

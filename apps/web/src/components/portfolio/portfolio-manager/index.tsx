@@ -469,6 +469,19 @@ export function PortfolioManager({
                 : setItemPublished({ id: dropId, published: false }),
             )
           }
+          onResolveAll={({ dropIds }) =>
+            run(async () => {
+              // Sequential and reversible: each one is an ordinary unpublish, so a
+              // wrong call costs a click rather than a record. Report the first failure
+              // rather than a count — a partial result the user cannot see is worse
+              // than a plain error.
+              for (const id of dropIds) {
+                const res = await setItemPublished({ id, published: false });
+                if (!res.ok) return res;
+              }
+              return { ok: true, message: `Hid ${dropIds.length} duplicates.` };
+            })
+          }
           resolving={pending}
           findings={allFindings}
           checking={checking}

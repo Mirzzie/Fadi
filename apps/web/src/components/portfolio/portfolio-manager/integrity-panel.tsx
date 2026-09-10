@@ -28,6 +28,7 @@ export function IntegrityPanel({
   titleOf,
   onRunAi,
   onResolve,
+  onResolveAll,
   resolving,
 }: {
   findings: IntegrityFinding[];
@@ -41,6 +42,19 @@ export function IntegrityPanel({
    * clicks. "hide" unpublishes (reversible, keeps the detail); "delete" is permanent.
    */
   onResolve?: (input: { dropId: string; mode: "hide" | "delete" }) => void;
+  /**
+   * Clear the confident duplicates in one go.
+   *
+   * Eight findings, each wanting a decision, is a chore list — and a chore list is
+   * demoralising in a tool whose whole job is to make someone feel able to apply. Worse,
+   * this backlog is HISTORICAL: the admission gate now prevents these at the write, so
+   * the list can only shrink. Making someone grind through it one row at a time to reach
+   * a state the product already guarantees is punishment for a bug they did not cause.
+   *
+   * Hide, never delete, for the bulk path. Reversible in a click, and a mistake costs
+   * nothing — which is the only reason it is safe to offer as one button.
+   */
+  onResolveAll?: (input: { dropIds: string[] }) => void;
   resolving?: boolean;
 }) {
   const clean = findings.length === 0;
@@ -60,6 +74,26 @@ export function IntegrityPanel({
             </span>
           )}
         </div>
+        {(() => {
+          // Only the pairs Fadi is confident about and has a recommendation for. A
+          // "might be the same" is a question, and bulk-answering questions is how you
+          // lose real work.
+          const sure = findings.filter(
+            (f) => f.severity === "duplicate" && f.dropId && f.title === "The same work, written twice",
+          );
+          if (!onResolveAll || sure.length < 2) return null;
+          return (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={resolving}
+              onClick={() => onResolveAll({ dropIds: sure.map((f) => f.dropId!) })}
+            >
+              <Copy className="size-4" aria-hidden="true" />
+              Hide all {sure.length} duplicates
+            </Button>
+          );
+        })()}
         <Button size="sm" variant="outline" onClick={onRunAi} disabled={checking}>
           {checking ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
           {checking ? "Checking…" : "Check with Fadi AI"}
