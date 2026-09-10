@@ -52,8 +52,9 @@ const CollectorEvent = z.object({
   context: z.string().nullable().optional(),
 });
 
-// `scanned` is the highest id the collector holds, so the caller can advance past
-// rows it filtered out. Optional: an older Worker won't send it.
+// `scanned` is the last id included in this response page. It must never be the
+// table high-water mark: doing that skips rows which did not fit in the page.
+// Optional because an older Worker may not send it.
 const CollectorResponse = z.object({
   events: z.array(CollectorEvent),
   scanned: z.number().optional(),
@@ -171,9 +172,6 @@ export async function syncCollectorEvents(input: {
   // Advance past everything scanned, not just what was imported.
   highest = Math.max(highest, parsed.data.scanned ?? 0);
   await writeCursor(input.userId, input.siteId, "collectorCursor", highest);
-
-  highest = Math.max(highest, parsed.data.scanned ?? 0);
-  await writeCursor(input.userId, input.siteId, "feedbackCursor", highest);
 
   return { ok: true, imported, skipped, lastId: highest };
 }
