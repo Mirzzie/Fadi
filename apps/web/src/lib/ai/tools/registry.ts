@@ -412,6 +412,76 @@ const inspectMachineTool: FadiTool = {
   },
 };
 
+/**
+ * THE MODEL PROPOSES A CHANGE — and that is the end of what it can do.
+ *
+ * This is the tool that turns "here is a tutorial" into "here is the container running on
+ * your laptop". It is also the most dangerous surface in Fadi, so it is built the other
+ * way round from a normal tool: it does not take a command, it takes a RECIPE ID and
+ * typed parameters, and it finishes by writing a row that asks the user a question.
+ *
+ * Nothing here runs. There is no argument to this tool, and no state anywhere, that lets
+ * a model skip the person. If a job description Fadi read says "run this instead", the
+ * furthest that instruction travels is a prompt the user sees, with the exact command in
+ * it, which they can decline.
+ */
+const proposeLabActionTool: FadiTool = {
+  name: "propose_lab_action",
+  description:
+    "Propose a concrete change to the user's own machine — start, stop or remove a lab container — so they can approve it and it actually happens. Use when a project step needs a service running and the user has allowed container access. Recipes: container.run (params: image, name, optional port), container.stop (name), container.remove (name). Images are a fixed set: nginx, postgres, redis, grafana, portainer. This NEVER runs anything by itself; it puts the exact command in front of the user for approval. Tell them to check Machine access in Learning.",
+  parameters: {
+    type: "object",
+    properties: {
+      recipe: {
+        type: "string",
+        enum: ["container.run", "container.stop", "container.remove"],
+        description: "Which catalogued action.",
+      },
+      image: {
+        type: "string",
+        enum: ["nginx", "postgres", "redis", "grafana", "portainer"],
+        description: "For container.run: which image, by key.",
+      },
+      name: {
+        type: "string",
+        description: "Short lowercase name for the container, e.g. \"web\". Fadi prefixes it with fadi-.",
+      },
+      port: { type: "number", description: "Optional port to publish, 1024-65535." },
+    },
+    required: ["recipe", "name"],
+  },
+  async execute(args, ctx): Promise<FadiToolResult> {
+    const { proposeAction } = await import("@/lib/lab/broker");
+    const surface = ctx.surface ?? "chat";
+    const result = await proposeAction({
+      userId: ctx.userId,
+      recipe: typeof args.recipe === "string" ? args.recipe : "",
+      // Passed through as-is. The broker validates; a tool that pre-cleaned parameters
+      // would be a second place where "what is allowed" is decided, and the two would
+      // drift.
+      params: { image: args.image, name: args.name, port: args.port },
+      actor: surface === "mcp" ? "mcp" : surface === "agent" ? "agent" : "model",
+      origin: "tool:propose_lab_action",
+    });
+
+    if (!result.ok) return { summary: result.message, view: "none" };
+
+    return {
+      // Said as a request, not as an accomplishment. A model reporting "I started nginx"
+      // when it has only queued a question would be lying about the user's own machine.
+      summary:
+        "I've asked for your approval to do this — nothing has run yet. " +
+        result.summary +
+        " The command is: " +
+        result.argv.map((a) => a.join(" ")).join(" && ") +
+        ". Approve it under Machine access in Learning" +
+        (result.reversal ? ". To undo afterwards: " + result.reversal : "."),
+      view: "none",
+      data: { requestId: result.requestId, argv: result.argv },
+    };
+  },
+};
+
 const projectStatusTool: FadiTool = {
   name: "project_status",
   description:
@@ -640,6 +710,7 @@ const TOOLS: FadiTool[] = [
   scanCompanyJobsTool,
   planProjectTool,
   inspectMachineTool,
+  proposeLabActionTool,
   projectStatusTool,
   completeProjectStepTool,
   evaluateFitTool,

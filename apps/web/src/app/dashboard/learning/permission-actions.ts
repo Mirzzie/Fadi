@@ -2,7 +2,11 @@
 
 import { z } from "zod";
 
-import { createLabActionsRepository, createLabGrantsRepository } from "@careeros/database";
+import {
+  createLabActionRequestsRepository,
+  createLabActionsRepository,
+  createLabGrantsRepository,
+} from "@careeros/database";
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
@@ -185,4 +189,82 @@ export async function revokeAllCapabilities(): Promise<{ ok: boolean; revoked?: 
     detail: "Revoked " + revoked + " live grant(s).",
   });
   return { ok: true, revoked };
+}
+
+/* ---------------------------------------------------------------------------
+ * WRITES — the approval surface.
+ *
+ * A model can reach `proposeAction`. Nothing a model touches can reach the two functions
+ * below, which are the only path from a proposal to the machine. That asymmetry is the
+ * design; these are server actions called from a button a person clicks.
+ * ------------------------------------------------------------------------- */
+
+export type PendingActionView = {
+  id: string;
+  summary: string;
+  reversal: string | null;
+  /** The exact commands, so approval is of a command rather than of a description. */
+  argv: string[];
+  actor: string;
+  origin: string | null;
+  expiresAt: string;
+};
+
+export async function listPendingActions(): Promise<{
+  ok: boolean;
+  pending?: PendingActionView[];
+}> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false };
+
+  const rows = await createLabActionRequestsRepository(getDatabase()).listPending(user.id);
+  return {
+    ok: true,
+    pending: rows.map((r) => ({
+      id: r.id,
+      summary: r.summary,
+      reversal: r.reversal,
+      argv: (r.argv as string[][]).map((a) => a.join(" ")),
+      actor: r.actor,
+      origin: r.origin,
+      expiresAt: r.expiresAt.toISOString(),
+    })),
+  };
+}
+
+/** Approve one request and run it. The only door to a write. */
+export async function approveAction(input: {
+  requestId: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  if (!z.string().uuid().safeParse(input.requestId).success) {
+    return { ok: false, message: "Unknown request." };
+  }
+
+  const { approveAndRun } = await import("@/lib/lab/broker");
+  const result = await approveAndRun({ userId: user.id, requestId: input.requestId });
+  return result.ok ? { ok: true, message: result.output } : { ok: false, message: result.message };
+}
+
+export async function denyAction(input: {
+  requestId: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  if (!z.string().uuid().safeParse(input.requestId).success) {
+    return { ok: false, message: "Unknown request." };
+  }
+
+  const db = getDatabase();
+  await createLabActionRequestsRepository(db).deny(user.id, input.requestId);
+  await createLabActionsRepository(db).record({
+    userId: user.id,
+    actor: "user",
+    origin: "dashboard:permissions",
+    capability: "action.deny",
+    decision: "denied",
+    detail: "You declined this request.",
+  });
+  return { ok: true };
 }

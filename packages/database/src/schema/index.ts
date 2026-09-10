@@ -1162,6 +1162,60 @@ export const labActions = pgTable(
 export type LabAction = typeof labActions.$inferSelect;
 export type NewLabAction = typeof labActions.$inferInsert;
 
+/**
+ * A WRITE FADI WANTS TO MAKE, WAITING FOR A PERSON TO SAY YES.
+ *
+ * Reads are covered by a time-boxed grant: allow "look at my containers" for two hours
+ * and Fadi may look repeatedly without asking again. Writes are NOT, and the difference
+ * is deliberate. A two-hour grant to *create containers* is a two-hour window in which an
+ * injected instruction can create containers, and nobody would see it until afterwards.
+ * So every write is approved individually, against the exact command it will run.
+ *
+ * The asymmetry that makes this work: a model may PROPOSE, and only a person may APPROVE.
+ * Nothing in the model's path can move a row from pending to approved.
+ *
+ * `argv` is stored as rendered, so the log answers "what was I shown when I agreed?"
+ * rather than "what would that recipe produce today".
+ */
+export const labActionRequests = pgTable(
+  "lab_action_requests",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Which recipe from the fixed catalogue — never a free-form command. */
+    recipe: text("recipe").notNull(),
+    /** The validated parameters. Re-rendered at execution and compared to `argv`. */
+    params: jsonb("params").notNull().default({}),
+    /** The exact argv the user was shown, as a list of [cmd, ...args] lists. */
+    argv: jsonb("argv").notNull().default([]),
+    /** The sentence the user read before approving. */
+    summary: text("summary").notNull(),
+    /** How to undo it, shown in the same breath. */
+    reversal: text("reversal"),
+    /** Who asked: user | model | mcp | agent. */
+    actor: text("actor").notNull(),
+    origin: text("origin"),
+    /** pending | approved | executed | denied | expired | failed */
+    status: text("status").notNull().default("pending"),
+    /**
+     * Short by design. An approval prompt that sat overnight and gets clicked in the
+     * morning is not consent for what is happening now.
+     */
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    executedAt: timestamp("executed_at", { withTimezone: true }),
+    /** What it produced, or why it failed. */
+    detail: text("detail"),
+    ...timestamps,
+  },
+  (table) => [index("lab_action_requests_user_idx").on(table.userId, table.status)],
+);
+
+export type LabActionRequest = typeof labActionRequests.$inferSelect;
+export type NewLabActionRequest = typeof labActionRequests.$inferInsert;
+
 export const projectRuns = pgTable(
   "project_runs",
   {

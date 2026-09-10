@@ -5,12 +5,16 @@ import { AlertTriangle, Loader2, ShieldCheck, ShieldOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
+  approveAction,
+  denyAction,
   grantCapability,
+  listPendingActions,
   listPermissions,
   revokeAllCapabilities,
   revokeCapability,
   type ActionView,
   type CapabilityView,
+  type PendingActionView,
 } from "@/app/dashboard/learning/permission-actions";
 
 /**
@@ -44,15 +48,18 @@ const ACTOR_LABEL: Record<string, string> = {
 export function MachineAccess() {
   const [caps, setCaps] = useState<CapabilityView[] | null>(null);
   const [recent, setRecent] = useState<ActionView[]>([]);
+  const [waiting, setWaiting] = useState<PendingActionView[]>([]);
+  const [note, setNote] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   const refresh = useCallback(() => {
     start(async () => {
-      const res = await listPermissions();
-      if (res.ok) {
-        setCaps(res.capabilities ?? []);
-        setRecent(res.recent ?? []);
+      const [perms, queue] = await Promise.all([listPermissions(), listPendingActions()]);
+      if (perms.ok) {
+        setCaps(perms.capabilities ?? []);
+        setRecent(perms.recent ?? []);
       }
+      if (queue.ok) setWaiting(queue.pending ?? []);
     });
   }, []);
 
@@ -101,6 +108,76 @@ export function MachineAccess() {
           </Button>
         ) : null}
       </header>
+
+      {/*
+        WAITING FOR YOU — above everything else, because it is the only part of this panel
+        that is blocking someone.
+
+        The command is shown verbatim. Approval of a description is not approval of a
+        command: the person needs to see the argv that will run, and who asked for it,
+        because "the model proposed this after reading a job description" is exactly the
+        situation this whole layer exists for.
+      */}
+      {waiting.length > 0 ? (
+        <div className="space-y-2 rounded-md border border-primary/50 bg-primary/5 p-3">
+          <p className="flex items-center gap-1.5 text-xs font-semibold">
+            <AlertTriangle className="size-3.5 text-primary" aria-hidden="true" />
+            {waiting.length} change{waiting.length === 1 ? "" : "s"} waiting for your approval
+          </p>
+          {waiting.map((w) => (
+            <div key={w.id} className="space-y-1.5 rounded border border-border/60 bg-background p-2.5">
+              <p className="text-xs font-medium">{w.summary}</p>
+              {w.argv.map((line) => (
+                <pre key={line} className="overflow-x-auto rounded bg-muted px-2 py-1 text-[10px]">
+                  {line}
+                </pre>
+              ))}
+              <p className="text-[11px] text-muted-foreground">
+                Asked by {ACTOR_LABEL[w.actor] ?? w.actor}
+                {w.origin ? " (" + w.origin + ")" : ""}.
+                {w.reversal ? " To undo: " + w.reversal : ""}
+              </p>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  disabled={pending}
+                  onClick={() =>
+                    start(async () => {
+                      const res = await approveAction({ requestId: w.id });
+                      setNote(res.ok ? "Done. " + (res.message ?? "") : res.message ?? "It didn't run.");
+                      refresh();
+                    })
+                  }
+                >
+                  Run it
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={pending}
+                  onClick={() =>
+                    start(async () => {
+                      await denyAction({ requestId: w.id });
+                      refresh();
+                    })
+                  }
+                >
+                  No
+                </Button>
+                <span className="text-[10px] text-muted-foreground">
+                  Expires {new Date(w.expiresAt).toLocaleTimeString()}
+                </span>
+              </div>
+            </div>
+          ))}
+          <p className="text-[10px] text-muted-foreground">
+            Nothing here has run. Each one is approved on its own — there is no setting that
+            lets these through without asking.
+          </p>
+        </div>
+      ) : null}
+
+      {note ? <p className="text-[11px] text-muted-foreground">{note}</p> : null}
 
       {/*
         Denials first. If something asked for what it was never given, that is the one
