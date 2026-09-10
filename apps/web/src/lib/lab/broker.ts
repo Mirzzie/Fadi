@@ -11,6 +11,12 @@ import {
 } from "@careeros/database";
 
 import {
+  isTemplateKey,
+  LAB_TEMPLATES,
+  renderTemplate,
+  type TemplateKey,
+} from "./templates";
+import {
   cidrLabel,
   guessKind,
   hostsOf,
@@ -348,6 +354,7 @@ export async function requestCapability(input: {
  * ------------------------------------------------------------------------- */
 
 export const RECIPE_IDS = [
+  "lab.start",
   "network.sweep",
   "network.identify",
   "container.run",
@@ -539,6 +546,58 @@ export const RECIPES: Record<RecipeId, Recipe> = {
    * repetition is the part that matters: one scan is a person looking for their Proxmox
    * box, a hundred is reconnaissance.
    */
+  /**
+   * BRING UP A LAB MACHINE.
+   *
+   * The one recipe that can emit `--device` and `--cap-add`, and only because the template
+   * it renders is declared as needing virtualisation. Windows here is a QEMU VM inside a
+   * container; KVM and a TAP device are what make that work at all.
+   *
+   * The caller picks a KEY from a closed catalogue. It cannot pick an image, a version, a
+   * flag, a mount or a port — "the model chooses the Windows version" and "the model
+   * chooses what gets downloaded and run on this laptop" are the same sentence.
+   */
+  "lab.start": {
+    blast: "host",
+    // Nothing is destroyed, and the machine can be removed again — but this reaches past a
+    // container in a way `docker run nginx` does not, so it is typed out.
+    reversibility: "reversible",
+    confirmToken: (p) => NAME_PREFIX + String(p.name),
+    validate: (raw) => {
+      const template = str(raw.template);
+      const name = str(raw.name);
+      if (!template || !isTemplateKey(template)) return null;
+      if (!name || !NAME_RE.test(name)) return null;
+      return { template, name };
+    },
+    summary: (p) => {
+      const t = LAB_TEMPLATES[String(p.template) as TemplateKey];
+      return (
+        "Start " +
+        t.label +
+        " as " +
+        NAME_PREFIX +
+        p.name +
+        ". " +
+        t.purpose +
+        " It needs " +
+        Math.round(t.ramMb / 1024) +
+        "GB of memory and about " +
+        t.diskGb +
+        "GB of disk." +
+        (t.caveat ? " " + t.caveat : "")
+      );
+    },
+    reversal: (p) => "Stop and remove it: docker rm -f " + NAME_PREFIX + String(p.name),
+    render: (p) => [
+      {
+        id: "start",
+        cmd: "docker",
+        args: renderTemplate(String(p.template) as TemplateKey, NAME_PREFIX + String(p.name)),
+      },
+    ],
+  },
+
   "network.sweep": {
     blast: "remote",
     // Nothing is changed anywhere. It is still typed out, because "reversible" is not the

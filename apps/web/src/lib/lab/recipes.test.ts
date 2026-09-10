@@ -301,31 +301,35 @@ describe("the catalogue itself stays safe as it grows", () => {
     }
   });
 
-  it("no recipe can emit a flag that hands over the host", async () => {
+  it("no recipe emits a flag that hands over the host", async () => {
     const { RECIPES, RECIPE_IDS } = await import("./broker");
-    // These are the flags that turn "a container" into "your machine". A future recipe
-    // that needs one is a decision to be argued for in review, not a quiet addition.
-    const forbidden = [
+
+    // NEVER, by any recipe, for any reason. Each of these turns "a container" into "your
+    // machine", and nothing in the catalogue needs one. A future recipe that does is a
+    // conversation to have in review, not a line to add quietly.
+    const neverAllowed = [
       "--privileged",
       "--network=host",
-      "host",
       "--pid",
-      "--cap-add",
-      "--user",
+      "--ipc",
       "--userns",
+      "--user",
       "-v",
       "--volume",
       "--mount",
-      "--device",
     ];
+
+    // Allowed ONLY to a recipe rendering a template declared as needing virtualisation.
+    //
+    // The absolute ban was right for composable recipes and wrong as a rule: running
+    // Windows means running a VM, and dockur/windows is QEMU wearing a container. It needs
+    // KVM, a TAP device, and the capability to configure that device. The honest invariant
+    // is not "never --device"; it is "only these, only there, and never derived from
+    // anything a caller said".
+    const virtualisationOnly = ["--device", "/dev/kvm", "/dev/net/tun", "--cap-add", "NET_ADMIN", "--stop-timeout", "120"];
 
     for (const id of RECIPE_IDS) {
       const recipe = RECIPES[id];
-      // Every recipe validates against the widest legal parameter bag it accepts.
-      // ONE bag holding a legal value for every field any recipe reads. Each validate()
-      // takes only the fields it knows about and ignores the rest, so a new recipe is
-      // covered by adding its field here — rather than by appending another ?? to a chain,
-      // which is what this was and which quietly skipped recipes nobody remembered to add.
       const params = recipe.validate({
         image: "nginx",
         name: "x",
@@ -334,14 +338,28 @@ describe("the catalogue itself stays safe as it grows", () => {
         content: "x",
         cidr: "192.168.0.0/24",
         ip: "192.168.0.56",
+        template: "windows-server-2025",
       });
       expect(params, `${id} should accept a legal parameter bag`).not.toBeNull();
+
       for (const step of recipe.render(params!)) {
-        // File steps carry no flags at all, which is itself the point: there is no argv
-        // for a dangerous option to hide in.
         if (!("args" in step)) continue;
         for (const arg of step.args) {
-          expect(forbidden, `${id} emitted ${arg}`).not.toContain(arg);
+          expect(neverAllowed, `${id} emitted ${arg}`).not.toContain(arg);
+        }
+
+        const elevated = step.args.filter(
+          (a) => a === "--device" || a === "--cap-add" || a.startsWith("/dev/"),
+        );
+        if (elevated.length > 0) {
+          // Whatever it asked for must be inside the permitted set, and it must have asked
+          // because a template said it needed to — not because a parameter said so.
+          for (const arg of step.args) {
+            if (arg.startsWith("--") || arg.startsWith("/dev/")) {
+              const known = virtualisationOnly.includes(arg) || ["-d", "-e", "-p", "--name"].includes(arg);
+              expect(known, `${id} emitted an unexpected flag: ${arg}`).toBe(true);
+            }
+          }
         }
       }
     }

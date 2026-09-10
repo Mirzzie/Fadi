@@ -200,6 +200,114 @@ export async function preflightFor(input: {
       return notes;
     }
 
+    if (input.recipe === "lab.start") {
+      const { LAB_TEMPLATES, isTemplateKey } = await import("./templates");
+      const key = String(input.params.template);
+      if (!isTemplateKey(key)) return [{ kind: "unknown", text: "Unknown lab template." }];
+      const t = LAB_TEMPLATES[key];
+
+      // THE CHECK THAT MAKES THIS A LAB ENGINE RATHER THAN A LAUNCHER.
+      //
+      // Starting a 4GB Windows VM on a laptop with 4GB free is not a failure the person
+      // finds out about in an error message — it is an hour of thrashing, a swap storm and
+      // a machine they cannot use while it happens. The numbers are knowable beforehand, so
+      // they are said beforehand.
+      const os = await import("node:os");
+      const totalMb = Math.round(os.totalmem() / (1024 * 1024));
+      const freeMb = Math.round(os.freemem() / (1024 * 1024));
+      const gb = (mb: number) => Math.round(mb / 1024);
+
+      // TWO DIFFERENT QUESTIONS, and the first version conflated them.
+      //
+      //   "Can this machine do it?"   — total memory. A property of the hardware.
+      //   "Is now a good moment?"     — free memory. A property of what is open.
+      //
+      // Reporting 4GB free on a 24GB laptop as though it were a limit tells the owner
+      // their machine is too small when it is nothing of the kind — the answer is to close
+      // something, not to buy a computer. Only the first is a reason not to try.
+      if (totalMb < t.ramMb + 1024) {
+        notes.push({
+          kind: "warn",
+          text:
+            "This machine has " +
+            gb(totalMb) +
+            "GB in total and this needs " +
+            gb(t.ramMb) +
+            "GB. There isn't room for it here even with everything closed — it wants a bigger host.",
+        });
+      } else if (freeMb < t.ramMb) {
+        notes.push({
+          kind: "warn",
+          text:
+            "Not right now: " +
+            gb(freeMb) +
+            "GB is free and this needs " +
+            gb(t.ramMb) +
+            "GB. The machine has " +
+            gb(totalMb) +
+            "GB, so closing a few things is enough — starting it as things stand would push into swap.",
+        });
+      } else if (freeMb - t.ramMb < 1024) {
+        notes.push({
+          kind: "warn",
+          text:
+            "That leaves under a gigabyte spare (" +
+            gb(freeMb) +
+            "GB free of " +
+            gb(totalMb) +
+            "GB, " +
+            gb(t.ramMb) +
+            "GB needed). It will run, but the machine will feel slow while it does.",
+        });
+      } else {
+        notes.push({
+          kind: "info",
+          text: gb(freeMb) + "GB free of " + gb(totalMb) + "GB, and this needs " + gb(t.ramMb) + "GB.",
+        });
+      }
+
+      if (t.needsVirtualisation) {
+        const fsp = await import("node:fs/promises");
+        try {
+          await fsp.access("/dev/kvm");
+          notes.push({ kind: "info", text: "KVM is available, so this will run at a usable speed." });
+        } catch {
+          notes.push({
+            kind: "warn",
+            // Without KVM this is software emulation: technically working, practically
+            // unusable, and worth knowing before an hour disappears.
+            text: "No access to /dev/kvm on this machine. Windows would be emulated in software, which is too slow to work in.",
+          });
+        }
+      }
+
+      const pulled = await imagePresent(t.image);
+      if (pulled === false) {
+        notes.push({
+          kind: "warn",
+          text:
+            t.needsVirtualisation
+              ? "The image isn't here yet, and Windows itself is downloaded on first boot — several gigabytes and a long wait before anything is usable."
+              : "The image isn't here yet, so approving will download it.",
+        });
+      }
+
+      for (const port of t.ports) {
+        if (await portTaken(port.host)) {
+          notes.push({
+            kind: "warn",
+            text: "Port " + port.host + " (" + port.what + ") is already in use. This will fail.",
+          });
+        }
+      }
+
+      const name = NAME_PREFIX + String(input.params.name);
+      if (await containerExists(name)) {
+        notes.push({ kind: "warn", text: "A container called " + name + " already exists." });
+      }
+      return notes;
+    }
+
     if (input.recipe === "network.sweep") {
       const hosts = Number(input.params.hosts) || 0;
       notes.push({
