@@ -20,3 +20,4 @@ export * from "./github-connections.repository";
 export * from "./users.repository";
 export * from "./learning-commitments.repository";
 export * from "./portfolio.repository";
+export * from "./product-events.repository";

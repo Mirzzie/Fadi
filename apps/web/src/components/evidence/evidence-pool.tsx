@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { buildEvidencePool, deleteEvidence, saveEvidence } from "@/app/dashboard/evidence/actions";
+import { RenderingsPanel } from "./renderings-panel";
+import { SameThingPanel } from "./same-thing-panel";
 import { HistoryCapture } from "@/components/evidence/history-capture";
 import type { EvidenceView, RankedEvidence } from "@/lib/evidence/pool";
 
@@ -77,6 +79,11 @@ export function EvidencePool({
       {error ? (
         <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm">{error}</p>
       ) : null}
+
+      {/* Duplicates are caught HERE because the pool is what every other surface
+          projects from — one reality stored twice becomes a duplicate in the résumé,
+          the portfolio and Fadi's prompt block simultaneously. */}
+      <SameThingPanel onChanged={() => router.refresh()} />
 
       {editing === "new" ? (
         <EvidenceEditor onClose={() => setEditing(null)} onSaved={() => { setEditing(null); router.refresh(); }} />
@@ -187,6 +194,10 @@ function EvidenceCard({
           </p>
         )
       ) : null}
+
+      {/* The other wordings of this same fact, if any — the payoff of separating a
+          real thing from the words used to describe it. */}
+      <RenderingsPanel itemId={item.id} />
     </li>
   );
 }

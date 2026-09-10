@@ -27,6 +27,8 @@ export function IntegrityPanel({
   aiNote,
   titleOf,
   onRunAi,
+  onResolve,
+  resolving,
 }: {
   findings: IntegrityFinding[];
   checking: boolean;
@@ -34,6 +36,12 @@ export function IntegrityPanel({
   aiNote: string | null;
   titleOf: (id: string) => string | undefined;
   onRunAi: () => void;
+  /**
+   * Resolve a duplicate. Fadi recommends which copy to keep; the owner decides and
+   * clicks. "hide" unpublishes (reversible, keeps the detail); "delete" is permanent.
+   */
+  onResolve?: (input: { dropId: string; mode: "hide" | "delete" }) => void;
+  resolving?: boolean;
 }) {
   const clean = findings.length === 0;
   return (
@@ -89,6 +97,43 @@ export function IntegrityPanel({
                 {f.suggestion && (
                   <p className="mt-1 text-[11px] text-warning">Suggested fix: {f.suggestion}</p>
                 )}
+
+                {/* Fadi's recommendation, acted on with one click — but never without
+                    it. Showing a problem and leaving the owner to fix it by hand is
+                    not intelligence; removing something on their behalf is not consent. */}
+                {onResolve && f.keepId && f.dropId ? (
+                  <div className="mt-2.5 flex flex-wrap items-center gap-2 border-t border-border/60 pt-2.5">
+                    <p className="text-[11px] text-muted-foreground">
+                      Fadi suggests keeping{" "}
+                      <span className="text-foreground">{titleOf(f.keepId) ?? "the other"}</span>
+                      {f.keepReason ? ` — ${f.keepReason}` : ""}.
+                    </p>
+                    <div className="ml-auto flex gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={resolving}
+                        onClick={() => onResolve({ dropId: f.dropId!, mode: "hide" })}
+                      >
+                        Hide the other
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={resolving}
+                        onClick={() => {
+                          const name = titleOf(f.dropId!) ?? "this entry";
+                          if (confirm(`Permanently delete “${name}”? This cannot be undone.`)) {
+                            onResolve({ dropId: f.dropId!, mode: "delete" });
+                          }
+                        }}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        Delete it
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
               </li>
             );
           })}

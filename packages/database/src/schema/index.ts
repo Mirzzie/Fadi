@@ -912,9 +912,34 @@ export const evidenceItems = pgTable(
      */
     marketTags: jsonb("market_tags").$type<string[]>().notNull().default([]),
     origin: text("origin").notNull().default("manual"), // ai | manual | learning
+    /**
+     * FACT IDENTITY — the fix for the deepest bug in the product.
+     *
+     * Fadi conflates a FACT (a real thing that happened — one, forever) with a
+     * RENDERING (one description of it, worded for an audience). Every ingest used to
+     * write a rendering as a new row, so tailoring a history for a different role —
+     * which is the entire point of the product — multiplied one reality into many
+     * records, and the person then read as scattered.
+     *
+     * Records that are the same real thing now share a `fact_id`. Exactly one of them
+     * is canonical; the rest are that fact's other wordings, KEPT rather than deleted,
+     * because the tailored phrasing is valuable — it is the translation layer
+     * (docs/PLATFORM_IDEOLOGY) applied to whole records instead of just tags.
+     *
+     * Default for a new row is "I am my own fact": fact_id = id, is_canonical = true.
+     */
+    factId: uuid("fact_id"),
+    isCanonical: boolean("is_canonical").notNull().default(true),
+    /** Which audience/track this wording was tailored for; null = the plain record. */
+    renderingFor: text("rendering_for"),
     ...timestamps,
   },
-  (table) => [index("evidence_items_user_id_idx").on(table.userId)]
+  (table) => [
+    index("evidence_items_user_id_idx").on(table.userId),
+    // Reads almost always want "one row per real thing".
+    index("evidence_items_user_canonical_idx").on(table.userId, table.isCanonical),
+    index("evidence_items_fact_idx").on(table.factId),
+  ]
 );
 
 /**
@@ -1028,6 +1053,20 @@ export const portfolioItems = pgTable(
     gallery: jsonb("gallery").$type<string[]>().notNull().default([]),
     sortOrder: integer("sort_order").notNull().default(0),
     isPublished: boolean("is_published").notNull().default(true),
+    /**
+     * THE PUBLISH GATE.
+     *
+     * `isPublished` is the owner's intent for a section of their site. This is
+     * something narrower and stricter: has a person actually looked at this row?
+     *
+     * The public site is the one part of Fadi that strangers read and the owner
+     * relies on, while most of the platform is still in development. Coupling them
+     * means any half-built path that writes an evidence row can reach a recruiter.
+     * Anything arriving automatically — an extraction, a sync, an import — starts
+     * NULL here and stays off the public site until it is confirmed. Anything the
+     * owner typed or edited is confirmed by definition: they were looking at it.
+     */
+    confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
     ...timestamps,
   },
   (table) => [
@@ -1103,6 +1142,8 @@ export type NewInterviewStory = typeof interviewStories.$inferInsert;
 export type McpToken = typeof mcpTokens.$inferSelect;
 export type NewMcpToken = typeof mcpTokens.$inferInsert;
 export type EvidenceItem = typeof evidenceItems.$inferSelect;
+export type ProductEvent = typeof productEvents.$inferSelect;
+export type NewProductEvent = typeof productEvents.$inferInsert;
 export type NewEvidenceItem = typeof evidenceItems.$inferInsert;
 export type LearningCommitment = typeof learningCommitments.$inferSelect;
 export type NewLearningCommitment = typeof learningCommitments.$inferInsert;

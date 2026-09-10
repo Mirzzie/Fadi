@@ -5,6 +5,7 @@ import {
   buildRefreshWorkflow,
   GitHubClient,
   GitHubError,
+  pagesBasePath,
   pagesUrl,
   toBase64,
   type FetchLike,
@@ -345,6 +346,79 @@ describe("GitHubClient — errors & git-data", () => {
 describe("pagesUrl", () => {
   it("lowercases the owner and points at the project path", () => {
     expect(pagesUrl("AdaLovelace", "portfolio")).toBe("https://adalovelace.github.io/portfolio/");
+  });
+
+  it("serves a user site at the root instead of repeating its name", () => {
+    expect(pagesUrl("AdaLovelace", "adalovelace.github.io")).toBe("https://adalovelace.github.io/");
+    expect(pagesUrl("AdaLovelace", "AdaLovelace.github.io")).toBe("https://adalovelace.github.io/");
+  });
+
+  it("agrees with the base path the site was BUILT for", () => {
+    // These two must never disagree: the export bakes pagesBasePath into all 40-odd
+    // asset URLs, and pagesUrl is where Fadi tells the user to look. When they diverge
+    // the page loads and every stylesheet 404s — an unstyled site with no error anywhere.
+    for (const [login, repo] of [
+      ["AdaLovelace", "portfolio"],
+      ["AdaLovelace", "adalovelace.github.io"],
+      ["Mirzzie", "Mirzzie"],
+    ] as const) {
+      const url = new URL(pagesUrl(login, repo));
+      expect(url.pathname).toBe(`${pagesBasePath(login, repo)}/`);
+    }
+  });
+});
+
+describe("resolveRepo — renamed repositories", () => {
+  it("reports the name GitHub actually has, not the one we asked with", async () => {
+    // THE BUG THIS PINS: the repo was renamed portfolio -> Mirzzie. GitHub follows the old
+    // name on the API, so every write succeeded — but Pages moved to /Mirzzie/ while the
+    // export was still built for /portfolio/, and all 47 assets 404'd. Unstyled page, no
+    // error anywhere. The canonical name has to come back from GitHub.
+    const { fetch } = fakeFetch([
+      { status: 200, body: { name: "Mirzzie", full_name: "Mirzzie/Mirzzie", owner: { login: "Mirzzie" } } },
+    ]);
+    const gh = new GitHubClient("t", fetch);
+
+    const r = await gh.resolveRepo("Mirzzie", "portfolio");
+    expect(r.status).toBe("exists");
+    expect(r.name).toBe("Mirzzie");
+    // And the base path built from it is the one Pages will serve.
+    expect(pagesBasePath(r.owner, r.name)).toBe("/Mirzzie");
+  });
+
+  it("keeps the requested name when the repo does not exist", async () => {
+    const { fetch } = fakeFetch([{ status: 404 }]);
+    const r = await new GitHubClient("t", fetch).resolveRepo("ada", "brand-new");
+
+    expect(r.status).toBe("missing");
+    expect(r.name).toBe("brand-new");
+  });
+
+  it("still answers no_access for a token that cannot see the repo", async () => {
+    const { fetch } = fakeFetch([{ status: 403 }]);
+    expect(await new GitHubClient("t", fetch).repoStatus("ada", "secret")).toBe("no_access");
+  });
+});
+
+describe("listRepos", () => {
+  it("walks past the first page so repo 101 is still offered", async () => {
+    const page1 = Array.from({ length: 100 }, (_, i) => ({ name: `r${i}`, full_name: `ada/r${i}` }));
+    const { fetch, calls } = fakeFetch([
+      { status: 200, body: page1 },
+      { status: 200, body: [{ name: "the-one-i-wanted", full_name: "ada/the-one-i-wanted" }] },
+    ]);
+
+    const repos = await new GitHubClient("t", fetch).listRepos();
+    expect(repos).toHaveLength(101);
+    expect(repos.at(-1)!.name).toBe("the-one-i-wanted");
+    expect(calls[1].url).toContain("page=2");
+  });
+
+  it("stops as soon as a page is short — no wasted requests", async () => {
+    const { fetch, calls } = fakeFetch([{ status: 200, body: [{ name: "only", full_name: "ada/only" }] }]);
+    await new GitHubClient("t", fetch).listRepos();
+
+    expect(calls).toHaveLength(1);
   });
 });
 

@@ -133,7 +133,9 @@ export async function publishToGithub(input: {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
 
-  const repoName = input.repo.trim().replace(/[^a-zA-Z0-9._-]/g, "-");
+  // Reassigned below to GitHub's canonical name if this one turns out to be a stale
+  // alias for a renamed repo — the Pages URL follows the new name, so the build must too.
+  let repoName = input.repo.trim().replace(/[^a-zA-Z0-9._-]/g, "-");
   if (!repoName) return { ok: false, message: "Give the repository a name (e.g. \"portfolio\")." };
 
   // A publish is several GitHub writes + repo creation; cap it so a stuck button can't
@@ -172,7 +174,13 @@ export async function publishToGithub(input: {
 
     // Decide create-vs-reuse from the token's ACTUAL view of the repo, and turn the
     // fine-grained-token failure modes into guidance instead of GitHub's opaque 403.
-    const state = await gh.repoStatus(login, repoName);
+    const resolved = await gh.resolveRepo(login, repoName);
+    const state = resolved.status;
+    // GitHub answered for a repo with a DIFFERENT name: the one we asked for was renamed
+    // and we followed the redirect. Publishing under the old name would build the export
+    // for a base path nothing serves.
+    const renamedFrom = state === "exists" && resolved.name !== repoName ? repoName : null;
+    if (renamedFrom) repoName = resolved.name;
     if (state === "no_access") {
       return {
         ok: false,
@@ -206,7 +214,15 @@ export async function publishToGithub(input: {
         userId: user.id,
         error: e instanceof Error ? e.message.slice(0, 200) : "unknown",
       });
-      return { ok: false, message: "Couldn't build your portfolio site — please try again." };
+      // Say WHAT failed. The generic version sent the user hunting a token problem that
+      // did not exist while the real cause (a bad build env) sat in the server log.
+      const why = e instanceof Error ? e.message.split("\n")[0].slice(0, 160) : "";
+      return {
+        ok: false,
+        message: why
+          ? `Couldn't build your portfolio site: ${why}`
+          : "Couldn't build your portfolio site — please try again.",
+      };
     }
 
     // .nojekyll is REQUIRED so GitHub Pages serves the _next/ folder (underscore-prefixed,
@@ -261,7 +277,16 @@ export async function publishToGithub(input: {
       deployedVia,
       files: siteFiles.length,
     });
-    return { ok: true, data: { pagesUrl: url, autoRefreshActive: false, note } };
+    // Do NOT probe the site here. GitHub Pages rebuilds asynchronously — for the first
+    // ~30-60s after a commit the URL still serves the PREVIOUS build, so an immediate
+    // check reports the old base path and cries "wrong repository" about a publish that
+    // is in fact correct. Verification is a separate, pollable action (see below) that
+    // the UI calls until Pages catches up.
+    const liveNote = renamedFrom
+      ? `"${renamedFrom}" has been renamed to "${repoName}" on GitHub — published there, since that's the name its Pages URL uses. ${note ?? ""}`.trim()
+      : note;
+
+    return { ok: true, data: { pagesUrl: url, autoRefreshActive: false, note: liveNote } };
   } catch (error) {
     if (error instanceof GitHubError) {
       // A 403 past the repo check means the repo is reachable but a specific permission
@@ -330,5 +355,64 @@ export async function getGithubRepos(): Promise<Result<{ repos: string[] }>> {
   } catch (error) {
     if (error instanceof GitHubError) return { ok: false, message: `GitHub: ${error.message}` };
     return { ok: false, message: "Couldn't list your repositories." };
+  }
+}
+
+/**
+ * IS THE PUBLISHED SITE ACTUALLY SERVING?
+ *
+ * A static export is built for exactly one base path ("/<repo>"), so if Pages serves it
+ * from anywhere else — a renamed repo, Pages not enabled, a stale deploy — the HTML loads
+ * and every stylesheet and script 404s. The page renders as raw unstyled markup and
+ * nothing in GitHub's UI explains why. Fadi used to call that a success.
+ *
+ * This is deliberately SEPARATE from publishing and safe to call repeatedly, because
+ * Pages rebuilds asynchronously: for the first minute the URL still serves the previous
+ * build. "Not yet" is the normal first answer, not a failure — only a check that keeps
+ * saying no is worth alarming about, which is the caller's judgement to make.
+ */
+export async function checkPublishedSite(): Promise<
+  Result<{ url: string; state: "live" | "stale" | "missing" | "unknown"; message: string }>
+> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  const conn = await createGithubConnectionsRepository(getDatabase()).getByUserId(user.id);
+  if (!conn?.pagesUrl || !conn.repo || !conn.githubLogin) {
+    return { ok: false, message: "Publish to GitHub first." };
+  }
+
+  const url = conn.pagesUrl;
+  const expected = `${pagesBasePath(conn.githubLogin, conn.repo)}/_next`;
+  try {
+    // Cache-bust: a CDN copy of the pre-deploy page would look exactly like a failure.
+    const bust = `${url}${url.includes("?") ? "&" : "?"}fadi-check=${Date.now()}`;
+    const res = await fetch(bust, { redirect: "follow", cache: "no-store" });
+    if (!res.ok) {
+      return {
+        ok: true,
+        data: {
+          url,
+          state: "missing",
+          message: `${url} isn't serving yet (HTTP ${res.status}). GitHub Pages usually takes a minute — if it stays like this, check Settings → Pages on that repository.`,
+        },
+      };
+    }
+    const html = await res.text();
+    // A root-hosted user site has no prefix to compare, so there is nothing to get wrong.
+    if (expected === "/_next" || !html.includes("/_next") || html.includes(expected)) {
+      return { ok: true, data: { url, state: "live", message: `Live at ${url} — styles and scripts load.` } };
+    }
+    const serving = /\/[A-Za-z0-9._-]+\/_next/.exec(html)?.[0]?.replace("/_next", "") ?? "another path";
+    return {
+      ok: true,
+      data: {
+        url,
+        state: "stale",
+        message: `${url} is still serving an older build made for ${serving}, so its styles and scripts 404. Give Pages a minute; if it persists, republish.`,
+      },
+    };
+  } catch {
+    return { ok: true, data: { url, state: "unknown", message: `Couldn't reach ${url} from here.` } };
   }
 }

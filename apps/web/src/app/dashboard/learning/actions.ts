@@ -124,16 +124,46 @@ export async function completeCommitmentAction(input: {
     // orphaned evidence item AND a commitment still marked in-progress — so the
     // obvious retry inserted the evidence a SECOND time. The idempotence guard above
     // only holds if the status update is guaranteed to land with the insert.
+    // Resolve BEFORE opening the transaction: the read is what needs the whole pool,
+    // and doing it inside would hold the transaction open across it for no benefit.
+    // A finished commitment is very often work the user already recorded by hand while
+    // they were doing it — that is the duplicate this catches.
+    const { admitAgainst, toIdentity, UNCONFIRMED_LINK } = await import("@/lib/identity/admit");
+    const candidate = {
+      kind: commitment.kind === "project" ? "project" : "education",
+      title: commitment.title,
+      organization: null,
+      period: new Date().getFullYear().toString(),
+      detail: built,
+      metrics: null,
+      tags: commitment.gap ? [commitment.gap.toLowerCase().trim()] : [],
+      origin: "learning",
+    };
+    const poolRows = await createEvidenceRepository(db).listForUser(user.id);
+    const metaOf = new Map(
+      poolRows.map((e) => [e.id, { factId: e.factId ?? e.id, origin: e.origin, detail: e.detail }]),
+    );
+    const admission = admitAgainst(
+      candidate,
+      poolRows.map((e) =>
+        toIdentity(
+          { kind: e.kind, title: e.title, organization: e.organization, period: e.period, detail: e.detail, tags: e.tags },
+          e.id,
+        ),
+      ),
+      (id) => metaOf.get(id) ?? { factId: id },
+    );
+
     const evidence = await db.transaction(async (tx) => {
       const created = await createEvidenceRepository(tx).create(user.id, {
-        kind: commitment.kind === "project" ? "project" : "education",
-        title: commitment.title,
-        organization: null,
-        period: new Date().getFullYear().toString(),
-        detail: built,
-        metrics: null,
-        tags: commitment.gap ? [commitment.gap.toLowerCase().trim()] : [],
-        origin: "learning",
+        ...candidate,
+        ...(admission.decision === "absorb"
+          ? {
+              factId: admission.factId,
+              isCanonical: false,
+              renderingFor: admission.sure ? null : UNCONFIRMED_LINK,
+            }
+          : {}),
       });
       await createLearningCommitmentsRepository(tx).completeForUser(
         user.id,

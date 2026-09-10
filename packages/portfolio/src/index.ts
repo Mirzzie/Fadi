@@ -4,8 +4,11 @@
 
 // View contract + mapper (pure).
 export * from "./view";
+export * from "./work-index";
+export * from "./identity";
 export * from "./integrity";
 export * from "./themes";
+export * from "./portfolio-theme";
 export * from "./media";
 export * from "./persona";
 
@@ -17,4 +20,8 @@ export * from "./tune-the-story";
 export * from "./resume-button";
 export * from "./gallery-lightbox";
 export * from "./portfolio-template";
+export * from "./work-template";
+export * from "./skill-filter";
+export * from "./feedback-form";
+export * from "./analytics-client";
 export * from "./case-study-template";

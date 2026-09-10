@@ -34,7 +34,7 @@ export type DomainEventMap = {
   "portfolio.changed": {
     userId: string;
     siteId: string;
-    reason: "item_saved" | "item_deleted" | "seeded" | "synced" | "imported" | "reordered";
+    reason: "item_saved" | "item_deleted" | "seeded" | "synced" | "imported" | "reordered" | "confirmed";
   };
 
   /** A portfolio site went public / private. */

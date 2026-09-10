@@ -57,16 +57,68 @@ export async function buildPortfolioSite(args: {
     const npx = process.platform === "win32" ? "npx.cmd" : "npx";
     await exec(npx, ["next", "build"], {
       cwd: dir,
-      env: { ...process.env, PORTFOLIO_BASE_PATH: args.basePath },
+      env: {
+        ...process.env,
+        PORTFOLIO_BASE_PATH: args.basePath,
+        // MUST be forced. Fadi normally runs via `next dev`, so process.env carries
+        // NODE_ENV=development into this child — and a production `next build` that
+        // inherits it resolves React inconsistently and dies part-way through
+        // prerendering with "Cannot read properties of null (reading 'useContext')".
+        // That made Publish fail for every locally-run install, while the surfaced
+        // error ("Couldn't build your portfolio site") pointed at the GitHub token.
+        NODE_ENV: "production",
+      },
       timeout: 180_000,
       maxBuffer: 32 * 1024 * 1024,
     });
 
-    return collectOut(join(dir, "out"));
+    const built = collectOut(join(dir, "out"));
+    assertStylesheetCoversMarkup(built);
+    return built;
   });
   // Keep the chain alive even if this build throws, so the next publish still runs.
   buildLock = run.catch(() => undefined);
   return run;
+}
+
+/**
+ * REFUSE TO PUBLISH A SITE WITH NO STYLES.
+ *
+ * Tailwind v4 only generates classes it was pointed at with @source, and it does not
+ * follow imports into sibling workspace packages. Miss one, and the build still succeeds:
+ * every file is emitted, every asset returns 200, and the deployed page is raw unstyled
+ * markup. That exact gap shipped — 72% of the template's classes were absent from the
+ * published CSS while Fadi reported success — and nothing anywhere could have caught it,
+ * because "the CSS file exists" was the only thing being checked.
+ *
+ * So compare the two artefacts against each other: take the plain utility classes the
+ * rendered HTML actually uses and require the stylesheet to define most of them. Plain
+ * classes only — arbitrary values like text-[clamp(...)] are escaped in ways that make
+ * naive matching unreliable, and there are always enough plain ones to judge by.
+ */
+export function assertStylesheetCoversMarkup(files: ExportedFile[]): void {
+  const html = files.find((f) => f.path === "index.html");
+  const css = files.filter((f) => f.path.endsWith(".css")).map((f) => f.content).join("\n");
+  if (!html) throw new Error("The build produced no index.html.");
+  if (!css.trim()) throw new Error("The build produced no stylesheet — the site would be unstyled.");
+
+  const used = new Set<string>();
+  for (const [, attr] of html.content.matchAll(/class="([^"]+)"/g)) {
+    for (const token of attr.split(/\s+/)) {
+      // Plain utilities only: no variants, no arbitrary values, no CSS-module hashes.
+      if (/^[a-z][a-z0-9]*(-[a-z0-9.]+)+$/.test(token)) used.add(token);
+    }
+  }
+  if (used.size < 20) return; // Too little to judge — don't block on a guess.
+
+  const missing = [...used].filter((t) => !css.includes(`.${t.replace(/\./g, "\\.")}`));
+  if (missing.length > used.size * 0.25) {
+    throw new Error(
+      `The stylesheet is missing ${missing.length} of ${used.size} classes the page uses ` +
+        `(e.g. ${missing.slice(0, 4).join(", ")}) — the published site would be unstyled. ` +
+        `This usually means a template moved and globals.css needs an @source for it.`,
+    );
+  }
 }
 
 function collectOut(outDir: string): ExportedFile[] {
@@ -90,7 +142,7 @@ function collectOut(outDir: string): ExportedFile[] {
   return files;
 }
 
-/** GitHub project sites need a "/<repo>" base path; a user site ("<login>.github.io") is root. */
-export function pagesBasePath(login: string, repo: string): string {
-  return repo.toLowerCase() === `${login.toLowerCase()}.github.io` ? "" : `/${repo}`;
-}
+// pagesBasePath now lives beside pagesUrl in ./github, so the two halves of one rule —
+// where the site is BUILT for and where it is SERVED from — cannot drift apart, and can
+// be tested without dragging this module's child_process import into the test run.
+export { pagesBasePath } from "./github";

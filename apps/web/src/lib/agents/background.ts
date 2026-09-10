@@ -15,6 +15,7 @@ import { getMarketIntelligence } from "@/lib/data-sources/service";
 import { ensureFreshLiveJobs } from "@/lib/jobs/sync";
 import { getRecommendedJobsForUser } from "@/lib/jobs/data";
 import { createJobScorer } from "@/lib/jobs/job-matching";
+import { coherenceFindings } from "@/lib/agents/coherence";
 import { offTrackPatternFinding } from "@/lib/guardian/patterns";
 import type { EmploymentType, WorkMode } from "@/lib/jobs/filters";
 import { parseLocation } from "@/lib/jobs/locations";
@@ -225,6 +226,10 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
         data: { kind: signal.kind, relevance: signal.relevance },
       });
     }
+
+    // 5. Does Fadi's own data still agree with itself? Same ledger as everything
+    //    else — no separate panel, no button to remember.
+    findings.push(...(await coherenceFindings(userId, lastRun ? new Date(lastRun.startedAt) : null)));
 
     await runsRepo.insertFindings(run.id, userId, findings);
     await runsRepo.finishRun(run.id, { status: "ok", findingsCount: findings.length });

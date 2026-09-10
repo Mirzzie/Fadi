@@ -7,6 +7,8 @@ import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getUserDocGenerate } from "@/lib/ai/user-generate";
 import { getDatabase } from "@/lib/database/client";
 import { checkPortfolioIntegrityAI, type IntegrityAiResult } from "@/lib/portfolio/integrity";
+import type { EvidenceKind } from "@/lib/evidence/pool";
+import type { FeedbackNote, PortfolioStats, TimelineEntry } from "@/lib/portfolio/analytics";
 import { publish } from "@/lib/events/bus";
 import {
   fromExportItem,
@@ -21,6 +23,16 @@ import {
 } from "@careeros/portfolio";
 
 const PATH = "/dashboard/portfolio";
+
+/** Portfolio sections → evidence kinds, so one decision engine serves both. */
+const SECTION_KIND: Record<string, EvidenceKind> = {
+  project: "project",
+  experience: "experience",
+  education: "education",
+  certification: "achievement",
+  skill: "skill",
+  custom: "skill",
+};
 
 const SECTIONS = [
   "project",
@@ -88,11 +100,19 @@ export async function loadPortfolio(): Promise<
   const site = await ensureSite(user.id, user.email);
   const items = await repo.listItemsForUser(user.id, site.id);
 
-  // Same match logic as syncFromEvidence, but count-only (no writes).
+  // Same match logic as syncFromEvidence, but count-only (no writes) — including the
+  // dismissal memory, or the CMS would keep offering to re-add work the user removed.
   const have = new Set(items.map((i) => i.evidenceItemId).filter(Boolean) as string[]);
   const evidence = await createEvidenceRepository(getDatabase()).listForUser(user.id);
+  const dismissed = new Set(
+    ((site.theme as { dismissedFacts?: unknown })?.dismissedFacts as string[] | undefined) ?? [],
+  );
+  const factOfEvidence = new Map(evidence.map((e) => [e.id, e.factId ?? e.id]));
   const pendingProof = seedItemsFromEvidence(evidence).filter(
-    (r) => !have.has(r.evidenceItemId) && !items.some((x) => isSameEntry(r, x)),
+    (r) =>
+      !have.has(r.evidenceItemId) &&
+      !dismissed.has(factOfEvidence.get(r.evidenceItemId) ?? r.evidenceItemId) &&
+      !items.some((x) => isSameEntry(r, x)),
   ).length;
 
   return {
@@ -105,12 +125,16 @@ export async function loadPortfolio(): Promise<
   };
 }
 
-const TEMPLATES = ["noir-gold", "aurora", "minimal"];
+// One template. Historic ids are still accepted so an existing site keeps loading;
+// they all render the same thing now.
+const TEMPLATES = ["work", "noir-gold", "aurora", "minimal", "blog", "blog-plain"];
 
 export async function updateSiteSettings(input: {
   handle: string;
   title: string;
   headline?: string;
+  /** Owner overrides for the public page's headings. Blank = fall back to default. */
+  labels?: Record<string, string>;
   template?: string;
   resumeLinks?: Record<string, string>;
   profile?: Record<string, unknown>;
@@ -130,6 +154,19 @@ export async function updateSiteSettings(input: {
     handle,
     title: input.title.trim() || "My portfolio",
     headline: input.headline?.trim() || null,
+    // Stored in the existing `theme` jsonb, so editable copy needs no migration.
+    // Blank values are dropped rather than saved, so a cleared field returns to the
+    // default instead of rendering an empty heading.
+    // Only touched when the caller actually sent labels — otherwise saving any other
+    // setting would silently wipe the owner's wording.
+    theme: input.labels
+      ? {
+          ...(site.theme ?? {}),
+          labels: Object.fromEntries(
+            Object.entries(input.labels).filter(([, v]) => typeof v === "string" && v.trim()),
+          ),
+        }
+      : site.theme,
     template: input.template && TEMPLATES.includes(input.template) ? input.template : site.template,
     resumeLinks: input.resumeLinks ?? site.resumeLinks,
     profile: input.profile ?? site.profile,
@@ -200,7 +237,13 @@ export async function seedFromEvidence(): Promise<Result<{ added: number }>> {
     }
   }
 
-  const rows = seedItemsFromEvidence(evidence).map((r) => ({
+  // Same gate as the sync. The seed runs against a portfolio that may already have
+  // hand-written items, so "it's the first build" is not a reason to skip the check.
+  const { admitPortfolioItems } = await import("@/lib/portfolio/admit-items");
+  const alreadyThere = await repo.listItemsForUser(user.id, site.id);
+  const { keep } = admitPortfolioItems(seedItemsFromEvidence(evidence), alreadyThere);
+
+  const rows = keep.map((r) => ({
     ...r,
     siteId: site.id,
     roles: [] as string[],
@@ -208,6 +251,10 @@ export async function seedFromEvidence(): Promise<Result<{ added: number }>> {
     imageUrl: null,
     gallery: [] as string[],
     isPublished: true,
+    // Arrived automatically, so it is not on the public site until a person looks at
+    // it. The site the owner actually relies on does not inherit whatever the rest of
+    // the platform happens to write.
+    confirmedAt: null,
   }));
   const created = await repo.createItems(user.id, rows);
   revalidatePath(PATH);
@@ -220,7 +267,7 @@ export async function seedFromEvidence(): Promise<Result<{ added: number }>> {
  * edits (images, blurbs, order, publish state) are preserved. Evidence is the
  * source of truth; this keeps the projection current as career data grows.
  */
-export async function syncFromEvidence(): Promise<Result<{ added: number }>> {
+export async function syncFromEvidence(): Promise<Result<{ added: number; nearMatches: number }>> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
 
@@ -236,10 +283,72 @@ export async function syncFromEvidence(): Promise<Result<{ added: number }>> {
   // ("MSc" vs "M.Sc.", "BCA, Computer Science" vs "Bachelor of Computer Application (BCA)")
   // no longer sneaks back in as a duplicate.
   const seeded = seedItemsFromEvidence(evidence);
-  const kept = seeded.filter(
-    (r) => !have.has(r.evidenceItemId) && !existing.some((x) => isSameEntry(r, x))
+
+  // WHAT THE USER ALREADY DECIDED AGAINST.
+  //
+  // Deleting a portfolio item used to be futile: the item's evidence id left `have`,
+  // the lexical check could not recognise a re-worded record, and the next Sync
+  // cheerfully re-created it — "Added 3 items from your evidence" on a pool the user
+  // had just cleaned. A dismissal is a decision, so it is remembered. It is keyed on
+  // the FACT, not the row, so the same reality re-worded stays dismissed too.
+  const dismissed = new Set(
+    ((site.theme as { dismissedFacts?: unknown })?.dismissedFacts as string[] | undefined) ?? [],
   );
-  if (kept.length === 0) return { ok: true, added: 0 };
+  const factOfEvidence = new Map(evidence.map((e) => [e.id, e.factId ?? e.id]));
+
+  // IDENTITY, NOT WORDING. `isSameEntry` is lexical and section-scoped, so a project
+  // rewritten for a different application read as a brand-new one. This asks whether
+  // it is the same real thing (see lib/identity/resolve).
+  const { findSameThings } = await import("@/lib/identity/resolve");
+  const asInput = (x: {
+    id?: string;
+    section: string;
+    title: string;
+    subtitle: string | null;
+    dateRange: string | null;
+    description: string | null;
+    bullets?: string[] | null;
+  }, id: string) => ({
+    id,
+    kind: x.section,
+    title: x.title,
+    organization: x.subtitle,
+    period: x.dateRange,
+    detail: [x.description, ...(x.bullets ?? [])].filter(Boolean).join(" "),
+  });
+  const existingInputs = existing.map((x) => asInput(x, x.id));
+
+  // A "MAYBE" DOES NOT BECOME A SECOND ITEM.
+  //
+  // This is where the user's six duplicates actually landed: the resolver ran, scored
+  // every one of them "maybe" rather than "same", and the old rule added on a maybe.
+  // Detection after the fact was never the answer — by then two copies of one project
+  // are already on a public site and in every document generated from it.
+  //
+  // Not creating an item here loses nothing: the evidence row still exists, still holds
+  // its wording, and the background pass reports the near-match so the owner can add it
+  // deliberately if the two really are different work. Skipping is a click to undo;
+  // publishing a duplicate is not.
+  let nearMatches = 0;
+
+  const kept = seeded.filter((r, idx) => {
+    if (have.has(r.evidenceItemId)) return false;
+    if (dismissed.has(factOfEvidence.get(r.evidenceItemId) ?? r.evidenceItemId)) return false;
+    if (existing.some((x) => isSameEntry(r, x))) return false;
+    // Only a CONFIDENT match suppresses a new item — a "maybe" is still added, because
+    // silently withholding real work is worse than a duplicate the user can merge.
+    const me = asInput(r, `seed-${idx}`);
+    const mine = findSameThings([me, ...existingInputs]).filter(
+      (m) => m.a === me.id || m.b === me.id,
+    );
+    if (mine.some((m) => m.verdict === "same")) return false;
+    if (mine.some((m) => m.verdict === "maybe")) {
+      nearMatches += 1;
+      return false;
+    }
+    return true;
+  });
+  if (kept.length === 0) return { ok: true, added: 0, nearMatches };
 
   const maxSort = existing.reduce((m, i) => Math.max(m, i.sortOrder), 0);
   const rows = kept.map((r, i) => ({
@@ -251,11 +360,12 @@ export async function syncFromEvidence(): Promise<Result<{ added: number }>> {
     gallery: [] as string[],
     isPublished: true,
     sortOrder: maxSort + (i + 1) * 10,
+    confirmedAt: null, // automatic — waits for a look before it goes public
   }));
   const created = await repo.createItems(user.id, rows);
   await publish("portfolio.changed", { userId: user.id, siteId: site.id, reason: "synced" });
   revalidatePath(PATH);
-  return { ok: true, added: created.length };
+  return { ok: true, added: created.length, nearMatches };
 }
 
 /**
@@ -343,6 +453,9 @@ export async function saveItem(input: {
       siteId: site.id,
       sortOrder: maxSort + 10,
       isPublished: true,
+      // The owner typed this. Confirmation is what "a person has looked at it" means,
+      // and they were looking at it while they wrote it.
+      confirmedAt: new Date(),
     });
   }
   if (!row) return { ok: false, message: "I can't find that item." };
@@ -424,7 +537,28 @@ export async function setItemPublished(input: {
 export async function deleteItem(input: { id: string }): Promise<{ ok: boolean }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false };
-  await createPortfolioRepository(getDatabase()).deleteItem(user.id, input.id);
+
+  const db = getDatabase();
+  const repo = createPortfolioRepository(db);
+
+  // Remember the decision BEFORE the row goes, or Sync will simply put it back.
+  // Keyed on the fact, so the same reality re-worded stays dismissed as well.
+  const item = await repo.getItemForUser(user.id, input.id);
+  if (item?.evidenceItemId) {
+    const site = await ensureSite(user.id, user.email);
+    const evidence = await createEvidenceRepository(db).listAllForUser(user.id);
+    const fact =
+      evidence.find((e) => e.id === item.evidenceItemId)?.factId ?? item.evidenceItemId;
+    const theme = (site.theme ?? {}) as Record<string, unknown>;
+    const prev = Array.isArray(theme.dismissedFacts) ? (theme.dismissedFacts as string[]) : [];
+    if (!prev.includes(fact)) {
+      await repo.updateSite(user.id, site.id, {
+        theme: { ...theme, dismissedFacts: [...prev, fact] },
+      });
+    }
+  }
+
+  await repo.deleteItem(user.id, input.id);
   revalidatePath(PATH);
   return { ok: true };
 }
@@ -450,7 +584,7 @@ export async function exportPortfolio(): Promise<Result<{ payload: PortfolioExpo
 export async function importPortfolio(input: {
   payload: PortfolioExport;
   mode: "merge" | "replace";
-}): Promise<Result<{ imported: number }>> {
+}): Promise<Result<{ imported: number; heldBack: number }>> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
   const payload = input.payload;
@@ -461,10 +595,25 @@ export async function importPortfolio(input: {
   const repo = createPortfolioRepository(getDatabase());
   const site = await ensureSite(user.id, user.email);
 
-  const rows = payload.items
-    .map(fromExportItem)
-    .filter((r) => r.title.trim())
-    .map((r, i) => ({ ...r, siteId: site.id, sortOrder: r.sortOrder || (i + 1) * 10 }));
+  const parsedItems = payload.items.map(fromExportItem).filter((r) => r.title.trim());
+
+  // "Replace" wipes the portfolio first, so there is nothing to duplicate against and
+  // the file is the truth. "Merge" adds to what is there — the door through which an
+  // export re-imported after some editing quietly doubles everything it touches.
+  const { admitPortfolioItems } = await import("@/lib/portfolio/admit-items");
+  const merged =
+    input.mode === "replace"
+      ? { keep: parsedItems, heldBack: [] as { title: string; matches: string }[] }
+      : admitPortfolioItems(parsedItems, await repo.listItemsForUser(user.id, site.id));
+
+  const rows = merged.keep.map((r, i) => ({
+    ...r,
+    siteId: site.id,
+    sortOrder: r.sortOrder || (i + 1) * 10,
+    // Choosing a file is deliberate; having read every row in it is not. An export from
+    // another Fadi, or a hand-edited JSON, is exactly the content most worth a look.
+    confirmedAt: null,
+  }));
 
   // Replace is atomic (see repo.replaceItems): the old delete-then-insert could wipe
   // the user's whole portfolio and insert nothing if the insert failed.
@@ -473,5 +622,327 @@ export async function importPortfolio(input: {
       ? await repo.replaceItems(user.id, site.id, rows)
       : await repo.createItems(user.id, rows);
   revalidatePath(PATH);
-  return { ok: true, imported: created.length };
+  return { ok: true, imported: created.length, heldBack: merged.heldBack.length };
+}
+
+export type FocusPlanItem = {
+  id: string;
+  title: string;
+  section: string;
+  /** "lead" | "keep" | "hide" — what focusing would do to this item. */
+  verdict: "lead" | "keep" | "hide";
+  reason: string;
+};
+
+export type FocusPlan = {
+  direction: string;
+  /** Every item, with what focusing would do to it. Nothing is ever deleted. */
+  plan: FocusPlanItem[];
+  leadCount: number;
+  hideCount: number;
+  note: string;
+};
+
+/**
+ * FOCUS THE PORTFOLIO ON ONE DIRECTION.
+ *
+ * The reviewer's point, applied to the site rather than to a single application:
+ * a portfolio that spans IT operations, cloud, DevOps and security asks the reader
+ * to work out what you are. Focusing picks ONE direction and puts everything else
+ * out of the way.
+ *
+ * Two rules, both inherited from the lead-evidence decision:
+ *   - Hiding is never deleting. Off-spine items are unpublished, so a different
+ *     direction (or a change of mind) restores them in one click.
+ *   - Qualifications, credentials and skills are structural and are never hidden —
+ *     the portfolio still has to say what you're qualified in.
+ *
+ * Preview first: this returns the plan and writes nothing. `applyPortfolioFocus`
+ * commits it. Detect → propose → approve, like the rest of the CMS.
+ */
+export async function planPortfolioFocus(input: {
+  direction: string;
+}): Promise<Result<FocusPlan>> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  const db = getDatabase();
+  const repo = createPortfolioRepository(db);
+  const site = await ensureSite(user.id, user.email);
+  const items = await repo.listItemsForUser(user.id, site.id);
+  if (items.length === 0) return { ok: false, message: "Nothing on the portfolio to focus yet." };
+
+  const [{ chooseLeadEvidence }, { createCareerProfilesRepository }] = await Promise.all([
+    import("@/lib/evidence/lead"),
+    import("@careeros/database"),
+  ]);
+  const profiles = await createCareerProfilesRepository(db).listForUser(user.id);
+  const target = profiles.find((p) => (p.label || p.targetRole) === input.direction);
+  if (!target) return { ok: false, message: `No career direction called "${input.direction}".` };
+
+  const seen = new Set<string>();
+  const directions = [];
+  for (const p of profiles) {
+    if (!p.targetRole) continue;
+    const name = p.label || p.targetRole;
+    if (seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    directions.push({ role: name, domain: p.domain, synonyms: p.roleSynonyms ?? [] });
+  }
+
+  // Judge each portfolio item on ITS OWN text, not on the evidence it was seeded
+  // from: on a real portfolio only a handful of items carry an evidence link
+  // (5 of 38 on the first site this ran against), so an evidence-keyed decision
+  // would silently shrug at almost everything. A portfolio item's TITLE is its own
+  // name for itself, so it is fed in as a tag — that is the signal that makes a
+  // card called "DevOps" recognisably DevOps.
+  const asEvidence = items.map((item) => ({
+    id: item.id,
+    kind: SECTION_KIND[item.section] ?? "skill",
+    title: item.title,
+    organization: item.subtitle,
+    period: item.dateRange,
+    detail: [item.description, ...(item.bullets ?? [])].filter(Boolean).join(" "),
+    metrics: null,
+    tags: [item.title, item.tag, ...(item.roles ?? [])].filter(Boolean) as string[],
+    marketTags: [],
+    origin: "portfolio",
+  }));
+
+  const decision = chooseLeadEvidence(
+    asEvidence,
+    { title: target.targetRole, description: target.domain ?? null },
+    directions,
+    // On a portfolio each skill is its own card, so skills dilute like projects do.
+    { competing: new Set(["experience", "project", "skill"]) }
+  );
+
+  const verdictOf = new Map<string, { verdict: FocusPlanItem["verdict"]; reason: string }>();
+  for (const p of decision.lead) verdictOf.set(p.item.id, { verdict: "lead", reason: p.reason });
+  for (const p of decision.holdBack) verdictOf.set(p.item.id, { verdict: "hide", reason: p.reason });
+  for (const p of [...decision.support, ...decision.untranslated])
+    verdictOf.set(p.item.id, { verdict: "keep", reason: p.reason });
+
+  const plan: FocusPlanItem[] = items.map((item) => {
+    const v = verdictOf.get(item.id);
+    return {
+      id: item.id,
+      title: item.title,
+      section: item.section,
+      verdict: v?.verdict ?? "keep",
+      reason: v?.reason ?? "Kept as is.",
+    };
+  });
+
+  const leadCount = plan.filter((p) => p.verdict === "lead").length;
+  const hideCount = plan.filter((p) => p.verdict === "hide").length;
+
+  return {
+    ok: true,
+    direction: input.direction,
+    plan,
+    leadCount,
+    hideCount,
+    note:
+      hideCount > 0
+        ? `Focusing on ${input.direction} leads with ${leadCount} and hides ${hideCount} off-direction ${hideCount === 1 ? "item" : "items"}. Nothing is deleted — switching direction brings them back.`
+        : `Your portfolio already reads as ${input.direction}. Nothing needs hiding.`,
+  };
+}
+
+/**
+ * Commit a focus plan — but only the hides the USER approved.
+ *
+ * Deliberately not "re-plan and apply": lexical matching cannot tell a genuinely
+ * off-direction item from an untranslated one. On the first real portfolio this ran
+ * against it proposed hiding `Linux` from a security focus, because the user's
+ * IT-Administrator direction lists "linux administrator" as a synonym while their
+ * Cybersecurity vocabulary (SOC, threat, incident response) shares no token with it
+ * — the exact "untranslated, not irrelevant" case the pool is built around.
+ *
+ * So the plan is a PROPOSAL and this takes the ids the user actually ticked, which
+ * is the CMS's existing rule: detect → propose → approve, never auto-mutate.
+ */
+export async function applyPortfolioFocus(input: {
+  /** Item ids the user approved for hiding. Everything else is (re)published. */
+  hideIds: string[];
+}): Promise<Result<{ hidden: number; shown: number }>> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  const db = getDatabase();
+  const repo = createPortfolioRepository(db);
+  const site = await ensureSite(user.id, user.email);
+  const items = await repo.listItemsForUser(user.id, site.id);
+
+  const hide = new Set(input.hideIds);
+  // Only touch what actually changes — and re-publish anything no longer hidden, or
+  // switching focus would leave the site permanently emptied by the previous focus.
+  for (const item of items) {
+    const shouldPublish = !hide.has(item.id);
+    if (item.isPublished !== shouldPublish) {
+      await repo.updateItem(user.id, item.id, { isPublished: shouldPublish });
+    }
+  }
+
+  revalidatePath(PATH);
+  return { ok: true, hidden: hide.size, shown: items.length - hide.size };
+}
+
+/** The user's career directions, for the focus picker. */
+export async function listFocusDirections(): Promise<Result<{ directions: string[] }>> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  const { createCareerProfilesRepository } = await import("@careeros/database");
+  const profiles = await createCareerProfilesRepository(getDatabase()).listForUser(user.id);
+  const seen = new Set<string>();
+  const directions: string[] = [];
+  for (const p of profiles) {
+    const name = p.label || p.targetRole;
+    if (!name || seen.has(name.toLowerCase())) continue;
+    seen.add(name.toLowerCase());
+    directions.push(name);
+  }
+  return { ok: true, directions };
+}
+
+/**
+ * The owner's own visitor numbers for their site.
+ *
+ * Owner-scoped by construction: the stats query filters on the caller's userId, so
+ * one person can never read another's traffic even if they guess a site id.
+ */
+export async function loadPortfolioStats(input: { days?: number } = {}): Promise<
+  Result<{
+    stats: PortfolioStats;
+    feedback: FeedbackNote[];
+    timeline: TimelineEntry[];
+    handle: string;
+    isPublished: boolean;
+  }>
+> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  const site = await ensureSite(user.id, user.email);
+  const { portfolioStats, portfolioFeedback, portfolioTimeline } = await import(
+    "@/lib/portfolio/analytics"
+  );
+  const [stats, feedback, timeline] = await Promise.all([
+    portfolioStats(user.id, site.id, input.days ?? 30),
+    portfolioFeedback(user.id, site.id),
+    portfolioTimeline(user.id, site.id, input.days ?? 30),
+  ]);
+  return { ok: true, stats, feedback, timeline, handle: site.handle, isPublished: site.isPublished };
+}
+
+/**
+ * Clear the owner's own visits and automated hits from the log.
+ *
+ * These rows are already excluded from every number, so this changes no statistic. It
+ * exists because testing your own portfolio means visiting it, and a log full of your
+ * own footprints makes the real ones hard to find. Genuine visitor events are never
+ * touched — there is deliberately no way to delete those from here, because a tool that
+ * lets you tidy away inconvenient evidence is not evidence.
+ */
+export async function clearPortfolioTestEvents(): Promise<Result<{ removed: number }>> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  const site = await ensureSite(user.id, user.email);
+  const { createProductEventsRepository } = await import("@careeros/database");
+  const { getDatabase } = await import("@/lib/database/client");
+  const removed = await createProductEventsRepository(getDatabase()).purgeExcluded(user.id, site.id);
+  return { ok: true, removed };
+}
+
+/**
+ * Pull visitor events from the public collector into Fadi.
+ *
+ * Manual rather than automatic: Fadi only runs when you run it, so a background
+ * schedule would be a schedule that mostly doesn't happen. Pressing Sync when you
+ * open the panel is honest about that.
+ */
+export async function syncPortfolioAudience(): Promise<
+  Result<{ imported: number; skipped: number }>
+> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  const site = await ensureSite(user.id, user.email);
+  const { syncCollectorEvents, syncCollectorFeedback } = await import(
+    "@/lib/portfolio/collector-sync"
+  );
+  const args = { userId: user.id, siteId: site.id, handle: site.handle };
+  const res = await syncCollectorEvents(args);
+  if (!res.ok) return { ok: false, message: res.message };
+  // Feedback lives on the same collector; one button should bring home both.
+  const fb = await syncCollectorFeedback(args);
+
+  revalidatePath(PATH);
+  return {
+    ok: true,
+    imported: res.imported + (fb.ok ? fb.imported : 0),
+    skipped: res.skipped,
+  };
+}
+
+export type Dismissal = { factId: string; title: string };
+
+/** What the user has told Sync to stop bringing back. */
+export async function listDismissed(): Promise<Result<{ dismissed: Dismissal[] }>> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  const site = await ensureSite(user.id, user.email);
+  const ids = ((site.theme as { dismissedFacts?: unknown })?.dismissedFacts as string[]) ?? [];
+  if (ids.length === 0) return { ok: true, dismissed: [] };
+
+  const evidence = await createEvidenceRepository(getDatabase()).listAllForUser(user.id);
+  const dismissed = ids.map((factId) => ({
+    factId,
+    title: evidence.find((e) => (e.factId ?? e.id) === factId)?.title ?? "A removed entry",
+  }));
+  return { ok: true, dismissed };
+}
+
+/**
+ * Undo a dismissal, so Sync will offer this work again.
+ *
+ * A dismissal is a decision, and a decision a user cannot reverse is a trap — the
+ * first version of this was only undoable by hand-editing JSON.
+ */
+export async function undismissFact(input: { factId: string }): Promise<{ ok: boolean }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false };
+  const repo = createPortfolioRepository(getDatabase());
+  const site = await ensureSite(user.id, user.email);
+  const theme = (site.theme ?? {}) as Record<string, unknown>;
+  const prev = Array.isArray(theme.dismissedFacts) ? (theme.dismissedFacts as string[]) : [];
+  await repo.updateSite(user.id, site.id, {
+    theme: { ...theme, dismissedFacts: prev.filter((f) => f !== input.factId) },
+  });
+  revalidatePath(PATH);
+  return { ok: true };
+}
+
+/**
+ * Put automatically-collected items on the public site.
+ *
+ * The gate's only action. Everything Fadi gathers on its own — an extraction, an
+ * evidence sync, an imported file — lands unconfirmed and stays off the live site
+ * until this runs. That is what lets the rest of the platform stay under construction
+ * without the one part strangers read being at risk.
+ */
+export async function confirmPortfolioItems(input: { ids: string[] }): Promise<
+  Result<{ confirmed: number }>
+> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  const repo = createPortfolioRepository(getDatabase());
+  const confirmed = await repo.confirmItems(user.id, input.ids.slice(0, 200));
+  const site = await ensureSite(user.id, user.email);
+  await publish("portfolio.changed", { userId: user.id, siteId: site.id, reason: "confirmed" });
+  revalidatePath(PATH);
+  return { ok: true, confirmed };
 }

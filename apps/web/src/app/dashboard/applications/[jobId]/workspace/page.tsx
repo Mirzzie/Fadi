@@ -15,6 +15,7 @@ import { ExternalLink } from "lucide-react";
 
 import { ApplicationOutcomePanel } from "@/components/workspace/application-outcome-panel";
 import { FitGatePanel } from "@/components/workspace/fit-gate-panel";
+import { LeadEvidencePanel } from "@/components/workspace/lead-evidence-panel";
 import { ApplicationQualityPanel } from "@/components/workspace/application-quality-panel";
 import { CvReviewPanel } from "@/components/workspace/cv-review-panel";
 import { InterviewPrepPanel } from "@/components/workspace/interview-prep-panel";
@@ -153,6 +154,15 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
               jobCompany={job.company}
               jobDescription={job.description ?? undefined}
             />
+          </WorkspaceSection>
+          {/* Sits between go/no-go and ready-to-send on purpose: once you've decided
+              to apply, the next real decision is what leads — not another score. */}
+          <WorkspaceSection
+            icon="lead"
+            title="What should lead here?"
+            hint="Which of your evidence goes first for this role"
+          >
+            <LeadEvidencePanel jobTitle={job.title} jobDescription={job.description ?? undefined} />
           </WorkspaceSection>
           <WorkspaceSection
             icon="quality"

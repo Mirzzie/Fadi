@@ -136,9 +136,17 @@ export function toBase64(text: string): string {
   return Buffer.from(text, "utf8").toString("base64");
 }
 
-/** The public Pages URL for a project site. */
+/** GitHub project sites need a "/<repo>" base path; a user site ("<login>.github.io") is root. */
+export function pagesBasePath(login: string, repo: string): string {
+  return repo.toLowerCase() === `${login.toLowerCase()}.github.io` ? "" : `/${repo}`;
+}
+
+/** The public Pages URL. A user site ("<login>.github.io") serves at the root — its own
+ *  name is NOT a path segment — so it must not be appended, or every link Fadi stores
+ *  and shows would point one level too deep. Must agree with pagesBasePath(). */
 export function pagesUrl(login: string, repo: string): string {
-  return `https://${login.toLowerCase()}.github.io/${repo}/`;
+  const host = `${login.toLowerCase()}.github.io`;
+  return repo.toLowerCase() === host ? `https://${host}/` : `https://${host}/${repo}/`;
 }
 
 export class GitHubClient {
@@ -196,20 +204,30 @@ export class GitHubClient {
    * whole point of showing a picker instead of a blind name field.
    */
   async listRepos(): Promise<Array<{ name: string; fullName: string; private: boolean }>> {
-    const { status, data } = await this.request(
-      "GET",
-      "/user/repos?per_page=100&sort=updated&affiliation=owner",
-    );
-    if (status !== 200 || !Array.isArray(data)) {
-      this.fail(status, data, "Could not list your repositories.");
+    // Paginate. A single page caps at 100, and "the repo I wanted wasn't in the list" is
+    // indistinguishable from "the token can't see it" — so walk until GitHub runs out.
+    // Bounded at 10 pages so a pathological account can't stall the picker.
+    const out: Array<{ name: string; fullName: string; private: boolean }> = [];
+    for (let page = 1; page <= 10; page += 1) {
+      const { status, data } = await this.request(
+        "GET",
+        `/user/repos?per_page=100&page=${page}&sort=updated&affiliation=owner`,
+      );
+      if (status !== 200 || !Array.isArray(data)) {
+        this.fail(status, data, "Could not list your repositories.");
+      }
+      const rows = data as Array<Record<string, unknown>>;
+      for (const r of rows) {
+        if (typeof r.name !== "string") continue;
+        out.push({
+          name: String(r.name),
+          fullName: String(r.full_name ?? r.name),
+          private: r.private === true,
+        });
+      }
+      if (rows.length < 100) break;
     }
-    return (data as Array<Record<string, unknown>>)
-      .filter((r) => typeof r.name === "string")
-      .map((r) => ({
-        name: String(r.name),
-        fullName: String(r.full_name ?? r.name),
-        private: r.private === true,
-      }));
+    return out;
   }
 
   /**
@@ -219,10 +237,37 @@ export class GitHubClient {
    * the caller give an actionable message instead of a blind create attempt.
    */
   async repoStatus(owner: string, repo: string): Promise<"exists" | "missing" | "no_access"> {
-    const { status } = await this.request("GET", `/repos/${owner}/${repo}`);
-    if (status === 200) return "exists";
-    if (status === 404) return "missing";
-    if (status === 403) return "no_access";
+    return (await this.resolveRepo(owner, repo)).status;
+  }
+
+  /**
+   * repoStatus, plus THE NAME GITHUB ACTUALLY HAS FOR THIS REPO.
+   *
+   * Renaming a repository does not break the API: GitHub silently follows the old name to
+   * the new repo, so every write Fadi makes still lands. What it does break is the Pages
+   * URL — that follows the NEW name. Publish under the stale name and the export is built
+   * for "/old" while the site is served at "/new": the HTML loads and all ~47 assets 404,
+   * which is a completely unstyled page with no error anywhere to explain it.
+   *
+   * So the canonical name is read back from the response and used for the base path and
+   * the Pages URL, instead of trusting what we had stored.
+   */
+  async resolveRepo(
+    owner: string,
+    repo: string,
+  ): Promise<{ status: "exists" | "missing" | "no_access"; name: string; owner: string }> {
+    const { status, data } = await this.request("GET", `/repos/${owner}/${repo}`);
+    if (status === 200) {
+      const body = (data ?? {}) as Record<string, unknown>;
+      const ownerLogin = (body.owner as Record<string, unknown> | undefined)?.login;
+      return {
+        status: "exists",
+        name: typeof body.name === "string" && body.name ? body.name : repo,
+        owner: typeof ownerLogin === "string" && ownerLogin ? ownerLogin : owner,
+      };
+    }
+    if (status === 404) return { status: "missing", name: repo, owner };
+    if (status === 403) return { status: "no_access", name: repo, owner };
     this.fail(status, null, `Unexpected status ${status} checking the repository.`);
   }
 

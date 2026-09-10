@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { CheckCircle2, ExternalLink, GitBranch, Loader2, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ExternalLink, GitBranch, Loader2, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  checkPublishedSite,
   connectGithub,
   disconnectGithub,
   getGithubConnection,
@@ -25,17 +26,17 @@ export function GithubPublishPanel({ isPublished }: { isPublished: boolean }) {
   const [conn, setConn] = useState<GithubConnectionView | null>(null);
   const [token, setToken] = useState("");
   const [repo, setRepo] = useState("portfolio");
-  const [repos, setRepos] = useState<string[]>([]);
+  const [repos, setRepos] = useState<string[] | null>(null);
+  // "type a name" mode — for creating a new repo, or naming one the list can't show.
+  const [customRepo, setCustomRepo] = useState(false);
   const [inspect, setInspect] = useState<{ hasIndex: boolean; foreign: string[] } | null>(null);
-  const [status, setStatus] = useState<{ ok: boolean; message: string; url?: string } | null>(null);
+  const [status, setStatus] = useState<{ ok: boolean; warn?: boolean; checking?: boolean; message: string; url?: string } | null>(null);
   const [pending, start] = useTransition();
 
   // Load the token's reachable repos so the picker only offers repos it can actually
   // write to — the point of showing a list instead of a blind name field.
   function loadRepos() {
-    getGithubRepos().then((r) => {
-      if (r.ok) setRepos(r.data.repos);
-    });
+    getGithubRepos().then((r) => setRepos(r.ok ? r.data.repos : []));
   }
 
   useEffect(() => {
@@ -89,13 +90,47 @@ export function GithubPublishPanel({ isPublished }: { isPublished: boolean }) {
           ok: true,
           message:
             res.data.note ??
-            "Published your full portfolio site. Live in ~1 minute at the URL below.",
+            "Published your full portfolio site. Waiting for GitHub Pages to serve it…",
           url: res.data.pagesUrl,
+          checking: true,
         });
+        void watchUntilLive();
       } else {
         setStatus({ ok: false, message: res.message });
       }
     });
+  }
+
+  /**
+   * Wait for Pages to actually serve the build we just pushed.
+   *
+   * GitHub Pages rebuilds asynchronously: for the first ~30-60s the URL still returns the
+   * PREVIOUS deploy. A single check the moment publishing finishes therefore reads a stale
+   * page and reports a perfectly good publish as broken — so poll, and only call it a
+   * problem once Pages has had long enough to catch up.
+   */
+  async function watchUntilLive() {
+    const deadline = Date.now() + 3 * 60 * 1000;
+    for (let attempt = 0; ; attempt += 1) {
+      await new Promise((r) => setTimeout(r, attempt === 0 ? 8000 : 12000));
+      const res = await checkPublishedSite();
+      if (!res.ok) return;
+
+      const done = res.data.state === "live" || Date.now() > deadline;
+      setStatus((prev) =>
+        prev?.ok
+          ? {
+              ...prev,
+              checking: !done,
+              warn: done && res.data.state !== "live",
+              message: done
+                ? res.data.message
+                : "Published. Waiting for GitHub Pages to serve the new build…",
+            }
+          : prev,
+      );
+      if (done) return;
+    }
   }
 
   function disconnect() {
@@ -160,25 +195,85 @@ export function GithubPublishPanel({ isPublished }: { isPublished: boolean }) {
           <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
             <div className="space-y-1.5">
               <Label htmlFor="gh-repo">Repository</Label>
-              <Input
-                id="gh-repo"
-                list="gh-repo-list"
-                value={repo}
-                onChange={(e) => setRepo(e.target.value)}
-                placeholder="portfolio"
-              />
-              <datalist id="gh-repo-list">
-                {repos.map((r) => (
-                  <option key={r} value={r} />
-                ))}
-              </datalist>
+              {/* A <datalist> only reveals itself once you type, so a list that WAS loaded
+                  looked like no list at all. A real <select> shows what the token can
+                  reach; "Other…" keeps the free-text path for creating a new repo. */}
+              {repos && repos.length > 0 && !customRepo ? (
+                <select
+                  id="gh-repo"
+                  value={repos.includes(repo.trim()) ? repo.trim() : ""}
+                  onChange={(e) => {
+                    if (e.target.value === "__other__") {
+                      setCustomRepo(true);
+                      setRepo("");
+                      return;
+                    }
+                    setRepo(e.target.value);
+                  }}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  {!repos.includes(repo.trim()) && (
+                    <option value="" disabled>
+                      Choose a repository…
+                    </option>
+                  )}
+                  {repos.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                  <option value="__other__">Other / create a new repo…</option>
+                </select>
+              ) : (
+                <Input
+                  id="gh-repo"
+                  value={repo}
+                  onChange={(e) => setRepo(e.target.value)}
+                  placeholder="portfolio"
+                  autoFocus={customRepo}
+                />
+              )}
               <p className="text-[11px] text-muted-foreground">
-                {repos.includes(repo.trim())
-                  ? "Existing repo — Fadi will publish into it."
-                  : repos.length > 0
-                    ? "New repo — pick an existing one above if creating fails (fine-grained tokens often can't create repos)."
-                    : "Type the repo name, or reconnect to load your repositories."}
+                {repos === null ? (
+                  "Loading your repositories…"
+                ) : repos.includes(repo.trim()) ? (
+                  "Existing repo — Fadi will publish into it."
+                ) : (
+                  <>
+                    New repo — fine-grained tokens usually can&apos;t create one, so create it
+                    on GitHub first.{" "}
+                    {customRepo && repos.length > 0 ? (
+                      <button
+                        type="button"
+                        className="underline"
+                        onClick={() => {
+                          setCustomRepo(false);
+                          setRepo(conn.repo && repos.includes(conn.repo) ? conn.repo : repos[0]);
+                        }}
+                      >
+                        Back to the list
+                      </button>
+                    ) : null}
+                  </>
+                )}
               </p>
+              {repos !== null && (
+                <p className="text-[11px] text-muted-foreground">
+                  {repos.length === 0
+                    ? "Your token can't see any repositories."
+                    : `${repos.length} ${repos.length === 1 ? "repository" : "repositories"} visible to this token.`}{" "}
+                  A fine-grained token only reaches the repos you selected when you made it —{" "}
+                  <a
+                    className="underline"
+                    href="https://github.com/settings/tokens?type=beta"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    grant it more
+                  </a>{" "}
+                  and reconnect if one is missing.
+                </p>
+              )}
             </div>
             <Button onClick={publish} disabled={pending || !isPublished}>
               {pending ? <Loader2 className="size-4 animate-spin" /> : <GitBranch className="size-4" />}
@@ -208,15 +303,25 @@ export function GithubPublishPanel({ isPublished }: { isPublished: boolean }) {
           )}
 
           {conn.pagesUrl && (
-            <a
-              className="inline-flex items-center gap-1 text-xs underline text-muted-foreground"
-              href={conn.pagesUrl}
-              target="_blank"
-              rel="noreferrer"
-            >
-              <ExternalLink className="size-3" aria-hidden="true" />
-              {conn.pagesUrl}
-            </a>
+            <div className="space-y-1">
+              {/* Opening your OWN site from here marks this browser as yours, so your
+                  visits never show up as someone taking an interest. It only marks the
+                  device you're on — see the note below. */}
+              <a
+                className="inline-flex items-center gap-1 text-xs underline text-muted-foreground"
+                href={`${conn.pagesUrl}${conn.pagesUrl.includes("?") ? "&" : "?"}not-me=1`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <ExternalLink className="size-3" aria-hidden="true" />
+                {conn.pagesUrl}
+              </a>
+              <p className="text-[11px] text-muted-foreground">
+                Opening it from here stops <em>this</em> browser being counted as a visitor. Each
+                device is separate — bookmark this link and open it once on your phone or other
+                browsers to do the same there.
+              </p>
+            </div>
           )}
 
           <button
@@ -233,10 +338,20 @@ export function GithubPublishPanel({ isPublished }: { isPublished: boolean }) {
       {status && (
         <div
           className={`flex items-start gap-2 rounded-md px-3 py-2 text-sm ${
-            status.ok ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
+            status.checking
+              ? "bg-muted text-muted-foreground"
+              : status.warn
+                ? "bg-warning/10 text-warning"
+                : status.ok
+                  ? "bg-success/10 text-success"
+                  : "bg-destructive/10 text-destructive"
           }`}
         >
-          {status.ok ? (
+          {status.checking ? (
+            <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin" aria-hidden="true" />
+          ) : status.warn ? (
+            <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          ) : status.ok ? (
             <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           ) : (
             <XCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />

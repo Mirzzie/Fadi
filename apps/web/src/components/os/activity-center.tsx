@@ -24,6 +24,12 @@ const KIND_LABEL: Record<string, string> = {
   world_shift: "World shift",
   off_track: "A pattern Fadi noticed",
   learning_pending: "Your commitment",
+  // Coherence: Fadi's own data disagreeing with itself. Phrased as an observation,
+  // not an accusation — the owner decides whether it's a mistake or a choice.
+  portfolio_gap: "Missing from your portfolio",
+  portfolio_duplicate: "Recorded twice",
+  evidence_link_unconfirmed: "Did Fadi get this right?",
+  evidence_needs_decision: "Two versions — you choose",
 };
 
 /**
