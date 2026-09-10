@@ -99,6 +99,8 @@ function toRemoteMode(posting: JobPosting): string | null {
  */
 export type JobSyncStatus = {
   running: boolean;
+  /** Distinguishes a completed import from an empty or failed one. */
+  outcome: "running" | "completed" | "empty" | "partial" | "persist_failed" | "failed";
   startedAt: number;
   finishedAt: number | null;
   /** Postings upserted so far this run. */
@@ -108,6 +110,8 @@ export type JobSyncStatus = {
   /** sources finished / total. */
   done: number;
   total: number;
+  /** Discovered postings which could not be persisted. */
+  persistFailed: number;
 };
 
 function statusKey(profile: RelevanceProfile, location?: LocationFilter): string {
@@ -160,12 +164,14 @@ async function beginRun(
   const sKey = statusKey(profile, location);
   const status: JobSyncStatus = {
     running: true,
+    outcome: "running",
     startedAt: Date.now(),
     finishedAt: null,
     found: 0,
     sources: [],
     done: 0,
     total: 0,
+    persistFailed: 0,
   };
   await writeStatus(sKey, status); // visible to the very next getJobSyncStatus read
   return { key, sKey, status };
@@ -236,6 +242,7 @@ async function runDiscovery(
       // *something*. Shrink the window so we retry sooner than the full TTL.
       await kv.set(key, "1", 60);
       status.running = false;
+      status.outcome = "empty";
       status.finishedAt = Date.now();
       await writeStatus(sKey, status);
       return 0;
@@ -245,6 +252,7 @@ async function runDiscovery(
     const jobsRepository = createJobsRepository(db);
 
     let upserted = 0;
+    let persistFailed = 0;
     for (const posting of postings) {
       try {
         await jobsRepository.upsertSeedJob({
@@ -263,12 +271,34 @@ async function runDiscovery(
         });
         upserted += 1;
       } catch (err) {
+        persistFailed += 1;
         logger.warn("jobs.sync.upsert_failed", {
           source: posting.sourceId,
           externalId: posting.externalId,
           error: err instanceof Error ? err.message : "unknown",
         });
       }
+    }
+
+    status.persistFailed = persistFailed;
+
+    // D13: discovery is not success when none of its records committed. Retiring
+    // seed/stale rows here used to remove useful data after a wholly failed import,
+    // while the UI announced "Search complete". Preserve the existing catalogue and
+    // shorten the reservation so a later request can retry.
+    if (upserted === 0) {
+      await kv.set(key, "1", 60);
+      status.running = false;
+      status.outcome = "persist_failed";
+      status.finishedAt = Date.now();
+      status.found = 0;
+      await writeStatus(sKey, status);
+      logger.warn("jobs.sync.persist_failed", {
+        targetRole: profile.targetRole,
+        discovered: postings.length,
+        failed: persistFailed,
+      });
+      return 0;
     }
 
     // Real postings are now live — retire the fabricated MVP seed for good.
@@ -289,6 +319,7 @@ async function runDiscovery(
     });
 
     status.running = false;
+    status.outcome = persistFailed > 0 ? "partial" : "completed";
     status.finishedAt = Date.now();
     status.found = upserted;
     await writeStatus(sKey, status);
@@ -303,6 +334,7 @@ async function runDiscovery(
     // every retry for half an hour. Shrink the window so the next load re-attempts soon.
     await kv.set(key, "1", 60).catch(() => {});
     status.running = false;
+    status.outcome = "failed";
     status.finishedAt = Date.now();
     await writeStatus(sKey, status);
     return 0;
