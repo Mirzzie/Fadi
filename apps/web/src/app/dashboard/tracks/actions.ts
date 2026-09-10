@@ -98,6 +98,9 @@ export async function switchTrackAction(
  * untagged; the direction's DERIVED artifacts (tailored base resume, report) are
  * deleted with it — regenerable, and dangerous as orphans (see below).
  */
+/** Rolls the transaction back when the track turns out not to belong to this user. */
+class NotOursError extends Error {}
+
 export async function deleteTrackAction(
   trackId: string
 ): Promise<{ ok: boolean; message?: string }> {
@@ -126,16 +129,25 @@ export async function deleteTrackAction(
     };
   }
 
-  // Delete the direction's DERIVED artifacts first (tailored base resume, report):
-  // left to ON DELETE SET NULL they'd become untagged rows — and the newest untagged
-  // resume is the shared fallback, so a deleted direction would silently poison
-  // every other direction's generation. Documents (user artifacts) stay, untagged.
-  await Promise.all([
-    createResumesRepository(getDatabase()).deleteForTrack(user.id, id.data),
-    createCareerReportsRepository(getDatabase()).deleteForTrack(user.id, id.data),
-  ]);
-
-  const deleted = await repo.deleteForUser(user.id, id.data);
+  // D09: ONE TRANSACTION. This was three independent writes — the tailored résumé, the
+  // report, then the track — so a failure on the last left the user without the derived
+  // artefacts while still holding the direction that explained them. The halves are not
+  // interchangeable: an untagged résumé becomes the shared fallback and silently poisons
+  // every other direction's generation, which is what the deletions below prevent.
+  //
+  // Documents (user artefacts) stay, untagged — those are the user's own work.
+  const deleted = await getDatabase().transaction(async (tx) => {
+    await createResumesRepository(tx).deleteForTrack(user.id, id.data);
+    await createCareerReportsRepository(tx).deleteForTrack(user.id, id.data);
+    const ok = await createCareerProfilesRepository(tx).deleteForUser(user.id, id.data);
+    // Roll the derived deletions back rather than stripping artefacts from a user who
+    // turns out not to own this track.
+    if (!ok) throw new NotOursError();
+    return ok;
+  }).catch((err) => {
+    if (err instanceof NotOursError) return false;
+    throw err;
+  });
   if (!deleted) return { ok: false, message: "That direction isn't yours." };
 
   logger.info("tracks.deleted", { userId: user.id, trackId: id.data });
