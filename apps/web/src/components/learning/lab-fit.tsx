@@ -5,7 +5,13 @@ import { Check, Cpu, HelpCircle, Loader2, Plus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { addLabResource, planLabFor, type LabPlan } from "@/app/dashboard/learning/lab-actions";
+import {
+  addLabResource,
+  detectLocalResources,
+  planLabFor,
+  type DetectedResource,
+  type LabPlan,
+} from "@/app/dashboard/learning/lab-actions";
 
 /**
  * "AND WHAT DO I RUN IT ON?"
@@ -82,10 +88,15 @@ export function LabFit({ title, detail }: { title: string; detail?: string | nul
               Fadi doesn&apos;t know what you have to work with yet, so it can&apos;t tell you whether
               this is runnable. Describe one machine and it will.
             </p>
-            <Button size="sm" variant="outline" className="mt-1.5" onClick={() => setAdding(true)}>
-              <Plus className="size-3.5" aria-hidden="true" />
-              Tell Fadi what I&apos;ve got
-            </Button>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {/* Fadi is running on this machine — asking the user to transcribe what is
+                  installed is asking them to copy out something Fadi can read. */}
+              <DetectHere onSaved={() => window.dispatchEvent(new CustomEvent("fadi:resources-changed"))} />
+              <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
+                <Plus className="size-3.5" aria-hidden="true" />
+                Describe one myself
+              </Button>
+            </div>
           </div>
         )
       ) : (
@@ -213,5 +224,80 @@ function AddResource({ onDone, onCancel }: { onDone: () => void; onCancel: () =>
         </Button>
       </div>
     </div>
+  );
+}
+
+/**
+ * "What is on this machine?" — answered by looking.
+ *
+ * DETECTS, NEVER REGISTERS. Finding a hypervisor must not silently hand Fadi a resource
+ * it may later be asked to provision on; the user confirms what gets saved. Everything
+ * behind this button is a read-only inspection from a fixed list in local-probe.ts —
+ * no command, argument or path comes from the browser, a request, or a model.
+ */
+function DetectHere({ onSaved }: { onSaved: () => void }) {
+  const [found, setFound] = useState<DetectedResource[] | null>(null);
+  const [absent, setAbsent] = useState<string[]>([]);
+  const [pending, start] = useTransition();
+
+  if (found) {
+    return (
+      <div className="w-full space-y-1.5">
+        {found.length === 0 ? (
+          <p className="text-[11px] text-muted-foreground">
+            Nothing detectable here{absent.length ? ` — no ${absent.slice(0, 3).join(", ")}` : ""}. Describe a
+            machine instead.
+          </p>
+        ) : (
+          found.map((d) => (
+            <div key={d.label} className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 p-2">
+              <span className="text-xs font-medium">{d.label}</span>
+              <span className="text-[11px] text-muted-foreground">{d.detail}</span>
+              <Button
+                size="sm"
+                variant="outline"
+                className="ml-auto"
+                disabled={pending}
+                onClick={() =>
+                  start(async () => {
+                    await addLabResource({
+                      label: d.label,
+                      kind: d.kind as never,
+                      arch: d.arch as never,
+                      virtualization: d.virtualization as never,
+                      memoryMb: d.memoryMb,
+                      alwaysOn: false,
+                      notes: d.detail,
+                    });
+                    onSaved();
+                  })
+                }
+              >
+                Use this
+              </Button>
+            </div>
+          ))
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <Button
+      size="sm"
+      disabled={pending}
+      onClick={() =>
+        start(async () => {
+          const res = await detectLocalResources();
+          if (res.ok) {
+            setFound(res.detected ?? []);
+            setAbsent(res.absent ?? []);
+          }
+        })
+      }
+    >
+      {pending ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <Cpu className="size-3.5" aria-hidden="true" />}
+      {pending ? "Looking…" : "Detect what's on this machine"}
+    </Button>
   );
 }

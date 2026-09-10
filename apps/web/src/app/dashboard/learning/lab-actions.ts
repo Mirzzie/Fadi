@@ -197,3 +197,50 @@ export async function completeStepAction(input: {
   });
   return { ok: Boolean(updated) };
 }
+
+/* --------------------------------------------------------- detect, never control */
+
+export type DetectedResource = {
+  label: string;
+  kind: string;
+  arch: string;
+  virtualization: string;
+  memoryMb: number | null;
+  detail: string;
+};
+
+/**
+ * Look at this machine and PROPOSE what it could host.
+ *
+ * Fadi runs on the user's own laptop, so asking them to type what is installed is asking
+ * them to transcribe something Fadi can read. It reads it.
+ *
+ * It proposes; it does not register. Detecting a hypervisor must not silently grant Fadi
+ * a resource it may later be asked to provision on — the same boundary as network
+ * discovery, applied to the machine underneath. The user confirms what gets saved.
+ */
+export async function detectLocalResources(): Promise<{
+  ok: boolean;
+  detected?: DetectedResource[];
+  absent?: string[];
+  message?: string;
+}> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  const { scanLocalMachine } = await import("@/lib/lab/local-probe");
+  const scan = await scanLocalMachine();
+
+  const detected: DetectedResource[] = scan.findings.map((f) => ({
+    label: f.label,
+    kind: f.kind,
+    arch: scan.host.arch,
+    virtualization: f.virtualization,
+    // Real memory, read from the machine rather than remembered by its owner — this is
+    // the number AM01 kept reporting as "not enough recorded to tell".
+    memoryMb: scan.host.memoryMb,
+    detail: f.detail,
+  }));
+
+  return { ok: true, detected, absent: scan.absent };
+}
