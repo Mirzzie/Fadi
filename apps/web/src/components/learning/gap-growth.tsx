@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { LabFit } from "@/components/learning/lab-fit";
 import {
   commitToProjectAction,
   completeCommitmentAction,
@@ -91,6 +92,9 @@ export function GapGrowth({ gapTitle, gapDetail }: { gapTitle: string; gapDetail
                   </Button>
                 )}
               </div>
+              {/* "And what do I run it on?" — asked here, where the project is proposed,
+                  rather than at onboarding where nobody yet knows they want a lab. */}
+              <LabFit title={s.title} detail={s.detail} />
             </div>
           ))}
           <p className="text-[0.7rem] text-muted-foreground">
