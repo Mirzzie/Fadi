@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   upsert: vi.fn(),
   deactivate: vi.fn(),
   archiveStale: vi.fn(),
+  discover: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -25,11 +26,35 @@ vi.mock("@/lib/kv/store", () => ({
       mocks.values.set(key, value);
       return true;
     },
+    deleteIfValue: async (key: string, expected: string) => {
+      if (mocks.values.get(key) !== expected) return false;
+      mocks.values.delete(key);
+      return true;
+    },
+    expireIfValue: async (key: string, expected: string) =>
+      mocks.values.get(key) === expected,
     incr: vi.fn(),
   }),
 }));
 vi.mock("@/lib/data-sources/service", () => ({
-  discoverJobs: async () => [
+  discoverJobs: mocks.discover,
+}));
+vi.mock("@careeros/database", () => ({
+  createJobsRepository: () => ({
+    upsertSeedJob: mocks.upsert,
+    deactivateBySource: mocks.deactivate,
+    archiveStaleLiveJobs: mocks.archiveStale,
+  }),
+}));
+
+beforeEach(() => {
+  mocks.values.clear();
+  mocks.ttlWrites.length = 0;
+  mocks.upsert.mockReset();
+  mocks.deactivate.mockReset();
+  mocks.archiveStale.mockReset();
+  mocks.discover.mockReset();
+  mocks.discover.mockResolvedValue([
     {
       sourceId: "board-a",
       externalId: "a-1",
@@ -46,22 +71,7 @@ vi.mock("@/lib/data-sources/service", () => ({
       location: "Dublin",
       remote: false,
     },
-  ],
-}));
-vi.mock("@careeros/database", () => ({
-  createJobsRepository: () => ({
-    upsertSeedJob: mocks.upsert,
-    deactivateBySource: mocks.deactivate,
-    archiveStaleLiveJobs: mocks.archiveStale,
-  }),
-}));
-
-beforeEach(() => {
-  mocks.values.clear();
-  mocks.ttlWrites.length = 0;
-  mocks.upsert.mockReset();
-  mocks.deactivate.mockReset();
-  mocks.archiveStale.mockReset();
+  ]);
 });
 
 describe("job discovery commit outcome", () => {
@@ -90,5 +100,23 @@ describe("job discovery commit outcome", () => {
       found: 0,
       persistFailed: 2,
     });
+  });
+
+  it("D14: a missing in-flight lease turns orphaned running status into failure", async () => {
+    let finish: ((rows: unknown[]) => void) | undefined;
+    mocks.discover.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    const { getJobSyncStatus, startBackgroundSync } = await import("./sync");
+    const profile = { targetRole: "Support Engineer", skills: [], skillGaps: [] };
+
+    await startBackgroundSync(profile);
+    const lockKey = [...mocks.values.keys()].find((key) => key.endsWith(":lock"));
+    expect(lockKey).toBeDefined();
+    mocks.values.delete(lockKey!); // simulate process death followed by lease expiry
+
+    const status = await getJobSyncStatus(profile);
+
+    expect(status).toMatchObject({ running: false, outcome: "failed" });
+    finish?.([]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
   });
 });

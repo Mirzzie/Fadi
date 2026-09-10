@@ -31,6 +31,8 @@ const SYNC_TTL_MS = 30 * 60 * 1000;
 // postings within ~30 days; we're a bit more aggressive.
 const JOB_FRESHNESS_MS = 14 * 24 * 60 * 60 * 1000;
 const SYNC_TTL_SECONDS = Math.ceil(SYNC_TTL_MS / 1000);
+const RUN_LEASE_SECONDS = 2 * 60;
+const RUN_HEARTBEAT_MS = 30 * 1000;
 
 /**
  * The normalized identity of a search — role, domain, resolved geography, and the
@@ -112,6 +114,8 @@ export type JobSyncStatus = {
   total: number;
   /** Discovered postings which could not be persisted. */
   persistFailed: number;
+  /** Internal lease reference used to detect an orphaned detached run. */
+  leaseKey?: string;
 };
 
 function statusKey(profile: RelevanceProfile, location?: LocationFilter): string {
@@ -134,15 +138,36 @@ export async function getJobSyncStatus(
   location?: LocationFilter
 ): Promise<JobSyncStatus | null> {
   try {
-    const raw = await getKv().get(statusKey(profile, location));
-    return raw ? (JSON.parse(raw) as JobSyncStatus) : null;
+    const kv = getKv();
+    const sKey = statusKey(profile, location);
+    const raw = await kv.get(sKey);
+    if (!raw) return null;
+    const status = JSON.parse(raw) as JobSyncStatus;
+    // A detached process cannot mark its own failure after it dies. The missing
+    // lease is the durable signal that the displayed "running" state is orphaned.
+    if (status.running) {
+      const leaseKey = status.leaseKey ?? `${await syncKey(profile, location)}:lock`;
+      if (!(await kv.get(leaseKey))) {
+        status.running = false;
+        status.outcome = "failed";
+        status.finishedAt = Date.now();
+        await writeStatus(sKey, status);
+      }
+    }
+    return status;
   } catch {
     return null;
   }
 }
 
 /** A reserved run: the TTL window is claimed and the initial "running" status is written. */
-type RunHandle = { key: string; sKey: string; status: JobSyncStatus };
+type RunHandle = {
+  freshKey: string;
+  lockKey: string;
+  leaseToken: string;
+  sKey: string;
+  status: JobSyncStatus;
+};
 
 /**
  * Claim the sync window and publish an initial "running" status. Returns null when a run
@@ -155,11 +180,21 @@ async function beginRun(
   location?: LocationFilter
 ): Promise<RunHandle | null> {
   const kv = getKv();
-  const key = await syncKey(profile, location);
-  // Atomic single-winner claim: a plain get()+set() has a race window where two concurrent
-  // loads both see "absent" and both fan out a full crawl. setNx closes it.
-  const claimed = await kv.setNx(key, "1", SYNC_TTL_SECONDS);
+  const freshKey = await syncKey(profile, location);
+  if (await kv.get(freshKey)) return null;
+
+  const lockKey = `${freshKey}:lock`;
+  const leaseToken = crypto.randomUUID();
+  // Keep the in-flight lease separate from the completed-result TTL. A live crawl
+  // renews it; a killed process stops renewing and becomes retryable within two minutes.
+  const claimed = await kv.setNx(lockKey, leaseToken, RUN_LEASE_SECONDS);
   if (!claimed) return null;
+
+  // A prior run may have completed between the freshness read and our lock claim.
+  if (await kv.get(freshKey)) {
+    await kv.deleteIfValue(lockKey, leaseToken);
+    return null;
+  }
 
   const sKey = statusKey(profile, location);
   const status: JobSyncStatus = {
@@ -172,9 +207,10 @@ async function beginRun(
     done: 0,
     total: 0,
     persistFailed: 0,
+    leaseKey: lockKey,
   };
   await writeStatus(sKey, status); // visible to the very next getJobSyncStatus read
-  return { key, sKey, status };
+  return { freshKey, lockKey, leaseToken, sKey, status };
 }
 
 /**
@@ -222,7 +258,10 @@ async function runDiscovery(
   run: RunHandle
 ): Promise<number> {
   const kv = getKv();
-  const { key, sKey, status } = run;
+  const { freshKey, lockKey, leaseToken, sKey, status } = run;
+  const heartbeat = setInterval(() => {
+    void kv.expireIfValue(lockKey, leaseToken, RUN_LEASE_SECONDS).catch(() => undefined);
+  }, RUN_HEARTBEAT_MS);
 
   try {
     // Deep pull. The cap is on POSTINGS to persist, not vacancies — since we now keep every
@@ -237,10 +276,15 @@ async function runDiscovery(
       status.total = ev.total;
       void writeStatus(sKey, status);
     });
+
+    // A run whose lease expired must not resume later and race a replacement run.
+    // It may finish its remote read, but it no longer owns permission to persist it.
+    if ((await kv.get(lockKey)) !== leaseToken) return 0;
+
     if (postings.length === 0) {
       // Nothing live came back — don't archive the seed, leave the user with
       // *something*. Shrink the window so we retry sooner than the full TTL.
-      await kv.set(key, "1", 60);
+      await kv.set(freshKey, "1", 60);
       status.running = false;
       status.outcome = "empty";
       status.finishedAt = Date.now();
@@ -287,7 +331,7 @@ async function runDiscovery(
     // while the UI announced "Search complete". Preserve the existing catalogue and
     // shorten the reservation so a later request can retry.
     if (upserted === 0) {
-      await kv.set(key, "1", 60);
+      await kv.set(freshKey, "1", 60);
       status.running = false;
       status.outcome = "persist_failed";
       status.finishedAt = Date.now();
@@ -322,6 +366,7 @@ async function runDiscovery(
     status.outcome = persistFailed > 0 ? "partial" : "completed";
     status.finishedAt = Date.now();
     status.found = upserted;
+    await kv.set(freshKey, "1", SYNC_TTL_SECONDS);
     await writeStatus(sKey, status);
 
     return upserted;
@@ -332,11 +377,15 @@ async function runDiscovery(
     });
     // A crashed run must NOT hold the 30-min lock — otherwise one transient failure blocks
     // every retry for half an hour. Shrink the window so the next load re-attempts soon.
-    await kv.set(key, "1", 60).catch(() => {});
+    await kv.set(freshKey, "1", 60).catch(() => {});
     status.running = false;
     status.outcome = "failed";
     status.finishedAt = Date.now();
     await writeStatus(sKey, status);
     return 0;
+  } finally {
+    clearInterval(heartbeat);
+    // Never delete a replacement lease acquired after ours expired.
+    await kv.deleteIfValue(lockKey, leaseToken).catch(() => false);
   }
 }

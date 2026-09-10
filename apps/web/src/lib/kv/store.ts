@@ -19,6 +19,9 @@ export interface KvStore {
    * requests both see "absent" and both proceed (duplicate crawls).
    */
   setNx(key: string, value: string, ttlSeconds: number): Promise<boolean>;
+  /** Delete or renew a lease only when it is still owned by the expected token. */
+  deleteIfValue(key: string, expected: string): Promise<boolean>;
+  expireIfValue(key: string, expected: string, ttlSeconds: number): Promise<boolean>;
   del(key: string): Promise<void>;
   /**
    * Atomic increment. When the key is created by this call and `ttlSeconds` > 0,
@@ -59,6 +62,20 @@ export class MemoryKv implements KvStore {
     // check and the write, so two interleaved callers cannot both observe "absent".
     if (this.live(key)) return false;
     this.store.set(key, { value, expiresAt: Date.now() + ttlSeconds * 1000 });
+    return true;
+  }
+
+  async deleteIfValue(key: string, expected: string): Promise<boolean> {
+    const entry = this.live(key);
+    if (!entry || entry.value !== expected) return false;
+    this.store.delete(key);
+    return true;
+  }
+
+  async expireIfValue(key: string, expected: string, ttlSeconds: number): Promise<boolean> {
+    const entry = this.live(key);
+    if (!entry || entry.value !== expected) return false;
+    entry.expiresAt = Date.now() + ttlSeconds * 1000;
     return true;
   }
 
@@ -123,6 +140,18 @@ class UpstashKv implements KvStore {
     // Redis SET key value NX EX ttl → "OK" when set, null when the key already existed.
     const r = await this.cmd("SET", key, value, "NX", "EX", ttlSeconds);
     return r === "OK";
+  }
+
+  async deleteIfValue(key: string, expected: string): Promise<boolean> {
+    const script =
+      "if redis.call('get',KEYS[1]) == ARGV[1] then return redis.call('del',KEYS[1]) else return 0 end";
+    return Number(await this.cmd("EVAL", script, 1, key, expected)) === 1;
+  }
+
+  async expireIfValue(key: string, expected: string, ttlSeconds: number): Promise<boolean> {
+    const script =
+      "if redis.call('get',KEYS[1]) == ARGV[1] then return redis.call('expire',KEYS[1],ARGV[2]) else return 0 end";
+    return Number(await this.cmd("EVAL", script, 1, key, expected, ttlSeconds)) === 1;
   }
 
   async del(key: string): Promise<void> {
