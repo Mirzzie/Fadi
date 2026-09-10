@@ -225,12 +225,34 @@ export async function admitEvidenceBatch(
       metaOf.set(id, { factId: id, origin: cand.origin, detail: cand.detail ?? null });
       fresh.push(cand);
     } else {
+      const takesLead = admission.decision === "update";
       rewordings.push({
         candidate: cand,
         factId: admission.factId,
         sure: admission.sure,
-        lead: admission.decision === "update" ? admission.intoId : null,
+        lead: takesLead ? admission.intoId : null,
       });
+
+      // D04b (Codex): ADVANCE THE PLANNED STATE after a promotion.
+      //
+      // Planning left the pool untouched, so a SECOND human version matching the same
+      // fact still saw the original machine row as the thing it replaced — and was
+      // scheduled to replace it too. Two canonical rows, one original demoted twice.
+      //
+      // The entry keeps its id (still the row that gets demoted) but takes on the
+      // promoter's wording and authorship, so the next candidate is judged against what
+      // will actually be leading. A second differing human version then meets the
+      // human-vs-human rule and becomes a conflict to ask about — correct, because two
+      // things the user wrote are not Fadi's to choose between.
+      if (takesLead) {
+        const idx = pool.findIndex((p) => p.id === admission.intoId);
+        if (idx >= 0) pool[idx] = toIdentity(cand, admission.intoId);
+        metaOf.set(admission.intoId, {
+          factId: admission.factId,
+          origin: cand.origin,
+          detail: cand.detail ?? null,
+        });
+      }
     }
   }
 
@@ -320,33 +342,50 @@ export async function admitEvidence(
     return { row: await repo.create(userId, fields), admission };
   }
 
-  // Keep the wording, attached to the fact it restates. Nothing is thrown away.
+  // ONE TRANSACTION (Codex). The insert and the demotion are a single state change:
+  // run separately, a failure between them leaves the fact with two canonical rows —
+  // the exact invariant D01/D02 exist to protect. mergeInto was made transactional and
+  // admission was not, so the earlier "fixed in one transaction" claim covered merge
+  // only. It covers both now.
+  //
+  // Demote first, promote second, matching mergeInto — a reader observing an
+  // intermediate state briefly sees zero canonicals rather than two, and zero is the
+  // state the surrounding code already treats as "nothing to show" rather than
+  // silently picking one of two leaders.
   const takesLead = admission.decision === "update";
-  await repo.create(userId, {
-    ...fields,
-    factId: admission.factId,
-    isCanonical: takesLead,
-    renderingFor: admission.decision === "absorb" && admission.conflict
-      ? NEEDS_DECISION
-      : admission.sure
-        ? null
-        : UNCONFIRMED_LINK,
+  const inserted = await getDatabase().transaction(async (tx) => {
+    const txRepo = createEvidenceRepository(tx);
+    if (takesLead) await txRepo.update(userId, admission.intoId, { isCanonical: false });
+    return txRepo.create(userId, {
+      ...fields,
+      factId: admission.factId,
+      isCanonical: takesLead,
+      renderingFor: admission.decision === "absorb" && admission.conflict
+        ? NEEDS_DECISION
+        : admission.sure
+          ? null
+          : UNCONFIRMED_LINK,
+    });
   });
-  if (takesLead) await repo.update(userId, admission.intoId, { isCanonical: false });
   logger.info("identity.absorbed", {
     userId,
     decision: admission.decision,
     sure: admission.sure,
     kind: candidate.kind,
   });
-  // D03 (Codex): this returned `existing.find(...)` — a copy read BEFORE the writes
-  // above. After a promotion that is the row we just demoted, still carrying
-  // isCanonical: true and the superseded wording. Callers that link to the returned row
-  // were linking to an obsolete record and believing it was the leading one.
+  // D03 (Codex, twice). This first returned a copy read BEFORE the writes — after a
+  // promotion, the row just demoted, still flagged canonical with superseded wording.
+  // The first fix re-read but FELL BACK to that same prior row on error, which is the
+  // identical bug wearing a catch block: substituting a stale record for a failed read.
   //
-  // Re-read instead. The canonical row for this fact is the answer to "what now carries
-  // this reality", which is the only thing a caller can safely act on.
-  const after = await repo.listRenderings(userId, admission.factId).catch(() => []);
-  const canonical = after.find((r) => r.isCanonical) ?? null;
-  return { row: canonical ?? (await repo.getForUser(userId, admission.intoId)), admission };
+  // A promotion returns exactly what it inserted. Nothing else can be more current.
+  if (takesLead) return { row: inserted, admission };
+
+  // An absorb leaves the leader unchanged, so report the stored canonical — and if that
+  // read fails, say null. A caller can handle "I don't know"; it cannot detect a guess.
+  const canonical = await repo
+    .listRenderings(userId, admission.factId)
+    .then((rows) => rows.find((r) => r.isCanonical) ?? null)
+    .catch(() => null);
+  return { row: canonical, admission };
 }
