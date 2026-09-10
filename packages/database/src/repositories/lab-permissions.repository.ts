@@ -154,6 +154,26 @@ export function createLabActionsRepository(db: Database) {
     },
 
     /**
+     * Denials inside a recent window, for the circuit breaker.
+     *
+     * Returns actor and time only. The breaker's judgement is made by a pure function
+     * that has no database access, so what it needs has to come to it — and keeping the
+     * query this narrow means the rule cannot quietly start depending on something else.
+     */
+    async denialsSince(userId: string, since: Date): Promise<Array<{ actor: string; createdAt: Date }>> {
+      return db
+        .select({ actor: labActions.actor, createdAt: labActions.createdAt })
+        .from(labActions)
+        .where(
+          and(
+            eq(labActions.userId, userId),
+            eq(labActions.decision, "denied"),
+            gt(labActions.createdAt, since),
+          ),
+        );
+    },
+
+    /**
      * Denials only, for the monitor.
      *
      * This is the query that matters. Successes are mostly the user's own work coming

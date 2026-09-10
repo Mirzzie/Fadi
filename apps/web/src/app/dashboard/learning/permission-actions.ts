@@ -208,6 +208,12 @@ export type PendingActionView = {
   actor: string;
   origin: string | null;
   expiresAt: string;
+  /** click | type-name — how hard this one is to approve. */
+  confirm: string;
+  /** What must be typed when confirm is "type-name". */
+  confirmToken: string;
+  blast: string;
+  reversibility: string;
 };
 
 export async function listPendingActions(): Promise<{
@@ -218,23 +224,45 @@ export async function listPendingActions(): Promise<{
   if (!user) return { ok: false };
 
   const rows = await createLabActionRequestsRepository(getDatabase()).listPending(user.id);
+  const { RECIPES, RECIPE_IDS } = await import("@/lib/lab/broker");
+  const { policyFor } = await import("@/lib/lab/policy");
+
   return {
     ok: true,
-    pending: rows.map((r) => ({
-      id: r.id,
-      summary: r.summary,
-      reversal: r.reversal,
-      argv: (r.argv as string[][]).map((a) => a.join(" ")),
-      actor: r.actor,
-      origin: r.origin,
-      expiresAt: r.expiresAt.toISOString(),
-    })),
+    pending: rows.map((r) => {
+      // The policy is derived NOW rather than frozen at proposal time, so tightening a
+      // rule applies to prompts already on screen instead of to the next batch.
+      const known = (RECIPE_IDS as readonly string[]).includes(r.recipe);
+      const recipe = known ? RECIPES[r.recipe as keyof typeof RECIPES] : null;
+      const policy = recipe
+        ? policyFor({ blast: recipe.blast, reversibility: recipe.reversibility })
+        : // An unknown recipe is the worst case, not the best. It must not become
+          // click-to-approve merely because Fadi no longer recognises it.
+          policyFor({ blast: "host", reversibility: "irreversible" });
+      const params = recipe ? recipe.validate((r.params ?? {}) as Record<string, unknown>) : null;
+
+      return {
+        id: r.id,
+        summary: r.summary,
+        reversal: r.reversal,
+        argv: (r.argv as string[][]).map((a) => a.join(" ")),
+        actor: r.actor,
+        origin: r.origin,
+        expiresAt: r.expiresAt.toISOString(),
+        confirm: policy.confirm,
+        confirmToken: recipe && params ? recipe.confirmToken(params) : "",
+        blast: policy.blast,
+        reversibility: policy.reversibility,
+      };
+    }),
   };
 }
 
 /** Approve one request and run it. The only door to a write. */
 export async function approveAction(input: {
   requestId: string;
+  /** What the person typed, for actions the policy says must be typed out. */
+  confirmation?: string;
 }): Promise<{ ok: boolean; message?: string }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
@@ -243,7 +271,11 @@ export async function approveAction(input: {
   }
 
   const { approveAndRun } = await import("@/lib/lab/broker");
-  const result = await approveAndRun({ userId: user.id, requestId: input.requestId });
+  const result = await approveAndRun({
+    userId: user.id,
+    requestId: input.requestId,
+    confirmation: input.confirmation,
+  });
   return result.ok ? { ok: true, message: result.output } : { ok: false, message: result.message };
 }
 

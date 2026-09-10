@@ -9,6 +9,16 @@ import {
   createLabGrantsRepository,
 } from "@careeros/database";
 
+import {
+  BREAKER_WINDOW_MINUTES,
+  breakerState,
+  policyFor,
+  withinQuota,
+  type Blast,
+  type Policy,
+  type Reversibility,
+} from "./policy";
+
 import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
 
@@ -284,6 +294,17 @@ const NAME_RE = /^[a-z0-9](?:[a-z0-9-]{0,28}[a-z0-9])?$/;
 export type RecipeParams = Record<string, unknown>;
 
 type Recipe = {
+  /** How far the damage reaches, and how hard it is to take back. */
+  blast: Blast;
+  reversibility: Reversibility;
+  /**
+   * What the person types to confirm, when the policy demands typing.
+   *
+   * The NAME of the thing being changed, so the confirmation is about this action rather
+   * than a ritual word. Typing "fadi-web" to remove fadi-web is a moment of reading; typing
+   * "DELETE" to remove anything is a reflex.
+   */
+  confirmToken: (p: RecipeParams) => string;
   /** Validate and normalise. Returns null when the proposal is not expressible. */
   validate: (raw: RecipeParams) => RecipeParams | null;
   /** The sentence the person reads before approving. */
@@ -303,6 +324,9 @@ const str = (v: unknown): string | null => (typeof v === "string" ? v.trim() : n
 
 export const RECIPES: Record<RecipeId, Recipe> = {
   "container.run": {
+    blast: "container",
+    reversibility: "reversible",
+    confirmToken: (p) => NAME_PREFIX + String(p.name),
     validate: (raw) => {
       const image = str(raw.image);
       const name = str(raw.name);
@@ -330,6 +354,10 @@ export const RECIPES: Record<RecipeId, Recipe> = {
   },
 
   "container.stop": {
+    blast: "container",
+    // Recoverable — the container starts again — but something stops working meanwhile.
+    reversibility: "disruptive",
+    confirmToken: (p) => NAME_PREFIX + String(p.name),
     ownWorkOnly: true,
     validate: (raw) => {
       const name = str(raw.name);
@@ -341,6 +369,9 @@ export const RECIPES: Record<RecipeId, Recipe> = {
   },
 
   "container.remove": {
+    blast: "container",
+    reversibility: "irreversible",
+    confirmToken: (p) => NAME_PREFIX + String(p.name),
     ownWorkOnly: true,
     validate: (raw) => {
       const name = str(raw.name);
@@ -356,15 +387,44 @@ export const RECIPES: Record<RecipeId, Recipe> = {
 };
 
 export type Proposal =
-  | { ok: true; requestId: string; summary: string; reversal: string; argv: string[][] }
+  | {
+      ok: true;
+      requestId: string;
+      summary: string;
+      reversal: string;
+      argv: string[][];
+      policy: Policy;
+      /** What the person must type, when the policy says typing. */
+      confirmToken: string;
+    }
   | { ok: false; message: string };
+
+/**
+ * Is the breaker open?
+ *
+ * Checked before anything else, on every path. A compromised model that has already
+ * tripped the breaker must not be able to keep proposing — the point of tripping is that
+ * asking stops, not merely that answering does.
+ */
+async function breakerOpen(userId: string): Promise<string | null> {
+  const db = getDatabase();
+  const grants = createLabGrantsRepository(db);
+  const denials = await createLabActionsRepository(db).denialsSince(
+    userId,
+    new Date(Date.now() - BREAKER_WINDOW_MINUTES * 60_000),
+  );
+  const state = breakerState(denials);
+  if (!state.tripped) return null;
+
+  // Tripping REVOKES. A breaker that only refuses the next call leaves every existing
+  // permission standing, which is the opposite of what the moment calls for.
+  await grants.revokeAll(userId);
+  return state.reason;
+}
 
 function isRecipe(value: string): value is RecipeId {
   return (RECIPE_IDS as readonly string[]).includes(value);
 }
-
-/** How long an approval prompt stays live. Consent is to what is happening now. */
-const PROPOSAL_MINUTES = 10;
 
 /**
  * PROPOSE a write. Runs nothing.
@@ -384,6 +444,19 @@ export async function proposeAction(input: {
   const db = getDatabase();
   const audit = createLabActionsRepository(db);
   const requests = createLabActionRequestsRepository(db);
+
+  const tripped = await breakerOpen(input.userId);
+  if (tripped) {
+    await audit.record({
+      userId: input.userId,
+      actor: input.actor,
+      origin: input.origin,
+      capability: input.recipe,
+      decision: "denied",
+      detail: "Circuit breaker open.",
+    });
+    return { ok: false, message: tripped };
+  }
 
   if (!isRecipe(input.recipe)) {
     await audit.record({
@@ -436,6 +509,24 @@ export async function proposeAction(input: {
     }
   }
 
+  const policy = policyFor({ blast: recipe.blast, reversibility: recipe.reversibility });
+
+  const quota = withinQuota({
+    policy,
+    executedLastHour: await requests.executedLastHour(input.userId, input.recipe),
+  });
+  if (!quota.allowed) {
+    await audit.record({
+      userId: input.userId,
+      actor: input.actor,
+      origin: input.origin,
+      capability: input.recipe,
+      decision: "denied",
+      detail: "Rate ceiling reached for this action.",
+    });
+    return { ok: false, message: quota.reason };
+  }
+
   const commands = recipe.render(params);
   const argv = commands.map((c) => [c.cmd, ...c.args]);
 
@@ -448,7 +539,9 @@ export async function proposeAction(input: {
     reversal: recipe.reversal(params),
     actor: input.actor,
     origin: input.origin,
-    expiresAt: new Date(Date.now() + PROPOSAL_MINUTES * 60_000),
+    // The policy sets the lifetime: what cannot be undone gets less time to sit on screen
+    // being clicked past.
+    expiresAt: new Date(Date.now() + policy.ttlMinutes * 60_000),
   });
 
   await audit.record({
@@ -469,6 +562,8 @@ export async function proposeAction(input: {
     summary: row.summary,
     reversal: row.reversal ?? "",
     argv,
+    policy,
+    confirmToken: recipe.confirmToken(params),
   };
 }
 
@@ -490,10 +585,38 @@ export type Execution =
 export async function approveAndRun(input: {
   userId: string;
   requestId: string;
+  /** What the person typed, when the policy requires typing. */
+  confirmation?: string;
 }): Promise<Execution> {
   const db = getDatabase();
   const audit = createLabActionsRepository(db);
   const requests = createLabActionRequestsRepository(db);
+
+  // The typed confirmation is checked BEFORE the row is claimed. Otherwise a mistyped
+  // word would burn the approval and the person would have to start again for no reason.
+  const preview = await requests.get(input.userId, input.requestId);
+  if (preview && isRecipe(preview.recipe)) {
+    const r = RECIPES[preview.recipe];
+    const params = r.validate((preview.params ?? {}) as RecipeParams);
+    const policy = policyFor({ blast: r.blast, reversibility: r.reversibility });
+    if (params && policy.confirm === "type-name") {
+      const expected = r.confirmToken(params);
+      if ((input.confirmation ?? "").trim() !== expected) {
+        await audit.record({
+          userId: input.userId,
+          actor: "user",
+          origin: "approval",
+          capability: preview.recipe,
+          decision: "denied",
+          detail: "Confirmation did not match. Nothing ran.",
+        });
+        return {
+          ok: false,
+          message: "Type " + expected + " exactly to confirm. Nothing ran.",
+        };
+      }
+    }
+  }
 
   // The claim is the UPDATE itself: pending and unexpired, or nothing. Two clicks on the
   // same prompt cannot both win.

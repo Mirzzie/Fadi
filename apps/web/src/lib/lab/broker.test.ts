@@ -37,8 +37,12 @@ vi.mock("@/lib/observability/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 vi.mock("@careeros/database", () => ({
-  createLabGrantsRepository: () => ({ findLive }),
-  createLabActionsRepository: () => ({ record }),
+  createLabGrantsRepository: () => ({ findLive, revokeAll: vi.fn() }),
+  createLabActionsRepository: () => ({ record, denialsSince: async () => [] }),
+  createLabActionRequestsRepository: () => ({
+    get: async () => null,
+    executedLastHour: async () => 0,
+  }),
 }));
 
 beforeEach(() => {

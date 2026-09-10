@@ -19,6 +19,10 @@ const propose = vi.fn();
 const approve = vi.fn();
 const finish = vi.fn();
 const createdNames = vi.fn();
+const get = vi.fn();
+const executedLastHour = vi.fn();
+const denialsSince = vi.fn();
+const revokeAll = vi.fn();
 
 vi.mock("node:child_process", () => ({
   execFile: Object.assign(execFileMock, {
@@ -30,9 +34,16 @@ vi.mock("@/lib/observability/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 vi.mock("@careeros/database", () => ({
-  createLabGrantsRepository: () => ({ findLive: vi.fn() }),
-  createLabActionsRepository: () => ({ record }),
-  createLabActionRequestsRepository: () => ({ propose, approve, finish, createdNames }),
+  createLabGrantsRepository: () => ({ findLive: vi.fn(), revokeAll }),
+  createLabActionsRepository: () => ({ record, denialsSince }),
+  createLabActionRequestsRepository: () => ({
+    propose,
+    approve,
+    finish,
+    createdNames,
+    get,
+    executedLastHour,
+  }),
 }));
 
 beforeEach(() => {
@@ -42,7 +53,16 @@ beforeEach(() => {
   approve.mockReset();
   finish.mockReset();
   createdNames.mockReset();
+  get.mockReset();
+  executedLastHour.mockReset();
+  denialsSince.mockReset();
+  revokeAll.mockReset();
   createdNames.mockResolvedValue([]);
+  // Quiet defaults: nothing suspicious has happened and nothing has run recently, so the
+  // security layer stays out of the way of the tests that are about something else.
+  denialsSince.mockResolvedValue([]);
+  executedLastHour.mockResolvedValue(0);
+  get.mockResolvedValue(null);
   propose.mockImplementation(async (row: Record<string, unknown>) => ({ ...row, id: "req-1" }));
   execFileMock.mockResolvedValue({ stdout: "abc123\n", stderr: "" });
 });
@@ -277,5 +297,103 @@ describe("the catalogue itself stays safe as it grows", () => {
         }
       }
     }
+  });
+});
+
+describe("the security layer stops things, not just describes them", () => {
+  it("THE BREAKER: a burst of machine denials closes everything and refuses to propose", async () => {
+    denialsSince.mockResolvedValue(
+      Array.from({ length: 6 }, () => ({ actor: "model", createdAt: new Date() })),
+    );
+
+    const res = await propose_({ image: "nginx", name: "web" });
+
+    expect(res.ok).toBe(false);
+    // Tripping REVOKES. A breaker that only refuses the next call leaves every existing
+    // permission standing, which is the opposite of what the moment calls for.
+    expect(revokeAll).toHaveBeenCalledWith("u1");
+    expect(propose).not.toHaveBeenCalled();
+    expect(execFileMock).not.toHaveBeenCalled();
+  });
+
+  it("the breaker ignores a person declining prompts", async () => {
+    denialsSince.mockResolvedValue(
+      Array.from({ length: 9 }, () => ({ actor: "user", createdAt: new Date() })),
+    );
+    const res = await propose_({ image: "nginx", name: "web" });
+    expect(res.ok).toBe(true);
+    expect(revokeAll).not.toHaveBeenCalled();
+  });
+
+  it("the hourly ceiling refuses rather than queues", async () => {
+    executedLastHour.mockResolvedValue(999);
+    const res = await propose_({ image: "nginx", name: "web" });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.message).toMatch(/nothing ran/i);
+    expect(propose).not.toHaveBeenCalled();
+  });
+
+  it("an irreversible action gets a shorter prompt life than a reversible one", async () => {
+    const reversible = await propose_({ image: "nginx", name: "web" });
+    createdNames.mockResolvedValue(["web"]);
+    const irreversible = await propose_({ name: "web" }, "container.remove");
+
+    expect(reversible.ok && irreversible.ok).toBe(true);
+    if (reversible.ok && irreversible.ok) {
+      expect(irreversible.policy.confirm).toBe("type-name");
+      expect(reversible.policy.confirm).toBe("click");
+      expect(irreversible.policy.ttlMinutes).toBeLessThan(reversible.policy.ttlMinutes);
+    }
+  });
+});
+
+describe("typing the name is not decoration", () => {
+  const removal = {
+    id: "req-1",
+    recipe: "container.remove",
+    params: { name: "web" },
+    argv: [["docker", "rm", "-f", "fadi-web"]],
+  };
+
+  it("refuses to run an irreversible action without the exact name", async () => {
+    get.mockResolvedValue(removal);
+    const { approveAndRun } = await import("./broker");
+
+    // "fadi-web " is absent on purpose: surrounding whitespace is trimmed, because a
+    // person who typed the name correctly and picked up a trailing space from a copy has
+    // still read and typed the name. The check is on intent, not on keystroke hygiene.
+    for (const typed of [undefined, "", "web", "fadi-wed", "DELETE", "fadi_web", "FADI-WEB"]) {
+      const res = await approveAndRun({ userId: "u1", requestId: "req-1", confirmation: typed });
+      expect(res.ok, `"${typed}" should not confirm`).toBe(false);
+    }
+    expect(execFileMock).not.toHaveBeenCalled();
+    // And the approval was never claimed, so a typo does not burn the prompt.
+    expect(approve).not.toHaveBeenCalled();
+  });
+
+  it("accepts the exact name and runs", async () => {
+    get.mockResolvedValue(removal);
+    approve.mockResolvedValue(removal);
+    const { approveAndRun } = await import("./broker");
+
+    const res = await approveAndRun({ userId: "u1", requestId: "req-1", confirmation: "fadi-web" });
+
+    expect(res.ok).toBe(true);
+    expect(execFileMock).toHaveBeenCalledWith("docker", ["rm", "-f", "fadi-web"], expect.anything());
+  });
+
+  it("does not demand typing for a reversible action", async () => {
+    const start = {
+      id: "req-2",
+      recipe: "container.run",
+      params: { image: "nginx", name: "web", port: null },
+      argv: [["docker", "run", "-d", "--name", "fadi-web", "nginx:1.27-alpine"]],
+    };
+    get.mockResolvedValue(start);
+    approve.mockResolvedValue(start);
+    const { approveAndRun } = await import("./broker");
+
+    const res = await approveAndRun({ userId: "u1", requestId: "req-2" });
+    expect(res.ok).toBe(true);
   });
 });

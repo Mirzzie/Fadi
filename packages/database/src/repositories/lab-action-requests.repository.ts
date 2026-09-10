@@ -30,6 +30,16 @@ export function createLabActionRequestsRepository(db: Database) {
       return row;
     },
 
+    /** Read one request without claiming it — for checking a confirmation before spending it. */
+    async get(userId: string, id: string): Promise<LabActionRequest | null> {
+      const [row] = await db
+        .select()
+        .from(labActionRequests)
+        .where(and(eq(labActionRequests.userId, userId), eq(labActionRequests.id, id)))
+        .limit(1);
+      return row ?? null;
+    },
+
     /** Live prompts: pending, not expired. Anything else is history. */
     async listPending(userId: string): Promise<LabActionRequest[]> {
       return db
@@ -108,6 +118,22 @@ export function createLabActionRequestsRepository(db: Database) {
           updatedAt: new Date(),
         })
         .where(and(eq(labActionRequests.userId, userId), eq(labActionRequests.id, id)));
+    },
+
+    /** Executions of one recipe inside the last hour, for the rate ceiling. */
+    async executedLastHour(userId: string, recipe: string): Promise<number> {
+      const rows = await db
+        .select({ id: labActionRequests.id })
+        .from(labActionRequests)
+        .where(
+          and(
+            eq(labActionRequests.userId, userId),
+            eq(labActionRequests.recipe, recipe),
+            eq(labActionRequests.status, "executed"),
+            gt(labActionRequests.executedAt, new Date(Date.now() - 3_600_000)),
+          ),
+        );
+      return rows.length;
     },
 
     /**

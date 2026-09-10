@@ -125,50 +125,14 @@ export function MachineAccess() {
             {waiting.length} change{waiting.length === 1 ? "" : "s"} waiting for your approval
           </p>
           {waiting.map((w) => (
-            <div key={w.id} className="space-y-1.5 rounded border border-border/60 bg-background p-2.5">
-              <p className="text-xs font-medium">{w.summary}</p>
-              {w.argv.map((line) => (
-                <pre key={line} className="overflow-x-auto rounded bg-muted px-2 py-1 text-[10px]">
-                  {line}
-                </pre>
-              ))}
-              <p className="text-[11px] text-muted-foreground">
-                Asked by {ACTOR_LABEL[w.actor] ?? w.actor}
-                {w.origin ? " (" + w.origin + ")" : ""}.
-                {w.reversal ? " To undo: " + w.reversal : ""}
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  disabled={pending}
-                  onClick={() =>
-                    start(async () => {
-                      const res = await approveAction({ requestId: w.id });
-                      setNote(res.ok ? "Done. " + (res.message ?? "") : res.message ?? "It didn't run.");
-                      refresh();
-                    })
-                  }
-                >
-                  Run it
-                </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={pending}
-                  onClick={() =>
-                    start(async () => {
-                      await denyAction({ requestId: w.id });
-                      refresh();
-                    })
-                  }
-                >
-                  No
-                </Button>
-                <span className="text-[10px] text-muted-foreground">
-                  Expires {new Date(w.expiresAt).toLocaleTimeString()}
-                </span>
-              </div>
-            </div>
+            <PendingAction
+              key={w.id}
+              w={w}
+              onSettled={(msg) => {
+                setNote(msg);
+                refresh();
+              }}
+            />
           ))}
           <p className="text-[10px] text-muted-foreground">
             Nothing here has run. Each one is approved on its own — there is no setting that
@@ -283,5 +247,107 @@ export function MachineAccess() {
         </ul>
       </details>
     </section>
+  );
+}
+
+
+/**
+ * One waiting change.
+ *
+ * The confirmation strength comes from the policy, not from this component: a reversible
+ * container start is a button, and anything irreversible or reaching past a container
+ * makes you type its name first. That is not friction for its own sake — it is the
+ * difference between an action you chose and one you clicked past on the way to something
+ * else.
+ */
+function PendingAction({
+  w,
+  onSettled,
+}: {
+  w: PendingActionView;
+  onSettled: (message: string) => void;
+}) {
+  const [typed, setTyped] = useState("");
+  const [busy, start] = useTransition();
+
+  const mustType = w.confirm === "type-name";
+  const ready = !mustType || typed.trim() === w.confirmToken;
+
+  return (
+    <div className="space-y-1.5 rounded border border-border/60 bg-background p-2.5">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <p className="text-xs font-medium">{w.summary}</p>
+        {w.reversibility === "irreversible" ? (
+          <span className="rounded-full border border-destructive/50 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-destructive">
+            can&apos;t be undone
+          </span>
+        ) : w.reversibility === "disruptive" ? (
+          <span className="rounded-full border border-amber-500/50 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-amber-500">
+            interrupts something
+          </span>
+        ) : null}
+      </div>
+
+      {/* Verbatim. Approving a description is not approving a command. */}
+      {w.argv.map((line) => (
+        <pre key={line} className="overflow-x-auto rounded bg-muted px-2 py-1 text-[10px]">
+          {line}
+        </pre>
+      ))}
+
+      <p className="text-[11px] text-muted-foreground">
+        Asked by {ACTOR_LABEL[w.actor] ?? w.actor}
+        {w.origin ? " (" + w.origin + ")" : ""}.
+        {w.reversal ? " " + w.reversal : ""}
+      </p>
+
+      {mustType ? (
+        <div className="space-y-1">
+          <label className="block text-[11px] text-muted-foreground" htmlFor={"confirm-" + w.id}>
+            Type <span className="font-mono text-foreground">{w.confirmToken}</span> to allow this.
+          </label>
+          <input
+            id={"confirm-" + w.id}
+            value={typed}
+            onChange={(e) => setTyped(e.target.value)}
+            autoComplete="off"
+            spellCheck={false}
+            className="h-7 w-full max-w-xs rounded border border-border bg-background px-2 font-mono text-[11px]"
+            placeholder={w.confirmToken}
+          />
+        </div>
+      ) : null}
+
+      <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          disabled={busy || !ready}
+          onClick={() =>
+            start(async () => {
+              const res = await approveAction({ requestId: w.id, confirmation: typed });
+              onSettled(res.ok ? "Done. " + (res.message ?? "") : (res.message ?? "It didn't run."));
+            })
+          }
+        >
+          Run it
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={busy}
+          onClick={() =>
+            start(async () => {
+              await denyAction({ requestId: w.id });
+              onSettled("Declined. Nothing ran.");
+            })
+          }
+        >
+          No
+        </Button>
+        <span className="text-[10px] text-muted-foreground">
+          Expires {new Date(w.expiresAt).toLocaleTimeString()}
+        </span>
+      </div>
+    </div>
   );
 }
