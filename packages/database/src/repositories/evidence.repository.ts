@@ -1,4 +1,4 @@
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
 
 import type { DbOrTx } from "../client";
 import { evidenceItems, type EvidenceItem, type NewEvidenceItem } from "../schema";
@@ -59,35 +59,65 @@ export function createEvidenceRepository(db: DbOrTx) {
      * already pointing at the absorbed row follows it to the new fact, so a chain of
      * merges can never strand a record behind a non-canonical parent.
      */
+    /**
+     * Fold one record into another as an alternative wording of the same fact.
+     *
+     * THE INVARIANT: exactly one canonical row per fact. Not at most one — exactly one.
+     * A fact with none is worse than a duplicate, because every surface that projects
+     * from the pool silently loses the record entirely.
+     *
+     * Two ways the previous version broke it, both found by Codex (D01, D02):
+     *
+     *   D01 — a freshly created row has `fact_id` NULL, so demoting "everything whose
+     *         fact_id equals the absorbed row's fact" never matched the absorbed row
+     *         itself. It stayed canonical, and the merge produced two.
+     *   D02 — when both rows already shared a fact, that same demotion ran AFTER the
+     *         promotion and demoted the keeper along with everything else, leaving the
+     *         fact with no canonical row at all.
+     *
+     * Fixed by making the demotion explicitly exclude the keeper and explicitly include
+     * the absorbed row by id, and by doing the whole thing in one transaction so a
+     * failure between the two writes cannot leave the invariant broken.
+     */
     async mergeInto(userId: string, canonicalId: string, absorbedId: string): Promise<void> {
-      const [canonical] = await db
-        .select()
-        .from(evidenceItems)
-        .where(and(eq(evidenceItems.userId, userId), eq(evidenceItems.id, canonicalId)))
-        .limit(1);
-      const [absorbed] = await db
-        .select()
-        .from(evidenceItems)
-        .where(and(eq(evidenceItems.userId, userId), eq(evidenceItems.id, absorbedId)))
-        .limit(1);
-      if (!canonical || !absorbed || canonicalId === absorbedId) return;
+      if (canonicalId === absorbedId) return;
+      await db.transaction(async (tx) => {
+        const rows = await tx
+          .select()
+          .from(evidenceItems)
+          .where(
+            and(
+              eq(evidenceItems.userId, userId),
+              inArray(evidenceItems.id, [canonicalId, absorbedId]),
+            ),
+          );
+        const canonical = rows.find((r) => r.id === canonicalId);
+        const absorbed = rows.find((r) => r.id === absorbedId);
+        if (!canonical || !absorbed) return;
 
-      const factId = canonical.factId ?? canonical.id;
-      await db
-        .update(evidenceItems)
-        .set({ factId, isCanonical: true, updatedAt: new Date() })
-        .where(and(eq(evidenceItems.userId, userId), eq(evidenceItems.id, canonicalId)));
+        const factId = canonical.factId ?? canonical.id;
+        const absorbedFact = absorbed.factId ?? absorbed.id;
 
-      // The absorbed row AND anything that had already been merged into it.
-      await db
-        .update(evidenceItems)
-        .set({ factId, isCanonical: false, updatedAt: new Date() })
-        .where(
-          and(
-            eq(evidenceItems.userId, userId),
-            eq(evidenceItems.factId, absorbed.factId ?? absorbed.id),
-          ),
-        );
+        // Demote FIRST, and never the keeper. Ordering matters: promoting first and then
+        // demoting by fact is what erased the keeper when both already shared a fact.
+        await tx
+          .update(evidenceItems)
+          .set({ factId, isCanonical: false, updatedAt: new Date() })
+          .where(
+            and(
+              eq(evidenceItems.userId, userId),
+              ne(evidenceItems.id, canonicalId),
+              // The absorbed row by id — because its own fact_id may still be NULL —
+              // and anything already merged into it.
+              or(eq(evidenceItems.id, absorbedId), eq(evidenceItems.factId, absorbedFact)),
+            ),
+          );
+
+        await tx
+          .update(evidenceItems)
+          .set({ factId, isCanonical: true, updatedAt: new Date() })
+          .where(and(eq(evidenceItems.userId, userId), eq(evidenceItems.id, canonicalId)));
+      });
     },
 
     /** Undo a merge: the row becomes its own fact again. */

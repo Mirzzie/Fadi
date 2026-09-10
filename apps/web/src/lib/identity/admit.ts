@@ -242,16 +242,28 @@ export async function admitEvidenceBatch(
       ? (created[Number(factId.slice(6))]?.id ?? null)
       : factId;
     if (!realFact) continue;
+
+    // D04 (Codex): `factId` was resolved through the batch→row mapping but `lead` was
+    // not, so a promotion targeting a row admitted EARLIER IN THE SAME BATCH passed the
+    // literal string "batch-0" to a uuid column. Depending on the driver that throws or
+    // matches nothing, and the fact is left with two canonical rows.
+    const realLead = lead === null ? null : lead.startsWith("batch-")
+      ? (created[Number(lead.slice(6))]?.id ?? null)
+      : lead;
+    // If the promotion target cannot be resolved, do NOT create a second canonical.
+    // Storing the wording without displacing anything is the safe half of the operation.
+    const takesLead = lead !== null && realLead !== null;
+
     await repo.create(userId, {
       ...normalize(candidate),
       factId: realFact,
       // An update leads immediately; a rewording is stored without displacing anything.
-      isCanonical: lead !== null,
+      isCanonical: takesLead,
       renderingFor: sure ? null : UNCONFIRMED_LINK,
     });
     // Demote, never delete — the previous wording stays on the fact and one click in
     // the renderings panel puts it back.
-    if (lead) await repo.update(userId, lead, { isCanonical: false });
+    if (takesLead && realLead) await repo.update(userId, realLead, { isCanonical: false });
   }
 
   if (rewordings.length > 0) {
@@ -327,5 +339,14 @@ export async function admitEvidence(
     sure: admission.sure,
     kind: candidate.kind,
   });
-  return { row: existing.find((e) => e.id === admission.intoId) ?? null, admission };
+  // D03 (Codex): this returned `existing.find(...)` — a copy read BEFORE the writes
+  // above. After a promotion that is the row we just demoted, still carrying
+  // isCanonical: true and the superseded wording. Callers that link to the returned row
+  // were linking to an obsolete record and believing it was the leading one.
+  //
+  // Re-read instead. The canonical row for this fact is the answer to "what now carries
+  // this reality", which is the only thing a caller can safely act on.
+  const after = await repo.listRenderings(userId, admission.factId).catch(() => []);
+  const canonical = after.find((r) => r.isCanonical) ?? null;
+  return { row: canonical ?? (await repo.getForUser(userId, admission.intoId)), admission };
 }
