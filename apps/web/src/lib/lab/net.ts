@@ -110,6 +110,78 @@ export function hostsOf(base: number, prefix: number): string[] {
   return out;
 }
 
+export type HostCheck = { ok: true; ip: string } | { ok: false; reason: string };
+
+/**
+ * A single private address Fadi may probe.
+ *
+ * Same rule as the range, applied to one host: private space only. A sweep that has
+ * already run tells you an address is alive; identifying it means opening connections to
+ * it, and the range check must not be skipped just because the address came from Fadi's
+ * own earlier result rather than from a person.
+ */
+export function parsePrivateHost(input: string): HostCheck {
+  const raw = (input ?? "").trim();
+  const addr = ipToInt(raw);
+  if (addr === null) return { ok: false, reason: "That isn't a valid IPv4 address." };
+
+  const isPrivate = PRIVATE_RANGES.some((r) => inRange(addr, r.base, r.prefix));
+  if (!isPrivate) {
+    return {
+      ok: false,
+      reason: "Fadi only connects to private addresses. " + raw + " isn't one, so nothing was sent.",
+    };
+  }
+  // Normalised through the integer, so "192.168.000.056" cannot reach anything a plain
+  // string comparison would have treated as a different host.
+  return { ok: true, ip: intToIp(addr) };
+}
+
+/**
+ * The ports Fadi checks when identifying a machine, and what each one suggests.
+ *
+ * FIXED. A port list taken from input is a port scanner with extra steps, and the
+ * difference between "is this the Proxmox box?" and "map everything this host is running"
+ * is exactly this list being short and written down here.
+ *
+ * Chosen to answer one question — what KIND of machine is this — rather than to find a way
+ * in. There is nothing here that is interesting to an attacker and uninteresting to
+ * someone cataloguing their own lab.
+ */
+export const IDENTIFY_PORTS: Array<{ port: number; means: string }> = [
+  { port: 8006, means: "Proxmox VE" },
+  { port: 22, means: "SSH" },
+  { port: 3389, means: "Windows Remote Desktop" },
+  { port: 445, means: "Windows file sharing" },
+  { port: 80, means: "a web server" },
+  { port: 443, means: "a web server (TLS)" },
+  { port: 2375, means: "Docker's API" },
+  { port: 9090, means: "Cockpit" },
+];
+
+/**
+ * What the open ports suggest this machine is.
+ *
+ * A guess, and labelled as one everywhere it surfaces. Port 8006 is Proxmox's web UI by
+ * convention, not by law, and a registry entry that says "hypervisor" because of a
+ * convention should not later be treated as though someone had confirmed it.
+ */
+export function guessKind(openPorts: number[]): { kind: string; virtualization: string; why: string } | null {
+  if (openPorts.includes(8006)) {
+    return { kind: "hypervisor", virtualization: "vms", why: "port 8006 is Proxmox's web interface" };
+  }
+  if (openPorts.includes(2375)) {
+    return { kind: "server", virtualization: "containers", why: "port 2375 is Docker's API" };
+  }
+  if (openPorts.includes(3389) || openPorts.includes(445)) {
+    return { kind: "server", virtualization: "none", why: "it answers on Windows ports" };
+  }
+  if (openPorts.includes(22)) {
+    return { kind: "server", virtualization: "none", why: "it answers on SSH" };
+  }
+  return null;
+}
+
 /** Canonical text for the range, so what is shown and what is swept cannot differ. */
 export function cidrLabel(base: number, prefix: number): string {
   return intToIp(base) + "/" + prefix;

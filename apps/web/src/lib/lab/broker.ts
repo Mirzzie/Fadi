@@ -10,7 +10,14 @@ import {
   createLabGrantsRepository,
 } from "@careeros/database";
 
-import { cidrLabel, hostsOf, parsePrivateCidr } from "./net";
+import {
+  cidrLabel,
+  guessKind,
+  hostsOf,
+  IDENTIFY_PORTS,
+  parsePrivateCidr,
+  parsePrivateHost,
+} from "./net";
 import {
   BREAKER_WINDOW_MINUTES,
   breakerState,
@@ -106,7 +113,9 @@ type FileStep = {
  * nothing for a tampered row to add an address to, and what gets pinged is always exactly
  * what the range check approved.
  */
-type NetStep = { id: string; net: "sweep"; cidr: string };
+type NetStep =
+  | { id: string; net: "sweep"; cidr: string }
+  | { id: string; net: "identify"; ip: string };
 
 type Step = Command | FileStep | NetStep;
 
@@ -125,7 +134,11 @@ function digest(text: string): string {
 
 /** How a step is shown to the person, and what the approval is compared against. */
 function displayOf(step: Step): string[] {
-  if (isNetStep(step)) return ["ping every host in", step.cidr];
+  if (isNetStep(step)) {
+    return step.net === "sweep"
+      ? ["ping every host in", step.cidr]
+      : ["connect to", step.ip, "on ports", IDENTIFY_PORTS.map((p) => p.port).join(",")];
+  }
   if (!isFileStep(step)) return [step.cmd, ...step.args];
   if (step.fs === "write") {
     return [
@@ -336,6 +349,7 @@ export async function requestCapability(input: {
 
 export const RECIPE_IDS = [
   "network.sweep",
+  "network.identify",
   "container.run",
   "container.stop",
   "container.remove",
@@ -548,6 +562,39 @@ export const RECIPES: Record<RecipeId, Recipe> = {
     reversal: () =>
       "Nothing to undo — but the scan is visible to anything watching the network, and that cannot be taken back.",
     render: (p) => [{ id: "sweep", net: "sweep", cidr: String(p.cidr) }],
+  },
+
+  /**
+   * WHAT IS THIS MACHINE?
+   *
+   * A ping says an address is alive. It does not say whether that is the Proxmox box, the
+   * printer, or someone's phone — and a lab registry full of bare IP addresses is a list
+   * nobody can plan against.
+   *
+   * So: open a connection to a short, fixed list of ports and see which answer. The list
+   * is written in net.ts and cannot be supplied, because a port list taken from input is a
+   * port scanner with extra steps.
+   *
+   * Approved per host. Typing the address is proportionate here — this opens connections
+   * to a device the person may not own, and there is exactly one line to type.
+   */
+  "network.identify": {
+    blast: "remote",
+    reversibility: "reversible",
+    confirmToken: (p) => String(p.ip),
+    validate: (raw) => {
+      const parsed = parsePrivateHost(str(raw.ip) ?? "");
+      return parsed.ok ? { ip: parsed.ip } : null;
+    },
+    summary: (p) =>
+      "Check which of " +
+      IDENTIFY_PORTS.length +
+      " common ports " +
+      p.ip +
+      " answers on, to work out what kind of machine it is. Nothing is sent beyond opening and closing a connection.",
+    reversal: () =>
+      "Nothing to undo — but the connection attempts are visible to that machine, and that cannot be taken back.",
+    render: (p) => [{ id: "identify", net: "identify", ip: String(p.ip) }],
   },
 
   "container.stop": {
@@ -794,7 +841,26 @@ export async function proposeAction(input: {
  * came from could have been edited in between, and a check that runs only on the way in is
  * a check that trusts storage.
  */
-async function runNetStep(step: NetStep): Promise<string> {
+/**
+ * What identifying a host turned up, in a shape the interface can act on.
+ *
+ * The audit log gets prose because a person reads it; the panel gets this because it has
+ * to offer "add this as a machine" with the fields already filled in. Parsing the prose
+ * back out would work right up until someone improved the wording.
+ */
+export type Discovered = {
+  ip: string;
+  name: string | null;
+  openPorts: number[];
+  /** A GUESS, carried with its reason. Never presented as a fact about the machine. */
+  guess: { kind: string; virtualization: string; why: string } | null;
+};
+
+type StepResult = { text: string; discovered?: Discovered };
+
+async function runNetStep(step: NetStep): Promise<StepResult> {
+  if (step.net === "identify") return runIdentify(step.ip);
+
   const parsed = parsePrivateCidr(step.cidr);
   if (!parsed.ok) throw new Error(parsed.reason);
 
@@ -818,7 +884,72 @@ async function runNetStep(step: NetStep): Promise<string> {
   }
 
   alive.sort((a, b) => (ipToIntSafe(a) ?? 0) - (ipToIntSafe(b) ?? 0));
-  return alive.length ? alive.length + " responded: " + alive.join(", ") : "Nothing responded in " + step.cidr + ".";
+  return {
+    text: alive.length
+      ? alive.length + " responded: " + alive.join(", ")
+      : "Nothing responded in " + step.cidr + ".",
+  };
+}
+
+/**
+ * Open a connection to each catalogued port and close it immediately.
+ *
+ * A TCP connect, not a command — there is no port-scanning binary involved and nothing for
+ * an argument to be smuggled into. The address is re-validated here for the same reason the
+ * sweep range is: a row can be edited between proposal and approval, and a check that runs
+ * only on the way in is a check that trusts storage.
+ */
+async function runIdentify(ip: string): Promise<StepResult> {
+  const parsed = parsePrivateHost(ip);
+  if (!parsed.ok) throw new Error(parsed.reason);
+
+  const net = await import("node:net");
+  const dns = await import("node:dns/promises");
+
+  const open: number[] = [];
+  await Promise.all(
+    IDENTIFY_PORTS.map(
+      ({ port }) =>
+        new Promise<void>((resolve) => {
+          const socket = new net.Socket();
+          const done = (isOpen: boolean) => {
+            if (isOpen) open.push(port);
+            socket.destroy();
+            resolve();
+          };
+          socket.setTimeout(2000);
+          socket.once("connect", () => done(true));
+          socket.once("timeout", () => done(false));
+          socket.once("error", () => done(false));
+          socket.connect(port, parsed.ip);
+        }),
+    ),
+  );
+
+  let name = "";
+  try {
+    const names = await dns.reverse(parsed.ip);
+    name = names[0] ?? "";
+  } catch {
+    // No reverse record. Common on home networks and not worth mentioning as a failure.
+  }
+
+  open.sort((a, b) => a - b);
+  const described = open
+    .map((p) => p + " (" + (IDENTIFY_PORTS.find((x) => x.port === p)?.means ?? "unknown") + ")")
+    .join(", ");
+
+  return {
+    text:
+      (name ? name + " — " : "") +
+      (open.length ? "answers on " + described : "answers on none of the ports checked"),
+    discovered: {
+      ip: parsed.ip,
+      name: name || null,
+      openPorts: open,
+      guess: guessKind(open),
+    },
+  };
 }
 
 function ipToIntSafe(ip: string): number | null {
@@ -826,9 +957,9 @@ function ipToIntSafe(ip: string): number | null {
   return parts.length === 4 ? ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0 : null;
 }
 
-async function runCommand(c: Command): Promise<string> {
+async function runCommand(c: Command): Promise<StepResult> {
   const { stdout } = await run(c.cmd, c.args, { timeout: 60_000, maxBuffer: 512 * 1024 });
-  return (stdout.split("\n")[0] ?? "").trim();
+  return { text: (stdout.split("\n")[0] ?? "").trim() };
 }
 
 /**
@@ -842,7 +973,7 @@ async function runCommand(c: Command): Promise<string> {
  * A write over an existing file copies it aside first, which is what makes `file.write`
  * genuinely reversible rather than reversible-sounding.
  */
-async function runFileStep(userId: string, step: FileStep): Promise<string> {
+async function runFileStep(userId: string, step: FileStep): Promise<StepResult> {
   const { createLabSettingsRepository } = await import("@careeros/database");
   const { resolveInWorkspace } = await import("./workspace");
   const fs = await import("node:fs/promises");
@@ -853,12 +984,12 @@ async function runFileStep(userId: string, step: FileStep): Promise<string> {
 
   if (step.fs === "mkdir") {
     await fs.mkdir(resolved.path, { recursive: true });
-    return "created " + step.path;
+    return { text: "created " + step.path };
   }
 
   if (step.fs === "remove") {
     await fs.rm(resolved.path, { force: true });
-    return "removed " + step.path;
+    return { text: "removed " + step.path };
   }
 
   let backup = "";
@@ -871,13 +1002,15 @@ async function runFileStep(userId: string, step: FileStep): Promise<string> {
   }
   await fs.mkdir(resolved.path.slice(0, resolved.path.lastIndexOf("/")), { recursive: true });
   await fs.writeFile(resolved.path, step.content ?? "", "utf8");
-  return backup
-    ? "wrote " + step.path + " (previous version kept as " + backup.split("/").pop() + ")"
-    : "wrote " + step.path;
+  return {
+    text: backup
+      ? "wrote " + step.path + " (previous version kept as " + backup.split("/").pop() + ")"
+      : "wrote " + step.path,
+  };
 }
 
 export type Execution =
-  | { ok: true; output: string }
+  | { ok: true; output: string; discovered?: Discovered }
   | { ok: false; message: string };
 
 /**
@@ -973,6 +1106,7 @@ export async function approveAndRun(input: {
 
   const started = Date.now();
   const out: string[] = [];
+  let discovered: Discovered | undefined;
   for (const c of commands) {
     try {
       const result = isNetStep(c)
@@ -980,7 +1114,8 @@ export async function approveAndRun(input: {
         : isFileStep(c)
           ? await runFileStep(input.userId, c)
           : await runCommand(c);
-      out.push(result);
+      out.push(result.text);
+      if (result.discovered) discovered = result.discovered;
       await audit.record({
         userId: input.userId,
         actor: "user",
@@ -988,7 +1123,7 @@ export async function approveAndRun(input: {
         capability: row.recipe,
         command: displayOf(c).join(" "),
         decision: "allowed",
-        detail: result.slice(0, 200),
+        detail: result.text.slice(0, 200),
         durationMs: Date.now() - started,
       });
     } catch (error) {
@@ -1014,5 +1149,5 @@ export async function approveAndRun(input: {
     detail: out.join(" ").slice(0, 400),
   });
   logger.info("lab.action_executed", { userId: input.userId, recipe: row.recipe });
-  return { ok: true, output: out.join(" ") };
+  return { ok: true, output: out.join(" "), discovered };
 }

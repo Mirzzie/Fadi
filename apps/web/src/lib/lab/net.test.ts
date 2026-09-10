@@ -107,3 +107,59 @@ describe("malformed input cannot slip through", () => {
     }
   });
 });
+
+describe("identifying a single host", () => {
+  it("accepts a private address and normalises it", async () => {
+    const { parsePrivateHost } = await import("./net");
+    const res = parsePrivateHost("192.168.0.56");
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.ip).toBe("192.168.0.56");
+  });
+
+  it("REFUSES a public address, even though it came from Fadi's own sweep result", async () => {
+    const { parsePrivateHost } = await import("./net");
+    // The range check must not be skipped because the address came from an earlier result
+    // rather than from a person. A stored result is still storage, and storage can be
+    // edited.
+    for (const ip of ["8.8.8.8", "1.1.1.1", "127.0.0.1", "169.254.1.1", "224.0.0.1"]) {
+      const res = parsePrivateHost(ip);
+      expect(res.ok, ip).toBe(false);
+      if (!res.ok) expect(res.reason).toMatch(/nothing was sent/i);
+    }
+  });
+
+  it("refuses malformed addresses and ambiguous octets", async () => {
+    const { parsePrivateHost } = await import("./net");
+    for (const ip of ["192.168.0", "192.168.0.256", "192.168.000.056", "192.168.0.1;ls", "", "::1"]) {
+      expect(parsePrivateHost(ip).ok, ip).toBe(false);
+    }
+  });
+
+  it("keeps the port list short and diagnostic, not exploratory", async () => {
+    const { IDENTIFY_PORTS } = await import("./net");
+    // The difference between "what kind of machine is this" and "map everything it runs"
+    // is this list staying short and written down.
+    expect(IDENTIFY_PORTS.length).toBeLessThanOrEqual(12);
+    for (const entry of IDENTIFY_PORTS) {
+      expect(Number.isInteger(entry.port)).toBe(true);
+      // Every port says what it means, so the result can be read by someone who does not
+      // know port numbers by heart.
+      expect(entry.means.length).toBeGreaterThan(2);
+    }
+  });
+
+  it("guesses a kind from ports, and never claims certainty", async () => {
+    const { guessKind } = await import("./net");
+    const proxmox = guessKind([22, 8006]);
+    expect(proxmox?.kind).toBe("hypervisor");
+    expect(proxmox?.virtualization).toBe("vms");
+    // The reason travels with the guess, because 8006 is Proxmox by convention, not by law.
+    expect(proxmox?.why).toMatch(/8006/);
+
+    expect(guessKind([2375])?.virtualization).toBe("containers");
+    expect(guessKind([3389])?.kind).toBe("server");
+    // Nothing recognisable must produce no guess at all, rather than a default.
+    expect(guessKind([])).toBeNull();
+    expect(guessKind([12345])).toBeNull();
+  });
+});

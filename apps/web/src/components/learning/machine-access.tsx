@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   approveAction,
   denyAction,
+  registerDiscovered,
   getWorkspace,
   setWorkspace,
   grantCapability,
@@ -52,6 +53,7 @@ export function MachineAccess() {
   const [recent, setRecent] = useState<ActionView[]>([]);
   const [waiting, setWaiting] = useState<PendingActionView[]>([]);
   const [workspace, setWorkspaceRoot] = useState<string | null>(null);
+  const [found, setFound] = useState<Discovered | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
@@ -142,6 +144,7 @@ export function MachineAccess() {
                 setNote(msg);
                 refresh();
               }}
+              onDiscovered={setFound}
             />
           ))}
           <p className="text-[10px] text-muted-foreground">
@@ -152,6 +155,16 @@ export function MachineAccess() {
       ) : null}
 
       {note ? <p className="text-[11px] text-muted-foreground">{note}</p> : null}
+
+      {found ? (
+        <RecordMachine
+          found={found}
+          onDone={() => {
+            setFound(null);
+            window.dispatchEvent(new CustomEvent("fadi:resources-changed"));
+          }}
+        />
+      ) : null}
 
       {/*
         Denials first. If something asked for what it was never given, that is the one
@@ -275,9 +288,11 @@ export function MachineAccess() {
 function PendingAction({
   w,
   onSettled,
+  onDiscovered,
 }: {
   w: PendingActionView;
   onSettled: (message: string) => void;
+  onDiscovered: (d: Discovered) => void;
 }) {
   const [typed, setTyped] = useState("");
   const [busy, start] = useTransition();
@@ -367,6 +382,9 @@ function PendingAction({
             start(async () => {
               const res = await approveAction({ requestId: w.id, confirmation: typed });
               onSettled(res.ok ? "Done. " + (res.message ?? "") : (res.message ?? "It didn't run."));
+              // A machine that answered is worth offering to record while it is in front
+              // of the person, rather than leaving them to type it in somewhere else later.
+              if (res.ok && res.discovered) onDiscovered(res.discovered);
             })
           }
         >
@@ -461,6 +479,84 @@ function WorkspaceSetting({ root, onChanged }: { root: string | null; onChanged:
           </Button>
         </div>
       ) : null}
+    </div>
+  );
+}
+
+
+/** What identifying a host turned up. Mirrors the broker's own type. */
+type Discovered = {
+  ip: string;
+  name: string | null;
+  openPorts: number[];
+  guess: { kind: string; virtualization: string; why: string } | null;
+};
+
+/**
+ * Offer to record a machine Fadi just identified.
+ *
+ * DETECTED, NEVER REGISTERED AUTOMATICALLY. Finding a hypervisor must not silently hand
+ * Fadi a resource it may later be asked to provision on — and a registry that fills itself
+ * is one nobody has read.
+ *
+ * The guess is shown WITH its reason and stays editable. Port 8006 is Proxmox by
+ * convention, not by law, and an entry that says "hypervisor" because of a convention must
+ * not later look like something a person confirmed.
+ */
+function RecordMachine({ found, onDone }: { found: Discovered; onDone: () => void }) {
+  const [label, setLabel] = useState(
+    found.guess?.kind === "hypervisor" ? "Proxmox at " + found.ip : (found.name ?? found.ip),
+  );
+  const [busy, start] = useTransition();
+
+  return (
+    <div className="space-y-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/5 p-2.5">
+      <p className="text-xs font-medium">
+        {found.ip}
+        {found.name ? " (" + found.name + ")" : ""} answered.
+      </p>
+      <p className="text-[11px] text-muted-foreground">
+        {found.openPorts.length ? "Open: " + found.openPorts.join(", ") + ". " : "No common ports open. "}
+        {found.guess
+          ? "Looks like a " + found.guess.kind + " — " + found.guess.why + ", which is a convention rather than proof."
+          : "Not enough to guess what it is, so Fadi won't."}
+      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          value={label}
+          onChange={(e) => setLabel(e.target.value)}
+          className="h-7 w-full max-w-xs rounded border border-border bg-background px-2 text-[11px]"
+          placeholder="Call it something you'll recognise"
+        />
+        <Button
+          size="sm"
+          disabled={busy || !label.trim()}
+          onClick={() =>
+            start(async () => {
+              await registerDiscovered({
+                ip: found.ip,
+                label: label.trim(),
+                kind: found.guess?.kind ?? "server",
+                virtualization: found.guess?.virtualization ?? "none",
+                note: found.guess ? "Guessed from open ports: " + found.guess.why + "." : undefined,
+              });
+              onDone();
+            })
+          }
+        >
+          Add it to my machines
+        </Button>
+        <Button size="sm" variant="ghost" disabled={busy} onClick={onDone}>
+          Not now
+        </Button>
+      </div>
+      {/* Capacity is left blank rather than guessed: a port answering says nothing about
+          memory, and an unmeasured number would be reported downstream as though someone
+          had checked. */}
+      <p className="text-[10px] text-muted-foreground">
+        Memory and disk stay unrecorded — a port answering says nothing about them, so Fadi will
+        say &ldquo;not enough recorded to tell&rdquo; rather than assume.
+      </p>
     </div>
   );
 }

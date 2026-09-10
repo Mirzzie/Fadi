@@ -317,13 +317,19 @@ describe("the catalogue itself stays safe as it grows", () => {
     for (const id of RECIPE_IDS) {
       const recipe = RECIPES[id];
       // Every recipe validates against the widest legal parameter bag it accepts.
-      // The widest legal bag for any recipe shape — container or filesystem.
-      const params =
-        recipe.validate({ image: "nginx", name: "x", port: 8080 }) ??
-        recipe.validate({ name: "x" }) ??
-        recipe.validate({ path: "dir/file.txt", content: "x" }) ??
-        recipe.validate({ path: "dir/file.txt" }) ??
-        recipe.validate({ cidr: "192.168.0.0/24" });
+      // ONE bag holding a legal value for every field any recipe reads. Each validate()
+      // takes only the fields it knows about and ignores the rest, so a new recipe is
+      // covered by adding its field here — rather than by appending another ?? to a chain,
+      // which is what this was and which quietly skipped recipes nobody remembered to add.
+      const params = recipe.validate({
+        image: "nginx",
+        name: "x",
+        port: 8080,
+        path: "dir/file.txt",
+        content: "x",
+        cidr: "192.168.0.0/24",
+        ip: "192.168.0.56",
+      });
       expect(params, `${id} should accept a legal parameter bag`).not.toBeNull();
       for (const step of recipe.render(params!)) {
         // File steps carry no flags at all, which is itself the point: there is no argv
@@ -559,5 +565,41 @@ describe("the network sweep cannot be pointed off your own network", () => {
     // If a host list were stored, a tampered row could add an address outside the range.
     expect(serialised).not.toContain("192.168.0.1\"");
     expect(JSON.stringify(row.params)).toContain("192.168.0.0/24");
+  });
+});
+
+describe("identifying a host is bounded the same way as the sweep", () => {
+  it("refuses a public address", async () => {
+    for (const ip of ["8.8.8.8", "1.1.1.1", "127.0.0.1"]) {
+      const res = await propose_({ ip }, "network.identify");
+      expect(res.ok, ip).toBe(false);
+      expect(propose).not.toHaveBeenCalled();
+    }
+  });
+
+  it("accepts a private address and must be typed out", async () => {
+    const res = await propose_({ ip: "192.168.0.56" }, "network.identify");
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.confirmToken).toBe("192.168.0.56");
+      expect(res.policy.confirm).toBe("type-name");
+      // The command line names the exact ports, so approval covers what is actually sent.
+      expect(res.argv[0].join(" ")).toContain("8006");
+      expect(res.reversal).toMatch(/visible to that machine/i);
+    }
+  });
+
+  it("cannot be handed a port list — the ports live in the file", async () => {
+    // A port list from input is a port scanner with extra steps.
+    const res = await propose_(
+      { ip: "192.168.0.56", ports: [1, 2, 3, 4, 5], port: 9999 },
+      "network.identify",
+    );
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      const line = res.argv[0].join(" ");
+      expect(line).not.toContain("9999");
+      expect(line).not.toContain("1,2,3,4,5");
+    }
   });
 });

@@ -266,7 +266,17 @@ export async function approveAction(input: {
   requestId: string;
   /** What the person typed, for actions the policy says must be typed out. */
   confirmation?: string;
-}): Promise<{ ok: boolean; message?: string }> {
+}): Promise<{
+  ok: boolean;
+  message?: string;
+  /** Present when the action identified a machine, so the panel can offer to record it. */
+  discovered?: {
+    ip: string;
+    name: string | null;
+    openPorts: number[];
+    guess: { kind: string; virtualization: string; why: string } | null;
+  };
+}> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
   if (!z.string().uuid().safeParse(input.requestId).success) {
@@ -279,7 +289,60 @@ export async function approveAction(input: {
     requestId: input.requestId,
     confirmation: input.confirmation,
   });
-  return result.ok ? { ok: true, message: result.output } : { ok: false, message: result.message };
+  return result.ok
+    ? { ok: true, message: result.output, discovered: result.discovered }
+    : { ok: false, message: result.message };
+}
+
+/**
+ * Register a machine Fadi found on the network.
+ *
+ * DETECTED, NEVER REGISTERED AUTOMATICALLY — the same boundary as detecting what is on
+ * this laptop. Finding a hypervisor must not silently hand Fadi a resource it may later be
+ * asked to provision on, and a registry that fills itself is one nobody has read.
+ *
+ * The kind arrives as a GUESS from the open ports, and the reason travels with it, so what
+ * gets saved is something the person agreed to rather than something a port number decided.
+ */
+export async function registerDiscovered(input: {
+  ip: string;
+  label: string;
+  kind: string;
+  virtualization: string;
+  note?: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  const { parsePrivateHost } = await import("@/lib/lab/net");
+  const parsed = parsePrivateHost(input.ip);
+  if (!parsed.ok) return { ok: false, message: parsed.reason };
+
+  const shape = z.object({
+    label: z.string().trim().min(1).max(80),
+    kind: z.enum(["laptop", "server", "hypervisor", "sbc", "microcontroller", "cloud"]),
+    virtualization: z.enum(["none", "containers", "vms", "nested"]),
+    note: z.string().trim().max(400).optional(),
+  });
+  const fields = shape.safeParse(input);
+  if (!fields.success) return { ok: false, message: "That isn't a machine Fadi can record." };
+
+  const { createLabResourcesRepository } = await import("@careeros/database");
+  await createLabResourcesRepository(getDatabase()).create(user.id, {
+    label: fields.data.label,
+    kind: fields.data.kind,
+    arch: "x86_64",
+    virtualization: fields.data.virtualization,
+    alwaysOn: true,
+    // Capacity is deliberately left unknown rather than guessed. A port scan says nothing
+    // about memory, and "unknown" is reported as unknown everywhere downstream — which is
+    // what stops a plan being built on a number nobody measured.
+    memoryMb: null,
+    diskGb: null,
+    notes: (fields.data.note ? fields.data.note + " " : "") + "Found at " + parsed.ip + ".",
+  });
+
+  return { ok: true };
 }
 
 export async function denyAction(input: {
