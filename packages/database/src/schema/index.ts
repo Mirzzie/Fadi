@@ -929,6 +929,29 @@ export const evidenceItems = pgTable(
      * Default for a new row is "I am my own fact": fact_id = id, is_canonical = true.
      */
     factId: uuid("fact_id"),
+    /**
+     * WHOSE WORK IS THIS? Default: your own.
+     *
+     * `organization` became a dumping ground — an employer, a tech stack, a hardware
+     * board, a third-party site and an academic module all landed in one field, and
+     * every surface rendered it as "where this happened". So a Raspberry Pi project
+     * read as a job, and a CTF room read as employment.
+     *
+     * That is a claim about someone's history that nobody made. It also poisoned
+     * identity resolution, which treats a shared organisation as evidence that two
+     * records are the same thing — two unrelated personal projects on the same board
+     * looked like colleagues.
+     *
+     * personal   — your own project. THE DEFAULT, and the honest one when unsure.
+     * employment — done for an employer, and only they may render as one.
+     * education  — a course, dissertation or academic module.
+     * platform   — a third-party site: TryHackMe, Hack The Box, Coursera.
+     * client     — freelance or contract work for someone else.
+     *
+     * Untagged means personal. Attribution to a company is something a person asserts,
+     * never something Fadi infers from a word that happens to appear in a title.
+     */
+    attribution: text("attribution").notNull().default("personal"),
     isCanonical: boolean("is_canonical").notNull().default(true),
     /** Which audience/track this wording was tailored for; null = the plain record. */
     renderingFor: text("rendering_for"),
@@ -1119,6 +1142,29 @@ export const portfolioItems = pgTable(
      * NULL here and stays off the public site until it is confirmed. Anything the
      * owner typed or edited is confirmed by definition: they were looking at it.
      */
+    /**
+     * WHOSE WORK IS THIS? Default: your own.
+     *
+     * `organization` became a dumping ground — an employer, a tech stack, a hardware
+     * board, a third-party site and an academic module all landed in one field, and
+     * every surface rendered it as "where this happened". So a Raspberry Pi project
+     * read as a job, and a CTF room read as employment.
+     *
+     * That is a claim about someone's history that nobody made. It also poisoned
+     * identity resolution, which treats a shared organisation as evidence that two
+     * records are the same thing — two unrelated personal projects on the same board
+     * looked like colleagues.
+     *
+     * personal   — your own project. THE DEFAULT, and the honest one when unsure.
+     * employment — done for an employer, and only they may render as one.
+     * education  — a course, dissertation or academic module.
+     * platform   — a third-party site: TryHackMe, Hack The Box, Coursera.
+     * client     — freelance or contract work for someone else.
+     *
+     * Untagged means personal. Attribution to a company is something a person asserts,
+     * never something Fadi infers from a word that happens to appear in a title.
+     */
+    attribution: text("attribution").notNull().default("personal"),
     confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
     ...timestamps,
   },

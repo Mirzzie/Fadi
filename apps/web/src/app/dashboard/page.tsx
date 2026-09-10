@@ -56,19 +56,25 @@ export default async function DashboardPage() {
     latestEvidenceAt,
     activeTrack,
     linkedin,
-  ] = await Promise.all([
+  ] = await (async () => {
+  // Read the phase FIRST: the setup checklist is built per mode, and a checklist that
+  // asks for what the current phase excludes is worse than no checklist.
+  const phase: CareerMode =
+    (await cookies()).get(MODE_COOKIE)?.value === "prepare" ? "prepare" : "apply";
+  return Promise.all([
     getDashboardProfileSummary(user.id),
     getLatestCareerReport(user.id),
     getRecommendedJobsForUser(user.id, 3, undefined, { skipSync: true }),
     getMomentumSummary(user.id),
     getMomentumReflection(user.id),
-    getSetupState(user.id),
+    getSetupState(user.id, phase),
     getAgencyDigest(user.id),
     getFadiImpact(user.id),
     createEvidenceRepository(db).latestUpdatedAt(user.id),
     createCareerProfilesRepository(db).getActiveForUser(user.id),
     createLinkedInProfilesRepository(db).getLatestForUser(user.id),
   ]);
+  })();
   // Same source as the shell (the cookie) so the nav and the content never disagree.
   const careerMode: CareerMode =
     (await cookies()).get(MODE_COOKIE)?.value === "prepare" ? "prepare" : "apply";

@@ -323,11 +323,17 @@ export function DashboardShell({
       </section>
 
       {/* Zone: Your momentum — the anti-give-up core, all in one place */}
+      {/* Your momentum is a COMMITMENT TO APPLY — "quality applications this week",
+          measured against a cadence target. In Prepare, applications are exactly what the
+          mode sets aside, so the panel was asking the user to be behind on work they had
+          just chosen not to do. */}
+      {applying ? (
       <section className="space-y-3">
         <ZoneHeading>Your momentum</ZoneHeading>
         <MomentumPanel momentum={toMomentumView(momentum)} />
         {reflection ? <MomentumReflectionCard reflection={reflection} /> : null}
       </section>
+      ) : null}
 
       {/* Zone: Your profile & report — compact. The full report lives on /dashboard/report
           so the dashboard stays a launchpad, not a document. */}

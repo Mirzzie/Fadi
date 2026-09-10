@@ -42,6 +42,16 @@ export type IdentityInput = {
   id: string;
   title: string;
   organization?: string | null;
+  /**
+   * personal | employment | education | platform | client. Default personal.
+   *
+   * Decides whether `organization` may act as an IDENTITY ANCHOR. A shared employer
+   * plus overlapping years is strong evidence two records describe the same work. A
+   * shared "Raspberry Pi" is evidence of nothing — it is a board two unrelated
+   * projects happen to run on, and treating it as an employer made them look like
+   * colleagues.
+   */
+  attribution?: string | null;
   period?: string | null;
   detail?: string | null;
   url?: string | null;
@@ -192,7 +202,14 @@ function artefacts(item: IdentityInput): Set<string> {
   );
 }
 
+/** Attributions where `organization` names a real institution someone can be "at". */
+const ORG_ATTRIBUTIONS = new Set(["employment", "education", "client"]);
+
 function orgKey(item: IdentityInput): string {
+  // Untagged is personal, so an untagged record's organisation is context, not an
+  // employer. Refusing to anchor on it is what stops "Raspberry Pi" and "Proxmox
+  // Homelab" from binding unrelated projects together.
+  if (!ORG_ATTRIBUTIONS.has(item.attribution ?? "personal")) return "";
   return tokens(item.organization ?? "").sort().join(" ");
 }
 
