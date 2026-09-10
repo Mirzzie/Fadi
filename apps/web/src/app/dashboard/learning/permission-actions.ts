@@ -208,6 +208,8 @@ export type PendingActionView = {
   actor: string;
   origin: string | null;
   expiresAt: string;
+  /** How long this has been waiting, in words. */
+  askedAgo: string;
   /** click | type-name — how hard this one is to approve. */
   confirm: string;
   /** What must be typed when confirm is "type-name". */
@@ -217,6 +219,17 @@ export type PendingActionView = {
   /** What the machine said would change, checked when this was proposed. */
   preflight: Array<{ kind: string; text: string }>;
 };
+
+/** Plain words rather than a timestamp: nobody reads a clock time as an age. */
+function describeAge(at: Date): string {
+  const minutes = Math.max(0, Math.round((Date.now() - at.getTime()) / 60_000));
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return minutes + (minutes === 1 ? " minute ago" : " minutes ago");
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return hours + (hours === 1 ? " hour ago" : " hours ago");
+  const days = Math.round(hours / 24);
+  return days + (days === 1 ? " day ago" : " days ago");
+}
 
 export async function listPendingActions(): Promise<{
   ok: boolean;
@@ -251,6 +264,7 @@ export async function listPendingActions(): Promise<{
         actor: r.actor,
         origin: r.origin,
         expiresAt: r.expiresAt.toISOString(),
+        askedAgo: describeAge(r.createdAt),
         confirm: policy.confirm,
         confirmToken: recipe && params ? recipe.confirmToken(params) : "",
         preflight: (r.preflight as Array<{ kind: string; text: string }>) ?? [],

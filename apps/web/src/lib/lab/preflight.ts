@@ -35,6 +35,24 @@ export type PreflightNote = {
   text: string;
 };
 
+/**
+ * Has the situation changed since the person read it?
+ *
+ * Codex's correction to the first design, and it was right: a short expiry threw away the
+ * user's DECISION because the CHECK went stale. Those are different things. The proposal
+ * can survive; what cannot survive is approving an effect that is no longer the effect
+ * that was described.
+ *
+ * Material means A WARNING THAT IS THERE NOW AND WAS NOT THERE THEN. A warning that
+ * disappeared is not material — "this will download the image" becoming "the image is
+ * already here" is the world getting better, and forcing a re-approval for it would train
+ * people to click through re-approvals.
+ */
+export function materialChanges(before: PreflightNote[], after: PreflightNote[]): PreflightNote[] {
+  const seen = new Set(before.filter((n) => n.kind === "warn").map((n) => n.text));
+  return after.filter((n) => n.kind === "warn" && !seen.has(n.text));
+}
+
 async function quiet(cmd: string, args: string[]): Promise<string | null> {
   try {
     const { stdout } = await run(cmd, args, { timeout: 5000, maxBuffer: 128 * 1024 });

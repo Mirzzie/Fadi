@@ -142,3 +142,49 @@ describe("container.stop preflight", () => {
     expect(notes.some((n) => n.kind === "info" && /isn't running/i.test(n.text))).toBe(true);
   });
 });
+
+describe("has the situation changed since they read it", () => {
+  it("a NEW warning is material", async () => {
+    const { materialChanges } = await import("./preflight");
+    const before = [{ kind: "info" as const, text: "The image is already here." }];
+    const after = [
+      { kind: "info" as const, text: "The image is already here." },
+      { kind: "warn" as const, text: "Port 8080 is already published by another container." },
+    ];
+    const changed = materialChanges(before, after);
+    expect(changed).toHaveLength(1);
+    expect(changed[0].text).toMatch(/8080/);
+  });
+
+  it("a warning that DISAPPEARED is not material", async () => {
+    const { materialChanges } = await import("./preflight");
+    // "This will download the image" becoming "already here" is the world getting better.
+    // Forcing a re-approval for it would teach people to click through re-approvals, which
+    // costs more than the ceremony is worth.
+    const before = [{ kind: "warn" as const, text: "That image isn't on this machine yet." }];
+    const after = [{ kind: "info" as const, text: "The image is already here." }];
+    expect(materialChanges(before, after)).toHaveLength(0);
+  });
+
+  it("unchanged warnings are not material — they were already read", async () => {
+    const { materialChanges } = await import("./preflight");
+    const notes = [{ kind: "warn" as const, text: "fadi-web is running." }];
+    expect(materialChanges(notes, notes)).toHaveLength(0);
+  });
+
+  it("new INFO is not material either", async () => {
+    const { materialChanges } = await import("./preflight");
+    // Only things that should give someone pause force a second look.
+    const before: Array<{ kind: "info" | "warn" | "unknown"; text: string }> = [];
+    const after = [{ kind: "info" as const, text: "The image is already here." }];
+    expect(materialChanges(before, after)).toHaveLength(0);
+  });
+
+  it("an empty prior snapshot still catches a new warning", async () => {
+    const { materialChanges } = await import("./preflight");
+    // Rows written before preflight existed have no notes. They must not be treated as
+    // "everything was already warned about".
+    const after = [{ kind: "warn" as const, text: "That file already exists." }];
+    expect(materialChanges([], after)).toHaveLength(1);
+  });
+});

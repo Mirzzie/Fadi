@@ -32,10 +32,22 @@ describe("confirmation strength follows the damage, not the convenience", () => 
     }
   });
 
-  it("an irreversible prompt expires faster than a reversible one", () => {
+  it("only an irreversible prompt has a deadline at all", () => {
+    // This assertion changed after Codex's review, and the reason matters. The first
+    // version expired every prompt in 3-10 minutes, which threw away the user's DECISION
+    // because the CHECK had gone stale — two separate things. Freshness now lives where it
+    // belongs, in a re-run of preflight at approval.
+    //
+    // A deadline still earns its place for exactly one job: bounding how long an
+    // irreversible ask can lie in wait for an absent-minded click. Navigating away from a
+    // page is not a decision, so everything reversible waits.
     const gone = policyFor({ blast: "host", reversibility: "irreversible" });
     const back = policyFor({ blast: "container", reversibility: "reversible" });
-    expect(gone.ttlMinutes).toBeLessThan(back.ttlMinutes);
+    const disruptive = policyFor({ blast: "container", reversibility: "disruptive" });
+
+    expect(gone.ttlMinutes).toBeGreaterThan(0);
+    expect(back.ttlMinutes).toBeNull();
+    expect(disruptive.ttlMinutes).toBeNull();
   });
 
   it("irreversible actions have the tightest hourly ceiling", () => {

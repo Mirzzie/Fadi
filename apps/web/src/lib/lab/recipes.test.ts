@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -19,6 +21,7 @@ const propose = vi.fn();
 const approve = vi.fn();
 const finish = vi.fn();
 const createdNames = vi.fn();
+const revise = vi.fn();
 const get = vi.fn();
 const executedLastHour = vi.fn();
 const denialsSince = vi.fn();
@@ -43,6 +46,7 @@ vi.mock("@careeros/database", () => ({
     createdNames,
     get,
     executedLastHour,
+    revise,
   }),
 }));
 
@@ -55,6 +59,7 @@ beforeEach(() => {
   createdNames.mockReset();
   get.mockReset();
   executedLastHour.mockReset();
+  revise.mockReset();
   denialsSince.mockReset();
   revokeAll.mockReset();
   createdNames.mockResolvedValue([]);
@@ -376,7 +381,7 @@ describe("the security layer stops things, not just describes them", () => {
     expect(propose).not.toHaveBeenCalled();
   });
 
-  it("an irreversible action gets a shorter prompt life than a reversible one", async () => {
+  it("an irreversible action gets a deadline; a reversible one waits for you", async () => {
     const reversible = await propose_({ image: "nginx", name: "web" });
     createdNames.mockResolvedValue(["web"]);
     const irreversible = await propose_({ name: "web" }, "container.remove");
@@ -385,7 +390,10 @@ describe("the security layer stops things, not just describes them", () => {
     if (reversible.ok && irreversible.ok) {
       expect(irreversible.policy.confirm).toBe("type-name");
       expect(reversible.policy.confirm).toBe("click");
-      expect(irreversible.policy.ttlMinutes).toBeLessThan(reversible.policy.ttlMinutes);
+      // Only what cannot be undone is allowed to lie in wait indefinitely; everything
+      // else survives the user going to look at something else.
+      expect(irreversible.policy.ttlMinutes).toBeGreaterThan(0);
+      expect(reversible.policy.ttlMinutes).toBeNull();
     }
   });
 });
@@ -601,5 +609,75 @@ describe("identifying a host is bounded the same way as the sweep", () => {
       expect(line).not.toContain("9999");
       expect(line).not.toContain("1,2,3,4,5");
     }
+  });
+});
+
+describe("approving an effect that has since changed", () => {
+  // The stored argv has to be exactly what the recipe renders, digest included — the
+  // approval path re-renders and compares. A hand-written digest here would fail for the
+  // right reason and teach nothing about freshness, so it is computed the same way.
+  const digest = createHash("sha256").update("hi").digest("hex").slice(0, 12);
+  const write = {
+    id: "req-1",
+    recipe: "file.write",
+    params: { path: "notes.md", content: "hi" },
+    argv: [["write", "notes.md", "(2 bytes, sha256:" + digest + ")"]],
+    // What they read: this file does not exist.
+    preflight: [{ kind: "info", text: "That file doesn't exist yet — this creates it." }],
+  };
+
+  it("HOLDS the action when a new warning appeared, and does not spend the approval", async () => {
+    get.mockResolvedValue(write);
+    // Between reading and clicking, the file appeared.
+    vi.doMock("./preflight", async (orig) => {
+      const actual = await (orig() as Promise<typeof import("./preflight")>);
+      return {
+        ...actual,
+        preflightFor: async () => [
+          { kind: "warn", text: "That file already exists (400 bytes). It will be replaced." },
+        ],
+      };
+    });
+    vi.resetModules();
+    const { approveAndRun } = await import("./broker");
+
+    const res = await approveAndRun({ userId: "u1", requestId: "req-1" });
+
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.message).toMatch(/changed since you read this/i);
+    // The prompt survives — the decision was not thrown away, only re-informed.
+    expect(revise).toHaveBeenCalled();
+    // And crucially the approval was never claimed, so it can still be given.
+    expect(approve).not.toHaveBeenCalled();
+    vi.doUnmock("./preflight");
+    vi.resetModules();
+  });
+
+  it("runs normally when nothing material changed", async () => {
+    // A container recipe rather than the file one: this test is about freshness, and
+    // executing a file step would drag the workspace lookup and a real disk into a
+    // question that has nothing to do with either.
+    const startNginx = {
+      id: "req-2",
+      recipe: "container.run",
+      params: { image: "nginx", name: "web", port: null },
+      argv: [["docker", "run", "-d", "--name", "fadi-web", "nginx:1.27-alpine"]],
+      preflight: [{ kind: "info", text: "The image is already here." }],
+    };
+    get.mockResolvedValue(startNginx);
+    approve.mockResolvedValue(startNginx);
+    vi.doMock("./preflight", async (orig) => {
+      const actual = await (orig() as Promise<typeof import("./preflight")>);
+      return { ...actual, preflightFor: async () => startNginx.preflight };
+    });
+    vi.resetModules();
+    const { approveAndRun } = await import("./broker");
+
+    const res = await approveAndRun({ userId: "u1", requestId: "req-2" });
+
+    expect(res.ok, res.ok ? "" : res.message).toBe(true);
+    expect(revise).not.toHaveBeenCalled();
+    vi.doUnmock("./preflight");
+    vi.resetModules();
   });
 });

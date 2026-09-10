@@ -796,9 +796,12 @@ export async function proposeAction(input: {
     preflight,
     actor: input.actor,
     origin: input.origin,
-    // The policy sets the lifetime: what cannot be undone gets less time to sit on screen
-    // being clicked past.
-    expiresAt: new Date(Date.now() + policy.ttlMinutes * 60_000),
+    // Null lifetime means the prompt waits until it is answered. A far-future timestamp
+    // rather than a nullable column, so every query that asks "is this still live?" keeps
+    // one shape and cannot forget the null case.
+    expiresAt: policy.ttlMinutes
+      ? new Date(Date.now() + policy.ttlMinutes * 60_000)
+      : new Date(Date.now() + 365 * 24 * 60 * 60_000),
   });
 
   await audit.record({
@@ -1055,6 +1058,51 @@ export async function approveAndRun(input: {
         return {
           ok: false,
           message: "Type " + expected + " exactly to confirm. Nothing ran.",
+        };
+      }
+    }
+  }
+
+  // RE-CHECK THE EFFECT BEFORE SPENDING THE APPROVAL.
+  //
+  // The person approved a described effect. Between then and now the machine may have
+  // moved: the container they were about to replace started, the file they were about to
+  // create appeared, the port came into use. Running anyway would execute something nobody
+  // agreed to, and refusing outright would throw away a decision that is still valid.
+  //
+  // So: re-run preflight, and only stop if a warning exists NOW that did not exist THEN.
+  if (preview && isRecipe(preview.recipe)) {
+    const r = RECIPES[preview.recipe];
+    const params = r.validate((preview.params ?? {}) as RecipeParams);
+    if (params) {
+      const { preflightFor, materialChanges } = await import("./preflight");
+      const fresh = await preflightFor({
+        userId: input.userId,
+        recipe: preview.recipe,
+        params,
+      });
+      const changed = materialChanges(
+        (preview.preflight ?? []) as Array<{ kind: "info" | "warn" | "unknown"; text: string }>,
+        fresh,
+      );
+      if (changed.length > 0) {
+        // A new revision, not a refusal: the prompt stays, carrying what changed, and the
+        // person decides again knowing it.
+        await requests.revise(input.userId, input.requestId, fresh);
+        await audit.record({
+          userId: input.userId,
+          actor: "user",
+          origin: "approval",
+          capability: preview.recipe,
+          decision: "denied",
+          detail: "Held: the situation changed since you read it. " + changed[0].text,
+        });
+        return {
+          ok: false,
+          message:
+            "Something changed since you read this, so Fadi didn't run it: " +
+            changed.map((c) => c.text).join(" ") +
+            " Have another look and approve it again if it still makes sense.",
         };
       }
     }

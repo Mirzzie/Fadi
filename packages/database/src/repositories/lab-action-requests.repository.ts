@@ -120,6 +120,26 @@ export function createLabActionRequestsRepository(db: Database) {
         .where(and(eq(labActionRequests.userId, userId), eq(labActionRequests.id, id)));
     },
 
+    /**
+     * Replace the preflight notes on a still-pending request.
+     *
+     * Used when the situation changed between reading and approving: the prompt survives
+     * and carries the new facts, rather than the decision being thrown away because the
+     * check went stale.
+     */
+    async revise(userId: string, id: string, preflight: unknown): Promise<void> {
+      await db
+        .update(labActionRequests)
+        .set({ preflight, updatedAt: new Date() })
+        .where(
+          and(
+            eq(labActionRequests.userId, userId),
+            eq(labActionRequests.id, id),
+            eq(labActionRequests.status, "pending"),
+          ),
+        );
+    },
+
     /** Executions of one recipe inside the last hour, for the rate ceiling. */
     async executedLastHour(userId: string, recipe: string): Promise<number> {
       const rows = await db

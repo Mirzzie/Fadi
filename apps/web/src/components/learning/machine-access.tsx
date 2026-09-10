@@ -403,9 +403,15 @@ function PendingAction({
         >
           No
         </Button>
-        <span className="text-[10px] text-muted-foreground">
-          Expires {new Date(w.expiresAt).toLocaleTimeString()}
-        </span>
+        {/*
+          The age, not the deadline.
+
+          Most prompts no longer expire — a decision should not be thrown away because the
+          user went to look at something else, and staleness of the EFFECT is re-checked at
+          approval instead. But "this was asked three days ago" is something the approver
+          needs and no amount of freshness-checking supplies it.
+        */}
+        <span className="text-[10px] text-muted-foreground">Asked {w.askedAgo}</span>
       </div>
     </div>
   );

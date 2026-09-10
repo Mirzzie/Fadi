@@ -36,8 +36,11 @@ export type Policy = {
   blast: Blast;
   reversibility: Reversibility;
   confirm: Confirm;
-  /** How long the approval prompt stays valid. Shorter for what cannot be undone. */
-  ttlMinutes: number;
+  /**
+   * How long the approval prompt stays valid, or null to persist until answered.
+   * Freshness of the EFFECT is a separate matter, re-checked at approval.
+   */
+  ttlMinutes: number | null;
   /** Ceiling on executions of this recipe per hour. */
   perHour: number;
 };
@@ -59,7 +62,22 @@ export function policyFor(input: { blast: Blast; reversibility: Reversibility })
       ? "type-name"
       : "click";
 
-  const ttlMinutes = reversibility === "irreversible" ? 3 : reversibility === "disruptive" ? 5 : 10;
+  /**
+   * How long the prompt stays valid — and null means "until you deal with it".
+   *
+   * The first version expired everything in 3-10 minutes, which Codex correctly called a
+   * mistake: it threw away the user's DECISION because the CHECK had gone stale. Those are
+   * separate concerns, and freshness is now handled where it belongs, by re-running
+   * preflight at approval and holding anything whose warnings have grown.
+   *
+   * A window still earns its place for one job: bounding how long an irreversible ask can
+   * lie in wait for an absent-minded click. A proposal from a compromised model that
+   * persists forever is a trap with no expiry date. Re-proposing costs one click, and
+   * these already require typing the target's name.
+   *
+   * Everything reversible persists. Navigating away from a page is not a decision.
+   */
+  const ttlMinutes = reversibility === "irreversible" ? 10 : null;
 
   const perHour =
     reversibility === "irreversible" ? 5 : blast === "host" || blast === "remote" ? 10 : 30;
