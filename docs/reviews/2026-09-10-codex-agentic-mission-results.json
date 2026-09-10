@@ -1,0 +1,45 @@
+{
+  "method": "Actual pure functions; no network, database or provisioning. Second case demonstrates encoded implication, not a live host failure.",
+  "sourceSha256": "1738ceda407085f305f5b4a9313fa50cbff70c887e24d7b46dbdce8bd8d718ac",
+  "unknownCapacity": {
+    "ok": true,
+    "resource": {
+      "id": "r",
+      "label": "Declared host",
+      "kind": "host",
+      "arch": "x86_64",
+      "memoryMb": null,
+      "diskGb": null,
+      "virtualization": "vms",
+      "alwaysOn": true
+    }
+  },
+  "vmCapabilityImpliesContainerCapability": {
+    "ok": true,
+    "resource": {
+      "id": "r",
+      "label": "Declared host",
+      "kind": "host",
+      "arch": "x86_64",
+      "memoryMb": null,
+      "diskGb": null,
+      "virtualization": "vms",
+      "alwaysOn": true
+    }
+  },
+  "placement": {
+    "fits": [
+      {
+        "id": "r",
+        "label": "Declared host",
+        "kind": "host",
+        "arch": "x86_64",
+        "memoryMb": null,
+        "diskGb": null,
+        "virtualization": "vms",
+        "alwaysOn": true
+      }
+    ],
+    "misses": []
+  }
+}

@@ -126,6 +126,54 @@ maintained rooms. Fadi cannot out-write them. The escape is that an IT-ops scena
 **generated against the learner's own inventory**, which no fixed library can do
 because it does not know what hardware you have.
 
+## Review corrections (Codex, 10 Sept 2026)
+
+Recorded here rather than silently absorbed, because each narrows a claim this ADR made.
+
+**"System of record for proof" overstates what observation establishes.** A repository
+existing proves neither authorship nor proficiency. A VM inventory does not prove the
+user built or troubleshot it. A screenshot's upload time is not the event time. An
+AI-provisioned lab may mainly demonstrate what Fadi did. **Store the observation, the
+user's contribution, the inference and its limits separately** — do not collapse them
+into one "evidence" record. This is the single most important correction to the pivot,
+because the whole thesis rests on capture producing something stronger than a claim, and
+observation alone does not.
+
+**Tags are not an ownership boundary** (rule 2 above, as written). Requires
+owner/resource/lab-scoped durable object ids, creation receipts, narrowly scoped
+credentials, and a check against the actual provider object. Cleanup must REFUSE on
+uncertain ownership rather than discovering targets by tag. Adversarial cases to test:
+forged or copied tags, stale ids, another user's objects, partial creation.
+
+**"Declarative" does not guarantee reversible** (rule 3). Deleted volumes, changed
+external systems and failed cleanup need explicit apply / partial / cleanup-failed
+states, idempotency keys, TTLs and reconciliation. Approval must bind to a concrete
+plan, resource and version — a model must not expand scope after approval.
+
+**Capacity declarations are not reservations.** The registry is a preliminary filter,
+not a provisioning authorisation: applying needs a live capacity recheck and an atomic
+reservation against quotas.
+
+**Read-only capture still crosses a trust boundary.** Private repository text and
+configs may contain secrets or instructions. Minimise collection, retain source
+visibility, redact before model calls, and treat fetched content as data rather than
+agent authority. Reusing the encrypted-PAT pattern also inherits its key-rotation
+weakness; it is not a completed credential lifecycle.
+
+**Network discovery: the blanket refusal was over-cautious.** User-authorised, bounded
+discovery of one's own network is a legitimate inventory feature. If built: an explicit
+action, a user-specified range, rate and time limits, cancellation, and a preview of
+what would be collected. **Discovery proposes resources; it never grants management
+authority and never registers credentials automatically.** Keep inventory discovery
+separate from vulnerability scanning and from lab fault injection. Deployment matters —
+a hosted server is not the user's LAN, so this needs a local component, not a
+server-side fetch.
+
+**Sequencing.** Continue read-only registry work, isolated proposals and deterministic
+dry-run planning. Gate infrastructure WRITES on data integrity (admission atomicity and
+concurrency), permissions, capacity reservation and recovery tests. A successful
+prototype does not imply permission to provision.
+
 ## Consequences
 
 - The learning section stops being a roadmap and becomes a loop that ends in evidence.

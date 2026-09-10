@@ -42,16 +42,57 @@ export type LabSpec = {
   alwaysOn?: boolean;
 };
 
-/** Heavier capability implies the lighter one: nested ⊃ vms ⊃ containers ⊃ none. */
-const VIRT_RANK: Record<Virtualization, number> = { none: 0, containers: 1, vms: 2, nested: 3 };
+/**
+ * AM02 (Codex): virtualization is NOT a total ordering.
+ *
+ * The old model ranked none < containers < vms < nested and let the heavier satisfy the
+ * lighter, so a Proxmox box "supported containers". It does not follow: running VMs
+ * establishes a hypervisor, not a container runtime, its images, its networking or
+ * permission to use it. What a VM host can offer is a PLAN — create a guest, install a
+ * runtime — which is a prerequisite to state, not a capability to assume.
+ *
+ * Nested does imply vms, because nested virtualisation IS running VMs. Nothing else
+ * implies anything.
+ */
+const SATISFIES: Record<Virtualization, Virtualization[]> = {
+  none: [],
+  containers: ["containers"],
+  vms: ["vms"],
+  nested: ["nested", "vms"],
+};
 
-export type Verdict =
-  | { ok: true; resource: Resource }
-  /** Every rejection names what was short, so the UI never has to say "no" without a why. */
-  | { ok: false; resource: Resource; reasons: string[] };
+/** What it would take to get there, when the resource cannot do it as it stands. */
+const PREREQUISITE: Partial<Record<Virtualization, string>> = {
+  containers: "a container runtime would need installing first",
+  vms: "a hypervisor would need installing first",
+};
+
+/**
+ * AM01 (Codex): THREE STATES, NOT TWO.
+ *
+ * The old model answered yes/no, and unknown capacity answered YES — a 32 GiB, 200 GB
+ * lab was reported as fitting a machine whose RAM and disk nobody had recorded. The
+ * reasoning was that refusing to plan on a missing number helps nobody, which is true
+ * and does not make "we have not checked" the same as "it fits".
+ *
+ * `unverified` keeps the resource as a candidate while naming exactly what has to be
+ * established before anything is applied to it. Planning stays useful; the guarantee
+ * stops being fictional.
+ */
+export type Feasibility = "feasible" | "infeasible" | "unverified";
+
+export type Verdict = {
+  resource: Resource;
+  state: Feasibility;
+  /** Why it cannot work. Populated only for `infeasible`. */
+  reasons: string[];
+  /** What must be confirmed or installed first. Populated only for `unverified`. */
+  checks: string[];
+};
 
 export function canHost(spec: LabSpec, r: Resource): Verdict {
   const reasons: string[] = [];
+  const checks: string[] = [];
 
   // A microcontroller is a resource, but it is not a host. Saying so plainly is kinder
   // than silently ranking it last and letting someone wonder why it never gets picked.
@@ -63,35 +104,59 @@ export function canHost(spec: LabSpec, r: Resource): Verdict {
     reasons.push(`needs ${spec.arch.join(" or ")}, and ${r.label} is ${r.arch}`);
   }
 
-  if (spec.needs && VIRT_RANK[r.virtualization] < VIRT_RANK[spec.needs]) {
-    reasons.push(
-      `needs ${spec.needs}, and ${r.label} ${
-        r.virtualization === "none" ? "runs neither containers nor VMs" : `only does ${r.virtualization}`
-      }`,
-    );
+  if (spec.needs && spec.needs !== "none" && !SATISFIES[r.virtualization].includes(spec.needs)) {
+    // A host that could get there with setup is unverified, not impossible. One that
+    // runs nothing at all is impossible.
+    if (r.virtualization === "none" || r.arch === "mcu") {
+      reasons.push(
+        `needs ${spec.needs}, and ${r.label} runs neither containers nor VMs`,
+      );
+    } else {
+      checks.push(
+        `${r.label} does ${r.virtualization}, not ${spec.needs} — ${
+          PREREQUISITE[spec.needs] ?? "it would need setting up first"
+        }`,
+      );
+    }
   }
 
-  // Unknown memory is not a failure. Half the machines someone owns are described from
-  // memory, and refusing to plan because a number is missing helps nobody.
-  if (spec.memoryMb != null && r.memoryMb != null && r.memoryMb < spec.memoryMb) {
-    reasons.push(`needs about ${gb(spec.memoryMb)} of RAM, ${r.label} has ${gb(r.memoryMb)}`);
+  // A recorded number that falls short is a real no. A missing one is a question —
+  // never a yes, which is what it used to be.
+  if (spec.memoryMb != null) {
+    if (r.memoryMb == null) checks.push(`how much RAM ${r.label} has (needs about ${gb(spec.memoryMb)})`);
+    else if (r.memoryMb < spec.memoryMb) {
+      reasons.push(`needs about ${gb(spec.memoryMb)} of RAM, ${r.label} has ${gb(r.memoryMb)}`);
+    }
   }
-  if (spec.diskGb != null && r.diskGb != null && r.diskGb < spec.diskGb) {
-    reasons.push(`needs ${spec.diskGb} GB free, ${r.label} has ${r.diskGb} GB`);
+  if (spec.diskGb != null) {
+    if (r.diskGb == null) checks.push(`how much free disk ${r.label} has (needs ${spec.diskGb} GB)`);
+    else if (r.diskGb < spec.diskGb) {
+      reasons.push(`needs ${spec.diskGb} GB free, ${r.label} has ${r.diskGb} GB`);
+    }
   }
 
   if (spec.alwaysOn && !r.alwaysOn) {
     reasons.push(`has to stay up, and ${r.label} isn't always on`);
   }
 
-  return reasons.length === 0 ? { ok: true, resource: r } : { ok: false, resource: r, reasons };
+  // Impossible beats unverified: no amount of checking rescues an ARM board from an
+  // x86 image, so do not ask the user to go and measure something pointless.
+  const state: Feasibility =
+    reasons.length > 0 ? "infeasible" : checks.length > 0 ? "unverified" : "feasible";
+  return { resource: r, state, reasons, checks };
 }
 
 const gb = (mb: number) => `${Math.round((mb / 1024) * 10) / 10} GB`;
 
 export type Placement = {
-  /** Resources that can run it, best first. */
+  /** Everything confirmed to work, best first. */
   fits: Resource[];
+  /**
+   * Candidates whose suitability is not established — kept, because dropping them would
+   * make an unmeasured machine indistinguishable from an unsuitable one, and listed
+   * with what has to be confirmed. NEVER presented as fits (AM01).
+   */
+  unverified: { resource: Resource; checks: string[] }[];
   /** Why each of the others cannot — so a "no" is always explained. */
   misses: { resource: Resource; reasons: string[] }[];
 };
@@ -107,15 +172,18 @@ export type Placement = {
 export function placeLab(spec: LabSpec, resources: Resource[]): Placement {
   const verdicts = resources.map((r) => canHost(spec, r));
   const fits = verdicts
-    .filter((v): v is { ok: true; resource: Resource } => v.ok)
+    .filter((v) => v.state === "feasible")
     .map((v) => v.resource)
     .sort((a, b) => {
       if (spec.alwaysOn && a.alwaysOn !== b.alwaysOn) return a.alwaysOn ? -1 : 1;
       return (a.memoryMb ?? Number.MAX_SAFE_INTEGER) - (b.memoryMb ?? Number.MAX_SAFE_INTEGER);
     });
+  const unverified = verdicts
+    .filter((v) => v.state === "unverified")
+    .map(({ resource, checks }) => ({ resource, checks }));
   const misses = verdicts
-    .filter((v): v is { ok: false; resource: Resource; reasons: string[] } => !v.ok)
+    .filter((v) => v.state === "infeasible")
     .map(({ resource, reasons }) => ({ resource, reasons }));
 
-  return { fits, misses };
+  return { fits, unverified, misses };
 }

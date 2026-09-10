@@ -27,27 +27,27 @@ describe("refusing to propose the impossible", () => {
     // that out three steps into an evening is the cost of not checking.
     const v = canHost({ needs: "vms", arch: ["x86_64"], memoryMb: 8192 }, pi);
 
-    expect(v.ok).toBe(false);
-    if (!v.ok) expect(v.reasons.join(" ")).toMatch(/x86_64.*arm64|only does containers/);
+    expect(v.state).toBe("infeasible");
+    expect(v.reasons.join(" ")).toMatch(/x86_64.*arm64/);
   });
 
   it("says plainly that a microcontroller is not a host", () => {
     const v = canHost({ needs: "containers" }, esp32);
 
-    expect(v.ok).toBe(false);
-    if (!v.ok) expect(v.reasons[0]).toMatch(/subject, not its host/);
+    expect(v.state).toBe("infeasible");
+    expect(v.reasons[0]).toMatch(/subject, not its host/);
   });
 
   it("still treats the ESP32 as a resource when nothing has to be hosted on it", () => {
     // It is genuinely useful — as the thing a lab monitors, flashes or attacks.
-    expect(canHost({}, esp32).ok).toBe(true);
+    expect(canHost({}, esp32).state).toBe("feasible");
   });
 
   it("names what was short rather than just refusing", () => {
     const v = canHost({ memoryMb: 65536 }, laptop);
 
-    expect(v.ok).toBe(false);
-    if (!v.ok) expect(v.reasons[0]).toContain("24 GB");
+    expect(v.state).toBe("infeasible");
+    expect(v.reasons[0]).toContain("24 GB");
   });
 });
 
@@ -82,17 +82,50 @@ describe("choosing where a lab should live", () => {
     }
   });
 
-  it("does not refuse a plan just because a number is missing", () => {
-    // Half the machines anyone owns are described from memory. Unknown RAM is not a no.
+  it("AM01: a missing number is a question, never a yes", () => {
+    // Codex executed this: a 32 GiB / 200 GB lab was reported as FITTING a machine whose
+    // capacity nobody had recorded. Unknown is not a refusal — but it is not a promise
+    // either, and "may fit" must never be rendered as "can run it".
     const vague: Resource = { ...laptop, id: "5", label: "Old desktop", memoryMb: null, diskGb: null };
+    const v = canHost({ memoryMb: 32768, diskGb: 200 }, vague);
 
-    expect(canHost({ memoryMb: 8192, diskGb: 100 }, vague).ok).toBe(true);
+    expect(v.state).toBe("unverified");
+    expect(v.checks.join(" ")).toMatch(/how much RAM/);
+    expect(v.checks.join(" ")).toMatch(/how much free disk/);
+
+    const { fits, unverified } = placeLab({ memoryMb: 32768, diskGb: 200 }, [vague]);
+    expect(fits).toEqual([]);
+    expect(unverified.map((u) => u.resource.label)).toEqual(["Old desktop"]);
+  });
+
+  it("AM02: running VMs does not establish a container runtime", () => {
+    // The old model ranked nested > vms > containers and let the heavier satisfy the
+    // lighter, so a Proxmox box "supported containers". A hypervisor is not a runtime.
+    const v = canHost({ needs: "containers" }, proxmox);
+
+    expect(v.state).toBe("unverified");
+    expect(v.checks[0]).toMatch(/container runtime would need installing/);
+  });
+
+  it("AM02: nested still implies VMs, because that is what nested virtualisation is", () => {
+    expect(canHost({ needs: "vms" }, proxmox).state).toBe("feasible");
+  });
+
+  it("impossible beats unverified — never ask someone to measure a pointless thing", () => {
+    // An ARM board cannot run an x86 image however much RAM it turns out to have.
+    const v = canHost({ arch: ["x86_64"], memoryMb: 99999 }, { ...pi, memoryMb: null });
+
+    expect(v.state).toBe("infeasible");
   });
 
   it("returns an honest empty result rather than inventing a home", () => {
-    const { fits, misses } = placeLab({ needs: "nested" }, [pi, esp32]);
+    const { fits, unverified, misses } = placeLab({ needs: "nested" }, [pi, esp32]);
 
+    // The Pi could in principle have a hypervisor installed, so it is a question, not a
+    // refusal. The ESP32 cannot host anything, so it is a refusal. Both are honest; what
+    // matters is that neither is reported as a fit.
     expect(fits).toEqual([]);
-    expect(misses).toHaveLength(2);
+    expect(unverified.map((u) => u.resource.label)).toEqual(["Raspberry Pi"]);
+    expect(misses.map((m) => m.resource.label)).toEqual(["ESP32"]);
   });
 });
