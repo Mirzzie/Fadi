@@ -149,6 +149,7 @@ export async function POST(req: NextRequest) {
   const genProvider = chain[0];
   const toolCtx: FadiToolContext = {
     userId: user.id,
+    surface: "chat",
     generate: genProvider
       ? {
           structured: (system, userMsg, schema, name) =>

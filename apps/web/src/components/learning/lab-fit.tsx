@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Check, Cpu, HelpCircle, Loader2, Plus, X } from "lucide-react";
+import { Check, Cpu, HelpCircle, Loader2, Plus, ShieldQuestion, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import {
   type DetectedResource,
   type LabPlan,
 } from "@/app/dashboard/learning/lab-actions";
+import { grantCapability } from "@/app/dashboard/learning/permission-actions";
 
 /**
  * "AND WHAT DO I RUN IT ON?"
@@ -231,14 +232,82 @@ function AddResource({ onDone, onCancel }: { onDone: () => void; onCancel: () =>
  * "What is on this machine?" — answered by looking.
  *
  * DETECTS, NEVER REGISTERS. Finding a hypervisor must not silently hand Fadi a resource
- * it may later be asked to provision on; the user confirms what gets saved. Everything
- * behind this button is a read-only inspection from a fixed list in local-probe.ts —
- * no command, argument or path comes from the browser, a request, or a model.
+ * it may later be asked to provision on; the user confirms what gets saved.
+ *
+ * ASKS BEFORE IT LOOKS. Nothing runs until the user grants the named capability, and the
+ * ask happens right here rather than in a settings page — a permission request carries
+ * meaning only next to the reason for it. Every command lives in a fixed catalogue in
+ * broker.ts; no command, argument or path comes from the browser, a request, or a model.
  */
 function DetectHere({ onSaved }: { onSaved: () => void }) {
   const [found, setFound] = useState<DetectedResource[] | null>(null);
   const [absent, setAbsent] = useState<string[]>([]);
+  const [needsGrant, setNeedsGrant] = useState<
+    Array<{ capability: string; summary: string; limit: string }>
+  >([]);
   const [pending, start] = useTransition();
+
+  const look = () =>
+    start(async () => {
+      const res = await detectLocalResources();
+      if (res.ok) {
+        setFound(res.detected ?? []);
+        setAbsent(res.absent ?? []);
+        setNeedsGrant(res.needsGrant ?? []);
+      }
+    });
+
+  // THE PERMISSION IS ASKED HERE, not in a settings page nobody visits.
+  //
+  // A consent screen at install time is a consent screen about nothing — the user has no
+  // idea yet what they are agreeing to or why. Asked at the moment Fadi wants to look, it
+  // is a real question with a visible reason, and the limit is stated in the same breath
+  // so "allow" means something specific rather than "allow everything, presumably".
+  if (needsGrant.length > 0) {
+    return (
+      <div className="w-full space-y-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-2.5">
+        <p className="flex items-center gap-1.5 text-xs font-medium">
+          <ShieldQuestion className="size-3.5 text-amber-600" aria-hidden="true" />
+          Fadi needs your permission first
+        </p>
+        {needsGrant.map((g) => (
+          <div key={g.capability} className="space-y-0.5">
+            <p className="text-[11px]">{g.summary}</p>
+            <p className="text-[11px] text-muted-foreground">{g.limit}</p>
+          </div>
+        ))}
+        <div className="flex items-center gap-2 pt-0.5">
+          <Button
+            size="sm"
+            disabled={pending}
+            onClick={() =>
+              start(async () => {
+                for (const g of needsGrant) {
+                  await grantCapability({ capability: g.capability });
+                }
+                setNeedsGrant([]);
+                const res = await detectLocalResources();
+                if (res.ok) {
+                  setFound(res.detected ?? []);
+                  setAbsent(res.absent ?? []);
+                  setNeedsGrant(res.needsGrant ?? []);
+                }
+              })
+            }
+          >
+            {pending ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
+            Allow for 2 hours
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setNeedsGrant([])}>
+            Not now
+          </Button>
+        </div>
+        <p className="text-[10px] text-muted-foreground">
+          Expires on its own. Every attempt — allowed or blocked — is logged under Machine access.
+        </p>
+      </div>
+    );
+  }
 
   if (found) {
     return (
@@ -286,15 +355,7 @@ function DetectHere({ onSaved }: { onSaved: () => void }) {
     <Button
       size="sm"
       disabled={pending}
-      onClick={() =>
-        start(async () => {
-          const res = await detectLocalResources();
-          if (res.ok) {
-            setFound(res.detected ?? []);
-            setAbsent(res.absent ?? []);
-          }
-        })
-      }
+      onClick={look}
     >
       {pending ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <Cpu className="size-3.5" aria-hidden="true" />}
       {pending ? "Looking…" : "Detect what's on this machine"}

@@ -1080,6 +1080,88 @@ export const portfolioSites = pgTable(
  * and an artefact at the end that becomes evidence. Fadi's tools operate on this, so a
  * model can drive a project forward rather than describe one.
  */
+/**
+ * PERMISSION TO TOUCH THIS MACHINE.
+ *
+ * Fadi runs on the user's own laptop, and the useful version of that reaches Docker, a
+ * hypervisor, a spare box. The reason not to just do it is not network exposure: Fadi
+ * ingests untrusted text by design — job descriptions, imported notes, portfolio
+ * feedback from strangers — and a model that reads instructions in that content while
+ * holding local execution is the actual danger.
+ *
+ * The answer is not to refuse. It is to make the permission explicit, scoped, revocable
+ * and observed, so that the worst an injected instruction can achieve is a CATALOGUED
+ * action, against a resource the user named, inside a window they opened, written to a
+ * log they are watching.
+ *
+ * A grant is never "Fadi may use my computer". It is "this capability, on this resource,
+ * until this time".
+ */
+export const labGrants = pgTable(
+  "lab_grants",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** Which resource this applies to. Null = this machine (where Fadi is running). */
+    resourceId: uuid("resource_id").references(() => labResources.id, { onDelete: "cascade" }),
+    /**
+     * The capability, from a fixed catalogue — "inspect.containers", "vm.create".
+     * Never a command. A grant widens WHAT MAY BE ASKED FOR, never what may be typed.
+     */
+    capability: text("capability").notNull(),
+    /** Deliberately short-lived by default: a permission nobody remembers giving is not consent. */
+    expiresAt: timestamp("expires_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    /** What the user was told they were allowing, kept for the audit trail. */
+    reason: text("reason"),
+    ...timestamps,
+  },
+  (table) => [index("lab_grants_user_idx").on(table.userId, table.capability)],
+);
+
+export type LabGrant = typeof labGrants.$inferSelect;
+export type NewLabGrant = typeof labGrants.$inferInsert;
+
+/**
+ * EVERY ATTEMPT, ALLOWED OR NOT.
+ *
+ * Denials matter more than successes here. A run of blocked "vm.create" attempts nobody
+ * initiated is what a compromised model looks like, and it is invisible if only
+ * successes are recorded.
+ *
+ * `actor` is the point: a person needs to see that the MODEL asked for something, not
+ * merely that something happened.
+ */
+export const labActions = pgTable(
+  "lab_actions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** user | model | mcp | agent */
+    actor: text("actor").notNull(),
+    /** The tool or surface that asked, e.g. "plan_project", "mcp:detect_local". */
+    origin: text("origin"),
+    capability: text("capability").notNull(),
+    resourceId: uuid("resource_id"),
+    /** The exact argv that ran, for a person to read afterwards. */
+    command: text("command"),
+    /** allowed | denied | error */
+    decision: text("decision").notNull(),
+    /** Why it was denied, or what it produced. */
+    detail: text("detail"),
+    durationMs: integer("duration_ms"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("lab_actions_user_idx").on(table.userId, table.createdAt)],
+);
+
+export type LabAction = typeof labActions.$inferSelect;
+export type NewLabAction = typeof labActions.$inferInsert;
+
 export const projectRuns = pgTable(
   "project_runs",
   {

@@ -7,6 +7,7 @@ import { CommitmentsList, GapGrowth } from "@/components/learning/gap-growth";
 import { CareerBlueprint } from "@/components/learning/career-blueprint";
 import type { CommitmentView } from "@/lib/learning/commitments-view";
 import { ProjectRuns } from "@/components/learning/project-run";
+import { MachineAccess } from "@/components/learning/machine-access";
 import type { StoredCareerReport } from "@/lib/career-report/schema";
 import { learningResources } from "@/lib/learning/resources";
 import { cn } from "@/lib/utils";
@@ -100,6 +101,12 @@ export function LearningShell({ report, commitments = [], role = null }: Props) 
 
       {/* In-progress commitments — completing one feeds your Evidence + resume */}
       <CommitmentsList commitments={commitments} />
+
+      {/* What Fadi may do on this machine, and what it actually tried.
+          Lives beside the lab because that is where local access is used; a permission
+          screen filed under Settings is one nobody reads until after something went
+          wrong. */}
+      <MachineAccess />
 
       {!hasContent ? (
         <div className="gradient-border glass-card rounded-xl p-6">

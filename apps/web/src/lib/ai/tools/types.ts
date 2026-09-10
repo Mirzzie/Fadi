@@ -40,6 +40,19 @@ import type { ZodSchema } from "zod";
 export interface FadiToolContext {
   userId: string;
   /**
+   * WHO IS CALLING — the chat model, an MCP client, or a background agent.
+   *
+   * Only matters for tools that touch the user's machine, and there it matters a great
+   * deal: the audit log records an actor, and an actor that says "model" for every caller
+   * cannot answer the question the log exists for. "An MCP client I connected last month
+   * asked to inspect my hypervisor" is a different fact from "the assistant I am talking
+   * to right now did", and a person reviewing a list of denials needs to tell them apart.
+   *
+   * Defaults to "chat" when unset, because the chat route is the oldest caller and an
+   * omission there should read as the least alarming truth, not the most.
+   */
+  surface?: "chat" | "mcp" | "agent";
+  /**
    * Generation capability, supplied by the chat route from the user's provider,
    * so tools that need the model (e.g. generate_document) can produce content
    * without holding a provider reference themselves.

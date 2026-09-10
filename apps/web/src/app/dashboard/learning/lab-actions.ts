@@ -203,7 +203,7 @@ export async function completeStepAction(input: {
 export type DetectedResource = {
   label: string;
   kind: string;
-  arch: string;
+  arch: string | null;
   virtualization: string;
   memoryMb: number | null;
   detail: string;
@@ -223,24 +223,34 @@ export async function detectLocalResources(): Promise<{
   ok: boolean;
   detected?: DetectedResource[];
   absent?: string[];
+  /** What Fadi was not allowed to look at, so the user can allow it here and retry. */
+  needsGrant?: Array<{ capability: string; summary: string; limit: string }>;
   message?: string;
 }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
 
   const { scanLocalMachine } = await import("@/lib/lab/local-probe");
-  const scan = await scanLocalMachine();
+  // actor "user" because a person clicked this. When a model or an MCP client asks, it
+  // says so — and that distinction is the whole value of the audit log.
+  const scan = await scanLocalMachine({
+    userId: user.id,
+    actor: "user",
+    origin: "dashboard:detect_local",
+  });
 
   const detected: DetectedResource[] = scan.findings.map((f) => ({
     label: f.label,
     kind: f.kind,
-    arch: scan.host.arch,
+    // Null when host access was not granted. It stays null rather than defaulting to
+    // x86_64: a guess that looks like a reading is worse than an absent reading.
+    arch: scan.host?.arch ?? null,
     virtualization: f.virtualization,
     // Real memory, read from the machine rather than remembered by its owner — this is
     // the number AM01 kept reporting as "not enough recorded to tell".
-    memoryMb: scan.host.memoryMb,
+    memoryMb: scan.host?.memoryMb ?? null,
     detail: f.detail,
   }));
 
-  return { ok: true, detected, absent: scan.absent };
+  return { ok: true, detected, absent: scan.absent, needsGrant: scan.needsGrant };
 }

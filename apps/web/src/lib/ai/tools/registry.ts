@@ -354,6 +354,64 @@ const planProjectTool: FadiTool = {
   },
 };
 
+/**
+ * THE MODEL ASKS THE MACHINE — through the same door as everyone else.
+ *
+ * This is the tool the user was after: "AI model calling, skills calling, tool calling"
+ * against their real hardware, not a link to a tutorial. What makes it safe to hand a
+ * model is that it cannot say WHAT to run. It names a capability from a fixed catalogue
+ * and the broker decides, checking a grant the user gave and writing an audit row either
+ * way — with actor "model", so the log distinguishes "the model asked for this" from
+ * "the user did this".
+ *
+ * When permission is missing the tool does not fail silently or invent a machine. It
+ * returns the request, so the model can say what it wants to look at and why, and the
+ * person can answer.
+ */
+const inspectMachineTool: FadiTool = {
+  name: "inspect_machine",
+  description:
+    "Look at what is actually installed on the user's own machine — container runtimes, hypervisors, memory and CPU — before planning a project or claiming something will run. Use when hardware matters to the answer. Requires the user's permission; if they have not granted it, this returns what to ask them for. Never guess the user's hardware when this tool can read it.",
+  parameters: { type: "object", properties: {} },
+  async execute(_args, ctx): Promise<FadiToolResult> {
+    const { scanLocalMachine } = await import("@/lib/lab/local-probe");
+    // The audit row says which surface asked. "An MCP client wanted to see my hypervisor"
+    // and "the assistant I am talking to wanted to" are different facts, and the log is
+    // only useful if it can tell them apart.
+    const surface = ctx.surface ?? "chat";
+    const scan = await scanLocalMachine({
+      userId: ctx.userId,
+      actor: surface === "mcp" ? "mcp" : surface === "agent" ? "agent" : "model",
+      origin: "tool:inspect_machine",
+    });
+
+    if (scan.needsGrant.length > 0 && scan.findings.length === 0) {
+      return {
+        // Said as a request, because that is what it is. A model that reports "I checked
+        // and found nothing" when it was actually blocked has told the user something
+        // false about their own computer.
+        summary:
+          "I can't look at this machine yet — you haven't allowed it. I'd want to: " +
+          scan.needsGrant.map((g) => g.summary).join(" ") +
+          " Open Learning → Machine access to allow it, and it expires on its own.",
+        view: "none",
+      };
+    }
+
+    const found = scan.findings.map((f) => f.detail).join(" ");
+    const host = scan.host
+      ? `${Math.round(scan.host.memoryMb! / 1024)}GB RAM, ${scan.host.cpus ?? "?"} CPUs, ${scan.host.arch}.`
+      : "";
+    return {
+      summary: scan.findings.length
+        ? `On this machine: ${found} ${host}`.trim()
+        : `Nothing detectable here${scan.absent.length ? ` — no ${scan.absent.slice(0, 3).join(", ")}` : ""}. ${host}`.trim(),
+      view: "none",
+      data: { findings: scan.findings, host: scan.host },
+    };
+  },
+};
+
 const projectStatusTool: FadiTool = {
   name: "project_status",
   description:
@@ -581,6 +639,7 @@ const TOOLS: FadiTool[] = [
   answerBehavioralTool,
   scanCompanyJobsTool,
   planProjectTool,
+  inspectMachineTool,
   projectStatusTool,
   completeProjectStepTool,
   evaluateFitTool,
