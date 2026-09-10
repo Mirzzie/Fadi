@@ -121,3 +121,79 @@ export async function planLabFor(input: {
     },
   };
 }
+
+/* ------------------------------------------------------------------ project runs */
+
+export type StepView = {
+  id: string;
+  ordinal: number;
+  title: string;
+  instruction: string;
+  verify: string | null;
+  produces: string | null;
+  status: string;
+  artifact: string | null;
+};
+export type RunView = {
+  id: string;
+  title: string;
+  resourceLabel: string | null;
+  status: string;
+  steps: StepView[];
+};
+
+/** Plan a committed project into steps against hardware the user actually owns. */
+export async function planProjectAction(input: {
+  title: string;
+  detail?: string | null;
+}): Promise<{ ok: boolean; message?: string; runId?: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  const { planProjectRun } = await import("@/lib/lab/plan-run");
+  const res = await planProjectRun(user.id, input);
+  return res.ok ? { ok: true, runId: res.plan.runId } : { ok: false, message: res.message };
+}
+
+export async function listProjectRuns(): Promise<{ ok: boolean; runs: RunView[] }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, runs: [] };
+  const { createProjectRunsRepository } = await import("@careeros/database");
+  const repo = createProjectRunsRepository(getDatabase());
+  const runs = await repo.listForUser(user.id);
+  const out: RunView[] = [];
+  for (const r of runs.filter((x) => x.status !== "abandoned")) {
+    const detail = await repo.getWithSteps(user.id, r.id);
+    if (!detail) continue;
+    out.push({
+      id: r.id,
+      title: r.title,
+      resourceLabel: r.resourceLabel,
+      status: r.status,
+      steps: detail.steps.map((s) => ({
+        id: s.id,
+        ordinal: s.ordinal,
+        title: s.title,
+        instruction: s.instruction,
+        verify: s.verify,
+        produces: s.produces,
+        status: s.status,
+        artifact: s.artifact,
+      })),
+    });
+  }
+  return { ok: true, runs: out };
+}
+
+export async function completeStepAction(input: {
+  stepId: string;
+  artifact?: string | null;
+}): Promise<{ ok: boolean }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false };
+  const { createProjectRunsRepository } = await import("@careeros/database");
+  const updated = await createProjectRunsRepository(getDatabase()).setStepStatus(user.id, input.stepId, {
+    status: "done",
+    artifact: input.artifact ?? null,
+  });
+  return { ok: Boolean(updated) };
+}

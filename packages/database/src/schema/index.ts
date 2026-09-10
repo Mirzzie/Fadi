@@ -1068,6 +1068,74 @@ export const portfolioSites = pgTable(
  * resource exists here because its owner described it. That is a privacy position and
  * also a correctness one — an inventory someone typed is an inventory they understand.
  */
+/**
+ * A PROJECT ACTUALLY BEING DONE.
+ *
+ * The learning section could name a gap, suggest a build and link a tutorial. Watching
+ * a video is not doing the work, and a link is not guidance — the user's words: "all
+ * these efforts to give me a youtube watch link is not great".
+ *
+ * A run is the difference between a suggestion and a thing in progress: concrete steps
+ * against the hardware they actually have, each with a way to tell whether it worked,
+ * and an artefact at the end that becomes evidence. Fadi's tools operate on this, so a
+ * model can drive a project forward rather than describe one.
+ */
+export const projectRuns = pgTable(
+  "project_runs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** The learning commitment this came from, if any. */
+    commitmentId: uuid("commitment_id"),
+    title: text("title").notNull(),
+    detail: text("detail"),
+    /** Which machine it was planned against — steps differ by host. */
+    resourceId: uuid("resource_id").references(() => labResources.id, { onDelete: "set null" }),
+    resourceLabel: text("resource_label"),
+    /** planned | running | done | abandoned */
+    status: text("status").notNull().default("planned"),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [index("project_runs_user_idx").on(table.userId, table.status)],
+);
+
+export type ProjectRun = typeof projectRuns.$inferSelect;
+export type NewProjectRun = typeof projectRuns.$inferInsert;
+
+export const projectSteps = pgTable(
+  "project_steps",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => projectRuns.id, { onDelete: "cascade" }),
+    ordinal: integer("ordinal").notNull(),
+    title: text("title").notNull(),
+    /** What to actually do. */
+    instruction: text("instruction").notNull(),
+    /**
+     * How to know it worked. A step without a check is an instruction you cannot fail,
+     * which is how someone reaches the end of a tutorial having learned nothing.
+     */
+    verify: text("verify"),
+    /** What this step leaves behind — the thing that later becomes evidence. */
+    produces: text("produces"),
+    /** pending | done | skipped */
+    status: text("status").notNull().default("pending"),
+    /** The user's own note, or a path/link to what they produced. */
+    artifact: text("artifact"),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [index("project_steps_run_idx").on(table.runId, table.ordinal)],
+);
+
+export type ProjectStep = typeof projectSteps.$inferSelect;
+export type NewProjectStep = typeof projectSteps.$inferInsert;
+
 export const labResources = pgTable(
   "lab_resources",
   {

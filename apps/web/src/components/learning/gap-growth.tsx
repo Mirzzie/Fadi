@@ -17,6 +17,7 @@ import {
 
 import { Button } from "@/components/ui/button";
 import { LabFit } from "@/components/learning/lab-fit";
+import { PlanProjectButton } from "@/components/learning/project-run";
 import {
   commitToProjectAction,
   completeCommitmentAction,
@@ -95,6 +96,9 @@ export function GapGrowth({ gapTitle, gapDetail }: { gapTitle: string; gapDetail
               {/* "And what do I run it on?" — asked here, where the project is proposed,
                   rather than at onboarding where nobody yet knows they want a lab. */}
               <LabFit title={s.title} detail={s.detail} />
+              {/* The answer to "a youtube link is not guidance": turn this into steps
+                  planned against the host above, each with a way to tell it worked. */}
+              <PlanProjectButton title={s.title} detail={s.detail} />
             </div>
           ))}
           <p className="text-[0.7rem] text-muted-foreground">

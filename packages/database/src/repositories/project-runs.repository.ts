@@ -1,0 +1,111 @@
+import { and, asc, eq } from "drizzle-orm";
+
+import type { Database } from "../client";
+import {
+  projectRuns,
+  projectSteps,
+  type NewProjectStep,
+  type ProjectRun,
+  type ProjectStep,
+} from "../schema/index";
+
+export function createProjectRunsRepository(db: Database) {
+  return {
+    async listForUser(userId: string): Promise<ProjectRun[]> {
+      return db
+        .select()
+        .from(projectRuns)
+        .where(eq(projectRuns.userId, userId))
+        .orderBy(asc(projectRuns.createdAt));
+    },
+
+    async getWithSteps(
+      userId: string,
+      runId: string,
+    ): Promise<{ run: ProjectRun; steps: ProjectStep[] } | null> {
+      const [run] = await db
+        .select()
+        .from(projectRuns)
+        .where(and(eq(projectRuns.userId, userId), eq(projectRuns.id, runId)))
+        .limit(1);
+      if (!run) return null;
+      const steps = await db
+        .select()
+        .from(projectSteps)
+        .where(eq(projectSteps.runId, runId))
+        .orderBy(asc(projectSteps.ordinal));
+      return { run, steps };
+    },
+
+    /**
+     * A run and its steps arrive together or not at all — a run with no steps is a
+     * shell the user cannot act on, and a half-written plan is worse than none because
+     * it looks finished.
+     */
+    async createWithSteps(
+      userId: string,
+      run: { title: string; detail?: string | null; commitmentId?: string | null; resourceId?: string | null; resourceLabel?: string | null },
+      steps: Array<Omit<NewProjectStep, "id" | "runId" | "createdAt" | "updatedAt">>,
+    ): Promise<{ run: ProjectRun; steps: ProjectStep[] }> {
+      return db.transaction(async (tx) => {
+        const [created] = await tx
+          .insert(projectRuns)
+          .values({
+            userId,
+            title: run.title,
+            detail: run.detail ?? null,
+            commitmentId: run.commitmentId ?? null,
+            resourceId: run.resourceId ?? null,
+            resourceLabel: run.resourceLabel ?? null,
+            status: "running",
+          })
+          .returning();
+        const inserted = steps.length
+          ? await tx
+              .insert(projectSteps)
+              .values(steps.map((s) => ({ ...s, runId: created.id })))
+              .returning()
+          : [];
+        return { run: created, steps: inserted };
+      });
+    },
+
+    async setStepStatus(
+      userId: string,
+      stepId: string,
+      patch: { status: "pending" | "done" | "skipped"; artifact?: string | null },
+    ): Promise<ProjectStep | null> {
+      // Scope by owner through the run, so a step id alone cannot reach another user's row.
+      const [step] = await db
+        .select({ id: projectSteps.id })
+        .from(projectSteps)
+        .innerJoin(projectRuns, eq(projectRuns.id, projectSteps.runId))
+        .where(and(eq(projectSteps.id, stepId), eq(projectRuns.userId, userId)))
+        .limit(1);
+      if (!step) return null;
+
+      const [updated] = await db
+        .update(projectSteps)
+        .set({
+          status: patch.status,
+          artifact: patch.artifact ?? undefined,
+          completedAt: patch.status === "done" ? new Date() : null,
+          updatedAt: new Date(),
+        })
+        .where(eq(projectSteps.id, stepId))
+        .returning();
+      return updated ?? null;
+    },
+
+    async setRunStatus(userId: string, runId: string, status: string): Promise<void> {
+      await db
+        .update(projectRuns)
+        .set({
+          status,
+          completedAt: status === "done" ? new Date() : null,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(projectRuns.userId, userId), eq(projectRuns.id, runId)));
+    },
+  };
+}

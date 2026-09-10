@@ -34,7 +34,15 @@ export function LabFit({ title, detail }: { title: string; detail?: string | nul
       if (res.ok && res.plan) setPlan(res.plan);
     });
 
-  useEffect(refresh, [title, detail]);
+  useEffect(() => {
+    refresh();
+    // Every suggestion renders its own LabFit. Adding a machine in ONE of them left the
+    // others still saying "Fadi doesn't know what you have to work with yet" — visibly
+    // contradicting the card above, which had just found it. They all re-check now.
+    const onChanged = () => refresh();
+    window.addEventListener("fadi:resources-changed", onChanged);
+    return () => window.removeEventListener("fadi:resources-changed", onChanged);
+  }, [title, detail]);
 
   if (!plan) {
     return (
@@ -142,7 +150,10 @@ function AddResource({ onDone, onCancel }: { onDone: () => void; onCancel: () =>
         virtualization: virt as never,
         alwaysOn,
       });
-      if (res.ok) onDone();
+      if (res.ok) {
+        window.dispatchEvent(new CustomEvent("fadi:resources-changed"));
+        onDone();
+      }
     });
 
   const field = "h-8 rounded-md border border-input bg-background px-2 text-xs";

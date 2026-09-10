@@ -312,6 +312,109 @@ const evaluateFitTool: FadiTool = {
   },
 };
 
+/* ---------------------------------------------------------------------------
+ * PROJECT RUNS — the tools that let Fadi DO a project rather than link to one.
+ *
+ * The learning section's output was a suggestion and a tutorial link. The user's
+ * verdict: "all these efforts to give me a youtube watch link is not great. I want real
+ * agentic tool actions and guide me in each step on it until I complete the project."
+ *
+ * These give a model the verbs it needs to run alongside someone: plan against the
+ * hardware they own, read where they are, mark a step done with what it produced, and
+ * finish. Nothing here does the work for them — it removes the part where they have to
+ * hold the whole plan in their head and decide alone what "done" looks like.
+ * ------------------------------------------------------------------------- */
+
+const planProjectTool: FadiTool = {
+  name: "plan_project",
+  description:
+    "Turn a project idea into concrete steps the user can execute TONIGHT on hardware they actually own. Use when they commit to a project, ask how to start one, or say a suggestion is too vague. Each step gets a way to verify it worked and names what it produces. Never answer a 'how do I build X' question with links when this can produce a real plan.",
+  parameters: {
+    type: "object",
+    properties: {
+      title: { type: "string", description: "The project title." },
+      detail: { type: "string", description: "What the project involves, if known." },
+    },
+    required: ["title"],
+  },
+  async execute(args, ctx): Promise<FadiToolResult> {
+    const title = typeof args.title === "string" ? args.title.trim() : "";
+    if (!title) return { summary: "I need the project title to plan it.", view: "none" };
+    const { planProjectRun } = await import("@/lib/lab/plan-run");
+    const res = await planProjectRun(ctx.userId, {
+      title,
+      detail: typeof args.detail === "string" ? args.detail : null,
+    });
+    if (!res.ok) return { summary: res.message, view: "none" };
+    return {
+      summary: `Planned "${title}" as ${res.plan.steps} steps against your own hardware. Open Learning to work through them — each one says how to tell it worked.`,
+      view: "none",
+      data: { runId: res.plan.runId, steps: res.plan.steps },
+    };
+  },
+};
+
+const projectStatusTool: FadiTool = {
+  name: "project_status",
+  description:
+    "Read where the user is in their in-progress projects: which step is next, what it asks, and how to verify it. Use when they ask 'what's next', 'where was I', 'what should I do now', or before advising on a project they have already started — so the advice continues their plan instead of restarting it.",
+  parameters: { type: "object", properties: {} },
+  async execute(_args, ctx): Promise<FadiToolResult> {
+    const { createProjectRunsRepository } = await import("@careeros/database");
+    const { getDatabase } = await import("@/lib/database/client");
+    const repo = createProjectRunsRepository(getDatabase());
+    const runs = (await repo.listForUser(ctx.userId)).filter((r) => r.status === "running");
+    if (runs.length === 0) {
+      return { summary: "No project is in progress. plan_project turns an idea into steps.", view: "none" };
+    }
+    const lines: string[] = [];
+    for (const run of runs.slice(0, 3)) {
+      const detail = await repo.getWithSteps(ctx.userId, run.id);
+      if (!detail) continue;
+      const done = detail.steps.filter((s) => s.status === "done").length;
+      const next = detail.steps.find((s) => s.status === "pending");
+      lines.push(
+        `${run.title} — ${done}/${detail.steps.length} done${run.resourceLabel ? ` on ${run.resourceLabel}` : ""}.` +
+          (next
+            ? `\n  Next: ${next.title}. ${next.instruction}${next.verify ? `\n  Worked when: ${next.verify}` : ""}`
+            : "\n  All steps done — it can be finished."),
+      );
+    }
+    return { summary: lines.join("\n\n"), view: "none" };
+  },
+};
+
+const completeProjectStepTool: FadiTool = {
+  name: "complete_project_step",
+  description:
+    "Mark the user's current project step as done, recording what it produced (a file, a repo, a screenshot). Use when they say they finished a step or show you the result. Recording what was produced is what later turns the project into evidence — never mark a step done without asking what it left behind.",
+  parameters: {
+    type: "object",
+    properties: {
+      stepId: { type: "string", description: "The step's id, from project_status." },
+      artifact: {
+        type: "string",
+        description: "What the step produced — a path, a repo URL, or a short description of the result.",
+      },
+    },
+    required: ["stepId"],
+  },
+  async execute(args, ctx): Promise<FadiToolResult> {
+    const stepId = typeof args.stepId === "string" ? args.stepId : "";
+    const { createProjectRunsRepository } = await import("@careeros/database");
+    const { getDatabase } = await import("@/lib/database/client");
+    const updated = await createProjectRunsRepository(getDatabase()).setStepStatus(ctx.userId, stepId, {
+      status: "done",
+      artifact: typeof args.artifact === "string" ? args.artifact : null,
+    });
+    if (!updated) return { summary: "I can't find that step.", view: "none" };
+    return {
+      summary: `Marked "${updated.title}" done.${updated.artifact ? ` Recorded: ${updated.artifact}` : ""}`,
+      view: "none",
+    };
+  },
+};
+
 const getMomentumReflectionTool: FadiTool = {
   name: "get_momentum_reflection",
   description:
@@ -477,6 +580,9 @@ const TOOLS: FadiTool[] = [
   draftReferralOutreachTool,
   answerBehavioralTool,
   scanCompanyJobsTool,
+  planProjectTool,
+  projectStatusTool,
+  completeProjectStepTool,
   evaluateFitTool,
   getCareerUpdates,
   generateDocument,

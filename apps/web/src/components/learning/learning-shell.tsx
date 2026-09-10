@@ -6,6 +6,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { CommitmentsList, GapGrowth } from "@/components/learning/gap-growth";
 import { CareerBlueprint } from "@/components/learning/career-blueprint";
 import type { CommitmentView } from "@/lib/learning/commitments-view";
+import { ProjectRuns } from "@/components/learning/project-run";
 import type { StoredCareerReport } from "@/lib/career-report/schema";
 import { learningResources } from "@/lib/learning/resources";
 import { cn } from "@/lib/utils";
@@ -91,6 +92,11 @@ export function LearningShell({ report, commitments = [], role = null }: Props) 
 
       {/* Direction-level plan: the cert ladder + proof-projects + in-demand skills */}
       <CareerBlueprint role={role} />
+
+      {/* Projects being DONE, one step at a time, against hardware the user owns.
+          Above the commitment list on purpose: the next concrete action beats a list
+          of things agreed to. */}
+      <ProjectRuns />
 
       {/* In-progress commitments — completing one feeds your Evidence + resume */}
       <CommitmentsList commitments={commitments} />

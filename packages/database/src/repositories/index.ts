@@ -15,6 +15,7 @@ export * from "./mcp-tokens.repository";
 export * from "./portfolio.repository";
 export * from "./product-events.repository";
 export * from "./profiles.repository";
+export * from "./project-runs.repository";
 export * from "./referrals.repository";
 export * from "./resilience.repository";
 export * from "./resume-templates.repository";
