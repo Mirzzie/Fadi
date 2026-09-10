@@ -33,7 +33,7 @@
  },
  {
   "id": "currency-wrong",
-  "verdict": "uncertain"
+  "verdict": "unsupported"
  },
  {
   "id": "currency-format",

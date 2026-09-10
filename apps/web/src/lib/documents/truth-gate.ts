@@ -40,7 +40,7 @@ export type TruthCheckInput = {
 //     measuring 19.8% failed to support "approximately 20%".
 //   · money required a symbol, so "USD 5000" in the record did not corroborate
 //     "$5,000 USD" in the draft — the same amount, written the other way round.
-const METRIC_RE = new RegExp(
+export const METRIC_RE = new RegExp(
   [
     // $50k, €1.2M, £900
     String.raw`[$€£]\s?\d[\d,]*(?:\.\d+)?\s?[kmb]?`,
@@ -66,7 +66,17 @@ const strip = (s: string) => s.toLowerCase().replace(/[\s,]/g, "");
  * substring-integer). A number means nothing without its unit, and "contains the
  * characters 2 and 0" is not evidence of anything.
  */
-type Metric = { value: number; unit: "percent" | "multiple" | "money" };
+type Metric = {
+  value: number;
+  unit: "percent" | "multiple" | "money";
+  /**
+   * Which money. Dropping this made EUR 5000 corroborate USD 5000 — the oracle's
+   * currency-wrong case, and a real regression introduced by widening the pattern to
+   * accept ISO codes. Two amounts in different currencies are different quantities
+   * until an exchange rate says otherwise, and none is recorded here.
+   */
+  currency?: "USD" | "EUR" | "GBP";
+};
 
 function parseMetric(raw: string): Metric | null {
   const t = raw.toLowerCase().replace(/[\s,]/g, "");
@@ -75,9 +85,16 @@ function parseMetric(raw: string): Metric | null {
   if (t.includes("%")) return { value: num, unit: "percent" };
   if (/x$/.test(t)) return { value: num, unit: "multiple" };
   if (/^[$€£]/.test(t) || /^(usd|eur|gbp)/.test(t) || /(usd|eur|gbp)$/.test(t)) {
-    // "50k" and "1.2m" are the same quantity written shorter.
-    const scale = /k$/.test(t) ? 1_000 : /m$/.test(t) ? 1_000_000 : /b$/.test(t) ? 1_000_000_000 : 1;
-    return { value: num * scale, unit: "money" };
+    // "50k" and "1.2m" are the same quantity written shorter. The suffix has to be read
+    // before the ISO code, or "5000usd" would scale by nothing and "1.2musd" would.
+    const body = t.replace(/^(usd|eur|gbp)/, "").replace(/(usd|eur|gbp)$/, "");
+    const scale = /k$/.test(body) ? 1_000 : /m$/.test(body) ? 1_000_000 : /b$/.test(body) ? 1_000_000_000 : 1;
+    const currency = t.includes("€") || t.includes("eur")
+      ? "EUR"
+      : t.includes("£") || t.includes("gbp")
+        ? "GBP"
+        : "USD";
+    return { value: num * scale, unit: "money", currency };
   }
   return null;
 }
@@ -140,7 +157,10 @@ function unsupportedNumbers(generated: string, rawCorpus: string): TruthFinding[
     const tolerance = approx ? Math.max(0.5, Math.abs(claim.value) * 0.01) : 0;
 
     const exact = corpusMetrics.some(
-      (c) => c.unit === claim.unit && Math.abs(c.value - claim.value) <= tolerance,
+      (c) =>
+        c.unit === claim.unit &&
+        c.currency === claim.currency &&
+        Math.abs(c.value - claim.value) <= tolerance,
     );
 
     // A relative change the record supports arithmetically: "from 10% to 8%" warrants
@@ -362,6 +382,14 @@ export type CoverageGap = { kind: "attribution" | "scope"; offending: string; me
 const ATTRIBUTION_RE =
   /\b(?:in|at|for|while at|during my time at)\s+(?:role\s+\w+|[A-Z][\w&.\-]*(?:\s+[A-Z][\w&.\-]*)*)/gi;
 const SCOPE_RE = /\b(?:the entire|the whole|all of|across the (?:organisation|organization|company|business)|department|division|company[- ]wide)\b/gi;
+
+/** Does this text contain anything the metric checker is capable of judging? */
+export function hasCheckableMetric(text: string): boolean {
+  METRIC_RE.lastIndex = 0;
+  const found = METRIC_RE.test(text);
+  METRIC_RE.lastIndex = 0;
+  return found;
+}
 
 export function coverageGaps(generated: string): CoverageGap[] {
   const out: CoverageGap[] = [];
