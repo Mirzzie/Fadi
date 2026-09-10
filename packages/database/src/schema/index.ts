@@ -346,6 +346,19 @@ export const careerReports = pgTable(
       .default([]),
     modelName: text("model_name"),
     promptVersion: text("prompt_version"),
+    /**
+     * How many evidence items this report was built from (D08).
+     *
+     * Staleness compared the newest evidence timestamp against the report's date, and a
+     * missing timestamp read as "nothing changed". So deleting EVERY piece of evidence
+     * made `max(updated_at)` null and the report reported itself FRESH — at the exact
+     * moment it had become maximally stale, describing a pool that no longer exists.
+     *
+     * A timestamp cannot express removal: the newest survivor of a deletion is older,
+     * not newer. A count can, and it distinguishes the two cases a null could not —
+     * "this user never had evidence" from "their evidence is gone".
+     */
+    evidenceCountAtGeneration: integer("evidence_count_at_generation"),
     generatedAt: timestamp("generated_at", { withTimezone: true }),
     ...timestamps,
   },

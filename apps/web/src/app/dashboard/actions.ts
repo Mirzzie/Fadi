@@ -1,6 +1,6 @@
 "use server";
 
-import { createCareerReportsRepository } from "@careeros/database";
+import { createCareerReportsRepository, createEvidenceRepository } from "@careeros/database";
 import { revalidatePath } from "next/cache";
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
@@ -260,7 +260,17 @@ ${composeCareerEvidence({ resumeText: context.resumeText, linkedInText: context.
 
     const report = completion;
 
+    // D08: record how much evidence this was written from, so later staleness can see
+    // removal. A newest-timestamp comparison cannot — deleting evidence makes the newest
+    // survivor older, and deleting all of it makes the timestamp null, which read as
+    // "nothing changed".
+    const evidenceCountAtGeneration = await createEvidenceRepository(getDatabase())
+      .listForUser(user.id)
+      .then((rows) => rows.length)
+      .catch(() => null);
+
     await careerReportsRepository.createForUser(user.id, {
+      evidenceCountAtGeneration,
       careerProfileId: context.careerProfileId,
       resumeId: context.resumeId,
       linkedinProfileId: context.linkedInProfileId,

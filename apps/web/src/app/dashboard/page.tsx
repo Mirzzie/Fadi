@@ -54,6 +54,7 @@ export default async function DashboardPage() {
     digest,
     impact,
     latestEvidenceAt,
+    evidenceCountNow,
     activeTrack,
     linkedin,
   ] = await (async () => {
@@ -71,6 +72,7 @@ export default async function DashboardPage() {
     getAgencyDigest(user.id),
     getFadiImpact(user.id),
     createEvidenceRepository(db).latestUpdatedAt(user.id),
+    createEvidenceRepository(db).listForUser(user.id).then((r) => r.length),
     createCareerProfilesRepository(db).getActiveForUser(user.id),
     createLinkedInProfilesRepository(db).getLatestForUser(user.id),
   ]);
@@ -92,6 +94,9 @@ export default async function DashboardPage() {
     latestEvidenceAt,
     latestResumeAt: trackResume?.updatedAt ?? null,
     latestLinkedInAt: linkedin?.updatedAt ?? null,
+    // D08: a timestamp cannot express deletion; a count can.
+    evidenceCount: evidenceCountNow,
+    evidenceCountAtGeneration: latestReport?.evidence_count_at_generation ?? null,
   });
 
   // Open builds in the ACTIVE direction's Prepare plan — the weekly pull-back hook.
