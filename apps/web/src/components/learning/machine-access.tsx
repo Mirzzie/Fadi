@@ -1,12 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
-import { AlertTriangle, Loader2, ShieldCheck, ShieldOff } from "lucide-react";
+import { AlertTriangle, FolderOpen, Loader2, ShieldCheck, ShieldOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
   approveAction,
   denyAction,
+  getWorkspace,
+  setWorkspace,
   grantCapability,
   listPendingActions,
   listPermissions,
@@ -49,17 +51,23 @@ export function MachineAccess() {
   const [caps, setCaps] = useState<CapabilityView[] | null>(null);
   const [recent, setRecent] = useState<ActionView[]>([]);
   const [waiting, setWaiting] = useState<PendingActionView[]>([]);
+  const [workspace, setWorkspaceRoot] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   const refresh = useCallback(() => {
     start(async () => {
-      const [perms, queue] = await Promise.all([listPermissions(), listPendingActions()]);
+      const [perms, queue, ws] = await Promise.all([
+        listPermissions(),
+        listPendingActions(),
+        getWorkspace(),
+      ]);
       if (perms.ok) {
         setCaps(perms.capabilities ?? []);
         setRecent(perms.recent ?? []);
       }
       if (queue.ok) setWaiting(queue.pending ?? []);
+      if (ws.ok) setWorkspaceRoot(ws.root ?? null);
     });
   }, []);
 
@@ -81,6 +89,8 @@ export function MachineAccess() {
   }
 
   const live = caps.filter((c) => c.grantedUntil);
+  // Proposals are not blocked attempts. Counting them here was the same conflation that
+  // tripped the circuit breaker, and it would have made ordinary work look like an attack.
   const denials = recent.filter((a) => a.decision === "denied");
 
   return (
@@ -168,6 +178,8 @@ export function MachineAccess() {
         </div>
       ) : null}
 
+      <WorkspaceSetting root={workspace} onChanged={refresh} />
+
       <div className="space-y-2">
         {caps.map((c) => {
           const left = timeLeft(c.grantedUntil);
@@ -228,7 +240,7 @@ export function MachineAccess() {
                   className={
                     a.decision === "denied"
                       ? "text-amber-600"
-                      : a.decision === "error"
+                      : a.decision === "error" || a.decision === "proposed"
                         ? "text-muted-foreground"
                         : "text-emerald-600"
                   }
@@ -348,6 +360,78 @@ function PendingAction({
           Expires {new Date(w.expiresAt).toLocaleTimeString()}
         </span>
       </div>
+    </div>
+  );
+}
+
+
+/**
+ * The workspace.
+ *
+ * Shown even when unset, and especially then — "Fadi has no filesystem access" is a fact
+ * worth seeing, not an absence to infer from an empty screen.
+ */
+function WorkspaceSetting({ root, onChanged }: { root: string | null; onChanged: () => void }) {
+  const [editing, setEditing] = useState(false);
+  const [path, setPath] = useState(root ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, start] = useTransition();
+
+  return (
+    <div className="rounded-md border border-border/60 p-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <FolderOpen className="size-3.5 text-muted-foreground" aria-hidden="true" />
+        <span className="text-xs font-medium">Workspace</span>
+        {root ? (
+          <code className="text-[11px] text-muted-foreground">{root}</code>
+        ) : (
+          <span className="text-[11px] text-muted-foreground">
+            Not set — Fadi has no filesystem access at all.
+          </span>
+        )}
+        <Button
+          size="sm"
+          variant="ghost"
+          className="ml-auto h-6 px-2 text-[10px]"
+          onClick={() => setEditing((v) => !v)}
+        >
+          {root ? "Change" : "Set one"}
+        </Button>
+      </div>
+
+      {editing ? (
+        <div className="mt-2 space-y-1.5">
+          <input
+            value={path}
+            onChange={(e) => setPath(e.target.value)}
+            placeholder="/home/you/fadi-labs"
+            spellCheck={false}
+            className="h-7 w-full max-w-md rounded border border-border bg-background px-2 font-mono text-[11px]"
+          />
+          <p className="text-[11px] text-muted-foreground">
+            An existing folder, absolute path. Fadi can read and write inside it and nowhere else —
+            symlinks pointing out of it are refused. Leave blank and press Save to take the access
+            away again.
+          </p>
+          {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
+          <Button
+            size="sm"
+            disabled={busy}
+            onClick={() =>
+              start(async () => {
+                const res = await setWorkspace({ path });
+                setError(res.ok ? null : (res.message ?? "Couldn't set that."));
+                if (res.ok) {
+                  setEditing(false);
+                  onChanged();
+                }
+              })
+            }
+          >
+            Save
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

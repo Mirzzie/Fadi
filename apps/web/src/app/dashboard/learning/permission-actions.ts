@@ -300,3 +300,77 @@ export async function denyAction(input: {
   });
   return { ok: true };
 }
+
+/* ---------------------------------------------------------------------------
+ * THE WORKSPACE — the one directory Fadi may write in.
+ * ------------------------------------------------------------------------- */
+
+export async function getWorkspace(): Promise<{ ok: boolean; root?: string | null }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false };
+  const { createLabSettingsRepository } = await import("@careeros/database");
+  const root = await createLabSettingsRepository(getDatabase()).workspaceRoot(user.id);
+  return { ok: true, root };
+}
+
+/**
+ * Nominate the workspace.
+ *
+ * The directory must already exist. Fadi does not create it: choosing where it may write
+ * is the person's decision, and a tool that silently makes the folder it is about to be
+ * confined to has made that decision for them.
+ *
+ * The path is resolved through realpath before it is stored, so what is saved is the real
+ * location rather than a route to it — otherwise a symlinked root would move the whole
+ * jail the moment the link changed.
+ */
+export async function setWorkspace(input: {
+  path: string;
+}): Promise<{ ok: boolean; root?: string; message?: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  const raw = (input.path ?? "").trim();
+  if (!raw) {
+    const { createLabSettingsRepository } = await import("@careeros/database");
+    await createLabSettingsRepository(getDatabase()).setWorkspaceRoot(user.id, null);
+    return { ok: true, message: "Cleared. Fadi has no filesystem access now." };
+  }
+
+  const { isAbsolute } = await import("node:path");
+  if (!isAbsolute(raw)) return { ok: false, message: "Give an absolute path." };
+
+  const fs = await import("node:fs/promises");
+  let resolved: string;
+  try {
+    resolved = await fs.realpath(raw);
+    const stat = await fs.stat(resolved);
+    if (!stat.isDirectory()) return { ok: false, message: "That isn't a directory." };
+  } catch {
+    return { ok: false, message: "That directory doesn't exist. Create it first, then set it here." };
+  }
+
+  // Refusing the obvious feet-shooting roots. Not a security boundary — someone
+  // determined can nominate anything — but a workspace of "/" or a home directory is
+  // almost always a mistake, and catching it here costs one sentence.
+  const dangerous = ["/", "/home", "/etc", "/usr", "/var", "/boot", process.env.HOME ?? ""];
+  if (dangerous.includes(resolved)) {
+    return {
+      ok: false,
+      message: "Pick a dedicated folder rather than " + resolved + " — a workspace should be somewhere you'd be happy for Fadi to make a mess.",
+    };
+  }
+
+  const db = getDatabase();
+  const { createLabSettingsRepository } = await import("@careeros/database");
+  await createLabSettingsRepository(db).setWorkspaceRoot(user.id, resolved);
+  await createLabActionsRepository(db).record({
+    userId: user.id,
+    actor: "user",
+    origin: "dashboard:permissions",
+    capability: "workspace.set",
+    decision: "allowed",
+    detail: "Workspace set to " + resolved,
+  });
+  return { ok: true, root: resolved };
+}

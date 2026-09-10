@@ -169,8 +169,10 @@ describe("proposing runs nothing", () => {
   it("records a proposal as something that did NOT happen", async () => {
     await propose_({ image: "nginx", name: "web" });
     // A log that counted proposals as actions would show a machine full of containers
-    // that were never created.
-    expect(record.mock.calls[0][0].decision).toBe("denied");
+    // that were never created. It is not a denial either — see the regression test below
+    // for what that mistake cost.
+    expect(record.mock.calls[0][0].decision).toBe("proposed");
+    expect(record.mock.calls[0][0].decision).not.toBe("allowed");
     expect(record.mock.calls[0][0].detail).toMatch(/awaiting your approval/i);
   });
 });
@@ -257,8 +259,12 @@ describe("the catalogue itself stays safe as it grows", () => {
     for (const key of ["nginx", "postgres", "redis", "grafana", "portainer"]) {
       const params = RECIPES["container.run"].validate({ image: key, name: "x" });
       expect(params).not.toBeNull();
-      const argv = RECIPES["container.run"].render(params!);
-      images.add(argv[0].args[argv[0].args.length - 1]);
+      const steps = RECIPES["container.run"].render(params!);
+      const first = steps[0];
+      // Container recipes render commands, not file steps — assert that as we read it,
+      // so a future change of shape fails here rather than silently skipping the check.
+      expect("args" in first).toBe(true);
+      if ("args" in first) images.add(first.args[first.args.length - 1]);
     }
     for (const image of images) {
       expect(image).toMatch(/:/);
@@ -288,11 +294,18 @@ describe("the catalogue itself stays safe as it grows", () => {
     for (const id of RECIPE_IDS) {
       const recipe = RECIPES[id];
       // Every recipe validates against the widest legal parameter bag it accepts.
+      // The widest legal bag for any recipe shape — container or filesystem.
       const params =
-        recipe.validate({ image: "nginx", name: "x", port: 8080 }) ?? recipe.validate({ name: "x" });
+        recipe.validate({ image: "nginx", name: "x", port: 8080 }) ??
+        recipe.validate({ name: "x" }) ??
+        recipe.validate({ path: "dir/file.txt", content: "x" }) ??
+        recipe.validate({ path: "dir/file.txt" });
       expect(params, `${id} should accept a legal parameter bag`).not.toBeNull();
-      for (const command of recipe.render(params!)) {
-        for (const arg of command.args) {
+      for (const step of recipe.render(params!)) {
+        // File steps carry no flags at all, which is itself the point: there is no argv
+        // for a dangerous option to hide in.
+        if (!("args" in step)) continue;
+        for (const arg of step.args) {
           expect(forbidden, `${id} emitted ${arg}`).not.toContain(arg);
         }
       }
@@ -397,3 +410,88 @@ describe("typing the name is not decoration", () => {
     expect(res.ok).toBe(true);
   });
 });
+
+describe("filesystem recipes refuse anything that isn't an ordinary workspace path", () => {
+  const hostilePaths = [
+    "/etc/passwd",
+    "../../.ssh/id_rsa",
+    "notes/../../../etc/shadow",
+    "~/secrets",
+    "a/b/c/d/e/f/g/h/i/j/deep.txt",
+    "file name with spaces.txt",
+    "file;rm -rf /.txt",
+    "$(whoami).txt",
+    "",
+  ];
+
+  for (const path of hostilePaths) {
+    it(`refuses ${JSON.stringify(path)}`, async () => {
+      const res = await propose_({ path, content: "x" }, "file.write");
+      expect(res.ok).toBe(false);
+      expect(propose).not.toHaveBeenCalled();
+    });
+  }
+
+  it("accepts an ordinary relative path", async () => {
+    const res = await propose_({ path: "ad-lab/provision.ps1", content: "Write-Host hi" }, "file.write");
+    expect(res.ok).toBe(true);
+    // The path stays RELATIVE in the row. There is no absolute path stored for anyone to
+    // tamper with, and containment is decided against the disk at execution.
+    if (res.ok) expect(res.argv[0].join(" ")).toContain("ad-lab/provision.ps1");
+  });
+
+  it("refuses a file larger than the cap", async () => {
+    const res = await propose_({ path: "big.txt", content: "x".repeat(300 * 1024) }, "file.write");
+    expect(res.ok).toBe(false);
+  });
+
+  it("refuses a write with no content at all, rather than creating an empty file by accident", async () => {
+    const res = await propose_({ path: "notes.md" }, "file.write");
+    expect(res.ok).toBe(false);
+  });
+
+  it("shows a content digest, so tampering with the body changes what was approved", async () => {
+    const a = await propose_({ path: "run.sh", content: "echo one" }, "file.write");
+    const b = await propose_({ path: "run.sh", content: "echo two" }, "file.write");
+    expect(a.ok && b.ok).toBe(true);
+    if (a.ok && b.ok) {
+      // Same path, same byte count — only the digest separates them. Without it, swapping
+      // the body of an approved write would pass the re-render comparison.
+      expect(a.argv[0].join(" ")).not.toBe(b.argv[0].join(" "));
+    }
+  });
+
+  it("deleting a file is irreversible and must be typed out; writing one is not", async () => {
+    const write = await propose_({ path: "notes.md", content: "hi" }, "file.write");
+    const remove = await propose_({ path: "notes.md" }, "file.remove");
+    expect(write.ok && remove.ok).toBe(true);
+    if (write.ok && remove.ok) {
+      expect(write.policy.confirm).toBe("click");
+      expect(remove.policy.confirm).toBe("type-name");
+      expect(remove.reversal).toMatch(/not reversible/i);
+      // And the write says what it actually does about the old version.
+      expect(write.reversal).toMatch(/fadi-bak/i);
+    }
+  });
+});
+
+describe("THE BUG: ordinary proposals must not look hostile", () => {
+  it("records a proposal as 'proposed', not as a denial", async () => {
+    // Found by the end-to-end filesystem test: proposals were logged as denials on the
+    // reasoning that nothing had run, and the circuit breaker counts machine denials — so
+    // five ordinary proposals revoked every permission the user had given. The security
+    // layer turned on the person it protects.
+    await propose_({ image: "nginx", name: "web" });
+
+    const decisions = record.mock.calls.map((c) => c[0].decision);
+    expect(decisions).toContain("proposed");
+    expect(decisions).not.toContain("denied");
+  });
+
+  it("a normal working session does not trip the breaker", async () => {
+    // What the breaker sees after several proposals must still be an empty denial list.
+    for (let i = 0; i < 8; i++) await propose_({ image: "nginx", name: "web" + i });
+    expect(revokeAll).not.toHaveBeenCalled();
+    expect(record.mock.calls.every((c) => c[0].decision === "proposed")).toBe(true);
+  });
+})

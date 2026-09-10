@@ -1,6 +1,7 @@
 import "server-only";
 
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { promisify } from "node:util";
 
 import {
@@ -79,6 +80,45 @@ export const CAPABILITY_IDS = [
 export type Capability = (typeof CAPABILITY_IDS)[number];
 
 type Command = { id: string; cmd: string; args: string[] };
+
+/**
+ * A filesystem step.
+ *
+ * `path` is RELATIVE to the user's workspace and stays that way in storage. Containment is
+ * resolved at execution against the live workspace root, so a row that sat in the database
+ * cannot carry a path that was inside the workspace when it was written and is not any
+ * more — and there is no absolute path in the row for anyone to tamper with.
+ */
+type FileStep = {
+  id: string;
+  fs: "write" | "mkdir" | "remove";
+  path: string;
+  content?: string;
+};
+
+type Step = Command | FileStep;
+
+function isFileStep(step: Step): step is FileStep {
+  return "fs" in step;
+}
+
+/** A short digest, so a display line changes when the CONTENT changes, not just its length. */
+function digest(text: string): string {
+  return createHash("sha256").update(text).digest("hex").slice(0, 12);
+}
+
+/** How a step is shown to the person, and what the approval is compared against. */
+function displayOf(step: Step): string[] {
+  if (!isFileStep(step)) return [step.cmd, ...step.args];
+  if (step.fs === "write") {
+    return [
+      "write",
+      step.path,
+      "(" + Buffer.byteLength(step.content ?? "") + " bytes, sha256:" + digest(step.content ?? "") + ")",
+    ];
+  }
+  return [step.fs, step.path];
+}
 
 type CapabilitySpec = {
   /** The consent text — what the user is agreeing to, in their words, not ours. */
@@ -258,7 +298,14 @@ export async function requestCapability(input: {
  * run.
  * ------------------------------------------------------------------------- */
 
-export const RECIPE_IDS = ["container.run", "container.stop", "container.remove"] as const;
+export const RECIPE_IDS = [
+  "container.run",
+  "container.stop",
+  "container.remove",
+  "file.write",
+  "dir.create",
+  "file.remove",
+] as const;
 export type RecipeId = (typeof RECIPE_IDS)[number];
 
 /**
@@ -291,6 +338,29 @@ const NAME_PREFIX = "fadi-";
  */
 const NAME_RE = /^[a-z0-9](?:[a-z0-9-]{0,28}[a-z0-9])?$/;
 
+/**
+ * A workspace-relative path Fadi may name.
+ *
+ * Deliberately narrow: ordinary characters, forward slashes, no leading slash, bounded
+ * depth and length. This is the FIRST of two checks — `resolveInWorkspace` does the real
+ * one against the disk at execution, because a regex cannot know what a symlink points at.
+ * Rejecting obvious nonsense here just means the person is never shown a prompt that was
+ * always going to fail.
+ */
+const REL_PATH_RE = /^(?!\/)(?:[A-Za-z0-9._-]+\/){0,8}[A-Za-z0-9._-]+$/;
+
+/**
+ * "." and ".." are legal SEGMENTS under the character class above, because a dot is an
+ * ordinary character in a filename. `..\/..\/.ssh\/id_rsa` therefore matched — the real
+ * containment check at execution would still have refused it, but the person would have
+ * been shown an approval prompt for a path that was never going to work, which is both
+ * noise and a worse first line of defence.
+ */
+function hasTraversalSegment(path: string): boolean {
+  return path.split("/").some((segment) => segment === "." || segment === "..");
+}
+const MAX_FILE_BYTES = 256 * 1024;
+
 export type RecipeParams = Record<string, unknown>;
 
 type Recipe = {
@@ -311,8 +381,8 @@ type Recipe = {
   summary: (p: RecipeParams) => string;
   /** How to undo it, said in the same breath. */
   reversal: (p: RecipeParams) => string;
-  /** The exact argv. Built ONLY from validated parameters. */
-  render: (p: RecipeParams) => Command[];
+  /** The exact steps. Built ONLY from validated parameters. */
+  render: (p: RecipeParams) => Step[];
   /**
    * True when the recipe may only act on something Fadi itself created. Stopping or
    * removing must not be able to name the user's own containers.
@@ -351,6 +421,63 @@ export const RECIPES: Record<RecipeId, Recipe> = {
       args.push(IMAGES[String(p.image)]);
       return [{ id: "run", cmd: "docker", args }];
     },
+  },
+
+  "file.write": {
+    blast: "workspace",
+    // Reversible because the previous version is copied aside before the write. A
+    // reversibility claim that depends on nobody having overwritten anything is not one.
+    reversibility: "reversible",
+    confirmToken: (p) => String(p.path),
+    validate: (raw) => {
+      const path = str(raw.path);
+      const content = typeof raw.content === "string" ? raw.content : null;
+      if (!path || !REL_PATH_RE.test(path) || hasTraversalSegment(path) || path.length > 200) return null;
+      if (content === null) return null;
+      if (Buffer.byteLength(content) > MAX_FILE_BYTES) return null;
+      return { path, content };
+    },
+    summary: (p) => {
+      const content = String(p.content ?? "");
+      const preview = content.length > 220 ? content.slice(0, 220) + "…" : content;
+      return (
+        "Write " + Buffer.byteLength(content) + " bytes to " + p.path + " in your workspace:\n\n" + preview
+      );
+    },
+    reversal: () => "If it already existed, the old version is kept next to it as a .fadi-bak file.",
+    render: (p) => [{ id: "write", fs: "write", path: String(p.path), content: String(p.content ?? "") }],
+  },
+
+  "dir.create": {
+    blast: "workspace",
+    reversibility: "reversible",
+    confirmToken: (p) => String(p.path),
+    validate: (raw) => {
+      const path = str(raw.path);
+      return path && REL_PATH_RE.test(path) && !hasTraversalSegment(path) && path.length <= 200
+        ? { path }
+        : null;
+    },
+    summary: (p) => "Create the folder " + p.path + " in your workspace.",
+    reversal: (p) => "Delete it: it is empty until something is written into it (" + p.path + ").",
+    render: (p) => [{ id: "mkdir", fs: "mkdir", path: String(p.path) }],
+  },
+
+  "file.remove": {
+    blast: "workspace",
+    reversibility: "irreversible",
+    confirmToken: (p) => String(p.path),
+    validate: (raw) => {
+      const path = str(raw.path);
+      return path && REL_PATH_RE.test(path) && !hasTraversalSegment(path) && path.length <= 200
+        ? { path }
+        : null;
+    },
+    summary: (p) => "Delete " + p.path + " from your workspace.",
+    // No backup is taken here, so no undo is implied. Saying otherwise would be the kind
+    // of comforting sentence that gets someone's work destroyed.
+    reversal: () => "Not reversible — this does not keep a copy.",
+    render: (p) => [{ id: "remove", fs: "remove", path: String(p.path) }],
   },
 
   "container.stop": {
@@ -528,7 +655,7 @@ export async function proposeAction(input: {
   }
 
   const commands = recipe.render(params);
-  const argv = commands.map((c) => [c.cmd, ...c.args]);
+  const argv = commands.map(displayOf);
 
   const row = await requests.propose({
     userId: input.userId,
@@ -550,9 +677,14 @@ export async function proposeAction(input: {
     origin: input.origin,
     capability: input.recipe,
     command: argv.map((a) => a.join(" ")).join(" && "),
-    decision: "denied",
-    // Recorded as denied because nothing ran. A proposal is not an action, and a log that
-    // calls it one would show a machine full of things that never happened.
+    // "proposed", not "denied" — a distinction that turned out to matter twice.
+    //
+    // A proposal is not an action, so it must not be logged as one; that part was right.
+    // But logging it as a DENIAL was also wrong, and worse: the circuit breaker counts
+    // denials by machines, so five ordinary proposals tripped it and revoked every
+    // permission the user had given. "Nothing ran" and "was refused" are different facts,
+    // and collapsing them turned the security layer against the person it protects.
+    decision: "proposed",
     detail: "Proposed, awaiting your approval.",
   });
 
@@ -565,6 +697,56 @@ export async function proposeAction(input: {
     policy,
     confirmToken: recipe.confirmToken(params),
   };
+}
+
+async function runCommand(c: Command): Promise<string> {
+  const { stdout } = await run(c.cmd, c.args, { timeout: 60_000, maxBuffer: 512 * 1024 });
+  return (stdout.split("\n")[0] ?? "").trim();
+}
+
+/**
+ * Filesystem work, confined at the moment it happens.
+ *
+ * The containment check is HERE, not only when the proposal was made. A row can sit for
+ * minutes; the workspace could have moved, or a directory in the path could have become a
+ * symlink since. The check that matters is the one taken against the disk as it is when
+ * the write happens.
+ *
+ * A write over an existing file copies it aside first, which is what makes `file.write`
+ * genuinely reversible rather than reversible-sounding.
+ */
+async function runFileStep(userId: string, step: FileStep): Promise<string> {
+  const { createLabSettingsRepository } = await import("@careeros/database");
+  const { resolveInWorkspace } = await import("./workspace");
+  const fs = await import("node:fs/promises");
+
+  const root = await createLabSettingsRepository(getDatabase()).workspaceRoot(userId);
+  const resolved = await resolveInWorkspace(root, step.path);
+  if (!resolved.ok) throw new Error(resolved.reason);
+
+  if (step.fs === "mkdir") {
+    await fs.mkdir(resolved.path, { recursive: true });
+    return "created " + step.path;
+  }
+
+  if (step.fs === "remove") {
+    await fs.rm(resolved.path, { force: true });
+    return "removed " + step.path;
+  }
+
+  let backup = "";
+  try {
+    await fs.access(resolved.path);
+    backup = resolved.path + ".fadi-bak-" + Date.now();
+    await fs.copyFile(resolved.path, backup);
+  } catch {
+    // Nothing there yet, so nothing to preserve.
+  }
+  await fs.mkdir(resolved.path.slice(0, resolved.path.lastIndexOf("/")), { recursive: true });
+  await fs.writeFile(resolved.path, step.content ?? "", "utf8");
+  return backup
+    ? "wrote " + step.path + " (previous version kept as " + backup.split("/").pop() + ")"
+    : "wrote " + step.path;
 }
 
 export type Execution =
@@ -644,7 +826,7 @@ export async function approveAndRun(input: {
   }
 
   const commands = recipe.render(params);
-  const rendered = JSON.stringify(commands.map((c) => [c.cmd, ...c.args]));
+  const rendered = JSON.stringify(commands.map(displayOf));
   if (rendered !== JSON.stringify(row.argv)) {
     // The command shown and the command about to run have diverged. Refuse, loudly.
     await requests.finish(input.userId, row.id, {
@@ -666,16 +848,16 @@ export async function approveAndRun(input: {
   const out: string[] = [];
   for (const c of commands) {
     try {
-      const { stdout } = await run(c.cmd, c.args, { timeout: 60_000, maxBuffer: 512 * 1024 });
-      out.push((stdout.split("\n")[0] ?? "").trim());
+      const result = isFileStep(c) ? await runFileStep(input.userId, c) : await runCommand(c);
+      out.push(result);
       await audit.record({
         userId: input.userId,
         actor: "user",
         origin: "approval",
         capability: row.recipe,
-        command: [c.cmd, ...c.args].join(" "),
+        command: displayOf(c).join(" "),
         decision: "allowed",
-        detail: (stdout.split("\n")[0] ?? "").trim().slice(0, 200),
+        detail: result.slice(0, 200),
         durationMs: Date.now() - started,
       });
     } catch (error) {
@@ -685,7 +867,7 @@ export async function approveAndRun(input: {
         actor: "user",
         origin: "approval",
         capability: row.recipe,
-        command: [c.cmd, ...c.args].join(" "),
+        command: displayOf(c).join(" "),
         decision: "error",
         detail: message.slice(0, 200),
         durationMs: Date.now() - started,

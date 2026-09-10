@@ -46,6 +46,10 @@ The failures it documents are worth naming, because two of them are ours to avoi
 frightening. They are blocked because five specific controls do not exist yet.** Each one
 maps to a thing that can go wrong:
 
+*(Built 2026-09-10: risk tiers and typed confirmation, quotas, the circuit breaker, and
+the workspace jail. Still open: preflight, real undo, tamper-evident log, egress
+allowlist.)*
+
 1. **Risk tiers and matching confirmation.** `docker stop` and `pacman -R` must not be
    approved by the same gesture. Irreversible actions get a stronger confirmation (type
    the name), a shorter prompt lifetime, and never a batch approval.
@@ -95,6 +99,21 @@ Two rules for remote work:
 
 Read first — list nodes, VMs, storage. Then create, behind the same approval path as
 everything else.
+
+## What we got wrong, and what it cost
+
+Worth recording, because it is the failure mode this whole layer is prone to.
+
+Proposals were logged with `decision: "denied"` — reasoning that nothing had run, which was
+true. But the circuit breaker counts denials by machines, so **five ordinary proposals
+revoked every permission the user had given**. The security layer turned on the person it
+was protecting, and it did so silently.
+
+"Nothing ran" and "was refused" are different facts. They now have different names in the
+log (`proposed` vs `denied`), the breaker counts only the second, and a test pins it.
+
+It was found by an end-to-end test writing to a real disk, not by any of the unit tests —
+which is the argument for having those, in one sentence.
 
 ## The rule that does not change
 

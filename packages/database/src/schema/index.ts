@@ -1149,7 +1149,13 @@ export const labActions = pgTable(
     resourceId: uuid("resource_id"),
     /** The exact argv that ran, for a person to read afterwards. */
     command: text("command"),
-    /** allowed | denied | error */
+    /**
+     * allowed | denied | error | proposed
+     *
+     * `proposed` is its own state on purpose. It means Fadi asked and is waiting — nothing
+     * has happened. Recording it as `denied` (nothing ran, after all) made the circuit
+     * breaker count ordinary proposals as hostile and revoke the user's permissions.
+     */
     decision: text("decision").notNull(),
     /** Why it was denied, or what it produced. */
     detail: text("detail"),
@@ -1161,6 +1167,27 @@ export const labActions = pgTable(
 
 export type LabAction = typeof labActions.$inferSelect;
 export type NewLabAction = typeof labActions.$inferInsert;
+
+/**
+ * THE WORKSPACE — the one place on this disk Fadi may write.
+ *
+ * "Anything touching the host filesystem" stops being frightening the moment it is
+ * SCOPED. One directory the person nominates, every path resolved through realpath and
+ * checked to be inside it, symlinks followed before the check. Outside it, Fadi has no
+ * filesystem at all — not a smaller one, none.
+ *
+ * Null is the honest default: no workspace means no file access, never "everywhere".
+ */
+export const labSettings = pgTable("lab_settings", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  /** Absolute, already resolved when it was set. */
+  workspaceRoot: text("workspace_root"),
+  ...timestamps,
+});
+
+export type LabSettings = typeof labSettings.$inferSelect;
 
 /**
  * A WRITE FADI WANTS TO MAKE, WAITING FOR A PERSON TO SAY YES.

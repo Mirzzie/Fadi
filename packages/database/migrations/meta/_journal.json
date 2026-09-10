@@ -288,6 +288,13 @@
       "when": 1789078991582,
       "tag": "0040_step_completion_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1789079732444,
+      "tag": "0041_lab_workspace",
+      "breakpoints": true
     }
   ]
 }
