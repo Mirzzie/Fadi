@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Check, Cpu, HelpCircle, Loader2, Plus, ShieldQuestion, X } from "lucide-react";
+import { Check, Cpu, HelpCircle, Loader2, Plus, Radar, ShieldQuestion, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,11 @@ import {
   type DetectedResource,
   type LabPlan,
 } from "@/app/dashboard/learning/lab-actions";
-import { grantCapability } from "@/app/dashboard/learning/permission-actions";
+import {
+  grantCapability,
+  proposeNetworkSweep,
+  readNetwork,
+} from "@/app/dashboard/learning/permission-actions";
 
 /**
  * "AND WHAT DO I RUN IT ON?"
@@ -129,6 +133,34 @@ export function LabFit({ title, detail }: { title: string; detail?: string | nul
               you start, not after.
             </p>
           ) : null}
+
+          {/*
+            THE LIST IS NEVER CLOSED.
+
+            These controls used to appear only when Fadi knew of no machines at all, so the
+            first machine you registered was also the last: the panel read as a verdict
+            about your hardware when it was only a verdict about what you had told it. Any
+            "no" here should be answerable with "I have another one" — including one Fadi
+            has not met yet, which is what the network button is for.
+          */}
+          {adding ? (
+            <AddResource
+              onDone={() => {
+                setAdding(false);
+                refresh();
+              }}
+              onCancel={() => setAdding(false)}
+            />
+          ) : (
+            <div className="flex flex-wrap gap-2 pt-1">
+              <DetectHere onSaved={() => window.dispatchEvent(new CustomEvent("fadi:resources-changed"))} />
+              <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
+                <Plus className="size-3.5" aria-hidden="true" />
+                Add another machine
+              </Button>
+              <FindOnNetwork />
+            </div>
+          )}
         </div>
       )}
       {pending ? <p className="mt-1 text-[11px] text-muted-foreground">updating…</p> : null}
@@ -359,6 +391,112 @@ function DetectHere({ onSaved }: { onSaved: () => void }) {
     >
       {pending ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <Cpu className="size-3.5" aria-hidden="true" />}
       {pending ? "Looking…" : "Detect what's on this machine"}
+    </Button>
+  );
+}
+
+
+/**
+ * "What else is on my network?"
+ *
+ * Two steps, deliberately separate. First the passive read — the interfaces this machine
+ * has and the devices it has already spoken to — which costs nothing and often answers the
+ * question outright. Only if that is not enough is a sweep offered, and a sweep is an
+ * approval, not a button: it sends packets to devices the person may not own.
+ */
+function FindOnNetwork() {
+  const [known, setKnown] = useState<string[] | null>(null);
+  const [subnets, setSubnets] = useState<string[]>([]);
+  const [ask, setAsk] = useState<{ summary: string; limit: string } | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [busy, start] = useTransition();
+
+  const look = () =>
+    start(async () => {
+      const res = await readNetwork();
+      if (!res.ok) {
+        setNote(res.message ?? "Couldn't read the network.");
+        return;
+      }
+      if (res.needsGrant) {
+        setAsk({ summary: res.needsGrant.summary, limit: res.needsGrant.limit });
+        return;
+      }
+      setKnown(res.known ?? []);
+      setSubnets(res.subnets ?? []);
+    });
+
+  if (ask) {
+    return (
+      <div className="w-full space-y-1.5 rounded-md border border-amber-500/40 bg-amber-500/5 p-2.5">
+        <p className="text-[11px] font-medium">{ask.summary}</p>
+        <p className="text-[11px] text-muted-foreground">{ask.limit}</p>
+        <div className="flex gap-2">
+          <Button
+            size="sm"
+            disabled={busy}
+            onClick={() =>
+              start(async () => {
+                await grantCapability({ capability: "inspect.network" });
+                setAsk(null);
+                const res = await readNetwork();
+                if (res.ok && !res.needsGrant) {
+                  setKnown(res.known ?? []);
+                  setSubnets(res.subnets ?? []);
+                }
+              })
+            }
+          >
+            Allow for 2 hours
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setAsk(null)}>
+            Not now
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (known) {
+    return (
+      <div className="w-full space-y-1.5 rounded-md border border-border/60 p-2.5">
+        <p className="text-[11px] font-medium">
+          {known.length ? "Already spoken to: " + known.join(", ") : "This machine hasn't spoken to anything recently."}
+        </p>
+        {/* The honest caveat: a passive read only shows recent conversations, so absence
+            here is not evidence that a machine isn't there. */}
+        <p className="text-[11px] text-muted-foreground">
+          That is only what is in this machine&apos;s cache — a device it hasn&apos;t talked to
+          lately won&apos;t appear. To find everything, Fadi has to ping every address, which you
+          approve one scan at a time.
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {subnets.map((cidr) => (
+            <Button
+              key={cidr}
+              size="sm"
+              variant="outline"
+              disabled={busy}
+              onClick={() =>
+                start(async () => {
+                  const res = await proposeNetworkSweep({ cidr });
+                  setNote(res.message ?? null);
+                })
+              }
+            >
+              Scan {cidr}
+            </Button>
+          ))}
+        </div>
+        {note ? <p className="text-[11px] text-muted-foreground">{note}</p> : null}
+      </div>
+    );
+  }
+
+  return (
+    <Button size="sm" variant="outline" disabled={busy} onClick={look}>
+      {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <Radar className="size-3.5" aria-hidden="true" />}
+      Find machines on my network
     </Button>
   );
 }

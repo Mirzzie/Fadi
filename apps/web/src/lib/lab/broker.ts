@@ -10,6 +10,7 @@ import {
   createLabGrantsRepository,
 } from "@careeros/database";
 
+import { cidrLabel, hostsOf, parsePrivateCidr } from "./net";
 import {
   BREAKER_WINDOW_MINUTES,
   breakerState,
@@ -75,6 +76,7 @@ export const CAPABILITY_IDS = [
   "inspect.containers",
   "inspect.virtualisation",
   "inspect.host",
+  "inspect.network",
 ] as const;
 
 export type Capability = (typeof CAPABILITY_IDS)[number];
@@ -96,7 +98,21 @@ type FileStep = {
   content?: string;
 };
 
-type Step = Command | FileStep;
+/**
+ * An active network step.
+ *
+ * The range is stored as a canonical CIDR string and the host list is REGENERATED at
+ * execution from it. No list of addresses is ever stored or passed around — so there is
+ * nothing for a tampered row to add an address to, and what gets pinged is always exactly
+ * what the range check approved.
+ */
+type NetStep = { id: string; net: "sweep"; cidr: string };
+
+type Step = Command | FileStep | NetStep;
+
+function isNetStep(step: Step): step is NetStep {
+  return "net" in step;
+}
 
 function isFileStep(step: Step): step is FileStep {
   return "fs" in step;
@@ -109,6 +125,7 @@ function digest(text: string): string {
 
 /** How a step is shown to the person, and what the approval is compared against. */
 function displayOf(step: Step): string[] {
+  if (isNetStep(step)) return ["ping every host in", step.cidr];
   if (!isFileStep(step)) return [step.cmd, ...step.args];
   if (step.fs === "write") {
     return [
@@ -156,6 +173,25 @@ export const CAPABILITIES: Record<Capability, CapabilitySpec> = {
     limit: "Node's own os module. No process list, no filesystem, no network.",
     defaultMinutes: 120,
     commands: [],
+  },
+  /**
+   * PASSIVE discovery — reads what this machine already knows, sends nothing.
+   *
+   * Deliberately separated from the sweep. The ARP cache and the interface list cost
+   * nothing and touch nobody: they are a record of conversations this machine has already
+   * had. Sending packets to devices you may not own is a different act with a different
+   * consent, and merging the two would hide the second behind the first.
+   */
+  "inspect.network": {
+    summary:
+      "Read this machine's own network interfaces and the devices it has already talked to.",
+    limit:
+      "Passive — nothing is sent to anything. It reads the ARP cache and the interface list, which only show devices this machine already contacted.",
+    defaultMinutes: 120,
+    commands: [
+      { id: "interfaces", cmd: "ip", args: ["-o", "-4", "addr", "show", "scope", "global"] },
+      { id: "neighbours", cmd: "ip", args: ["neigh", "show"] },
+    ],
   },
 };
 
@@ -299,6 +335,7 @@ export async function requestCapability(input: {
  * ------------------------------------------------------------------------- */
 
 export const RECIPE_IDS = [
+  "network.sweep",
   "container.run",
   "container.stop",
   "container.remove",
@@ -478,6 +515,39 @@ export const RECIPES: Record<RecipeId, Recipe> = {
     // of comforting sentence that gets someone's work destroyed.
     reversal: () => "Not reversible — this does not keep a copy.",
     render: (p) => [{ id: "remove", fs: "remove", path: String(p.path) }],
+  },
+
+  /**
+   * ACTIVE sweep — the first thing Fadi does that reaches devices the user may not own.
+   *
+   * Approved per scan rather than granted for a window, on purpose. A time-boxed grant to
+   * sweep the network is a window in which something can sweep it repeatedly, and the
+   * repetition is the part that matters: one scan is a person looking for their Proxmox
+   * box, a hundred is reconnaissance.
+   */
+  "network.sweep": {
+    blast: "remote",
+    // Nothing is changed anywhere. It is still typed out, because "reversible" is not the
+    // same as "harmless" — a sweep is visible to anything watching the network, and on a
+    // network that is not yours it is the sort of thing that gets noticed.
+    reversibility: "reversible",
+    confirmToken: (p) => String(p.cidr),
+    validate: (raw) => {
+      const parsed = parsePrivateCidr(str(raw.cidr) ?? "");
+      if (!parsed.ok) return null;
+      // Normalised: a host address given inside the subnet becomes the network address,
+      // so what the person confirms and what is swept cannot drift apart.
+      return { cidr: cidrLabel(parsed.base, parsed.prefix), hosts: parsed.hosts };
+    },
+    summary: (p) =>
+      "Ping all " +
+      p.hosts +
+      " addresses in " +
+      p.cidr +
+      " to find what is on your network. Nothing is changed on any device.",
+    reversal: () =>
+      "Nothing to undo — but the scan is visible to anything watching the network, and that cannot be taken back.",
+    render: (p) => [{ id: "sweep", net: "sweep", cidr: String(p.cidr) }],
   },
 
   "container.stop": {
@@ -699,6 +769,49 @@ export async function proposeAction(input: {
   };
 }
 
+/**
+ * The sweep itself.
+ *
+ * Pings each host with a short timeout and bounded concurrency. Every address is GENERATED
+ * from the approved range — none comes from input, none is stored — so `ping` is only ever
+ * handed an address this file computed.
+ *
+ * The range is re-checked here even though it was checked at proposal, because the row it
+ * came from could have been edited in between, and a check that runs only on the way in is
+ * a check that trusts storage.
+ */
+async function runNetStep(step: NetStep): Promise<string> {
+  const parsed = parsePrivateCidr(step.cidr);
+  if (!parsed.ok) throw new Error(parsed.reason);
+
+  const hosts = hostsOf(parsed.base, parsed.prefix);
+  const alive: string[] = [];
+  const CONCURRENCY = 32;
+
+  for (let i = 0; i < hosts.length; i += CONCURRENCY) {
+    const batch = hosts.slice(i, i + CONCURRENCY);
+    await Promise.all(
+      batch.map(async (host) => {
+        try {
+          // One packet, one second. Fixed argv; `host` is a dotted quad this file built.
+          await run("ping", ["-c", "1", "-W", "1", host], { timeout: 3000, maxBuffer: 16 * 1024 });
+          alive.push(host);
+        } catch {
+          // Silent, unreachable, or simply not there. All the same answer.
+        }
+      }),
+    );
+  }
+
+  alive.sort((a, b) => (ipToIntSafe(a) ?? 0) - (ipToIntSafe(b) ?? 0));
+  return alive.length ? alive.length + " responded: " + alive.join(", ") : "Nothing responded in " + step.cidr + ".";
+}
+
+function ipToIntSafe(ip: string): number | null {
+  const parts = ip.split(".").map(Number);
+  return parts.length === 4 ? ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0 : null;
+}
+
 async function runCommand(c: Command): Promise<string> {
   const { stdout } = await run(c.cmd, c.args, { timeout: 60_000, maxBuffer: 512 * 1024 });
   return (stdout.split("\n")[0] ?? "").trim();
@@ -848,7 +961,11 @@ export async function approveAndRun(input: {
   const out: string[] = [];
   for (const c of commands) {
     try {
-      const result = isFileStep(c) ? await runFileStep(input.userId, c) : await runCommand(c);
+      const result = isNetStep(c)
+        ? await runNetStep(c)
+        : isFileStep(c)
+          ? await runFileStep(input.userId, c)
+          : await runCommand(c);
       out.push(result);
       await audit.record({
         userId: input.userId,

@@ -374,3 +374,79 @@ export async function setWorkspace(input: {
   });
   return { ok: true, root: resolved };
 }
+
+/* ---------------------------------------------------------------------------
+ * FINDING MACHINES ON THE NETWORK.
+ * ------------------------------------------------------------------------- */
+
+/**
+ * What this machine already knows about the network — passive, nothing sent.
+ *
+ * Offered before the sweep, and separately from it, because it is often enough: the
+ * router, the docker bridges, anything this machine has spoken to recently. Suggesting a
+ * scan first would be asking for a bigger permission than the question needs.
+ */
+export async function readNetwork(): Promise<{
+  ok: boolean;
+  subnets?: string[];
+  known?: string[];
+  needsGrant?: { capability: string; summary: string; limit: string };
+  message?: string;
+}> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  const { CAPABILITIES, requestCapability } = await import("@/lib/lab/broker");
+  const res = await requestCapability({
+    userId: user.id,
+    capability: "inspect.network",
+    actor: "user",
+    origin: "dashboard:find_machines",
+  });
+
+  if (!res.ok) {
+    if (res.needsGrant) {
+      const spec = CAPABILITIES["inspect.network"];
+      return {
+        ok: true,
+        needsGrant: { capability: "inspect.network", summary: spec.summary, limit: spec.limit },
+      };
+    }
+    return { ok: false, message: res.message };
+  }
+
+  // "192.168.0.25/24" from the interface line — the subnet to offer as a sweep range.
+  const subnets = (res.results.interfaces ?? "")
+    .split("\n")
+    .map((line) => line.trim().split(/\s+/)[3] ?? "")
+    .filter((cidr) => /^\d{1,3}(\.\d{1,3}){3}\/\d{1,2}$/.test(cidr));
+
+  const known = (res.results.neighbours ?? "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && !line.includes("FAILED") && !line.startsWith("fe80"))
+    .map((line) => line.split(/\s+/)[0]);
+
+  return { ok: true, subnets, known };
+}
+
+/** Ask to sweep a range. Proposes only — the scan runs after you approve it. */
+export async function proposeNetworkSweep(input: {
+  cidr: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  const { proposeAction } = await import("@/lib/lab/broker");
+  const res = await proposeAction({
+    userId: user.id,
+    recipe: "network.sweep",
+    params: { cidr: input.cidr },
+    actor: "user",
+    origin: "dashboard:find_machines",
+  });
+
+  return res.ok
+    ? { ok: true, message: "Asked. Approve it under Machine access — nothing has been sent yet." }
+    : { ok: false, message: res.message };
+}

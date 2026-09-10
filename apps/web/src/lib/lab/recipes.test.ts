@@ -299,7 +299,8 @@ describe("the catalogue itself stays safe as it grows", () => {
         recipe.validate({ image: "nginx", name: "x", port: 8080 }) ??
         recipe.validate({ name: "x" }) ??
         recipe.validate({ path: "dir/file.txt", content: "x" }) ??
-        recipe.validate({ path: "dir/file.txt" });
+        recipe.validate({ path: "dir/file.txt" }) ??
+        recipe.validate({ cidr: "192.168.0.0/24" });
       expect(params, `${id} should accept a legal parameter bag`).not.toBeNull();
       for (const step of recipe.render(params!)) {
         // File steps carry no flags at all, which is itself the point: there is no argv
@@ -495,3 +496,45 @@ describe("THE BUG: ordinary proposals must not look hostile", () => {
     expect(record.mock.calls.every((c) => c[0].decision === "proposed")).toBe(true);
   });
 })
+
+describe("the network sweep cannot be pointed off your own network", () => {
+  it("REFUSES a public range, so an injected instruction gets nowhere", async () => {
+    for (const cidr of ["8.8.8.0/24", "1.1.1.0/24", "0.0.0.0/0", "10.0.0.0/8"]) {
+      const res = await propose_({ cidr }, "network.sweep");
+      expect(res.ok, cidr).toBe(false);
+      // Not even a prompt is created — the person is never asked to approve it.
+      expect(propose).not.toHaveBeenCalled();
+    }
+  });
+
+  it("accepts a private subnet and normalises it", async () => {
+    // Given a host address inside the subnet, what gets confirmed is the network address,
+    // so the range shown and the range swept cannot differ.
+    const res = await propose_({ cidr: "192.168.0.25/24" }, "network.sweep");
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.confirmToken).toBe("192.168.0.0/24");
+      expect(res.argv[0].join(" ")).toContain("192.168.0.0/24");
+      expect(res.summary).toContain("254");
+    }
+  });
+
+  it("must be typed out, and says plainly that a scan cannot be unseen", async () => {
+    const res = await propose_({ cidr: "192.168.0.0/24" }, "network.sweep");
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.policy.confirm).toBe("type-name");
+      // "Reversible" is not the same as "harmless", and the copy must not imply it is.
+      expect(res.reversal).toMatch(/visible to anything watching/i);
+    }
+  });
+
+  it("stores only the range, never a list of addresses", async () => {
+    await propose_({ cidr: "192.168.0.0/24" }, "network.sweep");
+    const row = propose.mock.calls[0][0];
+    const serialised = JSON.stringify(row);
+    // If a host list were stored, a tampered row could add an address outside the range.
+    expect(serialised).not.toContain("192.168.0.1\"");
+    expect(JSON.stringify(row.params)).toContain("192.168.0.0/24");
+  });
+});
