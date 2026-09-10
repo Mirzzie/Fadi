@@ -1,5 +1,6 @@
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { logger } from "@/lib/observability/logger";
+import { consumeAiSpendLimit } from "@/lib/security/ai-spend";
 import { synthesizeFadiSpeech } from "@/lib/voice/tts";
 
 /** Fadi's premium voice — neural TTS from the user's Groq/OpenAI key. Returns
@@ -17,6 +18,20 @@ export async function POST(req: Request) {
     /* bad body */
   }
   if (!text.trim()) return new Response("No text", { status: 400 });
+
+  const spend = await consumeAiSpendLimit({
+    userId: user.id,
+    operation: "speech-synthesis",
+    perUserLimit: 60,
+    globalLimit: 600,
+    windowMs: 5 * 60 * 1000,
+  });
+  if (!spend.allowed) {
+    return Response.json(
+      { error: "Too much speech generated too quickly.", retryAfterSeconds: spend.retryAfterSeconds },
+      { status: 429 },
+    );
+  }
 
   try {
     const out = await synthesizeFadiSpeech(user.id, text);
