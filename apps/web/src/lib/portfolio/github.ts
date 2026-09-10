@@ -203,11 +203,29 @@ export class GitHubClient {
    * is exactly its selected set — so it doubles as "what can I publish to?", which is the
    * whole point of showing a picker instead of a blind name field.
    */
-  async listRepos(): Promise<Array<{ name: string; fullName: string; private: boolean }>> {
+  async listRepos(): Promise<
+    Array<{
+      name: string;
+      fullName: string;
+      private: boolean;
+      // Kept for evidence capture. The picker only reads `name`, but a repository is
+      // also an artefact — dated, attributable, and linkable — and throwing this away
+      // meant re-fetching every repo to learn anything about it.
+      description: string | null;
+      language: string | null;
+      topics: string[];
+      url: string | null;
+      fork: boolean;
+      archived: boolean;
+      createdAt: string | null;
+      pushedAt: string | null;
+      stars: number;
+    }>
+  > {
     // Paginate. A single page caps at 100, and "the repo I wanted wasn't in the list" is
     // indistinguishable from "the token can't see it" — so walk until GitHub runs out.
     // Bounded at 10 pages so a pathological account can't stall the picker.
-    const out: Array<{ name: string; fullName: string; private: boolean }> = [];
+    const out: Awaited<ReturnType<GitHubClient["listRepos"]>> = [];
     for (let page = 1; page <= 10; page += 1) {
       const { status, data } = await this.request(
         "GET",
@@ -223,6 +241,15 @@ export class GitHubClient {
           name: String(r.name),
           fullName: String(r.full_name ?? r.name),
           private: r.private === true,
+          description: typeof r.description === "string" ? r.description : null,
+          language: typeof r.language === "string" ? r.language : null,
+          topics: Array.isArray(r.topics) ? r.topics.filter((t): t is string => typeof t === "string") : [],
+          url: typeof r.html_url === "string" ? r.html_url : null,
+          fork: r.fork === true,
+          archived: r.archived === true,
+          createdAt: typeof r.created_at === "string" ? r.created_at : null,
+          pushedAt: typeof r.pushed_at === "string" ? r.pushed_at : null,
+          stars: typeof r.stargazers_count === "number" ? r.stargazers_count : 0,
         });
       }
       if (rows.length < 100) break;
