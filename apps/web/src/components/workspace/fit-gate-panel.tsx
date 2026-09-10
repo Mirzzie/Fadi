@@ -12,6 +12,11 @@ const VERDICT_META: Record<FitVerdict, { label: string; cls: string; bar: string
   apply: { label: "Worth applying", cls: "text-emerald-300 border-emerald-500/40 bg-emerald-500/10", bar: "bg-emerald-400" },
   stretch: { label: "A stretch", cls: "text-amber-300 border-amber-500/40 bg-amber-500/10", bar: "bg-amber-400" },
   skip: { label: "Probably skip", cls: "text-rose-300 border-rose-500/40 bg-rose-500/10", bar: "bg-rose-400" },
+  // Gate outcomes, deliberately not on the green→red scale: they are the absence of a
+  // recommendation, not a weak one. Rendering "blocked" as a slightly worse "skip"
+  // would put it back on the axis the gate exists to leave.
+  check: { label: "Needs checking", cls: "text-sky-300 border-sky-500/40 bg-sky-500/10", bar: "bg-sky-400" },
+  blocked: { label: "Ruled out", cls: "text-rose-200 border-rose-500/60 bg-rose-500/20", bar: "bg-rose-500" },
 };
 
 export function FitGatePanel({

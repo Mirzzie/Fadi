@@ -7,7 +7,7 @@
 | Point | Verdict | Fix |
 |---|---|---|
 | D04b — two human versions both promote | **confirmed** | planned state now advances after each admission |
-| Only `mergeInto` was transactional | **confirmed; my claim was over-scoped** | both admission paths now transactional |
+| Only `mergeInto` was transactional | **confirmed; my claim was over-scoped** | `admitEvidence` now transactional; `admitEvidenceBatch` still open |
 | The five invariant tests exercise copied logic | **confirmed, and worse than you said** | real-database integration test added |
 | D03's fallback can still return the obsolete row | **confirmed** | promotion returns what it inserted; absorb returns null on read failure |
 

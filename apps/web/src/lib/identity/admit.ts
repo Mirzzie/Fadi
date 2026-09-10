@@ -348,10 +348,12 @@ export async function admitEvidence(
   // admission was not, so the earlier "fixed in one transaction" claim covered merge
   // only. It covers both now.
   //
-  // Demote first, promote second, matching mergeInto — a reader observing an
-  // intermediate state briefly sees zero canonicals rather than two, and zero is the
-  // state the surrounding code already treats as "nothing to show" rather than
-  // silently picking one of two leaders.
+  // Demote first, promote second, matching mergeInto. NOT because a reader sees the
+  // intermediate state — external readers never observe uncommitted work, and claiming
+  // they do was wrong (Codex). The order matters because it is what lets a uniqueness
+  // constraint hold at every statement boundary, and because the transaction's own
+  // later statements see its earlier writes. Atomicity still does not serialise two
+  // concurrent promotions of the same fact; that needs locking, and is open.
   const takesLead = admission.decision === "update";
   const inserted = await getDatabase().transaction(async (tx) => {
     const txRepo = createEvidenceRepository(tx);
