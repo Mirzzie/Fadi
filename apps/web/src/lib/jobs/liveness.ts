@@ -14,6 +14,43 @@ const LIVENESS_TTL_SECONDS = 10 * 60;
 const FETCH_TIMEOUT_MS = 4000;
 const MAX_BODY_BYTES = 24 * 1024; // enough to catch a banner/headline, not the whole page
 
+/**
+ * Read only the response prefix needed by the liveness detector.
+ *
+ * `arrayBuffer().slice(...)` placed the limit after the download, so a server could
+ * still make Fadi buffer an arbitrarily large body. Cancel the stream as soon as the
+ * bounded prefix is available. The streaming decoder preserves a multibyte character
+ * split across network chunks.
+ */
+export async function readBodyPrefix(
+  body: ReadableStream<Uint8Array> | null,
+  maxBytes = MAX_BODY_BYTES,
+): Promise<string> {
+  if (!body || maxBytes <= 0) return "";
+  const reader = body.getReader();
+  const decoder = new TextDecoder("utf-8", { fatal: false });
+  let read = 0;
+  let text = "";
+
+  try {
+    while (read < maxBytes) {
+      const next = await reader.read();
+      if (next.done) break;
+      const remaining = maxBytes - read;
+      const chunk = next.value.byteLength > remaining ? next.value.subarray(0, remaining) : next.value;
+      read += chunk.byteLength;
+      text += decoder.decode(chunk, { stream: true });
+      if (next.value.byteLength > remaining || read === maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        break;
+      }
+    }
+    return text + decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 async function readCache(url: string): Promise<PostingLiveness | null> {
   try {
     const raw = await getKv().get(`liveness:${url}`);
@@ -71,8 +108,7 @@ export async function checkPostingLiveness(url: string): Promise<PostingLiveness
 
     let snippet = "";
     try {
-      const buf = await res.arrayBuffer();
-      snippet = new TextDecoder("utf-8", { fatal: false }).decode(buf.slice(0, MAX_BODY_BYTES));
+      snippet = await readBodyPrefix(res.body);
     } catch {
       snippet = "";
     }
