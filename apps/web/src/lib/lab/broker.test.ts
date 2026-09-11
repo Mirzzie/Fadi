@@ -155,7 +155,11 @@ describe("with a grant", () => {
 
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.unavailable.length).toBeGreaterThan(0);
-    expect(record.mock.calls.some((c) => c[0].decision === "error")).toBe(true);
+    // "unavailable", not "error". Most machines have some of these tools and not others,
+    // and a log painted red for "podman isn't installed" teaches people to ignore red.
+    // It is still recorded — "Fadi tried and the machine said no" is worth seeing.
+    expect(record.mock.calls.some((c) => c[0].decision === "unavailable")).toBe(true);
+    expect(record.mock.calls.some((c) => c[0].decision === "error")).toBe(false);
   });
 });
 

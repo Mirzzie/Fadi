@@ -342,7 +342,9 @@ export async function requestCapability(input: {
         capability,
         resourceId,
         command: [c.cmd, ...c.args].join(" "),
-        decision: "error",
+        // Not an error. Most machines have some of these tools and not others, and a log
+        // full of red for "podman isn't installed" trains people to ignore red.
+        decision: "unavailable",
         detail: "Not available on this machine.",
         durationMs: Date.now() - started,
       });
@@ -877,7 +879,7 @@ export async function proposeAction(input: {
       actor: input.actor,
       origin: input.origin,
       capability: input.recipe,
-      decision: "denied",
+      decision: "rejected",
       detail: "Parameters rejected: " + JSON.stringify(input.params).slice(0, 160),
     });
     return { ok: false, message: "Those aren't parameters Fadi can express safely." };
@@ -1227,7 +1229,7 @@ export async function approveAndRun(input: {
           actor: "user",
           origin: "approval",
           capability: preview.recipe,
-          decision: "denied",
+          decision: "rejected",
           detail: "Confirmation did not match. Nothing ran.",
         });
         return {
@@ -1269,7 +1271,7 @@ export async function approveAndRun(input: {
           actor: "user",
           origin: "approval",
           capability: preview.recipe,
-          decision: "denied",
+          decision: "held",
           detail: "Held: the situation changed since you read it. " + changed[0].text,
         });
         return {

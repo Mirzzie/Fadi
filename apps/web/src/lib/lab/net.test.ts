@@ -163,3 +163,48 @@ describe("identifying a single host", () => {
     expect(guessKind([12345])).toBeNull();
   });
 });
+
+describe("offering a range the sweeper will actually accept", () => {
+  it("passes a normal /24 through untouched", async () => {
+    const { sweepableRange } = await import("./net");
+    const res = sweepableRange("192.168.0.25/24");
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.cidr).toBe("192.168.0.0/24");
+      expect(res.narrowedFrom).toBeUndefined();
+    }
+  });
+
+  it("NARROWS a Docker bridge instead of offering a scan that cannot run", async () => {
+    const { sweepableRange } = await import("./net");
+    // The reported bug: the panel listed every interface as a "Scan this" button,
+    // including 172.19.0.1/16, which the validator refuses — and the refusal was then
+    // shown as a blocked attempt, so a UI mistake looked like a security event.
+    for (const bridge of ["172.19.0.1/16", "172.18.0.1/16", "172.17.0.1/16"]) {
+      const res = sweepableRange(bridge);
+      expect(res.ok, bridge).toBe(true);
+      if (res.ok) {
+        expect(res.cidr).toMatch(/\/24$/);
+        // The narrowing is disclosed. Scanning something other than what the button says
+        // would be worse than refusing.
+        expect(res.narrowedFrom).toBe(bridge);
+      }
+    }
+  });
+
+  it("narrows around the host address, not to the start of the /16", async () => {
+    const { sweepableRange } = await import("./net");
+    const res = sweepableRange("10.8.3.7/8");
+    expect(res.ok).toBe(true);
+    // The interesting addresses are the ones near this machine.
+    if (res.ok) expect(res.cidr).toBe("10.8.3.0/24");
+  });
+
+  it("only WIDTH is negotiable — a public range stays refused however it is sliced", async () => {
+    const { sweepableRange } = await import("./net");
+    for (const cidr of ["8.8.8.8/8", "1.1.1.1/16", "203.0.113.5/16"]) {
+      const res = sweepableRange(cidr);
+      expect(res.ok, cidr).toBe(false);
+    }
+  });
+});

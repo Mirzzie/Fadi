@@ -186,3 +186,46 @@ export function guessKind(openPorts: number[]): { kind: string; virtualization: 
 export function cidrLabel(base: number, prefix: number): string {
   return intToIp(base) + "/" + prefix;
 }
+
+
+export type Sweepable =
+  | { ok: true; cidr: string; narrowedFrom?: string }
+  | { ok: false; reason: string };
+
+/**
+ * Turn an interface address into a range Fadi will actually sweep.
+ *
+ * The bug this fixes: the panel listed every interface CIDR as a "Scan this" button,
+ * including the Docker bridges at /16. The validator refuses anything wider than /22, so
+ * those buttons could only ever fail — and the failure was then displayed as a blocked
+ * attempt, which made a UI mistake look like a security event.
+ *
+ * A /16 bridge does not need refusing, it needs NARROWING. The interesting part of
+ * 172.19.0.1/16 is the /24 the host actually sits on; sweeping the other 65,000 addresses
+ * would take an hour to discover nothing. So the range is narrowed around the host address
+ * and the narrowing is disclosed, because silently scanning something other than what the
+ * button said would be worse than refusing.
+ */
+export function sweepableRange(interfaceCidr: string): Sweepable {
+  const direct = parsePrivateCidr(interfaceCidr);
+  if (direct.ok) return { ok: true, cidr: cidrLabel(direct.base, direct.prefix) };
+
+  const match = /^(\d{1,3}(?:\.\d{1,3}){3})\/(\d{1,2})$/.exec((interfaceCidr ?? "").trim());
+  if (!match) return { ok: false, reason: direct.reason };
+
+  const addr = ipToInt(match[1]);
+  const prefix = Number(match[2]);
+  if (addr === null) return { ok: false, reason: direct.reason };
+
+  // Only width is negotiable. A public range stays refused however it is sliced.
+  if (prefix >= MIN_PREFIX) return { ok: false, reason: direct.reason };
+
+  const narrowed = parsePrivateCidr(intToIp(addr) + "/24");
+  if (!narrowed.ok) return { ok: false, reason: narrowed.reason };
+
+  return {
+    ok: true,
+    cidr: cidrLabel(narrowed.base, narrowed.prefix),
+    narrowedFrom: interfaceCidr,
+  };
+}

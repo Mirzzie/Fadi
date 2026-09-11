@@ -709,6 +709,15 @@ export const userAiSettings = pgTable(
 // propositions. Optionally tied to a specific job/application. Rich-text body
 // stored as `content`; exported to PDF/DOCX on demand. Saved, versionable,
 // downloadable — the backbone of the document workspace.
+export type DocumentRevisionSnapshot = {
+  title: string;
+  content: string;
+  format: string;
+  template: string | null;
+  jobContext: Record<string, unknown>;
+  metadata: Record<string, unknown>;
+};
+
 export const documents = pgTable(
   "documents",
   {
@@ -728,6 +737,9 @@ export const documents = pgTable(
     kind: text("kind").notNull(), // resume | cover_letter | email | value_proposition | note
     title: text("title").notNull(),
     content: text("content").notNull().default(""),
+    // Incremented by every accepted save. Editors send the version they loaded so
+    // an older tab cannot silently replace a newer edit.
+    version: integer("version").notNull().default(1),
     format: text("format").notNull().default("richtext"), // richtext | markdown | plain
     template: text("template"), // selected resume/letter template id
     // Pasted job context for paste-a-JD workspaces (company, role, raw JD).
@@ -742,6 +754,29 @@ export const documents = pgTable(
     index("documents_user_updated_at_idx").on(table.userId, table.updatedAt),
     // The Documents library filters by the active track on every load.
     index("documents_user_career_profile_idx").on(table.userId, table.careerProfileId),
+  ]
+);
+
+// Immutable snapshots of every accepted document version. Keeping the snapshot
+// beside the compare-and-save counter makes conflict prevention recoverable: a
+// successful overwrite is never the only surviving copy of the prior wording.
+export const documentRevisions = pgTable(
+  "document_revisions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    documentId: uuid("document_id")
+      .notNull()
+      .references(() => documents.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    version: integer("version").notNull(),
+    snapshot: jsonb("snapshot").$type<DocumentRevisionSnapshot>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("document_revisions_document_version_idx").on(table.documentId, table.version),
+    index("document_revisions_user_document_idx").on(table.userId, table.documentId),
   ]
 );
 
@@ -1150,11 +1185,28 @@ export const labActions = pgTable(
     /** The exact argv that ran, for a person to read afterwards. */
     command: text("command"),
     /**
-     * allowed | denied | error | proposed
+     * What happened, and the distinctions here are load-bearing.
      *
-     * `proposed` is its own state on purpose. It means Fadi asked and is waiting — nothing
-     * has happened. Recording it as `denied` (nothing ran, after all) made the circuit
-     * breaker count ordinary proposals as hostile and revoke the user's permissions.
+     *   allowed     — it ran.
+     *   denied      — FADI WANTED SOMETHING AND WAS NOT PERMITTED. The only security
+     *                 signal in this list. The monitor's alarm counts these and nothing
+     *                 else; the circuit breaker counts these by non-human actors.
+     *   declined    — THE PERSON said no. Not a security event: it is the system working
+     *                 exactly as designed, and alarming someone about their own decision
+     *                 teaches them to ignore the alarm.
+     *   rejected    — the request was malformed or out of bounds (a range too wide, a
+     *                 package not on the list). Validation feedback, not an attack.
+     *   unavailable — the tool is not installed on this machine. Not an error; most
+     *                 machines have some of these and not others.
+     *   held        — refused for now because the situation changed since it was read.
+     *   proposed    — Fadi asked and is waiting. Nothing has happened.
+     *   error       — it ran and failed.
+     *
+     * Two of these exist because of bugs this column caused. `proposed` was recorded as
+     * `denied` ("nothing ran, after all"), which made the breaker treat ordinary proposals
+     * as hostile and revoke the user's permissions. `declined` and `rejected` were also
+     * recorded as `denied`, so the monitor showed a person's own declined prompts back to
+     * them under "blocked attempts — if you did not start these, revoke everything".
      */
     decision: text("decision").notNull(),
     /** Why it was denied, or what it produced. */
@@ -1501,6 +1553,7 @@ export type NewUserAiSettings = typeof userAiSettings.$inferInsert;
 export type AgentMessage = typeof agentMessages.$inferSelect;
 export type Document = typeof documents.$inferSelect;
 export type NewDocument = typeof documents.$inferInsert;
+export type DocumentRevision = typeof documentRevisions.$inferSelect;
 export type ResumeTemplateRow = typeof resumeTemplates.$inferSelect;
 export type AgentRun = typeof agentRuns.$inferSelect;
 export type AgentFinding = typeof agentFindings.$inferSelect;

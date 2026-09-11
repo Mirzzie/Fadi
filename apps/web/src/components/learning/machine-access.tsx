@@ -245,11 +245,15 @@ export function MachineAccess() {
               <li key={a.id} className="flex flex-wrap items-baseline gap-1.5">
                 <span
                   className={
+                    // Only a real denial is coloured as one. Everything that is not
+                    // "Fadi was refused" and not "it ran" is quiet — declining a prompt,
+                    // a range that was too wide, a tool that is not installed. Colouring
+                    // those as alarms is how someone learns to ignore the colour.
                     a.decision === "denied"
                       ? "text-amber-600"
-                      : a.decision === "error" || a.decision === "proposed"
-                        ? "text-muted-foreground"
-                        : "text-emerald-600"
+                      : a.decision === "allowed"
+                        ? "text-emerald-600"
+                        : "text-muted-foreground"
                   }
                 >
                   {a.decision}

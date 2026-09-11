@@ -22,6 +22,7 @@ const approve = vi.fn();
 const finish = vi.fn();
 const createdNames = vi.fn();
 const revise = vi.fn();
+const findLiveForBroker = vi.fn();
 const get = vi.fn();
 const executedLastHour = vi.fn();
 const denialsSince = vi.fn();
@@ -37,7 +38,7 @@ vi.mock("@/lib/observability/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 vi.mock("@careeros/database", () => ({
-  createLabGrantsRepository: () => ({ findLive: vi.fn(), revokeAll }),
+  createLabGrantsRepository: () => ({ findLive: findLiveForBroker, revokeAll }),
   createLabActionsRepository: () => ({ record, denialsSince }),
   createLabActionRequestsRepository: () => ({
     propose,
@@ -60,6 +61,8 @@ beforeEach(() => {
   get.mockReset();
   executedLastHour.mockReset();
   revise.mockReset();
+  findLiveForBroker.mockReset();
+  findLiveForBroker.mockResolvedValue(null);
   denialsSince.mockReset();
   revokeAll.mockReset();
   createdNames.mockResolvedValue([]);
@@ -136,7 +139,12 @@ describe("a proposal cannot express a command that is not in the file", () => {
   it("logs rejected parameters — a model that keeps failing validation is worth seeing", async () => {
     await propose_({ image: "nginx", name: "web; rm -rf /" });
     expect(record).toHaveBeenCalledTimes(1);
-    expect(record.mock.calls[0][0].decision).toBe("denied");
+    // "rejected", not "denied": the request was malformed, which is validation feedback
+    // rather than "Fadi wanted something and was refused". It is still LOGGED, because a
+    // model repeatedly submitting parameters that fail validation is worth seeing — it
+    // just does not belong in the alarm that says "if you did not start these, revoke
+    // everything".
+    expect(record.mock.calls[0][0].decision).toBe("rejected");
     expect(record.mock.calls[0][0].actor).toBe("model");
   });
 });
@@ -701,5 +709,46 @@ describe("approving an effect that has since changed", () => {
     expect(revise).not.toHaveBeenCalled();
     vi.doUnmock("./preflight");
     vi.resetModules();
+  });
+});
+
+describe("THE REPORTED BUG: the monitor showed a person their own decisions as attacks", () => {
+  it("a rejected parameter is 'rejected', not a denial", async () => {
+    // Screenshot from the owner: "11 blocked attempts", five of which were their own
+    // declines and their own too-wide scan requests, under the words "if you did not start
+    // these, revoke everything". Alarming someone about their own deliberate action is how
+    // an alarm stops being read.
+    await propose_({ cidr: "172.19.0.1/16" }, "network.sweep");
+
+    const row = record.mock.calls[0][0];
+    expect(row.decision).toBe("rejected");
+    expect(row.decision).not.toBe("denied");
+  });
+
+  it("an unknown recipe IS a denial — that one is real", async () => {
+    await propose_({}, "shell.exec");
+    expect(record.mock.calls[0][0].decision).toBe("denied");
+  });
+
+  it("no live grant IS a denial", async () => {
+    findLiveForBroker.mockResolvedValue(null);
+    const { requestCapability } = await import("./broker");
+    await requestCapability({ userId: "u1", capability: "inspect.host", actor: "model", origin: "t" });
+    expect(record.mock.calls.some((c) => c[0].decision === "denied")).toBe(true);
+  });
+
+  it("a mistyped confirmation is the person, not an attacker", async () => {
+    get.mockResolvedValue({
+      id: "req-1",
+      recipe: "container.remove",
+      params: { name: "web" },
+      argv: [["docker", "rm", "-f", "fadi-web"]],
+    });
+    const { approveAndRun } = await import("./broker");
+
+    await approveAndRun({ userId: "u1", requestId: "req-1", confirmation: "wrong" });
+
+    expect(record.mock.calls.some((c) => c[0].decision === "rejected")).toBe(true);
+    expect(record.mock.calls.some((c) => c[0].decision === "denied")).toBe(false);
   });
 });

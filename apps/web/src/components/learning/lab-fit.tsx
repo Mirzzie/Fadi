@@ -406,7 +406,7 @@ function DetectHere({ onSaved }: { onSaved: () => void }) {
  */
 function FindOnNetwork() {
   const [known, setKnown] = useState<string[] | null>(null);
-  const [subnets, setSubnets] = useState<string[]>([]);
+  const [subnets, setSubnets] = useState<Array<{ cidr: string; narrowedFrom?: string }>>([]);
   const [ask, setAsk] = useState<{ summary: string; limit: string } | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, start] = useTransition();
@@ -471,20 +471,25 @@ function FindOnNetwork() {
           approve one scan at a time.
         </p>
         <div className="flex flex-wrap gap-1.5">
-          {subnets.map((cidr) => (
+          {subnets.map((s) => (
             <Button
-              key={cidr}
+              key={s.cidr}
               size="sm"
               variant="outline"
               disabled={busy}
+              // The narrowing is disclosed in the label rather than applied quietly —
+              // scanning something other than what the button said would be worse than
+              // refusing to scan at all.
+              title={s.narrowedFrom ? "Narrowed from " + s.narrowedFrom + ", which is too wide to sweep" : undefined}
               onClick={() =>
                 start(async () => {
-                  const res = await proposeNetworkSweep({ cidr });
+                  const res = await proposeNetworkSweep({ cidr: s.cidr });
                   setNote(res.message ?? null);
                 })
               }
             >
-              Scan {cidr}
+              Scan {s.cidr}
+              {s.narrowedFrom ? " (of " + s.narrowedFrom.split("/")[1] + "-wide)" : ""}
             </Button>
           ))}
         </div>

@@ -161,7 +161,9 @@ export async function revokeCapability(input: {
     actor: "user",
     origin: "dashboard:permissions",
     capability: parsed.data,
-    decision: "denied",
+    // The user successfully did something. It was recorded as "denied" and therefore
+    // appeared in the monitor as an attempt someone had blocked.
+    decision: "allowed",
     detail: "Revoked by you — " + closed + " grant(s) closed.",
   });
   return { ok: true };
@@ -369,14 +371,21 @@ export async function denyAction(input: {
   }
 
   const db = getDatabase();
-  await createLabActionRequestsRepository(db).deny(user.id, input.requestId);
+  const requests = createLabActionRequestsRepository(db);
+  // Read it first so the row names WHAT was declined. "you asked for action.deny" is not a
+  // sentence about anything; "you declined container.remove" is.
+  const request = await requests.get(user.id, input.requestId);
+  await requests.deny(user.id, input.requestId);
   await createLabActionsRepository(db).record({
     userId: user.id,
     actor: "user",
     origin: "dashboard:permissions",
-    capability: "action.deny",
-    decision: "denied",
-    detail: "You declined this request.",
+    capability: request?.recipe ?? "unknown",
+    // DECLINED, not denied. A person saying no is the system working, and showing it back
+    // to them under "blocked attempts — if you did not start these, revoke everything" is
+    // how an alarm gets ignored.
+    decision: "declined",
+    detail: "You declined this.",
   });
   return { ok: true };
 }
@@ -468,7 +477,8 @@ export async function setWorkspace(input: {
  */
 export async function readNetwork(): Promise<{
   ok: boolean;
-  subnets?: string[];
+  /** Ranges Fadi will actually sweep, narrowed from the interface where necessary. */
+  subnets?: Array<{ cidr: string; narrowedFrom?: string }>;
   known?: string[];
   needsGrant?: { capability: string; summary: string; limit: string };
   message?: string;
@@ -495,11 +505,20 @@ export async function readNetwork(): Promise<{
     return { ok: false, message: res.message };
   }
 
-  // "192.168.0.25/24" from the interface line — the subnet to offer as a sweep range.
-  const subnets = (res.results.interfaces ?? "")
-    .split("\n")
-    .map((line) => line.trim().split(/\s+/)[3] ?? "")
-    .filter((cidr) => /^\d{1,3}(\.\d{1,3}){3}\/\d{1,2}$/.test(cidr));
+  // "192.168.0.25/24" from the interface line, narrowed to something Fadi will actually
+  // sweep. Offering a button for a /16 bridge that the validator then refuses turned a UI
+  // mistake into what looked like a security event.
+  const { sweepableRange } = await import("@/lib/lab/net");
+  const seen = new Set<string>();
+  const subnets: Array<{ cidr: string; narrowedFrom?: string }> = [];
+  for (const line of (res.results.interfaces ?? "").split("\n")) {
+    const raw = line.trim().split(/\s+/)[3] ?? "";
+    if (!/^\d{1,3}(\.\d{1,3}){3}\/\d{1,2}$/.test(raw)) continue;
+    const range = sweepableRange(raw);
+    if (!range.ok || seen.has(range.cidr)) continue;
+    seen.add(range.cidr);
+    subnets.push({ cidr: range.cidr, narrowedFrom: range.narrowedFrom });
+  }
 
   const known = (res.results.neighbours ?? "")
     .split("\n")
