@@ -153,12 +153,16 @@ export function renderTemplate(key: TemplateKey, containerName: string): string[
   }
 
   for (const [k, v] of Object.entries(t.env)) args.push("-e", k + "=" + v);
-  for (const p of t.ports) args.push("-p", p.host + ":" + p.container + (p.proto === "udp" ? "/udp" : ""));
+  // Local lab surfaces stay behind this application. Publishing without an address makes
+  // Docker listen on every interface, which exposed the Windows installer, RDP and fixed
+  // lab passwords to the LAN. Remote access is a separate, explicitly approved operation.
+  for (const p of t.ports) {
+    args.push("-p", "127.0.0.1:" + p.host + ":" + p.container + (p.proto === "udp" ? "/udp" : ""));
+  }
 
   args.push(t.image);
   return args;
 }
-
 
 /**
  * What a template needs, in the shape the placement matcher already speaks.

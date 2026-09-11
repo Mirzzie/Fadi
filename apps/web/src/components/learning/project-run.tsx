@@ -1,7 +1,16 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { ChevronRight, Hammer, Loader2, X } from "lucide-react";
+import {
+  CheckCircle2,
+  ChevronRight,
+  Hammer,
+  Loader2,
+  Monitor,
+  Paperclip,
+  Play,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -56,11 +65,12 @@ export function ProjectRuns({ mode = "overview" }: { mode?: "overview" | "all" }
 
   const visible = mode === "overview" ? runs.filter((r) => r.status !== "done") : runs;
   if (visible.length === 0) {
-    if (mode === "overview") return null;
     return (
       <section className="rounded-xl border border-dashed border-border bg-card/40 p-8 text-center">
         <Hammer className="mx-auto size-5 text-muted-foreground" aria-hidden="true" />
-        <h2 className="mt-3 text-sm font-semibold">No projects yet</h2>
+        <h2 className="mt-3 text-sm font-semibold">
+          {mode === "overview" ? "No active project" : "No projects yet"}
+        </h2>
         <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
           Turn a skill gap into a project from Overview. Fadi will plan one next step at a time and
           ask what each step produced.
@@ -76,87 +86,100 @@ export function ProjectRuns({ mode = "overview" }: { mode?: "overview" | "all" }
   }
 
   return (
-    <section className="space-y-3">
-      <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        <Hammer className="size-3.5" aria-hidden="true" />
-        {mode === "overview" ? "Continue your project" : "Your projects"}
-      </h2>
+    <div className={mode === "all" ? "grid gap-4 md:grid-cols-2" : "space-y-3"}>
       {visible.map((run) => (
-        <RunCard key={run.id} run={run} onChanged={refresh} />
+        <RunCard key={run.id} run={run} onChanged={refresh} featured={mode === "overview"} />
       ))}
-    </section>
+    </div>
   );
 }
 
-function RunCard({ run, onChanged }: { run: RunView; onChanged: () => void }) {
+function RunCard({
+  run,
+  onChanged,
+  featured,
+}: {
+  run: RunView;
+  onChanged: () => void;
+  featured: boolean;
+}) {
   const done = run.steps.filter((s) => s.status === "done").length;
   const next = run.steps.find((s) => s.status === "pending");
+  const percent = run.steps.length === 0 ? 0 : Math.round((done / run.steps.length) * 100);
 
   return (
-    <div className="rounded-xl border border-border bg-card p-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="text-sm font-semibold">{run.title}</h3>
-        {run.resourceLabel ? (
-          <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-muted-foreground">
-            on {run.resourceLabel}
-          </span>
-        ) : null}
-        <span className="ml-auto font-mono text-[11px] tabular-nums text-muted-foreground">
-          {done}/{run.steps.length}
-        </span>
-        {/* A way out. A plan you cannot stop following is a plan that turns into guilt —
-            and the platform has no business holding someone to a project it suggested. */}
-        <StopProject run={run} onChanged={onChanged} />
+    <article
+      className={`overflow-hidden rounded-2xl border bg-card shadow-sm ${featured ? "border-primary/30" : "border-border"}`}
+    >
+      <div className="relative border-b border-border/60 bg-gradient-to-r from-primary/10 via-transparent to-transparent p-4 sm:p-5">
+        <div className="flex items-start gap-3">
+          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary">
+            <Hammer className="size-4" aria-hidden="true" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="font-semibold">{run.title}</h3>
+              <span className="rounded-full border border-border bg-background/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                {next ? "In progress" : "Completed"}
+              </span>
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <CheckCircle2 className="size-3" aria-hidden="true" /> {done}/{run.steps.length}{" "}
+                steps
+              </span>
+              <span className="flex items-center gap-1">
+                <Paperclip className="size-3" aria-hidden="true" /> {run.evidencedCount} artifacts
+              </span>
+              <span className="flex items-center gap-1">
+                <Monitor className="size-3" aria-hidden="true" />
+                {run.resourceLabel ?? "No machine placed"}
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Progress you can see, without a list you have to face.
+      <div className="space-y-4 p-4 sm:p-5">
+        <div>
+          <div className="mb-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
+            <span>Project progress</span>
+            <span className="font-mono tabular-nums">{percent}%</span>
+          </div>
+          <div
+            className="h-1.5 overflow-hidden rounded-full bg-border/70"
+            role="progressbar"
+            aria-label="Project progress"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={percent}
+          >
+            <div
+              className="h-full rounded-full bg-primary transition-[width]"
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+        </div>
 
-          A step you ticked and a step that produced something are drawn differently. A
-          solid bar across six empty clicks is the same false claim as the copy underneath
-          it, just in a medium that is easier to believe. */}
-      <div
-        className="mt-2 flex gap-1"
-        aria-label={`${done} of ${run.steps.length} steps done, ${run.evidencedCount} with something to show`}
-      >
-        {run.steps.map((s) => (
-          <span
-            key={s.id}
-            title={
-              s.status !== "done"
-                ? "Not started"
-                : s.completion === "attested"
-                  ? "Marked done — nothing recorded"
-                  : "Produced: " + (s.artifact ?? "")
-            }
-            className={`h-1 flex-1 rounded-full ${
-              s.status !== "done"
-                ? "bg-border"
-                : s.completion === "attested"
-                  ? "bg-primary/30"
-                  : "bg-primary"
-            }`}
-          />
-        ))}
-      </div>
-
-      <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-muted/40 px-3 py-2.5">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            {next ? `Next · step ${next.ordinal}` : "Project complete"}
+        <div className="rounded-xl border border-border/60 bg-background/40 p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
+            {next ? `Next · step ${next.ordinal}` : "Project record"}
           </p>
-          <p className="truncate text-sm font-medium">
+          <p className="mt-1 truncate text-sm font-medium">
             {next?.title ?? `${run.evidencedCount} of ${run.steps.length} steps have an artifact`}
           </p>
         </div>
-        <Link
-          href={`/dashboard/learning/projects/${run.id}`}
-          className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
-        >
-          {next ? "Continue" : "Review"}
-          <ChevronRight className="size-3" aria-hidden="true" />
-        </Link>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <Button render={<Link href={`/dashboard/learning/projects/${run.id}`} />}>
+            {next ? <Play className="size-3.5" aria-hidden="true" /> : null}
+            {next ? "Continue project" : "Review project"}
+            <ChevronRight className="size-3.5" aria-hidden="true" />
+          </Button>
+          <StopProject run={run} onChanged={onChanged} />
+        </div>
       </div>
-    </div>
+    </article>
   );
 }
 

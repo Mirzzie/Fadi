@@ -53,7 +53,9 @@ describe("placing a Windows lab", () => {
   });
 
   it("counts host overhead rather than the guest alone", () => {
-    expect(specForTemplate("windows-11").memoryMb).toBeGreaterThan(LAB_TEMPLATES["windows-11"].ramMb);
+    expect(specForTemplate("windows-11").memoryMb).toBeGreaterThan(
+      LAB_TEMPLATES["windows-11"].ramMb
+    );
   });
 });
 
@@ -79,7 +81,11 @@ describe("placing a Linux lab", () => {
   });
 
   it("fits a machine that actually runs containers", () => {
-    const withDocker = { ...proxmox, id: "node-with-docker", virtualization: "containers" as const };
+    const withDocker = {
+      ...proxmox,
+      id: "node-with-docker",
+      virtualization: "containers" as const,
+    };
     const plan = placeLab(specForTemplate("linux-web"), [withDocker]);
     expect(plan.fits.map((f) => f.id)).toContain("node-with-docker");
   });
@@ -112,5 +118,22 @@ describe("the rendered argv", () => {
     expect(args[args.indexOf("--name") + 1]).toBe("fadi-site");
     // The image is the last argument and comes from the template, never from a parameter.
     expect(args[args.length - 1]).toBe(LAB_TEMPLATES["linux-web"].image);
+  });
+
+  it("binds every lab endpoint to loopback", () => {
+    for (const key of [
+      "windows-server-2025",
+      "windows-11",
+      "linux-web",
+      "linux-postgres",
+    ] as const) {
+      const args = renderTemplate(key, "fadi-local");
+      const bindings = args.filter((arg, index) => args[index - 1] === "-p");
+      expect(bindings.length, key).toBeGreaterThan(0);
+      expect(
+        bindings.every((binding) => binding.startsWith("127.0.0.1:")),
+        key
+      ).toBe(true);
+    }
   });
 });

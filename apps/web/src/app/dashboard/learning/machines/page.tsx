@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { LearningNavigation } from "@/components/learning/learning-navigation";
 import { MachineRegistration } from "@/components/learning/lab-fit";
+import { LabEngineExplainer } from "@/components/learning/lab-engine-explainer";
 import { MachineAccess } from "@/components/learning/machine-access";
 import { MachineInventory } from "@/components/learning/machine-inventory";
 import { getCurrentAuthUser } from "@/lib/auth/session";
@@ -34,6 +35,8 @@ export default async function LearningMachinesPage() {
             </p>
           </div>
         </header>
+
+        <LabEngineExplainer />
 
         <section className="space-y-3">
           <div>
