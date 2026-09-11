@@ -354,8 +354,6 @@ describe("the catalogue itself stays safe as it grows", () => {
       "--ipc",
       "--userns",
       "--user",
-      "-v",
-      "--volume",
       "--mount",
     ];
 
@@ -401,6 +399,21 @@ describe("the catalogue itself stays safe as it grows", () => {
         if (!("args" in step)) continue;
         for (const arg of step.args) {
           expect(neverAllowed, `${id} emitted ${arg}`).not.toContain(arg);
+        }
+
+        // -v is no longer banned outright, because a lab that cannot survive being
+        // stopped is a demo rather than a lab. What stays banned is the thing the ban was
+        // ever about: a HOST PATH. "-v /:/host" hands over the filesystem; "-v name:/path"
+        // is a volume Docker owns, with no route from it to the machine.
+        for (let i = 0; i < step.args.length; i++) {
+          if (step.args[i] !== "-v" && step.args[i] !== "--volume") continue;
+          const spec = step.args[i + 1] ?? "";
+          const source = spec.split(":")[0];
+          expect(source.startsWith("/"), `${id} bind-mounts a host path: ${spec}`).toBe(false);
+          expect(source.startsWith("."), `${id} bind-mounts a relative path: ${spec}`).toBe(false);
+          expect(source.startsWith("~"), `${id} bind-mounts a home path: ${spec}`).toBe(false);
+          // And a lab may only ever address its own storage.
+          expect(source.startsWith("fadi-"), `${id} names a volume it should not: ${spec}`).toBe(true);
         }
 
         const elevated = step.args.filter(

@@ -99,8 +99,10 @@ describe("the rendered argv", () => {
     expect(args).toContain("/dev/net/tun");
     expect(args).toContain("--cap-add");
     expect(args).toContain("NET_ADMIN");
-    // The concessions that were never needed and are never made.
-    for (const never of ["--privileged", "-v", "--volume", "--mount", "--network=host", "--user"]) {
+    // The concessions that were never needed and are never made. "-v" left this list when
+    // labs gained persistence: the ban was always about HOST PATHS, and a named volume is
+    // not one. The separate suite below proves no template can mount a host path.
+    for (const never of ["--privileged", "--mount", "--network=host", "--user", "--pid"]) {
       expect(args, never).not.toContain(never);
     }
   });
@@ -134,6 +136,52 @@ describe("the rendered argv", () => {
         bindings.every((binding) => binding.startsWith("127.0.0.1:")),
         key
       ).toBe(true);
+    }
+  });
+});
+
+describe("a lab survives being stopped", () => {
+  it("gives Windows a named volume, so an hour of Setup is not lost to a closed lid", async () => {
+    const { renderTemplate } = await import("./templates");
+    const args = renderTemplate("windows-server-2025", "fadi-dc01");
+    const i = args.indexOf("-v");
+    expect(i, "Windows must keep its disk").toBeGreaterThan(-1);
+    expect(args[i + 1]).toBe("fadi-dc01-storage:/storage");
+  });
+
+  it("NEVER mounts a host path — that is what the ban was always about", async () => {
+    const { LAB_TEMPLATES, renderTemplate } = await import("./templates");
+    for (const key of Object.keys(LAB_TEMPLATES)) {
+      const args = renderTemplate(key as keyof typeof LAB_TEMPLATES, "fadi-x");
+      for (let i = 0; i < args.length; i++) {
+        if (args[i] !== "-v") continue;
+        const source = args[i + 1].split(":")[0];
+        // "-v /:/host" hands over the filesystem. "-v fadi-x-storage:/storage" is a volume
+        // Docker owns, with no path into the machine.
+        expect(source.startsWith("/"), key).toBe(false);
+        expect(source).toBe("fadi-x-storage");
+      }
+    }
+  });
+
+  it("gives a disposable template no storage at all", async () => {
+    const { renderTemplate } = await import("./templates");
+    // An nginx serving a static page has nothing worth keeping; a volume per lab that
+    // never needed one is litter on someone's disk.
+    expect(renderTemplate("linux-web", "fadi-site")).not.toContain("-v");
+  });
+
+  it("binds every published port to loopback", async () => {
+    const { LAB_TEMPLATES, renderTemplate } = await import("./templates");
+    for (const key of Object.keys(LAB_TEMPLATES)) {
+      const args = renderTemplate(key as keyof typeof LAB_TEMPLATES, "fadi-x");
+      for (let i = 0; i < args.length; i++) {
+        if (args[i] !== "-p") continue;
+        // Verified the hard way: without this the Windows installer and RDP were reachable
+        // from every device on the home network, and ufw does not help because Docker's
+        // publishing bypasses it.
+        expect(args[i + 1].startsWith("127.0.0.1:"), key + " published " + args[i + 1]).toBe(true);
+      }
     }
   });
 });

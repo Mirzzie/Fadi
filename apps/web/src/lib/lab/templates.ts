@@ -43,6 +43,13 @@ export type LabTemplate = {
    * The flag that unlocks the otherwise-forbidden argv, and the only thing that does.
    */
   needsVirtualisation: boolean;
+  /**
+   * Where the machine keeps its state, when it has any worth keeping.
+   *
+   * Given a NAMED volume, never a host path — Docker owns the storage and there is no
+   * route from it to the filesystem. Absent for templates that are genuinely disposable.
+   */
+  persistentPath?: string;
   /** Said plainly at the point of consent. */
   caveat?: string;
 };
@@ -65,6 +72,9 @@ export const LAB_TEMPLATES: Record<string, LabTemplate> = {
     ramMb: 4096,
     diskGb: 40,
     needsVirtualisation: true,
+    // dockur keeps the guest disk here. Without it an hour of Windows Setup is lost the
+    // first time the machine stops.
+    persistentPath: "/storage",
     caveat:
       "This installs Windows from Microsoft's own evaluation media. You are responsible for licensing it, and the install takes a while before anything is usable.",
   },
@@ -81,6 +91,9 @@ export const LAB_TEMPLATES: Record<string, LabTemplate> = {
     ramMb: 4096,
     diskGb: 40,
     needsVirtualisation: true,
+    // dockur keeps the guest disk here. Without it an hour of Windows Setup is lost the
+    // first time the machine stops.
+    persistentPath: "/storage",
     caveat:
       "This installs Windows from Microsoft's own evaluation media. You are responsible for licensing it, and the install takes a while before anything is usable.",
   },
@@ -117,10 +130,12 @@ export const LAB_TEMPLATES: Record<string, LabTemplate> = {
     purpose: "Backups, replication, tuning, anything that needs a real database.",
     image: "postgres:16-alpine",
     env: { POSTGRES_PASSWORD: "fadilab" },
+
     ports: [{ host: 5432, container: 5432, what: "the database" }],
     ramMb: 512,
     diskGb: 2,
     needsVirtualisation: false,
+    persistentPath: "/var/lib/postgresql/data",
     caveat: "The password is a fixed lab value. Do not put anything real in this database.",
   },
 };
@@ -158,6 +173,23 @@ export function renderTemplate(key: TemplateKey, containerName: string): string[
   // lab passwords to the LAN. Remote access is a separate, explicitly approved operation.
   for (const p of t.ports) {
     args.push("-p", "127.0.0.1:" + p.host + ":" + p.container + (p.proto === "udp" ? "/udp" : ""));
+  }
+
+  // PERSISTENCE, and why this is not the bind-mount the rules forbid.
+  //
+  // Without storage a lab dies when it stops: a Windows Server that has spent an hour
+  // installing is gone the moment the laptop sleeps. That makes it a demo, not a lab, and
+  // the whole point is that a project spans evenings.
+  //
+  // The ban was on HOST PATHS — "-v /:/host" hands over the filesystem, and no template
+  // needs that. A NAMED VOLUME is a different thing: Docker owns it, it has no host path,
+  // and nothing inside the container can reach the machine through it. The name is derived
+  // from the container name, which is itself prefixed and validated, so a lab can only ever
+  // address its own storage.
+  //
+  // Bind mounts stay forbidden. This is the narrower permission that does the job.
+  if (t.persistentPath) {
+    args.push("-v", containerName + "-storage:" + t.persistentPath);
   }
 
   args.push(t.image);
