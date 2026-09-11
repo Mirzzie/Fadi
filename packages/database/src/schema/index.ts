@@ -1182,6 +1182,22 @@ export const labActions = pgTable(
     origin: text("origin"),
     capability: text("capability").notNull(),
     resourceId: uuid("resource_id"),
+    /**
+     * WHAT THIS WAS PART OF.
+     *
+     * Without these, the log is a flat stream of commands and the only way to ask "what
+     * happened while I was doing step 3" is to read timestamps and guess. The project
+     * timeline needs to filter by run and step, and an artefact needs to point back at the
+     * action that produced it.
+     *
+     * ALL THREE ARE OFTEN NULL, and that is not a gap to be filled in later: detecting this
+     * machine, sweeping the network from the machines page, revoking a grant — none of
+     * those belong to a project, and forcing them to claim one would be inventing a
+     * relationship to make a query simpler.
+     */
+    runId: uuid("run_id"),
+    stepId: uuid("step_id"),
+    artifactId: uuid("artifact_id"),
     /** The exact argv that ran, for a person to read afterwards. */
     command: text("command"),
     /**

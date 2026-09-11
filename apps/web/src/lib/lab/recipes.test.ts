@@ -752,3 +752,36 @@ describe("THE REPORTED BUG: the monitor showed a person their own decisions as a
     expect(record.mock.calls.some((c) => c[0].decision === "denied")).toBe(false);
   });
 });
+
+describe("actions know what they were part of", () => {
+  it("carries the run and step onto every audit row", async () => {
+    // Contract 3 for the project timeline: without this the log is a flat stream and the
+    // only way to ask "what happened during step 3" is to read timestamps and guess.
+    const { proposeAction } = await import("./broker");
+    await proposeAction({
+      userId: "u1",
+      recipe: "container.run",
+      params: { image: "nginx", name: "web" },
+      actor: "model",
+      origin: "workspace",
+      runId: "run-1",
+      stepId: "step-3",
+    });
+
+    expect(record).toHaveBeenCalled();
+    for (const call of record.mock.calls) {
+      expect(call[0].runId).toBe("run-1");
+      expect(call[0].stepId).toBe("step-3");
+    }
+  });
+
+  it("records null rather than inventing a project for work that has none", async () => {
+    // Detecting this machine belongs to no run. Forcing it to claim one would invent a
+    // relationship to make a query simpler.
+    await propose_({ image: "nginx", name: "web" });
+    for (const call of record.mock.calls) {
+      expect(call[0].runId).toBeNull();
+      expect(call[0].stepId).toBeNull();
+    }
+  });
+});

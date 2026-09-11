@@ -174,6 +174,22 @@ export function createLabActionsRepository(db: Database) {
     },
 
     /**
+     * Everything that happened as part of one project run.
+     *
+     * What the project timeline filters on. Actions with a null `runId` are not missing
+     * data — detecting this machine, sweeping the network, revoking a grant belong to no
+     * project — so they are simply absent here rather than swept in under a guess.
+     */
+    async forRun(userId: string, runId: string, limit = 200): Promise<LabAction[]> {
+      return db
+        .select()
+        .from(labActions)
+        .where(and(eq(labActions.userId, userId), eq(labActions.runId, runId)))
+        .orderBy(desc(labActions.createdAt))
+        .limit(limit);
+    },
+
+    /**
      * Denials only, for the monitor.
      *
      * This is the query that matters. Successes are mostly the user's own work coming

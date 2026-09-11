@@ -264,6 +264,15 @@ export async function requestCapability(input: {
   actor: Actor;
   origin: string;
   resourceId?: string | null;
+  /**
+   * What this is part of, when it is part of anything.
+   *
+   * Often null, and that is the correct value rather than a gap: detecting this machine or
+   * sweeping the network from the machines page belongs to no project, and making them
+   * claim one would invent a relationship to make a query simpler.
+   */
+  runId?: string | null;
+  stepId?: string | null;
 }): Promise<BrokerResult> {
   const db = getDatabase();
   const grants = createLabGrantsRepository(db);
@@ -277,6 +286,8 @@ export async function requestCapability(input: {
       userId: input.userId,
       actor: input.actor,
       origin: input.origin,
+      runId: input.runId ?? null,
+      stepId: input.stepId ?? null,
       capability: input.capability,
       resourceId,
       decision: "denied",
@@ -299,6 +310,8 @@ export async function requestCapability(input: {
       userId: input.userId,
       actor: input.actor,
       origin: input.origin,
+      runId: input.runId ?? null,
+      stepId: input.stepId ?? null,
       capability,
       resourceId,
       decision: "denied",
@@ -324,6 +337,8 @@ export async function requestCapability(input: {
         userId: input.userId,
         actor: input.actor,
         origin: input.origin,
+        runId: input.runId ?? null,
+        stepId: input.stepId ?? null,
         capability,
         resourceId,
         command: [c.cmd, ...c.args].join(" "),
@@ -339,6 +354,8 @@ export async function requestCapability(input: {
         userId: input.userId,
         actor: input.actor,
         origin: input.origin,
+        runId: input.runId ?? null,
+        stepId: input.stepId ?? null,
         capability,
         resourceId,
         command: [c.cmd, ...c.args].join(" "),
@@ -839,6 +856,9 @@ export async function proposeAction(input: {
   params: RecipeParams;
   actor: Actor;
   origin: string;
+  /** The run and step this belongs to, when it belongs to one. See requestCapability. */
+  runId?: string | null;
+  stepId?: string | null;
 }): Promise<Proposal> {
   const db = getDatabase();
   const audit = createLabActionsRepository(db);
@@ -850,6 +870,8 @@ export async function proposeAction(input: {
       userId: input.userId,
       actor: input.actor,
       origin: input.origin,
+      runId: input.runId ?? null,
+      stepId: input.stepId ?? null,
       capability: input.recipe,
       decision: "denied",
       detail: "Circuit breaker open.",
@@ -862,6 +884,8 @@ export async function proposeAction(input: {
       userId: input.userId,
       actor: input.actor,
       origin: input.origin,
+      runId: input.runId ?? null,
+      stepId: input.stepId ?? null,
       capability: input.recipe,
       decision: "denied",
       detail: "Unknown recipe — not in the catalogue.",
@@ -878,6 +902,8 @@ export async function proposeAction(input: {
       userId: input.userId,
       actor: input.actor,
       origin: input.origin,
+      runId: input.runId ?? null,
+      stepId: input.stepId ?? null,
       capability: input.recipe,
       decision: "rejected",
       detail: "Parameters rejected: " + JSON.stringify(input.params).slice(0, 160),
@@ -895,6 +921,8 @@ export async function proposeAction(input: {
         userId: input.userId,
         actor: input.actor,
         origin: input.origin,
+        runId: input.runId ?? null,
+        stepId: input.stepId ?? null,
         capability: input.recipe,
         decision: "denied",
         detail: "Refused: " + NAME_PREFIX + String(params.name) + " is not a container Fadi created.",
@@ -919,6 +947,8 @@ export async function proposeAction(input: {
       userId: input.userId,
       actor: input.actor,
       origin: input.origin,
+      runId: input.runId ?? null,
+      stepId: input.stepId ?? null,
       capability: input.recipe,
       decision: "denied",
       detail: "Rate ceiling reached for this action.",
@@ -961,6 +991,8 @@ export async function proposeAction(input: {
     userId: input.userId,
     actor: input.actor,
     origin: input.origin,
+    runId: input.runId ?? null,
+    stepId: input.stepId ?? null,
     capability: input.recipe,
     command: argv.map((a) => a.join(" ")).join(" && "),
     // "proposed", not "denied" — a distinction that turned out to matter twice.
