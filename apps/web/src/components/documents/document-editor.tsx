@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Check, Download, Loader2 } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -8,7 +8,11 @@ import { Button } from "@/components/ui/button";
 import { AiTellCheck } from "@/components/documents/ai-tell-check";
 import { DocAdvisor } from "@/components/documents/doc-advisor";
 import { DocTemplatePicker } from "@/components/documents/doc-template-picker";
-import { updateDocumentAction } from "@/app/dashboard/documents/actions";
+import {
+  DocumentHistoryLink,
+  DocumentSaveIndicator,
+  useVersionedDocumentSave,
+} from "@/components/documents/versioned-save";
 import type { DocKind } from "@/lib/jobs/application-types";
 import type { DocTemplate } from "@/lib/documents/doc-templates";
 
@@ -30,24 +34,23 @@ export function DocumentEditor({
   kind,
   initialTitle,
   initialContent,
+  initialVersion,
 }: {
   id: string;
   kind: string;
   initialTitle: string;
   initialContent: string;
+  initialVersion: number;
 }) {
   const [title, setTitle] = useState(initialTitle);
   const [content, setContent] = useState(initialContent);
-  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const { status, markDirty, save: saveVersion } = useVersionedDocumentSave(id, initialVersion);
   const dirtyRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const save = useCallback(async () => {
-    setStatus("saving");
-    const res = await updateDocumentAction({ id, title, content });
-    setStatus(res.ok ? "saved" : "idle");
-    dirtyRef.current = false;
-  }, [id, title, content]);
+    await saveVersion({ title, content });
+  }, [saveVersion, title, content]);
 
   // Debounced autosave after edits settle.
   useEffect(() => {
@@ -61,7 +64,7 @@ export function DocumentEditor({
 
   function onChange(next: { title?: string; content?: string }) {
     dirtyRef.current = true;
-    setStatus("idle");
+    markDirty();
     if (next.title !== undefined) setTitle(next.title);
     if (next.content !== undefined) setContent(next.content);
   }
@@ -92,21 +95,10 @@ export function DocumentEditor({
           <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
             {KIND_LABELS[kind] ?? kind}
           </span>
-          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            {status === "saving" ? (
-              <>
-                <Loader2 className="size-3 animate-spin" aria-hidden="true" /> Saving…
-              </>
-            ) : status === "saved" ? (
-              <>
-                <Check className="size-3 text-emerald-400" aria-hidden="true" /> Saved
-              </>
-            ) : (
-              "Edits autosave"
-            )}
-          </span>
+          <DocumentSaveIndicator status={status} />
         </div>
         <div className="flex items-center gap-2">
+          <DocumentHistoryLink id={id} />
           <DocTemplatePicker kind={kind as DocKind} onPick={applyTemplate} />
           <Button variant="outline" size="sm" onClick={exportDocx}>
             <Download className="size-4" aria-hidden="true" />
@@ -116,7 +108,7 @@ export function DocumentEditor({
             <Download className="size-4" aria-hidden="true" />
             PDF
           </Button>
-          <Button size="sm" onClick={save}>
+          <Button size="sm" onClick={save} disabled={status === "saving" || status === "conflict"}>
             Save
           </Button>
         </div>

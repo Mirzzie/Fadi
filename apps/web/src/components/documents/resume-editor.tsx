@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, BookmarkPlus, ChevronDown, ChevronUp, Check, Download, Loader2, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, BookmarkPlus, ChevronDown, ChevronUp, Download, Loader2, Plus, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -10,12 +10,16 @@ import { AiTellCheck } from "@/components/documents/ai-tell-check";
 import { DictatableTextarea } from "@/components/documents/dictatable-textarea";
 import { ResumeAdvisor } from "@/components/documents/resume-advisor";
 import { ResumePreview } from "@/components/documents/resume-preview";
+import {
+  DocumentHistoryLink,
+  DocumentSaveIndicator,
+  useVersionedDocumentSave,
+} from "@/components/documents/versioned-save";
 import { AccentPicker } from "@/components/ui/accent-picker";
 import { SelectMenu } from "@/components/ui/select-menu";
 import {
   deleteResumeTemplateAction,
   saveResumeTemplateAction,
-  updateDocumentAction,
 } from "@/app/dashboard/documents/actions";
 import {
   newId,
@@ -77,6 +81,7 @@ export function ResumeEditor({
   initialTitle,
   initialContent,
   initialTemplate,
+  initialVersion,
   experienceLevel,
   customTemplates = [],
 }: {
@@ -84,6 +89,7 @@ export function ResumeEditor({
   initialTitle: string;
   initialContent: string;
   initialTemplate?: string | null;
+  initialVersion: number;
   experienceLevel?: string | null;
   customTemplates?: { id: string; name: string; config: Record<string, unknown> }[];
 }) {
@@ -97,16 +103,13 @@ export function ResumeEditor({
       ? (initialTemplate as ResumeTemplate)
       : "classic",
   );
-  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const { status, markDirty, save: saveVersion } = useVersionedDocumentSave(id, initialVersion);
   const dirty = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const save = useCallback(async () => {
-    setStatus("saving");
-    const res = await updateDocumentAction({ id, title, content: serializeResume(data), template });
-    setStatus(res.ok ? "saved" : "idle");
-    dirty.current = false;
-  }, [id, title, data, template]);
+    await saveVersion({ title, content: serializeResume(data), template });
+  }, [saveVersion, title, data, template]);
 
   useEffect(() => {
     if (!dirty.current) return;
@@ -119,7 +122,7 @@ export function ResumeEditor({
 
   function patch(next: Partial<ResumeData>) {
     dirty.current = true;
-    setStatus("idle");
+    markDirty();
     setData((d) => ({ ...d, ...next }));
   }
   function patchPersonal(next: Partial<ResumeData["personal"]>) {
@@ -140,7 +143,7 @@ export function ResumeEditor({
 
   function applyCustomTemplate(config: Record<string, unknown>) {
     dirty.current = true;
-    setStatus("idle");
+    markDirty();
     if (typeof config.baseTemplate === "string") setTemplate(config.baseTemplate as ResumeTemplate);
     setData((d) => ({
       ...d,
@@ -380,33 +383,22 @@ export function ResumeEditor({
             value={title}
             onChange={(e) => {
               dirty.current = true;
-              setStatus("idle");
+              markDirty();
               setTitle(e.target.value);
             }}
             className="rounded-md bg-transparent px-1 text-sm font-semibold outline-none focus:bg-accent/40"
           />
-          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            {status === "saving" ? (
-              <>
-                <Loader2 className="size-3 animate-spin" aria-hidden="true" /> Saving…
-              </>
-            ) : status === "saved" ? (
-              <>
-                <Check className="size-3 text-emerald-400" aria-hidden="true" /> Saved
-              </>
-            ) : (
-              "Autosaves"
-            )}
-          </span>
+          <DocumentSaveIndicator status={status} />
         </div>
         <div className="flex items-center gap-2">
+          <DocumentHistoryLink id={id} />
           <SelectMenu
             ariaLabel="Resume template"
             className="min-w-32"
             value={template}
             onChange={(v) => {
               dirty.current = true;
-              setStatus("idle");
+              markDirty();
               setTemplate(v as ResumeTemplate);
             }}
             groups={[{ options: RESUME_TEMPLATES.map((t) => ({ value: t.id, label: t.label })) }]}
@@ -467,7 +459,7 @@ export function ResumeEditor({
             <Download className="size-4" aria-hidden="true" />
             JSON
           </Button>
-          <Button size="sm" onClick={save}>
+          <Button size="sm" onClick={save} disabled={status === "saving" || status === "conflict"}>
             Save
           </Button>
         </div>
@@ -694,4 +686,3 @@ function RepeatItem({ children, onRemove }: { children: React.ReactNode; onRemov
     </div>
   );
 }
-

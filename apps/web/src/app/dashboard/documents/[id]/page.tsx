@@ -57,6 +57,7 @@ export default async function DocumentEditorPage({ params }: { params: Promise<{
           initialTitle={doc.title}
           initialContent={doc.content}
           initialTemplate={doc.template}
+          initialVersion={doc.version}
           experienceLevel={careerProfile?.experienceLevel ?? null}
           customTemplates={savedTemplates.map((t) => ({
             id: t.id,
@@ -70,6 +71,7 @@ export default async function DocumentEditorPage({ params }: { params: Promise<{
           kind={doc.kind}
           initialTitle={doc.title}
           initialContent={doc.content}
+          initialVersion={doc.version}
         />
       ) : (
         <DocumentEditor
@@ -77,6 +79,7 @@ export default async function DocumentEditorPage({ params }: { params: Promise<{
           kind={doc.kind}
           initialTitle={doc.title}
           initialContent={doc.content}
+          initialVersion={doc.version}
         />
       )}
     </AppShell>
