@@ -54,7 +54,14 @@ export function GapGrowth({ gapTitle, gapDetail }: { gapTitle: string; gapDetail
       });
       if (!res.ok) return setError(res.message ?? "Couldn't commit.");
       setCommitted((prev) => new Set(prev).add(s.title));
-      router.refresh(); // shows up under "In progress"
+      // One intention, one destination. Committing to a build used to leave you on the
+      // list, with the project only appearing if you then found a second button. If Fadi
+      // managed to plan it, go there.
+      if (res.runId) {
+        router.push(`/dashboard/learning/projects/${res.runId}`);
+        return;
+      }
+      router.refresh();
     });
   }
 

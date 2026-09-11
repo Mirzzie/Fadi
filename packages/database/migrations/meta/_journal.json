@@ -323,6 +323,13 @@
       "when": 1789150065785,
       "tag": "0045_unusual_toro",
       "breakpoints": true
+    },
+    {
+      "idx": 46,
+      "version": "7",
+      "when": 1789158117966,
+      "tag": "0046_project_workspace",
+      "breakpoints": true
     }
   ]
 }

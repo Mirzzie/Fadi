@@ -14,6 +14,11 @@ import { publish } from "@/lib/events/bus";
 import { generateBlueprint, type BlueprintResult } from "@/lib/learning/blueprint";
 import { toCommitmentView, type CommitmentView } from "@/lib/learning/commitments-view";
 import { suggestProjectsForGap, type SuggestResult } from "@/lib/learning/suggest";
+import {
+  DEFAULT_WORKSPACE,
+  deservesWorkspace,
+  workspaceSlug,
+} from "@/lib/learning/workspace-choice";
 import { logger } from "@/lib/observability/logger";
 import { recordForwardMotion } from "@/lib/resilience/service";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
@@ -50,13 +55,33 @@ export async function suggestForGapAction(input: {
 }
 
 /** Commit to a project/course — it appears in "In progress" until completed. */
+/**
+ * Give the project somewhere to work, on this machine.
+ *
+ * LOCAL, because that is the default the owner chose: no account, no token, nothing leaves
+ * the laptop. Pushing to GitHub or GitLab is a separate decision they make later, if the
+ * work turns out to be worth pushing.
+ *
+ * Records the intent even when there is no workspace configured yet — the folder is made
+ * when Fadi first writes into it, and recording "this project works locally" is true
+ * regardless of whether the directory exists this second.
+ */
+async function attachLocalWorkspace(userId: string, runId: string, title: string): Promise<void> {
+  const { createProjectRunsRepository } = await import("@careeros/database");
+  await createProjectRunsRepository(getDatabase()).setWorkspace(userId, runId, {
+    workspaceKind: DEFAULT_WORKSPACE,
+    workspaceRef: workspaceSlug(title),
+    repoUrl: null,
+  });
+}
+
 export async function commitToProjectAction(input: {
   gap: string;
   title: string;
   detail?: string;
   kind?: string;
   searchQuery?: string | null;
-}): Promise<{ ok: boolean; message?: string; commitment?: CommitmentView }> {
+}): Promise<{ ok: boolean; message?: string; commitment?: CommitmentView; runId?: string | null }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
   if (!input.title.trim()) return { ok: false, message: "The commitment needs a title." };
@@ -72,8 +97,38 @@ export async function commitToProjectAction(input: {
       kind: input.kind ?? "project",
       searchQuery: input.searchQuery?.trim() || null,
     });
+    // COMMITTING TO A BUILD SHOULD GIVE YOU THE BUILD.
+    //
+    // It used to create a commitment and stop; the project itself only appeared if you
+    // then found "Plan the steps" on the card. That is two decisions for one intention,
+    // and the second one was buried. One click now produces the project, its steps, and a
+    // folder to work in.
+    //
+    // Best-effort on purpose: planning needs a model, and a model being rate-limited must
+    // not lose the commitment the person just made. They get the commitment either way and
+    // can plan it later.
+    let runId: string | null = null;
+    if (deservesWorkspace(input.kind ?? "project")) {
+      try {
+        const { planProjectRun } = await import("@/lib/lab/plan-run");
+        const planned = await planProjectRun(user.id, {
+          title: input.title.trim(),
+          detail: input.detail?.trim() ?? null,
+        });
+        if (planned.ok) {
+          runId = planned.plan.runId;
+          await attachLocalWorkspace(user.id, planned.plan.runId, input.title.trim());
+        }
+      } catch (error) {
+        logger.warn("learning.commit_plan_failed", {
+          userId: user.id,
+          error: error instanceof Error ? error.message : "unknown",
+        });
+      }
+    }
+
     revalidatePath(PATH);
-    return { ok: true, commitment: toCommitmentView(row) };
+    return { ok: true, commitment: toCommitmentView(row), runId };
   } catch (error) {
     logger.error("learning.commit_failed", {
       userId: user.id,

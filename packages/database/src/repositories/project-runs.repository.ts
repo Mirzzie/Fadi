@@ -133,6 +133,18 @@ export function createProjectRunsRepository(db: Database) {
       return rows.length > 0;
     },
 
+    /** Where this project's work lives. Set once at commit; changed if the person moves it. */
+    async setWorkspace(
+      userId: string,
+      runId: string,
+      workspace: { workspaceKind: string; workspaceRef: string; repoUrl: string | null },
+    ): Promise<void> {
+      await db
+        .update(projectRuns)
+        .set({ ...workspace, updatedAt: new Date() })
+        .where(and(eq(projectRuns.userId, userId), eq(projectRuns.id, runId)));
+    },
+
     async setRunStatus(userId: string, runId: string, status: string): Promise<void> {
       await db
         .update(projectRuns)

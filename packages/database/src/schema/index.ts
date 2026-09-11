@@ -1341,6 +1341,23 @@ export const projectRuns = pgTable(
     /** Which machine it was planned against — steps differ by host. */
     resourceId: uuid("resource_id").references(() => labResources.id, { onDelete: "set null" }),
     resourceLabel: text("resource_label"),
+    /**
+     * WHERE THE WORK LIVES — and it is the person's choice, not Fadi's.
+     *
+     *   local  — a folder in their own workspace. The default, because it needs no
+     *            account, no token, and nothing leaves the machine.
+     *   github — a private repository.
+     *   gitlab — the same, elsewhere. Not built yet; the column does not pretend otherwise.
+     *
+     * Null for everything that does not produce files. A certification is a thing you sit
+     * and a course is a thing you watch; making a workspace for either leaves a trail of
+     * empty folders, which says something worse about a person than having none.
+     */
+    workspaceKind: text("workspace_kind"),
+    /** The folder name for `local`, or the repository full name for a git backing. */
+    workspaceRef: text("workspace_ref"),
+    /** Only ever set for a git backing. */
+    repoUrl: text("repo_url"),
     /** planned | running | done | abandoned */
     status: text("status").notNull().default("planned"),
     completedAt: timestamp("completed_at", { withTimezone: true }),
