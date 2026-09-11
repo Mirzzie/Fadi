@@ -121,7 +121,10 @@ export async function addLabResource(
   // upsert, not create. Detecting this laptop three times found the same laptop three
   // times and recorded it three times, which turned the inventory into noise and made
   // placement answer "unmeasured: This machine, This machine, This machine".
-  await createLabResourcesRepository(getDatabase()).upsertDetected(user.id, {
+  const db = getDatabase();
+  const repo = createLabResourcesRepository(db);
+  const before = (await repo.listForUser(user.id)).some((r) => r.label === parsed.data.label);
+  const saved = await repo.upsertDetected(user.id, {
     ...parsed.data,
     memoryMb: parsed.data.memoryMb ?? null,
     diskGb: parsed.data.diskGb ?? null,
@@ -129,7 +132,37 @@ export async function addLabResource(
     // Read-only until a write scope is deliberately granted (ADR 0011).
     scopes: ["read"],
   });
+
+  await recordRegistryChange(user.id, {
+    capability: before ? "machine.update" : "machine.add",
+    resourceId: saved.id,
+    detail: (before ? "Updated " : "Added ") + saved.label + " in the registry.",
+  });
   return { ok: true, resources: await load(user.id) };
+}
+
+/**
+ * THE REGISTRY IS PART OF THE RECORD.
+ *
+ * Found the dull way: three machines vanished from a registry and the audit log could not
+ * say who removed them or when, because registry changes were never recorded at all. "You
+ * see every single action Fadi takes" cannot have a hole where the inventory is — and the
+ * moment a person most needs the log to work is exactly when something has gone missing.
+ */
+async function recordRegistryChange(
+  userId: string,
+  input: { capability: string; resourceId: string; detail: string },
+): Promise<void> {
+  const { createLabActionsRepository } = await import("@careeros/database");
+  await createLabActionsRepository(getDatabase()).record({
+    userId,
+    actor: "user",
+    origin: "dashboard:machines",
+    capability: input.capability,
+    resourceId: input.resourceId,
+    decision: "allowed",
+    detail: input.detail,
+  });
 }
 
 export async function removeLabResource(id: string): Promise<{ ok: boolean }> {
@@ -137,7 +170,18 @@ export async function removeLabResource(id: string): Promise<{ ok: boolean }> {
   if (!user) return { ok: false };
   const parsed = z.string().uuid().safeParse(id);
   if (!parsed.success) return { ok: false };
-  await createLabResourcesRepository(getDatabase()).remove(user.id, parsed.data);
+
+  const repo = createLabResourcesRepository(getDatabase());
+  // Read the label BEFORE deleting: "removed a machine" is not a sentence anyone can act
+  // on, and afterwards there is nothing left to name it by.
+  const existing = (await repo.listForUser(user.id)).find((r) => r.id === parsed.data);
+  await repo.remove(user.id, parsed.data);
+
+  await recordRegistryChange(user.id, {
+    capability: "machine.forget",
+    resourceId: parsed.data,
+    detail: "Removed " + (existing?.label ?? "a machine") + " from the registry.",
+  });
   return { ok: true };
 }
 

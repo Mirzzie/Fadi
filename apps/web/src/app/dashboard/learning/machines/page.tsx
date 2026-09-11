@@ -36,7 +36,6 @@ export default async function LearningMachinesPage() {
           </div>
         </header>
 
-        <LabEngineExplainer />
 
         <section className="space-y-3">
           <div>
@@ -50,6 +49,21 @@ export default async function LearningMachinesPage() {
           <MachineInventory />
           <MachineRegistration />
         </section>
+
+        {/*
+          The five-stage explanation used to open this page, above the machines. It is good
+          writing and it is reference material: a page called Machines should start with
+          your machines, and explain itself to whoever goes looking. Folded to the bottom,
+          behind a disclosure, rather than deleted.
+        */}
+        <details className="rounded-lg border border-border/60 p-3">
+          <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
+            How Fadi runs a lab, stage by stage
+          </summary>
+          <div className="mt-3">
+            <LabEngineExplainer />
+          </div>
+        </details>
 
         <section className="space-y-3">
           <div>
