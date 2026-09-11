@@ -400,7 +400,10 @@ const inspectMachineTool: FadiTool = {
 
     const found = scan.findings.map((f) => f.detail).join(" ");
     const host = scan.host
-      ? `${Math.round(scan.host.memoryMb! / 1024)}GB RAM, ${scan.host.cpus ?? "?"} CPUs, ${scan.host.arch}.`
+      ? `${Math.round(scan.host.memoryMb! / 1024)}GB RAM, ${scan.host.cpus ?? "?"} CPUs, ${scan.host.arch}` +
+        // Free disk decides whether a Windows lab is even possible, so it belongs in the
+        // sentence rather than only in the row.
+        (scan.host.freeDiskGb !== null ? `, ${scan.host.freeDiskGb}GB free.` : ".")
       : "";
     return {
       summary: scan.findings.length
@@ -481,6 +484,176 @@ const proposeLabActionTool: FadiTool = {
     };
   },
 };
+
+/**
+ * WHERE COULD THIS LAB RUN?
+ *
+ * Read-only, and it answers with the machines the person actually owns rather than with
+ * advice. The three-way answer matters: a host that fits, a host nobody has measured, and a
+ * host that is ruled out with a reason. An unmeasured machine reported as "fine" is how a
+ * plan becomes a wasted evening.
+ */
+const labCapacityTool: FadiTool = {
+  name: "lab_capacity",
+  description:
+    "List the lab machines Fadi can build (Windows Server, Windows 11, Ubuntu, nginx, Postgres) and say which of the user's own machines could host each. Use before suggesting a lab, and whenever the user asks what they can run. Reports 'not enough recorded to tell' for machines nobody has measured rather than guessing.",
+  parameters: { type: "object", properties: {} },
+  async execute(_args, ctx): Promise<FadiToolResult> {
+    const { LAB_TEMPLATES, specForTemplate } = await import("@/lib/lab/templates");
+    const { placeLab } = await import("@/lib/lab/capability");
+    const { createLabResourcesRepository } = await import("@careeros/database");
+    const { getDatabase } = await import("@/lib/database/client");
+
+    const rows = await createLabResourcesRepository(getDatabase()).listForUser(ctx.userId);
+    const resources = rows.map((r) => ({
+      id: r.id,
+      label: r.label,
+      kind: r.kind,
+      arch: r.arch as "x86_64" | "arm64" | "mcu",
+      memoryMb: r.memoryMb,
+      diskGb: r.diskGb,
+      virtualization: r.virtualization as "none" | "containers" | "vms" | "nested",
+      alwaysOn: r.alwaysOn,
+    }));
+
+    if (resources.length === 0) {
+      return {
+        summary:
+          "Fadi doesn't know what machines you have yet, so it can't say where anything would run. Ask them to add one under Learning → the lab panel, or let Fadi detect this machine.",
+        view: "none",
+      };
+    }
+
+    const lines: string[] = [];
+    for (const [key, template] of Object.entries(LAB_TEMPLATES)) {
+      const plan = placeLab(specForTemplate(key as keyof typeof LAB_TEMPLATES), resources);
+      const fits = plan.fits.map((f) => f.label);
+      const maybe = plan.unverified.map((u) => u.resource.label);
+      lines.push(
+        key +
+          " (" +
+          template.label +
+          "): " +
+          (fits.length ? "runs on " + fits.join(", ") : "nothing you have fits it") +
+          (maybe.length ? "; unmeasured: " + maybe.join(", ") : ""),
+      );
+    }
+
+    return { summary: lines.join("\n"), view: "none", data: { templates: Object.keys(LAB_TEMPLATES) } };
+  },
+};
+
+/**
+ * START AN OPERATING SYSTEM FOR A LAB.
+ *
+ * Windows here is a real VM — dockur is QEMU wearing a container — so it is slow to install
+ * and heavy to run, and the tool says so rather than letting a model promise a desktop in a
+ * minute. Linux templates are ordinary containers and up in seconds.
+ *
+ * A KEY, never an image. The model choosing the image is the model choosing what code runs
+ * on someone's laptop.
+ */
+const startLabMachineTool: FadiTool = {
+  name: "start_lab_machine",
+  description:
+    "Propose starting a lab operating system on the user's machine: windows-server-2025 or windows-11 (real VMs via dockur — several GB to download and 20+ minutes to install before usable), or linux-ubuntu, linux-web, linux-postgres (ordinary containers, ready in seconds). Use when a project needs a whole OS rather than a service. Prefer Linux when the project allows it. This NEVER starts anything by itself; it puts the exact command in front of the user for approval.",
+  parameters: {
+    type: "object",
+    properties: {
+      template: {
+        type: "string",
+        enum: ["windows-server-2025", "windows-11", "linux-ubuntu", "linux-web", "linux-postgres"],
+        description: "Which machine to start.",
+      },
+      name: {
+        type: "string",
+        description: 'Short lowercase name, e.g. "dc01". Fadi prefixes it with fadi-.',
+      },
+    },
+    required: ["template", "name"],
+  },
+  async execute(args, ctx): Promise<FadiToolResult> {
+    return proposeThrough(ctx, "lab.start", { template: args.template, name: args.name });
+  },
+};
+
+/**
+ * BUILD AN IMAGE FOR THIS PROJECT.
+ *
+ * Intent in, Dockerfile out. The model names a base and packages from a closed vocabulary;
+ * deterministic code writes the file. A refused package is named, and the alternative — the
+ * person writing the Dockerfile themselves — is offered rather than hidden.
+ */
+const buildLabImageTool: FadiTool = {
+  name: "build_lab_image",
+  description:
+    "Propose building a Linux lab image with specific tools installed, when no stock template fits the project. Fadi writes the Dockerfile itself from a vetted vocabulary and puts it in the user's workspace; it cannot install packages outside that list. Use when a project needs a particular combination of tools. This NEVER builds anything by itself.",
+  parameters: {
+    type: "object",
+    properties: {
+      name: { type: "string", description: 'Short lowercase name for the image, e.g. "ad-lab".' },
+      base: {
+        type: "string",
+        enum: ["ubuntu-24.04", "debian-12", "alpine-3.20", "python-3.12", "node-22"],
+        description: "Which base to start from.",
+      },
+      packages: {
+        type: "array",
+        items: { type: "string" },
+        description:
+          "Packages to install, by their ordinary names (nginx, openssh-server, tcpdump, ansible, postgresql-client...). Anything outside Fadi's vetted list is refused and named.",
+      },
+      ports: { type: "array", items: { type: "number" }, description: "Ports to expose, 1024-65535." },
+    },
+    required: ["name", "base"],
+  },
+  async execute(args, ctx): Promise<FadiToolResult> {
+    return proposeThrough(ctx, "lab.build", {
+      name: args.name,
+      base: args.base,
+      packages: args.packages,
+      ports: args.ports,
+    });
+  },
+};
+
+/**
+ * One proposal path for every lab tool, so none of them can drift into running something.
+ *
+ * Reports the request as a REQUEST. A model that says "I started Windows Server" when it has
+ * only queued a question has told the user something false about their own machine.
+ */
+async function proposeThrough(
+  ctx: FadiToolContext,
+  recipe: string,
+  params: Record<string, unknown>,
+): Promise<FadiToolResult> {
+  const { proposeAction } = await import("@/lib/lab/broker");
+  const surface = ctx.surface ?? "chat";
+  const result = await proposeAction({
+    userId: ctx.userId,
+    recipe,
+    params,
+    actor: surface === "mcp" ? "mcp" : surface === "agent" ? "agent" : "model",
+    origin: "tool:" + recipe,
+  });
+
+  if (!result.ok) return { summary: result.message, view: "none" };
+
+  return {
+    summary:
+      "I've asked for your approval — nothing has run yet. " +
+      result.summary +
+      "\n\nCommand: " +
+      result.argv.map((a) => a.join(" ")).join(" && ") +
+      (result.preflight.length
+        ? "\n\nBefore you decide: " + result.preflight.map((n) => n.text).join(" ")
+        : "") +
+      "\n\nApprove it under Machine access in Learning.",
+    view: "none",
+    data: { requestId: result.requestId, argv: result.argv, preflight: result.preflight },
+  };
+}
 
 const projectStatusTool: FadiTool = {
   name: "project_status",
@@ -711,6 +884,9 @@ const TOOLS: FadiTool[] = [
   planProjectTool,
   inspectMachineTool,
   proposeLabActionTool,
+  labCapacityTool,
+  startLabMachineTool,
+  buildLabImageTool,
   projectStatusTool,
   completeProjectStepTool,
   evaluateFitTool,

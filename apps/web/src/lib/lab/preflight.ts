@@ -266,6 +266,40 @@ export async function preflightFor(input: {
         });
       }
 
+      // DISK, which the first version simply did not check — and a Windows template that
+      // wants 40GB on a disk with 41GB free is the exact case where silence is worst: it
+      // downloads for twenty minutes and then fills the machine.
+      try {
+        const fsp = await import("node:fs/promises");
+        const stat = await fsp.statfs(os.homedir());
+        const freeGb = Math.round((stat.bsize * stat.bavail) / 1024 ** 3);
+        if (freeGb < t.diskGb) {
+          notes.push({
+            kind: "warn",
+            text:
+              "This wants about " +
+              t.diskGb +
+              "GB and only " +
+              freeGb +
+              "GB is free. It would fail partway through, after the download.",
+          });
+        } else if (freeGb - t.diskGb < 10) {
+          notes.push({
+            kind: "warn",
+            text:
+              "That leaves " +
+              (freeGb - t.diskGb) +
+              "GB spare on a " +
+              freeGb +
+              "GB margin. Tight — the disk grows as the machine is used.",
+          });
+        } else {
+          notes.push({ kind: "info", text: freeGb + "GB free, about " + t.diskGb + "GB needed." });
+        }
+      } catch {
+        notes.push({ kind: "unknown", text: "Couldn't check how much disk is free." });
+      }
+
       if (t.needsVirtualisation) {
         const fsp = await import("node:fs/promises");
         try {

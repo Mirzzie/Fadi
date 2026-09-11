@@ -65,7 +65,10 @@ export async function addLabResource(
   const parsed = resourceInput.safeParse(input);
   if (!parsed.success) return { ok: false, message: "Check the details and try again." };
 
-  await createLabResourcesRepository(getDatabase()).create(user.id, {
+  // upsert, not create. Detecting this laptop three times found the same laptop three
+  // times and recorded it three times, which turned the inventory into noise and made
+  // placement answer "unmeasured: This machine, This machine, This machine".
+  await createLabResourcesRepository(getDatabase()).upsertDetected(user.id, {
     ...parsed.data,
     memoryMb: parsed.data.memoryMb ?? null,
     diskGb: parsed.data.diskGb ?? null,
@@ -276,6 +279,8 @@ export type DetectedResource = {
   arch: string | null;
   virtualization: string;
   memoryMb: number | null;
+  /** Free space on this machine. Null when host access was not granted. */
+  diskGb: number | null;
   detail: string;
 };
 
@@ -319,6 +324,7 @@ export async function detectLocalResources(): Promise<{
     // Real memory, read from the machine rather than remembered by its owner — this is
     // the number AM01 kept reporting as "not enough recorded to tell".
     memoryMb: scan.host?.memoryMb ?? null,
+    diskGb: scan.host?.freeDiskGb ?? null,
     detail: f.detail,
   }));
 

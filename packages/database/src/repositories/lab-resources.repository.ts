@@ -21,6 +21,53 @@ export function createLabResourcesRepository(db: Database) {
         .orderBy(asc(labResources.createdAt));
     },
 
+    /**
+     * Record a machine Fadi DETECTED, without accumulating a copy per click.
+     *
+     * Detection is idempotent by nature — looking at this laptop twice finds the same
+     * laptop — so the registry must reconcile rather than append. Three clicks of "detect"
+     * produced three identical rows, which then made placement read "unmeasured: This
+     * machine, This machine, This machine" and turned an inventory into noise.
+     *
+     * Matched on label because that is what detection produces deterministically: the same
+     * machine yields the same label every time. A row the PERSON wrote with the same label
+     * is updated too, which is the friendlier reading of typing the same name twice.
+     *
+     * Never nulls a value that is already recorded: a detection run without host access
+     * knows less than the row it is updating, and letting it overwrite memory with null
+     * would make the registry worse every time someone declined a permission.
+     */
+    async upsertDetected(
+      userId: string,
+      input: Omit<NewLabResource, "id" | "userId" | "createdAt" | "updatedAt">,
+    ): Promise<LabResource> {
+      const [existing] = await db
+        .select()
+        .from(labResources)
+        .where(and(eq(labResources.userId, userId), eq(labResources.label, input.label)))
+        .limit(1);
+
+      if (!existing) {
+        const [row] = await db.insert(labResources).values({ ...input, userId }).returning();
+        return row;
+      }
+
+      const [row] = await db
+        .update(labResources)
+        .set({
+          kind: input.kind ?? existing.kind,
+          arch: input.arch ?? existing.arch,
+          virtualization: input.virtualization ?? existing.virtualization,
+          memoryMb: input.memoryMb ?? existing.memoryMb,
+          diskGb: input.diskGb ?? existing.diskGb,
+          notes: input.notes ?? existing.notes,
+          updatedAt: new Date(),
+        })
+        .where(eq(labResources.id, existing.id))
+        .returning();
+      return row;
+    },
+
     async create(
       userId: string,
       input: Omit<NewLabResource, "id" | "userId" | "createdAt" | "updatedAt">,

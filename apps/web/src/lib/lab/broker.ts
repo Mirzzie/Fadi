@@ -203,8 +203,11 @@ export const CAPABILITIES: Record<Capability, CapabilitySpec> = {
     ],
   },
   "inspect.host": {
-    summary: "Read this machine's total memory, CPU count and architecture.",
-    limit: "Node's own os module. No process list, no filesystem, no network.",
+    summary: "Read this machine's total memory, CPU count, architecture and free disk space.",
+    // Free disk was added to what this reads, so it is added to what it says it reads.
+    // Consent text that lags behind the code is not consent.
+    limit:
+      "Aggregate numbers only - how much space is free, never what is in it. No file is opened, no directory listed, no process list, no network.",
     defaultMinutes: 120,
     commands: [],
   },

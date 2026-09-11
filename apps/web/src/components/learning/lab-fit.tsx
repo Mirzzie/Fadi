@@ -367,6 +367,7 @@ function DetectHere({ onSaved }: { onSaved: () => void }) {
                       arch: d.arch as never,
                       virtualization: d.virtualization as never,
                       memoryMb: d.memoryMb,
+                      diskGb: d.diskGb,
                       alwaysOn: false,
                       notes: d.detail,
                     });

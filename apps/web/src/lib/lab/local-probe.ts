@@ -88,7 +88,13 @@ export type LocalScan = {
   /** Probes that found nothing, so a short result is explainable rather than mysterious. */
   absent: string[];
   /** Real capacity, read rather than remembered. Null when host access wasn't granted. */
-  host: { memoryMb: number | null; cpus: number | null; arch: "x86_64" | "arm64" } | null;
+  host: {
+    memoryMb: number | null;
+    cpus: number | null;
+    arch: "x86_64" | "arm64";
+    /** Free space where labs get built. Null when it could not be read. */
+    freeDiskGb: number | null;
+  } | null;
   /**
    * What Fadi wanted to look at and was not allowed to. Not an error — the scan returns
    * what it could see and names what it could not, so a thin result reads as "you haven't
@@ -149,10 +155,24 @@ export async function scanLocalMachine(input: {
 
     if (capability === "inspect.host") {
       const os = await import("node:os");
+
+      // Free disk, because placement cannot decide without it. A machine with memory
+      // recorded and disk unknown still reports "not enough recorded to tell" — which is
+      // how a registry full of real numbers answered nothing.
+      let freeDiskGb: number | null = null;
+      try {
+        const fsp = await import("node:fs/promises");
+        const stat = await fsp.statfs(os.homedir());
+        freeDiskGb = Math.round((stat.bsize * stat.bavail) / 1024 ** 3);
+      } catch {
+        // Some runtimes and filesystems do not answer. Null, never a guess.
+      }
+
       host = {
         memoryMb: Math.round(os.totalmem() / (1024 * 1024)),
         cpus: os.cpus()?.length ?? null,
         arch: os.arch() === "arm64" ? "arm64" : "x86_64",
+        freeDiskGb,
       };
     }
   }
