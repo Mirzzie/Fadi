@@ -16,8 +16,6 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { LabFit } from "@/components/learning/lab-fit";
-import { PlanProjectButton } from "@/components/learning/project-run";
 import {
   commitToProjectAction,
   completeCommitmentAction,
@@ -26,6 +24,7 @@ import {
 } from "@/app/dashboard/learning/actions";
 import type { CommitmentView } from "@/lib/learning/commitments-view";
 import type { ProjectSuggestion } from "@/lib/learning/suggest";
+import { labNeedFor, worthARepo } from "@/lib/learning/needs-lab";
 
 /** Gap → the smallest real project that closes it → one-click commitment. */
 export function GapGrowth({ gapTitle, gapDetail }: { gapTitle: string; gapDetail?: string }) {
@@ -73,37 +72,63 @@ export function GapGrowth({ gapTitle, gapDetail }: { gapTitle: string; gapDetail
         </button>
       ) : (
         <div className="mt-1 space-y-2">
-          {suggestions.map((s) => (
-            <div key={s.title} className="rounded-md border border-border/60 bg-background/40 p-2.5">
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium">
-                    {s.title}{" "}
-                    <span className="font-normal text-muted-foreground">· {s.kind}</span>
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{s.detail}</p>
+          {/*
+            ONE CARD, ONE DECISION.
+
+            This used to carry the whole provisioning apparatus per suggestion — "where you
+            could run this", a fits/misses list, two buttons for registering hardware, and a
+            plan button — repeated for every item, before the person had committed to
+            anything. Ten suggestions meant ten copies of it and a column you could not
+            read.
+
+            Fadi already knows whether a thing needs a machine. That knowledge is now USED
+            instead of displayed: at most one short phrase on the card, and the machinery
+            appears after you commit, for the items that actually need it.
+          */}
+          {suggestions.map((s) => {
+            const need = labNeedFor(s);
+            return (
+              <div
+                key={s.title}
+                className="rounded-lg border border-border/60 bg-background/40 p-3 transition-colors hover:border-border"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium leading-snug">{s.title}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[0.7rem]">
+                      <span className="rounded border border-border/60 px-1.5 py-0.5 uppercase tracking-wide text-muted-foreground">
+                        {s.kind}
+                      </span>
+                      {need.needed ? (
+                        <span className="rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-primary">
+                          {need.phrase}
+                        </span>
+                      ) : null}
+                      {worthARepo(s) ? (
+                        <span className="text-muted-foreground">· gets a repo</span>
+                      ) : null}
+                    </div>
+                  </div>
+                  {committed.has(s.title) ? (
+                    <span className="flex shrink-0 items-center gap-1 text-xs text-emerald-400">
+                      <Check className="size-3.5" aria-hidden="true" /> Committed
+                    </span>
+                  ) : (
+                    <Button size="sm" className="shrink-0" disabled={pending} onClick={() => commit(s)}>
+                      Commit
+                    </Button>
+                  )}
                 </div>
-                {committed.has(s.title) ? (
-                  <span className="flex shrink-0 items-center gap-1 text-xs text-emerald-400">
-                    <Check className="size-3.5" aria-hidden="true" /> Committed
-                  </span>
-                ) : (
-                  <Button size="sm" variant="outline" className="shrink-0" disabled={pending} onClick={() => commit(s)}>
-                    Commit
-                  </Button>
-                )}
+                {/* Two lines of description. The full text lives in the project once
+                    committed, where there is room for it. */}
+                <p className="mt-2 line-clamp-2 text-xs leading-relaxed text-muted-foreground">
+                  {s.detail}
+                </p>
               </div>
-              {/* "And what do I run it on?" — asked here, where the project is proposed,
-                  rather than at onboarding where nobody yet knows they want a lab. */}
-              <LabFit title={s.title} detail={s.detail} />
-              {/* The answer to "a youtube link is not guidance": turn this into steps
-                  planned against the host above, each with a way to tell it worked. */}
-              <PlanProjectButton title={s.title} detail={s.detail} />
-            </div>
-          ))}
-          <p className="text-[0.7rem] text-muted-foreground">
-            When you finish one, mark it complete below — what you built goes into your Evidence and
-            strengthens this direction&apos;s resume automatically.
+            );
+          })}
+          <p className="text-xs text-muted-foreground">
+            Committing opens the project. Fadi sets up a machine there only if the build needs one.
           </p>
         </div>
       )}
