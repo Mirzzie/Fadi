@@ -56,7 +56,17 @@ export type PlannedRun = { runId: string; steps: number };
 
 export async function planProjectRun(
   userId: string,
-  input: { title: string; detail?: string | null; commitmentId?: string | null },
+  input: {
+    title: string;
+    detail?: string | null;
+    commitmentId?: string | null;
+    /**
+     * Re-plan an existing run in place, replacing its steps and keeping everything else.
+     * A wrong plan is otherwise a dead end — abandon the project and start over, or follow
+     * instructions that do not match the machine they run on.
+     */
+    replaceRunId?: string;
+  },
 ): Promise<{ ok: true; plan: PlannedRun } | { ok: false; message: string }> {
   const generate = await getUserDocGenerate(userId);
   if (!generate) {
@@ -128,7 +138,32 @@ export async function planProjectRun(
       "project_plan",
     );
 
-    const { run } = await createProjectRunsRepository(db).createWithSteps(
+    const rows = parsed.steps.map((s, i) => ({
+      ordinal: i + 1,
+      title: s.title.trim(),
+      instruction: s.instruction.trim(),
+      verify: s.verify?.trim() || null,
+      produces: s.produces?.trim() || null,
+    }));
+
+    const repo = createProjectRunsRepository(db);
+
+    // Re-planning keeps the run — its workspace, its history, its identity — and replaces
+    // only the steps. A wrong plan was otherwise a dead end: abandon the project and start
+    // over, or follow instructions that do not match the machine they run on.
+    if (input.replaceRunId) {
+      const replaced = await repo.replaceSteps(userId, input.replaceRunId, rows, {
+        resourceId: host?.id ?? null,
+        resourceLabel: host?.label ?? null,
+      });
+      if (replaced.length === 0) {
+        return { ok: false, message: "That project is gone." };
+      }
+      logger.info("lab.run_replanned", { userId, steps: rows.length, host: host?.kind ?? "none" });
+      return { ok: true, plan: { runId: input.replaceRunId, steps: rows.length } };
+    }
+
+    const { run } = await repo.createWithSteps(
       userId,
       {
         title: input.title,
@@ -137,13 +172,7 @@ export async function planProjectRun(
         resourceId: host?.id ?? null,
         resourceLabel: host?.label ?? null,
       },
-      parsed.steps.map((s, i) => ({
-        ordinal: i + 1,
-        title: s.title.trim(),
-        instruction: s.instruction.trim(),
-        verify: s.verify?.trim() || null,
-        produces: s.produces?.trim() || null,
-      })),
+      rows,
     );
 
     logger.info("lab.run_planned", { userId, steps: parsed.steps.length, host: host?.kind ?? "none" });

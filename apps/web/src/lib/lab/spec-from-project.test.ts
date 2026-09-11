@@ -128,3 +128,52 @@ describe("choosing a reviewed lab for a project", () => {
     ).toBe("linux-ubuntu");
   });
 });
+
+describe("Windows is detected wherever it is said", () => {
+  it("THE REPORTED MISMATCH: Windows steps must not get an Ubuntu lab", async () => {
+    const { templateForProject } = await import("./spec-from-project");
+    // A guide full of .msi and C:\ paths beside a machine running Ubuntu is the
+    // incoherence that leaves someone stuck on step one.
+    expect(
+      templateForProject({
+        title: "Splunk SIEM Lab",
+        detail: "Install Splunk Enterprise on Windows, select the Windows 64-bit .msi.",
+      }),
+    ).toBe("windows-server-2025");
+  });
+
+  it("catches the ways a project says Windows without the enterprise vocabulary", async () => {
+    const { templateForProject } = await import("./spec-from-project");
+    for (const detail of [
+      "Run the installer with msiexec",
+      "Automate it with PowerShell",
+      "Save it to C:\\Users\\Downloads",
+      "Use the win64 build",
+      "Configure WinRM for remote management",
+    ]) {
+      expect(templateForProject({ title: "A lab", detail }), detail).toMatch(/^windows-/);
+    }
+  });
+
+  it("still prefers the server when the project is clearly server work", async () => {
+    const { templateForProject } = await import("./spec-from-project");
+    expect(
+      templateForProject({ title: "Active Directory lab", detail: "Domain controller and GPO." }),
+    ).toBe("windows-server-2025");
+    expect(
+      templateForProject({ title: "Endpoint hardening", detail: "Windows 11 with Intune." }),
+    ).toBe("windows-11");
+  });
+
+  it("does NOT drag Linux projects onto Windows", async () => {
+    const { templateForProject } = await import("./spec-from-project");
+    // The risk of widening the match: "windows" appears in plenty of prose that is not
+    // about running Windows.
+    expect(
+      templateForProject({ title: "Nginx TLS lab", detail: "Reverse proxy with certificates." }),
+    ).toBe("linux-web");
+    expect(
+      templateForProject({ title: "Postgres replication", detail: "Streaming replication on Linux." }),
+    ).toBe("linux-postgres");
+  });
+});

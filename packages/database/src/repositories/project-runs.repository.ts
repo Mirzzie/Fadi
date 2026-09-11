@@ -134,6 +134,50 @@ export function createProjectRunsRepository(db: Database) {
     },
 
     /** Where this project's work lives. Set once at commit; changed if the person moves it. */
+    /**
+     * Replace a run's steps, keeping the run.
+     *
+     * A plan can be wrong — steps describing a Windows installer against an Ubuntu lab —
+     * and without this the only remedy was to abandon the project and start again, losing
+     * its workspace, its history and whatever had been recorded against it.
+     *
+     * One transaction: a run must never be left with the old steps deleted and the new
+     * ones unwritten, which is a project that has become an empty shell.
+     */
+    async replaceSteps(
+      userId: string,
+      runId: string,
+      steps: Array<Omit<NewProjectStep, "id" | "runId" | "createdAt" | "updatedAt">>,
+      placement: { resourceId?: string | null; resourceLabel?: string | null },
+    ): Promise<ProjectStep[]> {
+      return db.transaction(async (tx) => {
+        const [owned] = await tx
+          .select({ id: projectRuns.id })
+          .from(projectRuns)
+          .where(and(eq(projectRuns.userId, userId), eq(projectRuns.id, runId)))
+          .limit(1);
+        if (!owned) return [];
+
+        await tx.delete(projectSteps).where(eq(projectSteps.runId, runId));
+        await tx
+          .update(projectRuns)
+          .set({
+            resourceId: placement.resourceId ?? null,
+            resourceLabel: placement.resourceLabel ?? null,
+            status: "running",
+            updatedAt: new Date(),
+          })
+          .where(eq(projectRuns.id, runId));
+
+        return steps.length
+          ? await tx
+              .insert(projectSteps)
+              .values(steps.map((step) => ({ ...step, runId })))
+              .returning()
+          : [];
+      });
+    },
+
     async setWorkspace(
       userId: string,
       runId: string,

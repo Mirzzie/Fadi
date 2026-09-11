@@ -96,11 +96,22 @@ export function specForProject(input: { title: string; detail?: string | null })
 export function templateForProject(input: { title: string; detail?: string | null }): TemplateKey {
   const text = `${input.title} ${input.detail ?? ""}`;
 
-  if (/\b(?:active directory|domain controllers?|group policy|windows server)\b/i.test(text)) {
+  // WINDOWS IS DETECTED WHEREVER IT IS SAID, not only in four enterprise phrases.
+  //
+  // The old list matched "active directory", "group policy" and two others. A project
+  // describing a .msi, a C:\ path, PowerShell or plainly "on Windows" fell through to
+  // Ubuntu — so the guide could be Windows while the machine was Linux, which is the
+  // incoherence that gets someone stuck on step one.
+  const SERVER = /\b(?:active directory|domain controllers?|group policy|windows server|gpo|adds|dcpromo)\b/i;
+  const DESKTOP = /\b(?:windows ?1[01]|windows desktop|intune|sccm|edr|winget)\b/i;
+  const ANY_WINDOWS = /\b(?:windows|win64|win32|powershell|\.msi\b|c:\\|msiexec|winrm|hyper-?v)\b/i;
+
+  if (SERVER.test(text)) return "windows-server-2025";
+  if (DESKTOP.test(text)) return "windows-11";
+  if (ANY_WINDOWS.test(text)) {
+    // Said Windows without saying which. A server is the safer default for lab work —
+    // it does everything the desktop does and is what most infrastructure projects mean.
     return "windows-server-2025";
-  }
-  if (/\b(?:windows 1[01]|windows desktop|endpoint|intune|sccm|edr)\b/i.test(text)) {
-    return "windows-11";
   }
   if (
     /\b(?:postgres(?:ql)?|relational database|sql database|database server|replication)\b/i.test(

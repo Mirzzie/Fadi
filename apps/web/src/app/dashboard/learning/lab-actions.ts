@@ -574,6 +574,42 @@ export async function completeStepAction(input: {
   return { ok: Boolean(updated) };
 }
 
+/**
+ * PLAN IT AGAIN, because a wrong plan is otherwise a dead end.
+ *
+ * A run was produced whose steps described installing a Windows .msi while the lab it was
+ * placed on ran Ubuntu. Every instruction was unfollowable and there was nothing to do
+ * about it: no re-plan, no edit, only abandon and start over, losing the project.
+ *
+ * Replaces the steps, keeps the run. Anything already recorded against a step goes with
+ * the step — which is why it says so, and why a run with evidence attached is worth
+ * thinking twice about.
+ */
+export async function replanProjectAction(input: {
+  runId: string;
+}): Promise<{ ok: boolean; message?: string; steps?: number }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  if (!z.string().uuid().safeParse(input.runId).success) {
+    return { ok: false, message: "Unknown project." };
+  }
+
+  const { createProjectRunsRepository } = await import("@careeros/database");
+  const repo = createProjectRunsRepository(getDatabase());
+  const existing = await repo.getWithSteps(user.id, input.runId);
+  if (!existing) return { ok: false, message: "That project is gone." };
+
+  const { planProjectRun } = await import("@/lib/lab/plan-run");
+  const planned = await planProjectRun(user.id, {
+    title: existing.run.title,
+    detail: existing.run.detail,
+    replaceRunId: input.runId,
+  });
+
+  if (!planned.ok) return { ok: false, message: planned.message };
+  return { ok: true, steps: planned.plan.steps };
+}
+
 /** Reopen a step — because "I marked that too early" needs a way back. */
 export async function reopenStepAction(input: { stepId: string }): Promise<{ ok: boolean }> {
   const user = await getCurrentAuthUser();
