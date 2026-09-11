@@ -7,7 +7,7 @@ import { createLabResourcesRepository, createProjectRunsRepository } from "@care
 import { getDatabase } from "@/lib/database/client";
 import { getUserDocGenerate } from "@/lib/ai/user-generate";
 import { placeLab, type Resource } from "@/lib/lab/capability";
-import { hostOsOf, placementBriefing } from "./host-and-lab";
+import { hostOsOf, labOsOf, osViolations, placementBriefing } from "./host-and-lab";
 import { specForProject, templateForProject } from "@/lib/lab/spec-from-project";
 import { logger } from "@/lib/observability/logger";
 
@@ -137,6 +137,52 @@ export async function planProjectRun(
       planSchema,
       "project_plan",
     );
+
+    // CHECK THE PLAN AGAINST ITS OWN MACHINE.
+    //
+    // The briefing above asks for the right OS; it does not guarantee it. A real re-plan
+    // with an explicit "do NOT write a C:\\ path, a .msi, msiexec or PowerShell" came back
+    // with C:\Logs and C:\Program Files anyway. So the output is checked, and a plan that
+    // contradicts its own machine is sent back once with the violation named rather than
+    // saved as something unfollowable.
+    const labOs = labOsOf(template);
+    const planText = parsed.steps.map((s) => `${s.title} ${s.instruction} ${s.verify ?? ""}`).join("\n");
+    const violations = osViolations(planText, labOs);
+
+    if (violations.length > 0) {
+      logger.warn("lab.plan_os_mismatch", { userId, labOs, violations: violations.join(", ") });
+      const retry = await generate.structured(
+        SYSTEM,
+        [
+          `Project: ${input.title}`,
+          input.detail ? `Description: ${input.detail}` : "",
+          placement,
+          hostLine,
+          `Your previous plan used ${violations.join(", ")}, which cannot run on this ${labOs === "linux" ? "Linux" : "Windows"} machine. Write it again for the machine it actually runs on.`,
+        ]
+          .filter(Boolean)
+          .join("\n"),
+        planSchema,
+        "project_plan",
+      );
+      const retryText = retry.steps.map((s) => `${s.title} ${s.instruction} ${s.verify ?? ""}`).join("\n");
+      if (osViolations(retryText, labOs).length === 0) {
+        parsed.steps = retry.steps;
+      } else {
+        // Twice is enough. An unfollowable plan saved is worse than no plan: it looks like
+        // work waiting to be done and is a dead end on step one.
+        logger.warn("lab.plan_os_mismatch_persisted", { userId, labOs });
+        return {
+          ok: false,
+          message:
+            "Fadi kept writing " +
+            violations.join(", ") +
+            " for a " +
+            (labOs === "linux" ? "Linux" : "Windows") +
+            " machine, so it hasn't saved the plan rather than give you steps that cannot run. Try again, or say in the project description which OS you want.",
+        };
+      }
+    }
 
     const rows = parsed.steps.map((s, i) => ({
       ordinal: i + 1,

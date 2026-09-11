@@ -28,6 +28,7 @@ import {
   proposeProjectLabResumeAction,
   proposeProjectLabStopAction,
   reopenStepAction,
+  replanProjectAction,
   type ProjectRuntimeView,
   type RunView,
   type StepView,
@@ -297,6 +298,15 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
                 <p className="mt-1 text-sm text-muted-foreground">
                   Complete the current task before the next one becomes active.
                 </p>
+                {/*
+                  A WAY OUT OF A WRONG PLAN.
+
+                  A plan was produced describing a Windows .msi installer against a lab
+                  running Ubuntu — unfollowable from step one, with nothing to do about it
+                  but abandon the project and lose its workspace and history. Re-planning
+                  replaces the steps and keeps everything else.
+                */}
+                <Replan runId={runId} onReplanned={refresh} />
               </header>
               <ol className="divide-y divide-border/60">
                 {run.steps.map((step) => {
@@ -613,5 +623,66 @@ function EvidencePanel({
         })}
       </ol>
     </section>
+  );
+}
+
+
+/**
+ * Plan this project again.
+ *
+ * Behind a confirmation, because it discards the current steps — and anything recorded
+ * against a step goes with the step. That is worth a sentence rather than a surprise.
+ */
+function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => void }) {
+  const [asking, setAsking] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [busy, start] = useTransition();
+
+  if (!asking) {
+    return (
+      <button
+        type="button"
+        onClick={() => setAsking(true)}
+        className="mt-2 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+      >
+        These steps don&apos;t match my machine — plan it again
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-2 space-y-1.5 rounded-lg border border-border/60 p-2.5">
+      <p className="text-xs">
+        Fadi will write new steps for this project, against the machine it actually runs on.
+      </p>
+      <p className="text-[11px] text-muted-foreground">
+        The current steps are replaced, and anything you recorded against them goes too. The
+        project, its workspace and its history stay.
+      </p>
+      {note ? <p className="text-[11px] text-amber-500">{note}</p> : null}
+      <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          disabled={busy}
+          onClick={() =>
+            start(async () => {
+              const res = await replanProjectAction({ runId });
+              if (!res.ok) {
+                setNote(res.message ?? "Couldn't plan it again.");
+                return;
+              }
+              setAsking(false);
+              setNote(null);
+              onReplanned();
+            })
+          }
+        >
+          {busy ? "Planning…" : "Plan it again"}
+        </Button>
+        <Button size="sm" variant="ghost" disabled={busy} onClick={() => setAsking(false)}>
+          Cancel
+        </Button>
+      </div>
+    </div>
   );
 }

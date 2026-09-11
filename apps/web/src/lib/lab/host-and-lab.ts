@@ -64,6 +64,7 @@ export function placementBriefing(input: {
     }.`,
   ];
 
+  // WHICH MACHINE each step happens on.
   if (labOs === "windows" && input.hostOs !== "windows") {
     lines.push(
       `THE WORK HAPPENS INSIDE THE WINDOWS LAB, NOT ON THEIR ${host.toUpperCase()} COMPUTER.`,
@@ -81,6 +82,23 @@ export function placementBriefing(input: {
     );
   }
 
+  // AND WHAT THE LAB IS NOT — always, not only when the two machines differ.
+  //
+  // Found by re-planning a real project and reading what came back. With host and lab both
+  // Linux, the branch above distinguishes the two MACHINES and never rules out another OS;
+  // the model, seeing "Splunk", wrote msiexec, PowerShell and C:\Program Files anyway,
+  // because nothing had told it not to. Software with a familiar Windows install story
+  // pulls a plan toward Windows unless the instruction is explicit.
+  if (labOs === "linux") {
+    lines.push(
+      "Every command in this plan runs on Linux. Use Linux paths, package managers and shells. Do NOT write a C:\\ path, a .msi, msiexec, PowerShell, a Windows service, or any Windows UI step — not even for software whose usual install guide is written for Windows.",
+    );
+  } else {
+    lines.push(
+      "Every command in this plan runs on Windows. Use Windows paths, PowerShell and Windows tooling. Do NOT write apt, systemctl, /etc paths or bash-only syntax.",
+    );
+  }
+
   if (input.hostOs === "macos") {
     // Worth stating rather than discovering: there is no macOS lab, and pretending
     // otherwise would produce steps nobody can run.
@@ -90,4 +108,40 @@ export function placementBriefing(input: {
   }
 
   return lines.join("\n");
+}
+
+
+/**
+ * DOES THIS PLAN MATCH THE MACHINE IT RUNS ON?
+ *
+ * The briefing tells the model which OS the lab is. It is not a guarantee. Re-planning a
+ * real Splunk project with an explicit "do NOT write a C:\\ path, a .msi, msiexec or
+ * PowerShell" still produced `C:\Logs\apache_access.log` and `C:\Program Files` — the
+ * titles turned Linux, the instructions did not. Software with a familiar Windows install
+ * story pulls hard, and a smaller model follows the pull.
+ *
+ * So the output is CHECKED rather than trusted, which is the same rule the rest of this
+ * codebase applies to everything a model produces. A plan that contradicts its own machine
+ * is not a stylistic problem — it is unfollowable from step one.
+ */
+export function osViolations(text: string, labOs: LabOs): string[] {
+  const found: string[] = [];
+
+  if (labOs === "linux") {
+    // Windows-only constructs. Deliberately narrow: "Windows" as a word is fine in prose
+    // ("unlike Windows, ..."), a C:\ path is not.
+    if (/[A-Za-z]:\\\\/.test(text) || /[A-Za-z]:\\/.test(text)) found.push("a Windows drive path");
+    if (/\.msi\b/i.test(text)) found.push("an .msi installer");
+    if (/\bmsiexec\b/i.test(text)) found.push("msiexec");
+    if (/\bpowershell\b/i.test(text)) found.push("PowerShell");
+    if (/\bGet-[A-Z][A-Za-z]+\b/.test(text)) found.push("a PowerShell cmdlet");
+    if (/\bServer Manager\b/i.test(text)) found.push("Server Manager");
+  } else {
+    if (/\bapt(?:-get)?\s+install\b/i.test(text)) found.push("apt");
+    if (/\bsystemctl\b/i.test(text)) found.push("systemctl");
+    if (/\byum\s+install\b|\bdnf\s+install\b/i.test(text)) found.push("a Linux package manager");
+    if (/\bchmod\s+\+x\b/i.test(text)) found.push("chmod");
+  }
+
+  return [...new Set(found)];
 }

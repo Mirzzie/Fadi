@@ -69,3 +69,57 @@ describe("telling the planner where the work happens", () => {
     expect(brief).toContain("This laptop");
   });
 });
+
+describe("the briefing always says what the lab is NOT", () => {
+  it("forbids Windows even when host and lab are both Linux", async () => {
+    const { placementBriefing } = await import("./host-and-lab");
+    // Found by re-planning a real Splunk project: with both machines on Linux the briefing
+    // only distinguished the two MACHINES, so the model wrote msiexec, PowerShell and
+    // C:\Program Files anyway. Familiar Windows install stories pull a plan toward Windows
+    // unless the instruction is explicit.
+    const brief = placementBriefing({ hostOs: "linux", template: "linux-ubuntu", hostLabel: "This laptop" });
+    expect(brief).toMatch(/Every command in this plan runs on Linux/);
+    expect(brief).toMatch(/Do NOT write/);
+    expect(brief).toMatch(/msiexec/);
+    expect(brief).toMatch(/usual install guide is written for Windows/);
+  });
+
+  it("forbids Linux syntax when the lab is Windows", async () => {
+    const { placementBriefing } = await import("./host-and-lab");
+    const brief = placementBriefing({ hostOs: "windows", template: "windows-server-2025", hostLabel: null });
+    expect(brief).toMatch(/Every command in this plan runs on Windows/);
+    expect(brief).toMatch(/apt/);
+    expect(brief).toMatch(/systemctl/);
+  });
+})
+
+describe("checking a plan against its own machine", () => {
+  it("catches Windows constructs in a Linux plan", async () => {
+    const { osViolations } = await import("./host-and-lab");
+    // Exactly what came back from a real re-plan after being told not to.
+    expect(osViolations("Save it to C:\\Logs\\apache_access.log", "linux")).toContain("a Windows drive path");
+    expect(osViolations("run msiexec /i splunk.msi", "linux").length).toBeGreaterThan(0);
+    expect(osViolations("Open PowerShell as Administrator", "linux")).toContain("PowerShell");
+    expect(osViolations("Get-Service Splunkd", "linux")).toContain("a PowerShell cmdlet");
+  });
+
+  it("catches Linux constructs in a Windows plan", async () => {
+    const { osViolations } = await import("./host-and-lab");
+    expect(osViolations("run apt install splunk", "windows")).toContain("apt");
+    expect(osViolations("systemctl enable splunkd", "windows")).toContain("systemctl");
+  });
+
+  it("does NOT flag ordinary prose that merely mentions an OS", async () => {
+    const { osViolations } = await import("./host-and-lab");
+    // The word is fine; the construct is not. Flagging "Windows" as a word would make the
+    // check fire on every comparison and get switched off.
+    expect(osViolations("Unlike Windows, Linux keeps logs in /var/log.", "linux")).toEqual([]);
+    expect(osViolations("This is the Linux equivalent of Task Manager.", "windows")).toEqual([]);
+  });
+
+  it("reports each violation once", async () => {
+    const { osViolations } = await import("./host-and-lab");
+    const many = "C:\\a and C:\\b and C:\\c";
+    expect(osViolations(many, "linux")).toEqual(["a Windows drive path"]);
+  });
+});
