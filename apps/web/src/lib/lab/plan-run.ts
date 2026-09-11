@@ -7,7 +7,8 @@ import { createLabResourcesRepository, createProjectRunsRepository } from "@care
 import { getDatabase } from "@/lib/database/client";
 import { getUserDocGenerate } from "@/lib/ai/user-generate";
 import { placeLab, type Resource } from "@/lib/lab/capability";
-import { specForProject } from "@/lib/lab/spec-from-project";
+import { hostOsOf, placementBriefing } from "./host-and-lab";
+import { specForProject, templateForProject } from "@/lib/lab/spec-from-project";
 import { logger } from "@/lib/observability/logger";
 
 /**
@@ -92,26 +93,24 @@ export async function planProjectRun(
     };
   }
 
-  // WHAT OPERATING SYSTEM IS THIS, ACTUALLY.
+  // TWO MACHINES, AND THEY ARE OFTEN DIFFERENT.
   //
-  // A plan was produced telling the owner to "select the Windows 64-bit .msi" and save it
-  // to C:\Users\%USERNAME%\Downloads — on a Linux laptop. Every step of it was
-  // unfollowable, and nothing in the prompt had ever said what machine they were on, so
-  // the model filled the gap with the most common answer.
+  // A plan told the owner to download a Windows .msi into C:\Users\%USERNAME%\Downloads
+  // on a Linux laptop. Telling the planner the host OS fixes that and opens the opposite
+  // error: a Windows Server project rewritten as Linux steps, teaching something nobody
+  // asked to learn.
   //
-  // This is process.platform: the OS Fadi itself is running on. It is self-knowledge
-  // rather than an inspection of someone's machine — no capability covers "which OS am I",
-  // and gating it would mean planning blind by default, which is how the Windows steps
+  // So both are named — the host they sit at, and the lab Fadi provisions — along with
+  // which one each step belongs to. process.platform is self-knowledge about the machine
+  // Fadi runs on, not an inspection of anyone's computer, so it needs no capability;
+  // gating it would mean planning blind by default, which is how the Windows steps
   // happened.
-  const platform = process.platform;
-  const osLine =
-    platform === "linux"
-      ? "This machine runs LINUX. Use Linux paths, package managers and shell commands. Never write a C:\\ path, a .msi, PowerShell or a Windows UI step for it."
-      : platform === "darwin"
-        ? "This machine runs MACOS. Use macOS paths and Homebrew. Never write a C:\\ path or a .msi for it."
-        : platform === "win32"
-          ? "This machine runs WINDOWS. Use Windows paths and PowerShell."
-          : `This machine reports platform "${platform}". Say so rather than assuming a familiar one.`;
+  const template = templateForProject(input);
+  const placement = placementBriefing({
+    hostOs: hostOsOf(process.platform),
+    template,
+    hostLabel: host?.label ?? null,
+  });
 
   const hostLine = host
     ? `Host: ${host.label} — ${host.kind}, ${host.arch}, ${
@@ -122,7 +121,7 @@ export async function planProjectRun(
   try {
     const parsed = await generate.structured(
       SYSTEM,
-      [`Project: ${input.title}`, input.detail ? `Description: ${input.detail}` : "", osLine, hostLine]
+      [`Project: ${input.title}`, input.detail ? `Description: ${input.detail}` : "", placement, hostLine]
         .filter(Boolean)
         .join("\n"),
       planSchema,

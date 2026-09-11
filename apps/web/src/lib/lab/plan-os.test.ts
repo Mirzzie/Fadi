@@ -23,28 +23,21 @@ describe("the planner is told the operating system", () => {
     const code = SRC.split("\n")
       .filter((line) => !line.trim().startsWith("*") && !line.trim().startsWith("//"))
       .join("\n");
-    expect(code).toMatch(/const platform\s*=\s*process\.platform/);
+    expect(code).toMatch(/hostOsOf\(process\.platform\)/);
   });
 
   it("puts the OS into the prompt, not just into a variable", () => {
     // The bug would have survived a version that computed this and never sent it.
     const promptAssembly = SRC.slice(SRC.indexOf("`Project: ${input.title}`"));
-    expect(promptAssembly.slice(0, 200)).toContain("osLine");
+    expect(promptAssembly.slice(0, 200)).toContain("placement");
   });
 
-  it("names every platform it might run on, including the unexpected one", () => {
-    for (const platform of ["linux", "darwin", "win32"]) {
-      expect(SRC, platform).toContain(`"${platform}"`);
-    }
-    // A platform nobody anticipated must produce an honest sentence rather than falling
-    // through to whichever branch happens to be last.
-    expect(SRC).toMatch(/reports platform/);
-  });
-
-  it("forbids the exact mistake that was made", () => {
-    // Naming the failure in the instruction is what stops it recurring: a general "use the
-    // right OS" reads as filler, and this model had already ignored the general case.
-    expect(SRC).toMatch(/\.msi/);
-    expect(SRC).toMatch(/PowerShell/);
+  it("sends a placement briefing, not just an OS name", () => {
+    // The naive version said "this machine runs Linux", which fixed Windows-steps-on-Linux
+    // and made the opposite error available: a Windows Server project rewritten as Linux
+    // steps. Both machines have to be named. The wording of that briefing is tested in
+    // host-and-lab.test.ts; here we only prove the planner sends it.
+    expect(SRC).toContain("placementBriefing");
+    expect(SRC).toContain("templateForProject");
   });
 });
