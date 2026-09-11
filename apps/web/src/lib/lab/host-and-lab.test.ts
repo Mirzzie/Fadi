@@ -123,3 +123,18 @@ describe("checking a plan against its own machine", () => {
     expect(osViolations(many, "linux")).toEqual(["a Windows drive path"]);
   });
 });
+
+describe("briefing a project with no lab", () => {
+  it("tells the planner there is no machine, plainly", async () => {
+    const { placementBriefing } = await import("./host-and-lab");
+    const brief = placementBriefing({ hostOs: "linux", template: null, hostLabel: null });
+
+    expect(brief).toMatch(/NEEDS NO LAB MACHINE/);
+    // The exact phrase that appeared in the broken plan must be forbidden, or the model
+    // keeps writing steps for a machine that is not there.
+    expect(brief).toMatch(/Do NOT say "in the lab machine"/);
+    expect(brief).toMatch(/browser/i);
+    // And it must not invent an OS instruction for a machine that does not exist.
+    expect(brief).not.toMatch(/Every command in this plan runs on/);
+  });
+});

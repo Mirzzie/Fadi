@@ -50,12 +50,28 @@ export function labOsOf(template: TemplateKey): LabOs {
  */
 export function placementBriefing(input: {
   hostOs: HostOs;
-  template: TemplateKey;
+  template: TemplateKey | null;
   hostLabel: string | null;
 }): string {
+  const host = HOST_LABEL[input.hostOs];
+
+  // NO LAB, and that is a real answer.
+  //
+  // A ServiceNow project was given an Ubuntu container; ServiceNow is a website. The plan
+  // then said "on the laptop (Ubuntu 24.04) open a web browser", conflating the laptop
+  // with a machine that had no reason to exist. When nothing needs provisioning the
+  // planner is told so plainly, or it will write steps for a machine that is not there.
+  if (!input.template) {
+    return [
+      `The person's own computer runs ${host}.`,
+      "THIS PROJECT NEEDS NO LAB MACHINE. It is done in a browser or on their own computer — a hosted product, a vendor console, or writing.",
+      `Write every step for their own ${host} computer or for the website in question. Do NOT say "in the lab machine", do not reference a container or a VM, and do not ask them to install an operating system for this.`,
+      "If something does need to be saved, save it in their own working folder.",
+    ].join("\n");
+  }
+
   const labOs = labOsOf(input.template);
   const lab = LAB_TEMPLATES[input.template];
-  const host = HOST_LABEL[input.hostOs];
 
   const lines = [
     `The person's own computer runs ${host}.`,

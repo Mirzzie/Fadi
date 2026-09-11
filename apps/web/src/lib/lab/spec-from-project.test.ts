@@ -177,3 +177,63 @@ describe("Windows is detected wherever it is said", () => {
     ).toBe("linux-postgres");
   });
 });
+
+describe("work that needs no machine at all", () => {
+  it("THE REPORTED CASE: a ServiceNow project gets no lab", async () => {
+    const { templateForProject } = await import("./spec-from-project");
+    // ServiceNow is SaaS — you request a developer instance on their website and work in a
+    // browser. The Ubuntu container Fadi provisioned did nothing except cost disk and ask
+    // for permissions the work never needed, and the first step then read "on the laptop
+    // (Ubuntu 24.04) open a web browser".
+    expect(
+      templateForProject({
+        title: "ServiceNow SOC Incident Management Demo",
+        detail: "Create a ServiceNow Personal Developer Instance and configure incident management.",
+      }),
+    ).toBeNull();
+  });
+
+  it("recognises the shape, not just the brand", async () => {
+    const { templateForProject } = await import("./spec-from-project");
+    for (const detail of [
+      "Sign up for a free account and use the web console.",
+      "Request a developer instance, no installation required.",
+      "A browser-based hosted platform with a free tier account.",
+    ]) {
+      expect(templateForProject({ title: "A lab", detail }), detail).toBeNull();
+    }
+  });
+
+  it("a writing project gets no lab either", async () => {
+    const { templateForProject } = await import("./spec-from-project");
+    expect(
+      templateForProject({ title: "Incident response", detail: "Write a runbook for phishing triage." }),
+    ).toBeNull();
+  });
+
+  it("still gives a machine to work that genuinely needs one", async () => {
+    const { templateForProject } = await import("./spec-from-project");
+    // The risk of a "no machine" answer is that it swallows real lab work.
+    expect(
+      templateForProject({ title: "AD lab", detail: "Build a Windows Server domain controller." }),
+    ).toBe("windows-server-2025");
+    expect(
+      templateForProject({ title: "Reverse proxy", detail: "Configure nginx with TLS certificates." }),
+    ).toBe("linux-web");
+    expect(templateForProject({ title: "Scripting", detail: "Automate backups with bash." })).toBe(
+      "linux-ubuntu",
+    );
+  });
+
+  it("a hosted product wins over infrastructure vocabulary", async () => {
+    const { templateForProject } = await import("./spec-from-project");
+    // "Incident management" sounds like a server. ServiceNow is a website, and the hosted
+    // product has to be checked first or the vocabulary wins.
+    expect(
+      templateForProject({
+        title: "ServiceNow incident management",
+        detail: "Configure the server, groups and windows for change management.",
+      }),
+    ).toBeNull();
+  });
+});

@@ -145,9 +145,11 @@ export async function planProjectRun(
     // with C:\Logs and C:\Program Files anyway. So the output is checked, and a plan that
     // contradicts its own machine is sent back once with the violation named rather than
     // saved as something unfollowable.
-    const labOs = labOsOf(template);
+    // A project with no lab has no OS to contradict — the check is about a plan matching
+    // the machine it runs on, and there is no machine.
+    const labOs = template ? labOsOf(template) : null;
     const planText = parsed.steps.map((s) => `${s.title} ${s.instruction} ${s.verify ?? ""}`).join("\n");
-    const violations = osViolations(planText, labOs);
+    const violations = labOs ? osViolations(planText, labOs) : [];
 
     if (violations.length > 0) {
       logger.warn("lab.plan_os_mismatch", { userId, labOs, violations: violations.join(", ") });
@@ -166,7 +168,7 @@ export async function planProjectRun(
         "project_plan",
       );
       const retryText = retry.steps.map((s) => `${s.title} ${s.instruction} ${s.verify ?? ""}`).join("\n");
-      if (osViolations(retryText, labOs).length === 0) {
+      if (labOs && osViolations(retryText, labOs).length === 0) {
         parsed.steps = retry.steps;
       } else {
         // Twice is enough. An unfollowable plan saved is worse than no plan: it looks like

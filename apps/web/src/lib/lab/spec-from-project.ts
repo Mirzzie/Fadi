@@ -93,7 +93,53 @@ export function specForProject(input: { title: string; detail?: string | null })
  * recommendation later, but an agent cannot turn free-form project text into an image,
  * flag, port, or host path. It can only select one key from the reviewed catalogue.
  */
-export function templateForProject(input: { title: string; detail?: string | null }): TemplateKey {
+/**
+ * WORK THAT NEEDS NO MACHINE AT ALL.
+ *
+ * A ServiceNow project was given an Ubuntu container. ServiceNow is SaaS: you request a
+ * developer instance on their website and work in a browser. There is nothing to install,
+ * so the container added nothing — and the first step then read "on the laptop (Ubuntu
+ * 24.04) open a web browser", conflating the laptop with a lab that had no reason to
+ * exist.
+ *
+ * The same is true of every hosted console, and of projects that are only writing. Fadi
+ * spinning up a VM for them is not harmless: it costs disk, it asks for permissions it
+ * does not need, and it tells someone the work happens somewhere it does not.
+ *
+ * Matched on the SHAPE of the work — a hosted product, a vendor console, a browser-only
+ * task — rather than on a list of brand names, which would be stale within a month. The
+ * brands that are here are the ones whose free tiers this platform's users actually reach
+ * for.
+ */
+const NO_MACHINE =
+  /\b(?:servicenow|salesforce|workday|okta|auth0|jira|confluence|notion|figma|canva|splunk cloud|elastic cloud|datadog|sentry|grafana cloud|snyk|tryhackme|hack ?the ?box|codecademy|coursera|udemy)\b/i;
+
+const BROWSER_ONLY =
+  /\b(?:sign up for|create a free account|developer instance|free tier account|web console|browser-based|no installation|saas|hosted (?:platform|service|instance))\b/i;
+
+const WRITING_ONLY =
+  /\b(?:write|document|draft|outline|prepare) (?:a|an|the)? ?(?:runbook|policy|report|playbook|case study|post-?mortem|summary|proposal)\b/i;
+
+/**
+ * Which lab a project needs, or NULL when it needs none.
+ *
+ * Null is a real answer, not a failure to classify. Defaulting to Ubuntu made "no machine
+ * required" unrepresentable, so every project got one.
+ */
+export function templateForProject(input: { title: string; detail?: string | null }): TemplateKey | null {
+  const text = `${input.title} ${input.detail ?? ""}`;
+
+  // Asked first: a hosted product needs no machine however much infrastructure vocabulary
+  // its description carries. "Incident management" sounds like a server; ServiceNow is a
+  // website.
+  if (NO_MACHINE.test(text) || BROWSER_ONLY.test(text) || WRITING_ONLY.test(text)) {
+    return null;
+  }
+
+  return templateForProjectInner(input);
+}
+
+function templateForProjectInner(input: { title: string; detail?: string | null }): TemplateKey {
   const text = `${input.title} ${input.detail ?? ""}`;
 
   // WINDOWS IS DETECTED WHEREVER IT IS SAID, not only in four enterprise phrases.

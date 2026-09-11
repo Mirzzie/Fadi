@@ -380,6 +380,18 @@ export async function proposeProjectLabAction(input: { runId: string }): Promise
     title: project.run.title,
     detail: project.run.detail,
   });
+
+  // NO LAB IS A REAL ANSWER, and refusing here is the point. A ServiceNow project was
+  // given an Ubuntu container: ServiceNow is a website, so the container did nothing
+  // except cost disk and ask for permissions the work never needed.
+  if (!template) {
+    return {
+      ok: false,
+      message:
+        "This project doesn't need a lab machine — it's done in your browser or on your own computer. Nothing to start.",
+    };
+  }
+
   const currentStep = project.steps.find((step) => step.status === "pending") ?? null;
   const proposal = await proposeAction({
     userId: user.id,
