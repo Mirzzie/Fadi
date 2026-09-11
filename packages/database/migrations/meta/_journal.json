@@ -330,6 +330,13 @@
       "when": 1789158117966,
       "tag": "0046_project_workspace",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1789158498280,
+      "tag": "0047_capability_requests",
+      "breakpoints": true
     }
   ]
 }

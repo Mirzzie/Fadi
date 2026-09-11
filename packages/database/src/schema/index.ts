@@ -1279,6 +1279,19 @@ export const labActionRequests = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    /**
+     * What is being asked for.
+     *
+     *   action     — change something. `recipe` names it.
+     *   capability — permission to LOOK at something. `recipe` names the capability.
+     *
+     * One queue for both, because they are the same question to the person answering:
+     * Fadi wants to do a thing and is waiting. Splitting them put read permissions on a
+     * settings page as a standing list, which asked people to grant access speculatively
+     * for things that might never happen — and a permission granted in advance is one
+     * nobody remembers giving.
+     */
+    kind: text("kind").notNull().default("action"),
     /** Which recipe from the fixed catalogue — never a free-form command. */
     recipe: text("recipe").notNull(),
     /** The validated parameters. Re-rendered at execution and compared to `argv`. */

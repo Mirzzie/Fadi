@@ -23,6 +23,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const execFileMock = vi.fn();
 const findLive = vi.fn();
+const proposed: Record<string, unknown>[] = [];
+let pendingCapabilityResult: unknown = null;
 const record = vi.fn();
 
 vi.mock("node:child_process", () => ({
@@ -40,6 +42,13 @@ vi.mock("@careeros/database", () => ({
   createLabGrantsRepository: () => ({ findLive, revokeAll: vi.fn() }),
   createLabActionsRepository: () => ({ record, denialsSince: async () => [] }),
   createLabActionRequestsRepository: () => ({
+    pendingCapability: async () => pendingCapabilityResult,
+    // A denied read now RAISES A REQUEST instead of only logging, so the queue can ask the
+    // person wherever they are rather than leaving a standing list on a settings page.
+    propose: async (row: Record<string, unknown>) => {
+      proposed.push(row);
+      return { ...row, id: "req-1" };
+    },
     get: async () => null,
     executedLastHour: async () => 0,
   }),
@@ -206,5 +215,61 @@ describe("nothing can be steered from outside", () => {
     // The reason the catalogue is worth auditing is that it is the ONLY place commands
     // live. A second executor elsewhere would make this whole file decorative.
     expect(PROBE).not.toContain("child_process");
+  });
+});
+
+describe("permission is asked at the trigger, not stockpiled in advance", () => {
+  it("raises a REQUEST when a read is refused, so the queue can ask", async () => {
+    // The objection this answers: "why is there a predefined permissions list? the user
+    // should only be asked when there is an action that requires system access."
+    //
+    // A standing list of "Allow for 2h" rows asks people to grant access speculatively for
+    // things that may never happen — and a permission granted in advance is one nobody
+    // remembers giving.
+    findLive.mockResolvedValue(null);
+    proposed.length = 0;
+    const { requestCapability } = await import("./broker");
+
+    await requestCapability({
+      userId: "u1",
+      capability: "inspect.containers",
+      actor: "model",
+      origin: "test",
+    });
+
+    expect(proposed).toHaveLength(1);
+    expect(proposed[0].kind).toBe("capability");
+    expect(proposed[0].recipe).toBe("inspect.containers");
+    // The card must carry the consent text and its limit, not a bare capability id.
+    expect(String(proposed[0].summary)).toMatch(/docker/i);
+    expect(String(proposed[0].reversal)).toMatch(/cannot/i);
+  });
+
+  it("asks ONCE — a page that inspects repeatedly does not fill the queue", async () => {
+    findLive.mockResolvedValue(null);
+    proposed.length = 0;
+    pendingCapabilityResult = { id: "already-asking" };
+    const { requestCapability } = await import("./broker");
+
+    await requestCapability({ userId: "u1", capability: "inspect.host", actor: "model", origin: "t" });
+
+    expect(proposed).toHaveLength(0);
+    pendingCapabilityResult = null;
+  });
+
+  it("still runs nothing and still records the denial", async () => {
+    findLive.mockResolvedValue(null);
+    const { requestCapability } = await import("./broker");
+
+    const result = await requestCapability({
+      userId: "u1",
+      capability: "inspect.containers",
+      actor: "model",
+      origin: "test",
+    });
+
+    expect(result.ok).toBe(false);
+    expect(execFileMock).not.toHaveBeenCalled();
+    expect(record.mock.calls.some((c) => c[0].decision === "denied")).toBe(true);
   });
 });

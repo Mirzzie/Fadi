@@ -15,7 +15,6 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   getWorkspace,
-  grantCapability,
   listPermissions,
   registerDiscovered,
   revokeAllCapabilities,
@@ -48,9 +47,6 @@ function timeLeft(iso: string | null): string | null {
   return mins >= 60 ? Math.round(mins / 60) + "h left" : mins + "m left";
 }
 
-function permissionDuration(minutes: number): string {
-  return minutes >= 60 && minutes % 60 === 0 ? `${minutes / 60}h` : `${minutes}m`;
-}
 
 export function MachineAccess() {
   const [caps, setCaps] = useState<CapabilityView[] | null>(null);
@@ -192,13 +188,25 @@ export function MachineAccess() {
 
       {openPanel === "permissions" ? (
         <div className="space-y-2 border-t border-border/60 bg-background/25 p-4">
-          <p className="text-xs text-muted-foreground">
-            These permissions allow read-only inspection for a short time. Starting, stopping, or
-            changing a lab is approved separately every time.
-          </p>
-          {caps.map((capability) => {
-            const left = timeLeft(capability.grantedUntil);
-            return (
+          {/*
+            WHAT IS OPEN, NOT WHAT COULD BE.
+
+            This listed every capability Fadi understands with an "Allow for 2h" button
+            beside it — a standing menu asking people to grant access in advance, for things
+            that may never happen. A permission granted speculatively is one nobody
+            remembers giving.
+
+            Fadi asks at the moment it needs something, and the ask arrives in the same
+            queue as everything else, wherever the person happens to be. So this panel only
+            shows what is currently open, and the only thing it offers is taking it back.
+          */}
+          {live.length === 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Nothing is open. Fadi will ask when it needs something, and the request will appear
+              wherever you are — there is no list here to grant in advance.
+            </p>
+          ) : (
+            live.map((capability) => (
               <div
                 key={capability.capability}
                 className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 bg-card p-3"
@@ -207,41 +215,23 @@ export function MachineAccess() {
                   <p className="text-xs font-medium">{capability.summary}</p>
                   <p className="mt-0.5 text-[11px] text-muted-foreground">{capability.limit}</p>
                 </div>
-                {left ? (
-                  <>
-                    <span className="text-[11px] text-emerald-500">{left}</span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={pending}
-                      onClick={() =>
-                        start(async () => {
-                          await revokeCapability({ capability: capability.capability });
-                          refresh();
-                        })
-                      }
-                    >
-                      Revoke
-                    </Button>
-                  </>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={pending}
-                    onClick={() =>
-                      start(async () => {
-                        await grantCapability({ capability: capability.capability });
-                        refresh();
-                      })
-                    }
-                  >
-                    Allow for {permissionDuration(capability.defaultMinutes)}
-                  </Button>
-                )}
+                <span className="text-[11px] text-emerald-500">{timeLeft(capability.grantedUntil)}</span>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={pending}
+                  onClick={() =>
+                    start(async () => {
+                      await revokeCapability({ capability: capability.capability });
+                      refresh();
+                    })
+                  }
+                >
+                  Revoke
+                </Button>
               </div>
-            );
-          })}
+            ))
+          )}
         </div>
       ) : null}
 

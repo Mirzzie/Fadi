@@ -30,6 +30,29 @@ export function createLabActionRequestsRepository(db: Database) {
       return row;
     },
 
+    /**
+     * Is Fadi already waiting on permission for this?
+     *
+     * Without this, every denied read raises another prompt: open a page that inspects the
+     * machine and the queue fills with the same question. One live ask per capability.
+     */
+    async pendingCapability(userId: string, capability: string): Promise<LabActionRequest | null> {
+      const [row] = await db
+        .select()
+        .from(labActionRequests)
+        .where(
+          and(
+            eq(labActionRequests.userId, userId),
+            eq(labActionRequests.kind, "capability"),
+            eq(labActionRequests.recipe, capability),
+            eq(labActionRequests.status, "pending"),
+            gt(labActionRequests.expiresAt, new Date()),
+          ),
+        )
+        .limit(1);
+      return row ?? null;
+    },
+
     /** Read one request without claiming it — for checking a confirmation before spending it. */
     async get(userId: string, id: string): Promise<LabActionRequest | null> {
       const [row] = await db

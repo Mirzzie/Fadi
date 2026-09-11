@@ -42,6 +42,7 @@ vi.mock("@careeros/database", () => ({
   createLabGrantsRepository: () => ({ findLive: findLiveForBroker, revokeAll }),
   createLabActionsRepository: () => ({ record, denialsSince }),
   createLabActionRequestsRepository: () => ({
+    pendingCapability: async () => null,
     propose,
     approve,
     finish,

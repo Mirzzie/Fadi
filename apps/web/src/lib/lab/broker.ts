@@ -309,6 +309,36 @@ export async function requestCapability(input: {
 
   const live = await grants.findLive(input.userId, capability, resourceId);
   if (!live) {
+    // ASK AT THE MOMENT OF THE TRIGGER, not in advance.
+    //
+    // Permission used to be a standing list on a settings page: four rows offering "Allow
+    // for 2h" for things that might never happen. That asks people to grant access
+    // speculatively, and a permission granted in advance is one nobody remembers giving.
+    //
+    // So a denied read raises a REQUEST in the same queue as everything else, which
+    // surfaces wherever the person is rather than on a page they have to go and find.
+    // One live ask per capability — opening a page that inspects the machine should not
+    // fill the queue with the same question.
+    const requests = createLabActionRequestsRepository(db);
+    const already = await requests.pendingCapability(input.userId, capability);
+    if (!already) {
+      await requests.propose({
+        userId: input.userId,
+        kind: "capability",
+        recipe: capability,
+        params: { capability },
+        argv: spec.commands.map((c) => [c.cmd, ...c.args]),
+        summary: spec.summary,
+        reversal: spec.limit,
+        preflight: [],
+        actor: input.actor,
+        origin: input.origin,
+        // Long-lived: a question about permission is still worth answering an hour later,
+        // and it disappears the moment it is answered either way.
+        expiresAt: new Date(Date.now() + 24 * 60 * 60_000),
+      });
+    }
+
     await audit.record({
       userId: input.userId,
       actor: input.actor,
@@ -318,7 +348,7 @@ export async function requestCapability(input: {
       capability,
       resourceId,
       decision: "denied",
-      detail: "No live grant.",
+      detail: "No live grant — asked you for permission.",
     });
     return {
       ok: false,
@@ -1417,6 +1447,43 @@ export async function approveAndRun(input: {
         };
       }
     }
+  }
+
+  // A PERMISSION ASK IS ANSWERED BY GRANTING, NOT BY RUNNING.
+  //
+  // Same queue, same card, same "yes" — but saying yes to "may I look at your containers"
+  // opens the capability for its window rather than executing anything. Nothing about the
+  // machine changes at the moment of approval; the next read is simply allowed.
+  if (preview && preview.kind === "capability") {
+    const capability = preview.recipe;
+    if (!isCapability(capability)) {
+      return { ok: false, message: "Fadi no longer asks for that." };
+    }
+    const claimed = await requests.approve(input.userId, input.requestId);
+    if (!claimed) {
+      return { ok: false, message: "That request is no longer waiting — it has already been answered." };
+    }
+
+    const spec = CAPABILITIES[capability];
+    await createLabGrantsRepository(db).grant({
+      userId: input.userId,
+      capability,
+      minutes: spec.defaultMinutes,
+      reason: spec.summary + " Limit: " + spec.limit,
+    });
+    await requests.finish(input.userId, input.requestId, {
+      status: "executed",
+      detail: "Allowed for " + spec.defaultMinutes + " minutes.",
+    });
+    await audit.record({
+      userId: input.userId,
+      actor: "user",
+      origin: "approval",
+      capability,
+      decision: "allowed",
+      detail: "You allowed this for " + spec.defaultMinutes + " minutes.",
+    });
+    return { ok: true, output: "Allowed. Fadi can do this for the next " + spec.defaultMinutes + " minutes." };
   }
 
   // RE-CHECK THE EFFECT BEFORE SPENDING THE APPROVAL.
