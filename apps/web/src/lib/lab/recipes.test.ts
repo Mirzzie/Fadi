@@ -339,6 +339,10 @@ describe("the catalogue itself stays safe as it grows", () => {
         cidr: "192.168.0.0/24",
         ip: "192.168.0.56",
         template: "windows-server-2025",
+        base: "ubuntu-24.04",
+        packages: ["nginx"],
+        ports: [8080],
+        workdir: "/lab",
       });
       expect(params, `${id} should accept a legal parameter bag`).not.toBeNull();
 

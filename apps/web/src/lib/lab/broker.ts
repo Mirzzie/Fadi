@@ -10,6 +10,7 @@ import {
   createLabGrantsRepository,
 } from "@careeros/database";
 
+import { composeDockerfile, validateImageSpec } from "./image";
 import {
   isTemplateKey,
   LAB_TEMPLATES,
@@ -123,7 +124,20 @@ type NetStep =
   | { id: string; net: "sweep"; cidr: string }
   | { id: string; net: "identify"; ip: string };
 
-type Step = Command | FileStep | NetStep;
+/**
+ * Building an image from a directory in the workspace.
+ *
+ * Its own kind because the build context is a PATH, and paths are resolved against the
+ * live workspace at execution — never stored absolute, never trusted from a row. Same rule
+ * as a file write, for the same reason.
+ */
+type BuildStep = { id: string; build: string; tag: string };
+
+type Step = Command | FileStep | NetStep | BuildStep;
+
+function isBuildStep(step: Step): step is BuildStep {
+  return "build" in step;
+}
 
 function isNetStep(step: Step): step is NetStep {
   return "net" in step;
@@ -140,6 +154,7 @@ function digest(text: string): string {
 
 /** How a step is shown to the person, and what the approval is compared against. */
 function displayOf(step: Step): string[] {
+  if (isBuildStep(step)) return ["docker", "build", "-t", step.tag, step.build];
   if (isNetStep(step)) {
     return step.net === "sweep"
       ? ["ping every host in", step.cidr]
@@ -355,6 +370,8 @@ export async function requestCapability(input: {
 
 export const RECIPE_IDS = [
   "lab.start",
+  "lab.build",
+  "lab.buildFile",
   "network.sweep",
   "network.identify",
   "container.run",
@@ -596,6 +613,81 @@ export const RECIPES: Record<RecipeId, Recipe> = {
         args: renderTemplate(String(p.template) as TemplateKey, NAME_PREFIX + String(p.name)),
       },
     ],
+  },
+
+  /**
+   * BUILD A LAB IMAGE FOR THIS PROJECT.
+   *
+   * The model expresses intent — a base, some packages, some ports — and image.ts renders
+   * the Dockerfile deterministically. Nothing a caller says becomes a line in the file.
+   *
+   * The Dockerfile is WRITTEN INTO THE WORKSPACE before it is built, deliberately: it is
+   * something the person can read, keep, edit and show, rather than a hidden artefact of a
+   * build. It is also, incidentally, evidence.
+   */
+  "lab.build": {
+    blast: "workspace",
+    reversibility: "reversible",
+    confirmToken: (p) => NAME_PREFIX + String(p.name),
+    validate: (raw) => {
+      const name = str(raw.name);
+      if (!name || !NAME_RE.test(name)) return null;
+      const spec = validateImageSpec({
+        base: raw.base,
+        packages: raw.packages,
+        ports: raw.ports,
+        workdir: raw.workdir,
+      });
+      if (!spec.ok) return null;
+      return { name, ...spec.spec, dockerfile: composeDockerfile(spec.spec) };
+    },
+    summary: (p) =>
+      "Build a lab image called " +
+      NAME_PREFIX +
+      p.name +
+      " from this Dockerfile, written into your workspace at " +
+      p.name +
+      "/Dockerfile:\n\n" +
+      String(p.dockerfile),
+    reversal: (p) =>
+      "Remove the image with docker rmi " + NAME_PREFIX + String(p.name) + "; the Dockerfile stays in your workspace.",
+    render: (p) => [
+      { id: "dockerfile", fs: "write", path: String(p.name) + "/Dockerfile", content: String(p.dockerfile) },
+      { id: "build", build: String(p.name), tag: NAME_PREFIX + String(p.name) },
+    ],
+  },
+
+  /**
+   * BUILD A DOCKERFILE THE PERSON WROTE THEMSELVES.
+   *
+   * The other honest path. The vocabulary above cannot express everything, and pretending
+   * otherwise would mean either a uselessly narrow catalogue or a model writing code. So
+   * when it falls short, the person writes the file in their own workspace and Fadi builds
+   * THAT — labelled as theirs, in the prompt and in the log.
+   *
+   * Fadi is not vetting this file and does not claim to. It is the same rule the evidence
+   * layer uses: a human's own work outranks a machine's, and it is never re-attributed.
+   */
+  "lab.buildFile": {
+    blast: "workspace",
+    reversibility: "reversible",
+    confirmToken: (p) => String(p.path),
+    validate: (raw) => {
+      const path = str(raw.path);
+      if (!path || !REL_PATH_RE.test(path) || hasTraversalSegment(path) || path.length > 200) return null;
+      const name = str(raw.name);
+      if (!name || !NAME_RE.test(name)) return null;
+      return { path, name };
+    },
+    summary: (p) =>
+      "Build the Dockerfile you wrote in " +
+      p.path +
+      " as " +
+      NAME_PREFIX +
+      p.name +
+      ". This is your file — Fadi hasn't checked what is in it and isn't vouching for it.",
+    reversal: (p) => "Remove the image with docker rmi " + NAME_PREFIX + String(p.name) + ".",
+    render: (p) => [{ id: "build", build: String(p.path), tag: NAME_PREFIX + String(p.name) }],
   },
 
   "network.sweep": {
@@ -1019,6 +1111,30 @@ function ipToIntSafe(ip: string): number | null {
   return parts.length === 4 ? ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0 : null;
 }
 
+/**
+ * Build an image from a workspace directory.
+ *
+ * The context is resolved and contained here, at execution, exactly like a file write —
+ * so a build cannot be pointed at the home directory by a row that was edited, and cannot
+ * follow a symlink out of the workspace.
+ */
+async function runBuildStep(userId: string, step: BuildStep): Promise<StepResult> {
+  const { createLabSettingsRepository } = await import("@careeros/database");
+  const { resolveInWorkspace } = await import("./workspace");
+
+  const root = await createLabSettingsRepository(getDatabase()).workspaceRoot(userId);
+  const resolved = await resolveInWorkspace(root, step.build);
+  if (!resolved.ok) throw new Error(resolved.reason);
+
+  // Builds pull base images and run package managers; a minute is not enough.
+  const { stdout } = await run("docker", ["build", "-t", step.tag, resolved.path], {
+    timeout: 900_000,
+    maxBuffer: 4 * 1024 * 1024,
+  });
+  const lines = stdout.trim().split("\n");
+  return { text: lines[lines.length - 1] ?? "built " + step.tag };
+}
+
 async function runCommand(c: Command): Promise<StepResult> {
   const { stdout } = await run(c.cmd, c.args, { timeout: 60_000, maxBuffer: 512 * 1024 });
   return { text: (stdout.split("\n")[0] ?? "").trim() };
@@ -1216,11 +1332,13 @@ export async function approveAndRun(input: {
   let discovered: Discovered | undefined;
   for (const c of commands) {
     try {
-      const result = isNetStep(c)
-        ? await runNetStep(c)
-        : isFileStep(c)
-          ? await runFileStep(input.userId, c)
-          : await runCommand(c);
+      const result = isBuildStep(c)
+        ? await runBuildStep(input.userId, c)
+        : isNetStep(c)
+          ? await runNetStep(c)
+          : isFileStep(c)
+            ? await runFileStep(input.userId, c)
+            : await runCommand(c);
       out.push(result.text);
       if (result.discovered) discovered = result.discovered;
       await audit.record({
