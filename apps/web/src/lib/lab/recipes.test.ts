@@ -27,6 +27,7 @@ const get = vi.fn();
 const executedLastHour = vi.fn();
 const denialsSince = vi.fn();
 const revokeAll = vi.fn();
+const getResource = vi.fn();
 
 vi.mock("node:child_process", () => ({
   execFile: Object.assign(execFileMock, {
@@ -49,6 +50,7 @@ vi.mock("@careeros/database", () => ({
     executedLastHour,
     revise,
   }),
+  createLabResourcesRepository: () => ({ get: getResource }),
 }));
 
 beforeEach(() => {
@@ -65,12 +67,14 @@ beforeEach(() => {
   findLiveForBroker.mockResolvedValue(null);
   denialsSince.mockReset();
   revokeAll.mockReset();
+  getResource.mockReset();
   createdNames.mockResolvedValue([]);
   // Quiet defaults: nothing suspicious has happened and nothing has run recently, so the
   // security layer stays out of the way of the tests that are about something else.
   denialsSince.mockResolvedValue([]);
   executedLastHour.mockResolvedValue(0);
   get.mockResolvedValue(null);
+  getResource.mockResolvedValue(null);
   propose.mockImplementation(async (row: Record<string, unknown>) => ({ ...row, id: "req-1" }));
   execFileMock.mockResolvedValue({ stdout: "abc123\n", stderr: "" });
 });
@@ -107,7 +111,13 @@ describe("a proposal cannot express a command that is not in the file", () => {
   }
 
   it("rejects an image nobody vetted, however it is spelled", async () => {
-    for (const image of ["evil/miner:latest", "nginx:latest", "../nginx", "nginx:1.27-alpine", ""]) {
+    for (const image of [
+      "evil/miner:latest",
+      "nginx:latest",
+      "../nginx",
+      "nginx:1.27-alpine",
+      "",
+    ]) {
       const res = await propose_({ image, name: "web" });
       expect(res.ok, `image ${JSON.stringify(image)} should be refused`).toBe(false);
     }
@@ -183,7 +193,10 @@ describe("proposing runs nothing", () => {
     const mutating = ["run", "rm", "stop", "start", "create", "kill", "exec", "pull", "build"];
     for (const call of execFileMock.mock.calls) {
       const args = call[1] as string[];
-      expect(args.some((a) => mutating.includes(a)), args.join(" ")).toBe(false);
+      expect(
+        args.some((a) => mutating.includes(a)),
+        args.join(" ")
+      ).toBe(false);
     }
   });
 
@@ -195,7 +208,17 @@ describe("proposing runs nothing", () => {
     const { join } = await import("node:path");
     const src = readFileSync(join(process.cwd(), "src/lib/lab/preflight.ts"), "utf8");
 
-    for (const verb of ['"run"', '"rm"', '"stop"', '"start"', '"create"', '"exec"', '"pull"', '"kill"', '"build"']) {
+    for (const verb of [
+      '"run"',
+      '"rm"',
+      '"stop"',
+      '"start"',
+      '"create"',
+      '"exec"',
+      '"pull"',
+      '"kill"',
+      '"build"',
+    ]) {
       expect(src, "preflight must not contain " + verb).not.toContain(verb);
     }
     expect(src).not.toMatch(/writeFile|unlink|rmdir|mkdir/);
@@ -227,6 +250,15 @@ describe("Fadi may only stop or remove what it started", () => {
     const res = await propose_({ name: "web" }, "container.stop");
     expect(res.ok).toBe(true);
     if (res.ok) expect(res.argv[0]).toEqual(["docker", "stop", "fadi-web"]);
+  });
+
+  it("can resume a lab created through the project template path", async () => {
+    createdNames.mockImplementation(async (_userId: string, recipe: string) =>
+      recipe === "lab.start" ? ["project-12345678"] : []
+    );
+    const res = await propose_({ name: "project-12345678" }, "container.start");
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.argv[0]).toEqual(["docker", "start", "fadi-project-12345678"]);
   });
 
   it("checks the same way for removal, which is the destructive one", async () => {
@@ -269,7 +301,7 @@ describe("approval runs exactly what was shown", () => {
     expect(execFileMock).toHaveBeenCalledWith(
       "docker",
       ["run", "-d", "--name", "fadi-web", "nginx:1.27-alpine"],
-      expect.anything(),
+      expect.anything()
     );
   });
 
@@ -334,7 +366,15 @@ describe("the catalogue itself stays safe as it grows", () => {
     // KVM, a TAP device, and the capability to configure that device. The honest invariant
     // is not "never --device"; it is "only these, only there, and never derived from
     // anything a caller said".
-    const virtualisationOnly = ["--device", "/dev/kvm", "/dev/net/tun", "--cap-add", "NET_ADMIN", "--stop-timeout", "120"];
+    const virtualisationOnly = [
+      "--device",
+      "/dev/kvm",
+      "/dev/net/tun",
+      "--cap-add",
+      "NET_ADMIN",
+      "--stop-timeout",
+      "120",
+    ];
 
     for (const id of RECIPE_IDS) {
       const recipe = RECIPES[id];
@@ -351,6 +391,9 @@ describe("the catalogue itself stays safe as it grows", () => {
         packages: ["nginx"],
         ports: [8080],
         workdir: "/lab",
+        resourceId: "11111111-1111-4111-8111-111111111111",
+        label: "Windows lab",
+        vmxPath: "/home/user/VMs/windows/windows.vmx",
       });
       expect(params, `${id} should accept a legal parameter bag`).not.toBeNull();
 
@@ -361,14 +404,15 @@ describe("the catalogue itself stays safe as it grows", () => {
         }
 
         const elevated = step.args.filter(
-          (a) => a === "--device" || a === "--cap-add" || a.startsWith("/dev/"),
+          (a) => a === "--device" || a === "--cap-add" || a.startsWith("/dev/")
         );
         if (elevated.length > 0) {
           // Whatever it asked for must be inside the permitted set, and it must have asked
           // because a template said it needed to — not because a parameter said so.
           for (const arg of step.args) {
             if (arg.startsWith("--") || arg.startsWith("/dev/")) {
-              const known = virtualisationOnly.includes(arg) || ["-d", "-e", "-p", "--name"].includes(arg);
+              const known =
+                virtualisationOnly.includes(arg) || ["-d", "-e", "-p", "--name"].includes(arg);
               expect(known, `${id} emitted an unexpected flag: ${arg}`).toBe(true);
             }
           }
@@ -378,10 +422,50 @@ describe("the catalogue itself stays safe as it grows", () => {
   });
 });
 
+describe("existing VMware machines", () => {
+  it("resolves the VMX path from an owner-scoped resource instead of caller input", async () => {
+    getResource.mockResolvedValue({
+      id: "11111111-1111-4111-8111-111111111111",
+      label: "Windows lab",
+      endpoint: "vmware://local/home/user/VMs/windows.vmx",
+    });
+    const res = await propose_(
+      {
+        resourceId: "11111111-1111-4111-8111-111111111111",
+        vmxPath: "/tmp/attacker.vmx",
+        label: "Not the real label",
+      },
+      "vmware.start",
+    );
+
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.argv[0]).toEqual([
+        "vmrun",
+        "start",
+        "/home/user/VMs/windows.vmx",
+        "gui",
+      ]);
+      expect(res.summary).toContain("Windows lab");
+      expect(res.argv[0]).not.toContain("/tmp/attacker.vmx");
+    }
+  });
+
+  it("refuses an absent or differently owned VMware resource", async () => {
+    getResource.mockResolvedValue(null);
+    const res = await propose_(
+      { resourceId: "11111111-1111-4111-8111-111111111111" },
+      "vmware.start",
+    );
+    expect(res.ok).toBe(false);
+    expect(propose).not.toHaveBeenCalled();
+  });
+});
+
 describe("the security layer stops things, not just describes them", () => {
   it("THE BREAKER: a burst of machine denials closes everything and refuses to propose", async () => {
     denialsSince.mockResolvedValue(
-      Array.from({ length: 6 }, () => ({ actor: "model", createdAt: new Date() })),
+      Array.from({ length: 6 }, () => ({ actor: "model", createdAt: new Date() }))
     );
 
     const res = await propose_({ image: "nginx", name: "web" });
@@ -396,7 +480,7 @@ describe("the security layer stops things, not just describes them", () => {
 
   it("the breaker ignores a person declining prompts", async () => {
     denialsSince.mockResolvedValue(
-      Array.from({ length: 9 }, () => ({ actor: "user", createdAt: new Date() })),
+      Array.from({ length: 9 }, () => ({ actor: "user", createdAt: new Date() }))
     );
     const res = await propose_({ image: "nginx", name: "web" });
     expect(res.ok).toBe(true);
@@ -460,7 +544,11 @@ describe("typing the name is not decoration", () => {
     const res = await approveAndRun({ userId: "u1", requestId: "req-1", confirmation: "fadi-web" });
 
     expect(res.ok).toBe(true);
-    expect(execFileMock).toHaveBeenCalledWith("docker", ["rm", "-f", "fadi-web"], expect.anything());
+    expect(execFileMock).toHaveBeenCalledWith(
+      "docker",
+      ["rm", "-f", "fadi-web"],
+      expect.anything()
+    );
   });
 
   it("does not demand typing for a reversible action", async () => {
@@ -501,7 +589,10 @@ describe("filesystem recipes refuse anything that isn't an ordinary workspace pa
   }
 
   it("accepts an ordinary relative path", async () => {
-    const res = await propose_({ path: "ad-lab/provision.ps1", content: "Write-Host hi" }, "file.write");
+    const res = await propose_(
+      { path: "ad-lab/provision.ps1", content: "Write-Host hi" },
+      "file.write"
+    );
     expect(res.ok).toBe(true);
     // The path stays RELATIVE in the row. There is no absolute path stored for anyone to
     // tamper with, and containment is decided against the disk at execution.
@@ -562,7 +653,7 @@ describe("THE BUG: ordinary proposals must not look hostile", () => {
     expect(revokeAll).not.toHaveBeenCalled();
     expect(record.mock.calls.every((c) => c[0].decision === "proposed")).toBe(true);
   });
-})
+});
 
 describe("the network sweep cannot be pointed off your own network", () => {
   it("REFUSES a public range, so an injected instruction gets nowhere", async () => {
@@ -601,7 +692,7 @@ describe("the network sweep cannot be pointed off your own network", () => {
     const row = propose.mock.calls[0][0];
     const serialised = JSON.stringify(row);
     // If a host list were stored, a tampered row could add an address outside the range.
-    expect(serialised).not.toContain("192.168.0.1\"");
+    expect(serialised).not.toContain('192.168.0.1"');
     expect(JSON.stringify(row.params)).toContain("192.168.0.0/24");
   });
 });
@@ -631,7 +722,7 @@ describe("identifying a host is bounded the same way as the sweep", () => {
     // A port list from input is a port scanner with extra steps.
     const res = await propose_(
       { ip: "192.168.0.56", ports: [1, 2, 3, 4, 5], port: 9999 },
-      "network.identify",
+      "network.identify"
     );
     expect(res.ok).toBe(true);
     if (res.ok) {
@@ -733,7 +824,12 @@ describe("THE REPORTED BUG: the monitor showed a person their own decisions as a
   it("no live grant IS a denial", async () => {
     findLiveForBroker.mockResolvedValue(null);
     const { requestCapability } = await import("./broker");
-    await requestCapability({ userId: "u1", capability: "inspect.host", actor: "model", origin: "t" });
+    await requestCapability({
+      userId: "u1",
+      capability: "inspect.host",
+      actor: "model",
+      origin: "t",
+    });
     expect(record.mock.calls.some((c) => c[0].decision === "denied")).toBe(true);
   });
 
@@ -783,5 +879,27 @@ describe("actions know what they were part of", () => {
       expect(call[0].runId).toBeNull();
       expect(call[0].stepId).toBeNull();
     }
+  });
+
+  it("keeps project provenance when the approved command actually runs", async () => {
+    const row = {
+      id: "req-1",
+      recipe: "container.run",
+      params: { image: "nginx", name: "web", port: null },
+      argv: [["docker", "run", "-d", "--name", "fadi-web", "nginx:1.27-alpine"]],
+      preflight: [],
+      runId: "run-1",
+      stepId: "step-3",
+    };
+    get.mockResolvedValue(row);
+    approve.mockResolvedValue(row);
+
+    const { approveAndRun } = await import("./broker");
+    const result = await approveAndRun({ userId: "u1", requestId: "req-1" });
+
+    expect(result.ok).toBe(true);
+    const execution = record.mock.calls.find((call) => call[0].decision === "allowed");
+    expect(execution?.[0].runId).toBe("run-1");
+    expect(execution?.[0].stepId).toBe("step-3");
   });
 });

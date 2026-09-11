@@ -21,7 +21,7 @@ import {
 export function createLabActionRequestsRepository(db: Database) {
   return {
     async propose(
-      input: Omit<NewLabActionRequest, "id" | "createdAt" | "updatedAt" | "status">,
+      input: Omit<NewLabActionRequest, "id" | "createdAt" | "updatedAt" | "status">
     ): Promise<LabActionRequest> {
       const [row] = await db
         .insert(labActionRequests)
@@ -49,8 +49,8 @@ export function createLabActionRequestsRepository(db: Database) {
           and(
             eq(labActionRequests.userId, userId),
             eq(labActionRequests.status, "pending"),
-            gt(labActionRequests.expiresAt, new Date()),
-          ),
+            gt(labActionRequests.expiresAt, new Date())
+          )
         )
         .orderBy(desc(labActionRequests.createdAt));
     },
@@ -62,6 +62,27 @@ export function createLabActionRequestsRepository(db: Database) {
         .where(eq(labActionRequests.userId, userId))
         .orderBy(desc(labActionRequests.createdAt))
         .limit(limit);
+    },
+
+    /** Latest request for one project and recipe, including failed or declined attempts. */
+    async latestForRun(
+      userId: string,
+      runId: string,
+      recipe: string
+    ): Promise<LabActionRequest | null> {
+      const [row] = await db
+        .select()
+        .from(labActionRequests)
+        .where(
+          and(
+            eq(labActionRequests.userId, userId),
+            eq(labActionRequests.runId, runId),
+            eq(labActionRequests.recipe, recipe)
+          )
+        )
+        .orderBy(desc(labActionRequests.createdAt))
+        .limit(1);
+      return row ?? null;
     },
 
     /**
@@ -83,8 +104,8 @@ export function createLabActionRequestsRepository(db: Database) {
             eq(labActionRequests.userId, userId),
             eq(labActionRequests.id, id),
             eq(labActionRequests.status, "pending"),
-            gt(labActionRequests.expiresAt, new Date()),
-          ),
+            gt(labActionRequests.expiresAt, new Date())
+          )
         )
         .returning();
       return row ?? null;
@@ -98,8 +119,8 @@ export function createLabActionRequestsRepository(db: Database) {
           and(
             eq(labActionRequests.userId, userId),
             eq(labActionRequests.id, id),
-            eq(labActionRequests.status, "pending"),
-          ),
+            eq(labActionRequests.status, "pending")
+          )
         );
     },
 
@@ -107,7 +128,7 @@ export function createLabActionRequestsRepository(db: Database) {
     async finish(
       userId: string,
       id: string,
-      outcome: { status: "executed" | "failed"; detail: string },
+      outcome: { status: "executed" | "failed"; detail: string }
     ): Promise<void> {
       await db
         .update(labActionRequests)
@@ -135,8 +156,8 @@ export function createLabActionRequestsRepository(db: Database) {
           and(
             eq(labActionRequests.userId, userId),
             eq(labActionRequests.id, id),
-            eq(labActionRequests.status, "pending"),
-          ),
+            eq(labActionRequests.status, "pending")
+          )
         );
     },
 
@@ -150,8 +171,8 @@ export function createLabActionRequestsRepository(db: Database) {
             eq(labActionRequests.userId, userId),
             eq(labActionRequests.recipe, recipe),
             eq(labActionRequests.status, "executed"),
-            gt(labActionRequests.executedAt, new Date(Date.now() - 3_600_000)),
-          ),
+            gt(labActionRequests.executedAt, new Date(Date.now() - 3_600_000))
+          )
         );
       return rows.length;
     },
@@ -171,8 +192,8 @@ export function createLabActionRequestsRepository(db: Database) {
           and(
             eq(labActionRequests.userId, userId),
             eq(labActionRequests.recipe, recipe),
-            eq(labActionRequests.status, "executed"),
-          ),
+            eq(labActionRequests.status, "executed")
+          )
         )
         .orderBy(desc(labActionRequests.executedAt));
       return rows

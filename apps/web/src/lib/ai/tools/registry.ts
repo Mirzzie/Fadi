@@ -569,11 +569,27 @@ const startLabMachineTool: FadiTool = {
         type: "string",
         description: 'Short lowercase name, e.g. "dc01". Fadi prefixes it with fadi-.',
       },
+      runId: {
+        type: "string",
+        description: "Project run id when this machine supports an existing learning project.",
+      },
+      stepId: {
+        type: "string",
+        description: "Current project step id, when known.",
+      },
     },
     required: ["template", "name"],
   },
   async execute(args, ctx): Promise<FadiToolResult> {
-    return proposeThrough(ctx, "lab.start", { template: args.template, name: args.name });
+    return proposeThrough(
+      ctx,
+      "lab.start",
+      { template: args.template, name: args.name },
+      {
+        runId: typeof args.runId === "string" ? args.runId : null,
+        stepId: typeof args.stepId === "string" ? args.stepId : null,
+      },
+    );
   },
 };
 
@@ -627,15 +643,39 @@ async function proposeThrough(
   ctx: FadiToolContext,
   recipe: string,
   params: Record<string, unknown>,
+  project: { runId?: string | null; stepId?: string | null } = {},
 ): Promise<FadiToolResult> {
   const { proposeAction } = await import("@/lib/lab/broker");
   const surface = ctx.surface ?? "chat";
+  let runId: string | null = null;
+  let stepId: string | null = null;
+  if (project.runId) {
+    const { createProjectRunsRepository } = await import("@careeros/database");
+    const { getDatabase } = await import("@/lib/database/client");
+    const detail = await createProjectRunsRepository(getDatabase()).getWithSteps(
+      ctx.userId,
+      project.runId,
+    );
+    if (!detail) {
+      return { summary: "That project is not available in this account. Nothing was proposed.", view: "none" };
+    }
+    const requestedStep = project.stepId
+      ? detail.steps.find((candidate) => candidate.id === project.stepId)
+      : detail.steps.find((candidate) => candidate.status === "pending");
+    if (project.stepId && !requestedStep) {
+      return { summary: "That step does not belong to this project. Nothing was proposed.", view: "none" };
+    }
+    runId = detail.run.id;
+    stepId = requestedStep?.id ?? null;
+  }
   const result = await proposeAction({
     userId: ctx.userId,
     recipe,
     params,
     actor: surface === "mcp" ? "mcp" : surface === "agent" ? "agent" : "model",
     origin: "tool:" + recipe,
+    runId,
+    stepId,
   });
 
   if (!result.ok) return { summary: result.message, view: "none" };
@@ -651,7 +691,7 @@ async function proposeThrough(
         : "") +
       "\n\nApprove it under Machine access in Learning.",
     view: "none",
-    data: { requestId: result.requestId, argv: result.argv, preflight: result.preflight },
+    data: { requestId: result.requestId, runId, stepId, argv: result.argv, preflight: result.preflight },
   };
 }
 
@@ -681,7 +721,19 @@ const projectStatusTool: FadiTool = {
             : "\n  All steps done — it can be finished."),
       );
     }
-    return { summary: lines.join("\n\n"), view: "none" };
+    const projects = [];
+    for (const run of runs.slice(0, 3)) {
+      const detail = await repo.getWithSteps(ctx.userId, run.id);
+      if (!detail) continue;
+      const next = detail.steps.find((step) => step.status === "pending");
+      projects.push({
+        runId: run.id,
+        title: run.title,
+        stepId: next?.id ?? null,
+        nextStep: next?.title ?? null,
+      });
+    }
+    return { summary: lines.join("\n\n"), view: "none", data: { projects } };
   },
 };
 

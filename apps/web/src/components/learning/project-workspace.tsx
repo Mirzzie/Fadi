@@ -23,12 +23,20 @@ import {
 import {
   completeStepAction,
   listProjectRuns,
+  projectRuntimeAction,
+  proposeProjectLabAction,
+  proposeProjectLabResumeAction,
+  proposeProjectLabStopAction,
   reopenStepAction,
+  type ProjectRuntimeView,
   type RunView,
   type StepView,
 } from "@/app/dashboard/learning/lab-actions";
+import { PendingAction } from "@/components/os/pending-action-card";
+import { announceActionsChanged, usePendingActions } from "@/components/os/pending-actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { reachableSurface, runtimeMessage } from "@/lib/lab/runtime-contract";
 
 function proofLabel(step: StepView) {
   if (step.completion === "verified") {
@@ -57,15 +65,21 @@ function proofLabel(step: StepView) {
 
 export function ProjectWorkspace({ runId }: { runId: string }) {
   const [run, setRun] = useState<RunView | null | undefined>(undefined);
+  const [runtime, setRuntime] = useState<ProjectRuntimeView | undefined>(undefined);
   const [artifact, setArtifact] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [panel, setPanel] = useState<"build" | "evidence">("build");
   const [pending, startTransition] = useTransition();
+  const { pending: approvals, refresh: refreshApprovals } = usePendingActions();
 
   const refresh = useCallback(() => {
     startTransition(async () => {
-      const result = await listProjectRuns();
+      const [result, observed] = await Promise.all([
+        listProjectRuns(),
+        projectRuntimeAction({ runId }),
+      ]);
       setRun(result.ok ? (result.runs.find((candidate) => candidate.id === runId) ?? null) : null);
+      setRuntime(observed.ok ? observed.runtime : null);
     });
   }, [runId]);
 
@@ -73,7 +87,13 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
     refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    const timer = setInterval(refresh, 5_000);
+    return () => clearInterval(timer);
+  }, [refresh]);
+
   const current = useMemo(() => run?.steps.find((step) => step.status === "pending"), [run]);
+  const approval = approvals.find((request) => request.runId === runId) ?? null;
 
   if (run === undefined) {
     return (
@@ -121,6 +141,27 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
   };
 
   const percent = run.steps.length === 0 ? 0 : Math.round((run.doneCount / run.steps.length) * 100);
+  const surface = runtime ? reachableSurface(runtime) : null;
+
+  const proposeLab = (mode: "prepare" | "stop" | "resume") => {
+    setMessage(null);
+    startTransition(async () => {
+      const result =
+        mode === "stop"
+          ? await proposeProjectLabStopAction({ runId })
+          : mode === "resume"
+            ? await proposeProjectLabResumeAction({ runId })
+            : await proposeProjectLabAction({ runId });
+      setMessage(
+        result.message ?? (result.ok ? "Waiting for your decision." : "That did not work.")
+      );
+      if (result.ok) {
+        announceActionsChanged();
+        refreshApprovals();
+      }
+      refresh();
+    });
+  };
 
   return (
     <div className="space-y-5">
@@ -197,18 +238,55 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
             <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold">Lab environment</p>
               <p className="text-xs text-muted-foreground">
-                {run.resourceLabel
-                  ? `${run.resourceLabel} is selected for this project. No runtime session is attached yet.`
-                  : "Choose a machine before Fadi prepares a lab for this project."}
+                {runtime
+                  ? runtimeMessage(runtime)
+                  : run.resourceLabel
+                    ? `${run.resourceLabel} is the planned host. Prepare a local isolated lab when you are ready.`
+                    : "Fadi can prepare an isolated local lab and keep its actions attached to this project."}
               </p>
             </div>
+            {!runtime ? (
+              <Button
+                size="sm"
+                disabled={pending || Boolean(approval)}
+                onClick={() => proposeLab("prepare")}
+              >
+                {pending ? (
+                  <Loader2 className="animate-spin" aria-hidden="true" />
+                ) : (
+                  <Server aria-hidden="true" />
+                )}
+                Prepare lab
+              </Button>
+            ) : runtime.phase === "stopped" ? (
+              <Button
+                size="sm"
+                disabled={pending || Boolean(approval)}
+                onClick={() => proposeLab("resume")}
+              >
+                Resume lab
+              </Button>
+            ) : runtime.phase !== "queued" && runtime.phase !== "failed" ? (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={pending || Boolean(approval)}
+                onClick={() => proposeLab("stop")}
+              >
+                Pause lab
+              </Button>
+            ) : null}
             <Link
               href="/dashboard/learning/machines"
-              className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border bg-background px-3 text-xs font-medium hover:bg-muted"
+              aria-label="Manage machines"
+              title="Manage machines"
+              className="grid size-8 place-items-center rounded-lg border border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
             >
-              Manage machines <ExternalLink className="size-3" aria-hidden="true" />
+              <ExternalLink className="size-3.5" aria-hidden="true" />
             </Link>
           </section>
+
+          {message ? <p className="text-xs text-muted-foreground">{message}</p> : null}
 
           <div className="grid gap-4 lg:grid-cols-[minmax(19rem,0.78fr)_minmax(26rem,1.22fr)]">
             <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
@@ -350,32 +428,73 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
                   </h2>
                 </div>
                 <span className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">
-                  No runtime session
+                  {runtime ? runtime.phase.replace("_", " ") : "Not prepared"}
                 </span>
               </div>
-              <div className="grid min-h-[29rem] place-items-center bg-background/30 p-8 text-center">
-                <div className="max-w-md">
-                  <div className="mx-auto grid size-14 place-items-center rounded-2xl border border-border bg-card">
-                    <Monitor className="size-6 text-muted-foreground" aria-hidden="true" />
+              {approval ? (
+                <div className="grid min-h-[29rem] place-items-center bg-background/30 p-5">
+                  <div className="w-full max-w-xl">
+                    <p className="mb-3 text-center text-sm text-muted-foreground">
+                      Review the effect, then approve or decline it here.
+                    </p>
+                    <PendingAction
+                      w={approval}
+                      onSettled={(result) => {
+                        setMessage(result);
+                        refreshApprovals();
+                        refresh();
+                      }}
+                    />
                   </div>
-                  <h3 className="mt-4 font-semibold">
-                    {run.resourceLabel
-                      ? "Machine chosen; session not started"
-                      : "Choose where this project will run"}
-                  </h3>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    {run.resourceLabel
-                      ? "Fadi has placement information, but no durable provisioning state, reachable endpoint, or readiness check for this run. The console stays closed until those facts exist."
-                      : "Register or select a machine. The engine will check capacity before asking permission to provision anything."}
-                  </p>
-                  <Link
-                    href="/dashboard/learning/machines"
-                    className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
-                  >
-                    Open Machines <ExternalLink className="size-3.5" aria-hidden="true" />
-                  </Link>
                 </div>
-              </div>
+              ) : surface?.sessionPath ? (
+                <div className="relative min-h-[29rem] bg-black">
+                  <iframe
+                    src={surface.sessionPath}
+                    title={`${runtime?.templateLabel ?? "Lab"} ${surface.kind}`}
+                    className="h-[34rem] w-full border-0"
+                    allow="clipboard-read; clipboard-write; fullscreen"
+                    sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts"
+                  />
+                  <a
+                    href={surface.sessionPath}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="absolute right-3 top-3 rounded-md border border-white/20 bg-black/70 px-2.5 py-1.5 text-xs text-white hover:bg-black"
+                  >
+                    Open separately
+                  </a>
+                </div>
+              ) : (
+                <div className="grid min-h-[29rem] place-items-center bg-background/30 p-8 text-center">
+                  <div className="max-w-md">
+                    <div className="mx-auto grid size-14 place-items-center rounded-2xl border border-border bg-card">
+                      {runtime && !["failed", "stopped"].includes(runtime.phase) ? (
+                        <Loader2 className="size-6 animate-spin text-primary" aria-hidden="true" />
+                      ) : (
+                        <Monitor className="size-6 text-muted-foreground" aria-hidden="true" />
+                      )}
+                    </div>
+                    <h3 className="mt-4 font-semibold">
+                      {runtime?.templateLabel ?? "Prepare the practical environment"}
+                    </h3>
+                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                      {runtime
+                        ? runtimeMessage(runtime)
+                        : "Fadi chooses a reviewed lab from the project, shows the exact machine change for approval, then checks the real service before calling it ready."}
+                    </p>
+                    {!runtime ? (
+                      <Button
+                        className="mt-4"
+                        disabled={pending}
+                        onClick={() => proposeLab("prepare")}
+                      >
+                        Prepare lab
+                      </Button>
+                    ) : null}
+                  </div>
+                </div>
+              )}
             </section>
           </div>
         </>

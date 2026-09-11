@@ -14,6 +14,7 @@ const kindLabel: Record<string, string> = {
   laptop: "Laptop",
   server: "Server",
   hypervisor: "Hypervisor",
+  vm: "VMware guest",
   sbc: "Single-board computer",
   microcontroller: "Microcontroller",
   cloud: "Cloud host",
@@ -160,7 +161,9 @@ export function MachineInventory() {
           </dl>
 
           <div className="mt-4 rounded-lg border border-border/60 bg-background/40 px-3 py-2 text-xs text-muted-foreground">
-            Runtime state unknown · no health check attached
+            {resource.endpointKind === "vmware"
+              ? "Connected through local VMware · actions require approval"
+              : "Runtime state unknown · no health check attached"}
           </div>
         </article>
       ))}

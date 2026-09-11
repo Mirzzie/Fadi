@@ -21,6 +21,15 @@ export function createLabResourcesRepository(db: Database) {
         .orderBy(asc(labResources.createdAt));
     },
 
+    async get(userId: string, id: string): Promise<LabResource | null> {
+      const [row] = await db
+        .select()
+        .from(labResources)
+        .where(and(eq(labResources.userId, userId), eq(labResources.id, id)))
+        .limit(1);
+      return row ?? null;
+    },
+
     /**
      * Record a machine Fadi DETECTED, without accumulating a copy per click.
      *
@@ -61,6 +70,8 @@ export function createLabResourcesRepository(db: Database) {
           memoryMb: input.memoryMb ?? existing.memoryMb,
           diskGb: input.diskGb ?? existing.diskGb,
           notes: input.notes ?? existing.notes,
+          endpoint: input.endpoint ?? existing.endpoint,
+          scopes: input.scopes ?? existing.scopes,
           updatedAt: new Date(),
         })
         .where(eq(labResources.id, existing.id))

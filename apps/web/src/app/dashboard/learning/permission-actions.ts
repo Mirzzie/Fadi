@@ -203,6 +203,9 @@ export async function revokeAllCapabilities(): Promise<{ ok: boolean; revoked?: 
 
 export type PendingActionView = {
   id: string;
+  recipe: string;
+  runId: string | null;
+  stepId: string | null;
   summary: string;
   reversal: string | null;
   /** The exact commands, so approval is of a command rather than of a description. */
@@ -260,6 +263,9 @@ export async function listPendingActions(): Promise<{
 
       return {
         id: r.id,
+        recipe: r.recipe,
+        runId: r.runId,
+        stepId: r.stepId,
         summary: r.summary,
         reversal: r.reversal,
         argv: (r.argv as string[][]).map((a) => a.join(" ")),
@@ -380,6 +386,8 @@ export async function denyAction(input: {
     userId: user.id,
     actor: "user",
     origin: "dashboard:permissions",
+    runId: request?.runId ?? null,
+    stepId: request?.stepId ?? null,
     capability: request?.recipe ?? "unknown",
     // DECLINED, not denied. A person saying no is the system working, and showing it back
     // to them under "blocked attempts — if you did not start these, revoke everything" is
@@ -436,7 +444,10 @@ export async function setWorkspace(input: {
     const stat = await fs.stat(resolved);
     if (!stat.isDirectory()) return { ok: false, message: "That isn't a directory." };
   } catch {
-    return { ok: false, message: "That directory doesn't exist. Create it first, then set it here." };
+    return {
+      ok: false,
+      message: "That directory doesn't exist. Create it first, then set it here.",
+    };
   }
 
   // Refusing the obvious feet-shooting roots. Not a security boundary — someone
@@ -446,7 +457,10 @@ export async function setWorkspace(input: {
   if (dangerous.includes(resolved)) {
     return {
       ok: false,
-      message: "Pick a dedicated folder rather than " + resolved + " — a workspace should be somewhere you'd be happy for Fadi to make a mess.",
+      message:
+        "Pick a dedicated folder rather than " +
+        resolved +
+        " — a workspace should be somewhere you'd be happy for Fadi to make a mess.",
     };
   }
 

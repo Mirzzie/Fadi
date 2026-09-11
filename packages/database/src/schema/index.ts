@@ -1153,7 +1153,7 @@ export const labGrants = pgTable(
     reason: text("reason"),
     ...timestamps,
   },
-  (table) => [index("lab_grants_user_idx").on(table.userId, table.capability)],
+  (table) => [index("lab_grants_user_idx").on(table.userId, table.capability)]
 );
 
 export type LabGrant = typeof labGrants.$inferSelect;
@@ -1230,7 +1230,7 @@ export const labActions = pgTable(
     durationMs: integer("duration_ms"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (table) => [index("lab_actions_user_idx").on(table.userId, table.createdAt)],
+  (table) => [index("lab_actions_user_idx").on(table.userId, table.createdAt)]
 );
 
 export type LabAction = typeof labActions.$inferSelect;
@@ -1305,6 +1305,9 @@ export const labActionRequests = pgTable(
     /** Who asked: user | model | mcp | agent. */
     actor: text("actor").notNull(),
     origin: text("origin"),
+    /** Project provenance. Null for machine work started outside a project. */
+    runId: uuid("run_id"),
+    stepId: uuid("step_id"),
     /** pending | approved | executed | denied | expired | failed */
     status: text("status").notNull().default("pending"),
     /**
@@ -1318,7 +1321,7 @@ export const labActionRequests = pgTable(
     detail: text("detail"),
     ...timestamps,
   },
-  (table) => [index("lab_action_requests_user_idx").on(table.userId, table.status)],
+  (table) => [index("lab_action_requests_user_idx").on(table.userId, table.status)]
 );
 
 export type LabActionRequest = typeof labActionRequests.$inferSelect;
@@ -1343,7 +1346,7 @@ export const projectRuns = pgTable(
     completedAt: timestamp("completed_at", { withTimezone: true }),
     ...timestamps,
   },
-  (table) => [index("project_runs_user_idx").on(table.userId, table.status)],
+  (table) => [index("project_runs_user_idx").on(table.userId, table.status)]
 );
 
 export type ProjectRun = typeof projectRuns.$inferSelect;
@@ -1388,7 +1391,7 @@ export const projectSteps = pgTable(
     completedAt: timestamp("completed_at", { withTimezone: true }),
     ...timestamps,
   },
-  (table) => [index("project_steps_run_idx").on(table.runId, table.ordinal)],
+  (table) => [index("project_steps_run_idx").on(table.runId, table.ordinal)]
 );
 
 export type ProjectStep = typeof projectSteps.$inferSelect;
@@ -1429,7 +1432,7 @@ export const labResources = pgTable(
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
     ...timestamps,
   },
-  (table) => [index("lab_resources_user_idx").on(table.userId)],
+  (table) => [index("lab_resources_user_idx").on(table.userId)]
 );
 
 export type LabResource = typeof labResources.$inferSelect;

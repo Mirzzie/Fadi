@@ -9,6 +9,7 @@ import {
   addLabResource,
   detectLocalResources,
   planLabFor,
+  registerVmwareMachine,
   type DetectedResource,
   type LabPlan,
 } from "@/app/dashboard/learning/lab-actions";
@@ -172,29 +173,116 @@ export function LabFit({ title, detail }: { title: string; detail?: string | nul
  * the first resource is registered. Project cards still ask just in time; this is the
  * durable place to inspect and extend the whole lab. */
 export function MachineRegistration() {
-  const [adding, setAdding] = useState(false);
+  const [mode, setMode] = useState<"choose" | "describe" | "vmware" | null>(null);
 
-  if (adding) {
+  if (mode === "describe") {
     return (
       <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
         <AddResource
-          onDone={() => setAdding(false)}
-          onCancel={() => setAdding(false)}
+          onDone={() => setMode(null)}
+          onCancel={() => setMode("choose")}
         />
+      </div>
+    );
+  }
+  if (mode === "vmware") {
+    return (
+      <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+        <AddVmwareResource onDone={() => setMode(null)} onCancel={() => setMode("choose")} />
+      </div>
+    );
+  }
+  if (mode === "choose") {
+    return (
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-4 shadow-sm">
+        <DetectHere
+          onSaved={() => {
+            window.dispatchEvent(new CustomEvent("fadi:resources-changed"));
+            setMode(null);
+          }}
+        />
+        <Button size="sm" variant="outline" onClick={() => setMode("vmware")}>
+          Existing VMware VM
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => setMode("describe")}>
+          Describe a machine
+        </Button>
+        <FindOnNetwork />
+        <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setMode(null)}>
+          Cancel
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
-      <DetectHere
-        onSaved={() => window.dispatchEvent(new CustomEvent("fadi:resources-changed"))}
-      />
-      <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
+    <div>
+      <Button size="sm" onClick={() => setMode("choose")}>
         <Plus className="size-3.5" aria-hidden="true" />
-        Describe a machine
+        Add machine
       </Button>
-      <FindOnNetwork />
+    </div>
+  );
+}
+
+function AddVmwareResource({ onDone, onCancel }: { onDone: () => void; onCancel: () => void }) {
+  const [label, setLabel] = useState("");
+  const [path, setPath] = useState("");
+  const [message, setMessage] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+
+  return (
+    <div className="space-y-3">
+      <div>
+        <h3 className="text-sm font-semibold">Connect an existing VMware machine</h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Fadi records the VMX file. Every start or suspend remains a separate approval.
+        </p>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Input
+          value={label}
+          onChange={(event) => setLabel(event.target.value)}
+          placeholder="Name, e.g. Windows lab"
+          className="h-8 text-xs"
+          autoFocus
+        />
+        <Input
+          value={path}
+          onChange={(event) => setPath(event.target.value)}
+          placeholder="/absolute/path/to/machine.vmx"
+          className="h-8 font-mono text-xs"
+          spellCheck={false}
+        />
+      </div>
+      <p className="text-[11px] text-muted-foreground">
+        The path is resolved and read once before it is saved. It is never accepted from project text
+        or an AI model; those callers can only name this registered machine by id.
+      </p>
+      {message ? <p className="text-xs text-destructive">{message}</p> : null}
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="ghost" onClick={onCancel} disabled={pending}>
+          Back
+        </Button>
+        <Button
+          size="sm"
+          disabled={pending || !label.trim() || !path.trim()}
+          onClick={() =>
+            start(async () => {
+              const result = await registerVmwareMachine({ label, path });
+              if (!result.ok) {
+                setMessage(result.message ?? "Could not connect that VM.");
+                return;
+              }
+              window.dispatchEvent(new CustomEvent("fadi:resources-changed"));
+              onDone();
+            })
+          }
+        >
+          {pending ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
+          Connect VM
+        </Button>
+      </div>
     </div>
   );
 }

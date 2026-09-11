@@ -93,7 +93,9 @@ export function PendingAction({
                     : "text-muted-foreground")
               }
             >
-              <span aria-hidden="true">{note.kind === "warn" ? "!" : note.kind === "unknown" ? "?" : "·"}</span>
+              <span aria-hidden="true">
+                {note.kind === "warn" ? "!" : note.kind === "unknown" ? "?" : "·"}
+              </span>
               <span>{note.text}</span>
             </li>
           ))}
@@ -102,8 +104,7 @@ export function PendingAction({
 
       <p className="text-[11px] text-muted-foreground">
         Asked by {ACTOR_LABEL[w.actor] ?? w.actor}
-        {w.origin ? " (" + w.origin + ")" : ""}.
-        {w.reversal ? " " + w.reversal : ""}
+        {w.origin ? " (" + w.origin + ")" : ""}.{w.reversal ? " " + w.reversal : ""}
       </p>
 
       {mustType ? (
@@ -130,7 +131,9 @@ export function PendingAction({
           onClick={() =>
             start(async () => {
               const res = await approveAction({ requestId: w.id, confirmation: typed });
-              onSettled(res.ok ? "Done. " + (res.message ?? "") : (res.message ?? "It didn't run."));
+              onSettled(
+                res.ok ? "Done. " + (res.message ?? "") : (res.message ?? "It didn't run.")
+              );
               // Every surface showing this queue hears about it, so the prompt does not
               // linger on one screen after being answered on another.
               announceActionsChanged();
@@ -140,7 +143,7 @@ export function PendingAction({
             })
           }
         >
-          Run it
+          Approve and run
         </Button>
         <Button
           size="sm"
@@ -154,7 +157,7 @@ export function PendingAction({
             })
           }
         >
-          No
+          Decline
         </Button>
         {/*
           The age, not the deadline.
@@ -169,5 +172,3 @@ export function PendingAction({
     </div>
   );
 }
-
-

@@ -24,7 +24,7 @@ import { completionFor, completionOf, runHonesty } from "@/lib/lab/completion";
 
 const resourceInput = z.object({
   label: z.string().trim().min(1).max(80),
-  kind: z.enum(["laptop", "server", "hypervisor", "sbc", "microcontroller", "cloud"]),
+  kind: z.enum(["laptop", "server", "hypervisor", "vm", "sbc", "microcontroller", "cloud"]),
   arch: z.enum(["x86_64", "arm64", "mcu"]).default("x86_64"),
   memoryMb: z.number().int().positive().max(4_194_304).nullable().optional(),
   diskGb: z.number().int().positive().max(1_000_000).nullable().optional(),
@@ -33,7 +33,10 @@ const resourceInput = z.object({
   notes: z.string().trim().max(400).optional(),
 });
 
-export type LabResourceView = Resource & { notes: string | null };
+export type LabResourceView = Resource & {
+  notes: string | null;
+  endpointKind: "vmware" | "remote" | null;
+};
 
 async function load(userId: string): Promise<LabResourceView[]> {
   const rows = await createLabResourcesRepository(getDatabase()).listForUser(userId);
@@ -47,7 +50,57 @@ async function load(userId: string): Promise<LabResourceView[]> {
     virtualization: r.virtualization as Resource["virtualization"],
     alwaysOn: r.alwaysOn,
     notes: r.notes,
+    endpointKind: r.endpoint?.startsWith("vmware:")
+      ? "vmware"
+      : r.endpoint
+        ? "remote"
+        : null,
   }));
+}
+
+/** Register a VMX file the user explicitly selected; this does not start or inspect it. */
+export async function registerVmwareMachine(input: {
+  label: string;
+  path: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  const parsed = z.object({
+    label: z.string().trim().min(1).max(80),
+    path: z.string().trim().min(1).max(1000),
+  }).safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Give the VM a name and select its .vmx file." };
+
+  const path = await import("node:path");
+  const fs = await import("node:fs/promises");
+  if (!path.isAbsolute(parsed.data.path) || path.extname(parsed.data.path).toLowerCase() !== ".vmx") {
+    return { ok: false, message: "Use the absolute path to a VMware .vmx file." };
+  }
+  let resolved: string;
+  try {
+    resolved = await fs.realpath(parsed.data.path);
+    const stat = await fs.stat(resolved);
+    if (!stat.isFile()) return { ok: false, message: "That path is not a VMX file." };
+  } catch {
+    return { ok: false, message: "Fadi could not read that VMX file." };
+  }
+
+  await createLabResourcesRepository(getDatabase()).upsertDetected(user.id, {
+    label: parsed.data.label,
+    kind: "vm",
+    arch: "x86_64",
+    memoryMb: null,
+    diskGb: null,
+    virtualization: "none",
+    alwaysOn: false,
+    notes: "Existing local VMware guest. Capacity and guest readiness are not yet observed.",
+    scopes: ["read", "provision"],
+    endpoint: `vmware://local${encodeURI(resolved)}`,
+    secretCiphertext: null,
+    secretHint: null,
+    lastSeenAt: null,
+  });
+  return { ok: true, message: "VMware machine connected. Starting or suspending it still needs approval." };
 }
 
 export async function listLabResources(): Promise<{ ok: boolean; resources: LabResourceView[] }> {
@@ -57,7 +110,7 @@ export async function listLabResources(): Promise<{ ok: boolean; resources: LabR
 }
 
 export async function addLabResource(
-  input: z.input<typeof resourceInput>,
+  input: z.input<typeof resourceInput>
 ): Promise<{ ok: boolean; message?: string; resources?: LabResourceView[] }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
@@ -120,8 +173,16 @@ export async function planLabFor(input: {
       because,
       noResources: false,
       fits: fits.map((r) => ({ id: r.id, label: r.label })),
-      unverified: unverified.map((u) => ({ id: u.resource.id, label: u.resource.label, checks: u.checks })),
-      misses: misses.map((m) => ({ id: m.resource.id, label: m.resource.label, reasons: m.reasons })),
+      unverified: unverified.map((u) => ({
+        id: u.resource.id,
+        label: u.resource.label,
+        checks: u.checks,
+      })),
+      misses: misses.map((m) => ({
+        id: m.resource.id,
+        label: m.resource.label,
+        reasons: m.reasons,
+      })),
     },
   };
 }
@@ -143,6 +204,8 @@ export type StepView = {
 export type RunView = {
   id: string;
   title: string;
+  detail: string | null;
+  resourceId: string | null;
   resourceLabel: string | null;
   status: string;
   steps: StepView[];
@@ -183,6 +246,8 @@ export async function listProjectRuns(): Promise<{ ok: boolean; runs: RunView[] 
     out.push({
       id: r.id,
       title: r.title,
+      detail: r.detail,
+      resourceId: r.resourceId,
       resourceLabel: r.resourceLabel,
       status: r.status,
       steps: detail.steps.map((s) => ({
@@ -206,6 +271,237 @@ export async function listProjectRuns(): Promise<{ ok: boolean; runs: RunView[] 
 }
 
 /**
+ * Prepare the reviewed local Docker lab that best matches this project.
+ *
+ * This creates an approval request and nothing else. The project and current step travel
+ * with that request so the global approval queue, runtime surface, audit trail, and later
+ * evidence all refer to the same work.
+ */
+export async function proposeProjectLabAction(input: { runId: string }): Promise<{
+  ok: boolean;
+  requestId?: string;
+  message?: string;
+}> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  const id = z.string().uuid().safeParse(input.runId);
+  if (!id.success) return { ok: false, message: "Unknown project." };
+
+  const {
+    createLabActionRequestsRepository,
+    createLabResourcesRepository,
+    createProjectRunsRepository,
+  } =
+    await import("@careeros/database");
+  const db = getDatabase();
+  const project = await createProjectRunsRepository(db).getWithSteps(user.id, id.data);
+  if (!project) return { ok: false, message: "That project is unavailable." };
+
+  const requests = createLabActionRequestsRepository(db);
+  const existing = await requests.latestForRun(user.id, id.data, "lab.start");
+  if (existing?.status === "pending" || existing?.status === "approved") {
+    return {
+      ok: true,
+      requestId: existing.id,
+      message: "The lab is already waiting for your decision.",
+    };
+  }
+
+  const { proposeAction } = await import("@/lib/lab/broker");
+  const resource = project.run.resourceId
+    ? await createLabResourcesRepository(db).get(user.id, project.run.resourceId)
+    : null;
+  if (resource?.endpoint?.startsWith("vmware:")) {
+    const proposal = await proposeAction({
+      userId: user.id,
+      recipe: "vmware.start",
+      params: { resourceId: resource.id },
+      actor: "user",
+      origin: "dashboard:project_lab",
+      runId: project.run.id,
+      stepId: project.steps.find((step) => step.status === "pending")?.id ?? null,
+    });
+    return proposal.ok
+      ? {
+          ok: true,
+          requestId: proposal.requestId,
+          message: `${resource.label} is ready for your approval. Nothing has run yet.`,
+        }
+      : { ok: false, message: proposal.message };
+  }
+
+  const { templateForProject } = await import("@/lib/lab/spec-from-project");
+  const { LAB_TEMPLATES } = await import("@/lib/lab/templates");
+  const template = templateForProject({
+    title: project.run.title,
+    detail: project.run.detail,
+  });
+  const currentStep = project.steps.find((step) => step.status === "pending") ?? null;
+  const proposal = await proposeAction({
+    userId: user.id,
+    recipe: "lab.start",
+    params: { template, name: `project-${project.run.id.slice(0, 8)}` },
+    actor: "user",
+    origin: "dashboard:project_lab",
+    runId: project.run.id,
+    stepId: currentStep?.id ?? null,
+  });
+  return proposal.ok
+    ? {
+        ok: true,
+        requestId: proposal.requestId,
+        message: `${LAB_TEMPLATES[template].label} is ready for your approval. Nothing has run yet.`,
+      }
+    : { ok: false, message: proposal.message };
+}
+
+export type ProjectRuntimeView = Awaited<
+  ReturnType<(typeof import("@/lib/lab/runtime-observer"))["observeProjectRuntime"]>
+>;
+
+/** Current observed state; safe to poll because it only inspects Fadi's named container. */
+export async function projectRuntimeAction(input: {
+  runId: string;
+}): Promise<{ ok: boolean; runtime?: ProjectRuntimeView; message?: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  const id = z.string().uuid().safeParse(input.runId);
+  if (!id.success) return { ok: false, message: "Unknown project." };
+  const { observeProjectRuntime } = await import("@/lib/lab/runtime-observer");
+  return { ok: true, runtime: await observeProjectRuntime(user.id, id.data) };
+}
+
+/** Ask to stop this project's current local lab. Approval remains per action. */
+export async function proposeProjectLabStopAction(input: { runId: string }): Promise<{
+  ok: boolean;
+  requestId?: string;
+  message?: string;
+}> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  const id = z.string().uuid().safeParse(input.runId);
+  if (!id.success) return { ok: false, message: "Unknown project." };
+
+  const {
+    createLabActionRequestsRepository,
+    createLabResourcesRepository,
+    createProjectRunsRepository,
+  } =
+    await import("@careeros/database");
+  const db = getDatabase();
+  const project = await createProjectRunsRepository(db).getWithSteps(user.id, id.data);
+  if (!project) return { ok: false, message: "That project is unavailable." };
+  const resource = project.run.resourceId
+    ? await createLabResourcesRepository(db).get(user.id, project.run.resourceId)
+    : null;
+  if (resource?.endpoint?.startsWith("vmware:")) {
+    const { proposeAction } = await import("@/lib/lab/broker");
+    const proposal = await proposeAction({
+      userId: user.id,
+      recipe: "vmware.suspend",
+      params: { resourceId: resource.id },
+      actor: "user",
+      origin: "dashboard:project_lab",
+      runId: project.run.id,
+      stepId: project.steps.find((step) => step.status === "pending")?.id ?? null,
+    });
+    return proposal.ok
+      ? { ok: true, requestId: proposal.requestId, message: "Suspend is waiting for your approval." }
+      : { ok: false, message: proposal.message };
+  }
+
+  const started = await createLabActionRequestsRepository(db).latestForRun(
+    user.id,
+    id.data,
+    "lab.start"
+  );
+  const raw = started?.params as { name?: unknown } | null;
+  if (started?.status !== "executed" || typeof raw?.name !== "string") {
+    return { ok: false, message: "There is no running project lab to stop." };
+  }
+
+  const { proposeAction } = await import("@/lib/lab/broker");
+  const currentStep = project.steps.find((step) => step.status === "pending") ?? null;
+  const proposal = await proposeAction({
+    userId: user.id,
+    recipe: "container.stop",
+    params: { name: raw.name },
+    actor: "user",
+    origin: "dashboard:project_lab",
+    runId: project.run.id,
+    stepId: currentStep?.id ?? null,
+  });
+  return proposal.ok
+    ? { ok: true, requestId: proposal.requestId, message: "Stop is waiting for your approval." }
+    : { ok: false, message: proposal.message };
+}
+
+/** Resume a stopped project lab without creating a second machine. */
+export async function proposeProjectLabResumeAction(input: { runId: string }): Promise<{
+  ok: boolean;
+  requestId?: string;
+  message?: string;
+}> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  const id = z.string().uuid().safeParse(input.runId);
+  if (!id.success) return { ok: false, message: "Unknown project." };
+
+  const {
+    createLabActionRequestsRepository,
+    createLabResourcesRepository,
+    createProjectRunsRepository,
+  } =
+    await import("@careeros/database");
+  const db = getDatabase();
+  const project = await createProjectRunsRepository(db).getWithSteps(user.id, id.data);
+  if (!project) return { ok: false, message: "That project is unavailable." };
+  const resource = project.run.resourceId
+    ? await createLabResourcesRepository(db).get(user.id, project.run.resourceId)
+    : null;
+  if (resource?.endpoint?.startsWith("vmware:")) {
+    const { proposeAction } = await import("@/lib/lab/broker");
+    const proposal = await proposeAction({
+      userId: user.id,
+      recipe: "vmware.start",
+      params: { resourceId: resource.id },
+      actor: "user",
+      origin: "dashboard:project_lab",
+      runId: project.run.id,
+      stepId: project.steps.find((step) => step.status === "pending")?.id ?? null,
+    });
+    return proposal.ok
+      ? { ok: true, requestId: proposal.requestId, message: "Resume is waiting for your approval." }
+      : { ok: false, message: proposal.message };
+  }
+
+  const started = await createLabActionRequestsRepository(db).latestForRun(
+    user.id,
+    id.data,
+    "lab.start"
+  );
+  const raw = started?.params as { name?: unknown } | null;
+  if (started?.status !== "executed" || typeof raw?.name !== "string") {
+    return { ok: false, message: "There is no stopped project lab to resume." };
+  }
+
+  const { proposeAction } = await import("@/lib/lab/broker");
+  const currentStep = project.steps.find((step) => step.status === "pending") ?? null;
+  const proposal = await proposeAction({
+    userId: user.id,
+    recipe: "container.start",
+    params: { name: raw.name },
+    actor: "user",
+    origin: "dashboard:project_lab",
+    runId: project.run.id,
+    stepId: currentStep?.id ?? null,
+  });
+  return proposal.ok
+    ? { ok: true, requestId: proposal.requestId, message: "Resume is waiting for your approval." }
+    : { ok: false, message: proposal.message };
+}
+
+/**
  * Mark a step done — and record HOW, which is the part that keeps this honest.
  *
  * Clicking Done with an empty field is a claim about the past with nothing behind it. It
@@ -222,11 +518,15 @@ export async function completeStepAction(input: {
   if (!user) return { ok: false };
   const artifact = input.artifact?.trim() || null;
   const { createProjectRunsRepository } = await import("@careeros/database");
-  const updated = await createProjectRunsRepository(getDatabase()).setStepStatus(user.id, input.stepId, {
-    status: "done",
-    artifact,
-    completion: completionFor(artifact),
-  });
+  const updated = await createProjectRunsRepository(getDatabase()).setStepStatus(
+    user.id,
+    input.stepId,
+    {
+      status: "done",
+      artifact,
+      completion: completionFor(artifact),
+    }
+  );
   return { ok: Boolean(updated) };
 }
 
@@ -235,11 +535,15 @@ export async function reopenStepAction(input: { stepId: string }): Promise<{ ok:
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false };
   const { createProjectRunsRepository } = await import("@careeros/database");
-  const updated = await createProjectRunsRepository(getDatabase()).setStepStatus(user.id, input.stepId, {
-    status: "pending",
-    artifact: null,
-    completion: null,
-  });
+  const updated = await createProjectRunsRepository(getDatabase()).setStepStatus(
+    user.id,
+    input.stepId,
+    {
+      status: "pending",
+      artifact: null,
+      completion: null,
+    }
+  );
   return { ok: Boolean(updated) };
 }
 

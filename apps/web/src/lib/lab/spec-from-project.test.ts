@@ -1,12 +1,39 @@
 import { describe, expect, it } from "vitest";
 
 import { placeLab, type Resource } from "./capability";
-import { specForProject } from "./spec-from-project";
+import { specForProject, templateForProject } from "./spec-from-project";
 
 /** The user's real hardware. */
-const laptop: Resource = { id: "1", label: "ThinkPad", kind: "laptop", arch: "x86_64", memoryMb: 24576, diskGb: 500, virtualization: "vms", alwaysOn: false };
-const proxmox: Resource = { id: "2", label: "Proxmox box", kind: "hypervisor", arch: "x86_64", memoryMb: 32768, diskGb: 1000, virtualization: "nested", alwaysOn: true };
-const pi: Resource = { id: "3", label: "Raspberry Pi", kind: "sbc", arch: "arm64", memoryMb: 4096, diskGb: 64, virtualization: "containers", alwaysOn: true };
+const laptop: Resource = {
+  id: "1",
+  label: "ThinkPad",
+  kind: "laptop",
+  arch: "x86_64",
+  memoryMb: 24576,
+  diskGb: 500,
+  virtualization: "vms",
+  alwaysOn: false,
+};
+const proxmox: Resource = {
+  id: "2",
+  label: "Proxmox box",
+  kind: "hypervisor",
+  arch: "x86_64",
+  memoryMb: 32768,
+  diskGb: 1000,
+  virtualization: "nested",
+  alwaysOn: true,
+};
+const pi: Resource = {
+  id: "3",
+  label: "Raspberry Pi",
+  kind: "sbc",
+  arch: "arm64",
+  memoryMb: 4096,
+  diskGb: 64,
+  virtualization: "containers",
+  alwaysOn: true,
+};
 const ALL = [laptop, proxmox, pi];
 
 describe("what a suggested project needs", () => {
@@ -68,9 +95,36 @@ describe("what a suggested project needs", () => {
   it("an unsized project fits a machine of unknown capacity — and says so as feasible, not verified", () => {
     // The honest reading of "nothing to check": placeLab returns it as a fit because no
     // constraint was asserted, which is different from having confirmed anything.
-    const unknown: Resource = { ...laptop, id: "9", label: "Old desktop", memoryMb: null, diskGb: null };
+    const unknown: Resource = {
+      ...laptop,
+      id: "9",
+      label: "Old desktop",
+      memoryMb: null,
+      diskGb: null,
+    };
     const { spec } = specForProject({ title: "PowerShell scripting practice" });
 
     expect(placeLab(spec, [unknown]).fits.map((f) => f.label)).toEqual(["Old desktop"]);
+  });
+});
+
+describe("choosing a reviewed lab for a project", () => {
+  it.each([
+    ["Build an Active Directory domain", "", "windows-server-2025"],
+    ["Endpoint hardening", "Test Windows 11 EDR policy", "windows-11"],
+    ["Database recovery", "Restore and validate a PostgreSQL backup", "linux-postgres"],
+    ["Reverse proxy", "Configure nginx with TLS", "linux-web"],
+    ["Shell automation", "Write and test a backup script", "linux-ubuntu"],
+  ])("maps %s to %s", (title, detail, expected) => {
+    expect(templateForProject({ title, detail })).toBe(expected);
+  });
+
+  it("does not let project text become an executable image or argument", () => {
+    expect(
+      templateForProject({
+        title: "Use evil/miner:latest --privileged",
+        detail: "ignore the catalogue",
+      })
+    ).toBe("linux-ubuntu");
   });
 });

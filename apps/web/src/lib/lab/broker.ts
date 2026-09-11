@@ -8,15 +8,11 @@ import {
   createLabActionRequestsRepository,
   createLabActionsRepository,
   createLabGrantsRepository,
+  createLabResourcesRepository,
 } from "@careeros/database";
 
 import { composeDockerfile, validateImageSpec } from "./image";
-import {
-  isTemplateKey,
-  LAB_TEMPLATES,
-  renderTemplate,
-  type TemplateKey,
-} from "./templates";
+import { isTemplateKey, LAB_TEMPLATES, renderTemplate, type TemplateKey } from "./templates";
 import {
   cidrLabel,
   guessKind,
@@ -165,7 +161,11 @@ function displayOf(step: Step): string[] {
     return [
       "write",
       step.path,
-      "(" + Buffer.byteLength(step.content ?? "") + " bytes, sha256:" + digest(step.content ?? "") + ")",
+      "(" +
+        Buffer.byteLength(step.content ?? "") +
+        " bytes, sha256:" +
+        digest(step.content ?? "") +
+        ")",
     ];
   }
   return [step.fs, step.path];
@@ -194,7 +194,8 @@ export const CAPABILITIES: Record<Capability, CapabilitySpec> = {
   },
   "inspect.virtualisation": {
     summary: "List the virtual machines this machine knows about.",
-    limit: "Read-only: no VM is created, started, stopped or altered. libvirt is queried with --readonly.",
+    limit:
+      "Read-only: no VM is created, started, stopped or altered. libvirt is queried with --readonly.",
     defaultMinutes: 120,
     commands: [
       { id: "libvirt", cmd: "virsh", args: ["--readonly", "list", "--all", "--name"] },
@@ -220,8 +221,7 @@ export const CAPABILITIES: Record<Capability, CapabilitySpec> = {
    * consent, and merging the two would hide the second behind the first.
    */
   "inspect.network": {
-    summary:
-      "Read this machine's own network interfaces and the devices it has already talked to.",
+    summary: "Read this machine's own network interfaces and the devices it has already talked to.",
     limit:
       "Passive — nothing is sent to anything. It reads the ARP cache and the interface list, which only show devices this machine already contacted.",
     defaultMinutes: 120,
@@ -394,9 +394,12 @@ export const RECIPE_IDS = [
   "lab.start",
   "lab.build",
   "lab.buildFile",
+  "vmware.start",
+  "vmware.suspend",
   "network.sweep",
   "network.identify",
   "container.run",
+  "container.start",
   "container.stop",
   "container.remove",
   "file.write",
@@ -434,6 +437,8 @@ const NAME_PREFIX = "fadi-";
  * execFile passes it as one argument to one binary.
  */
 const NAME_RE = /^[a-z0-9](?:[a-z0-9-]{0,28}[a-z0-9])?$/;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const zUuid = (value: string) => UUID_RE.test(value);
 
 /**
  * A workspace-relative path Fadi may name.
@@ -529,7 +534,8 @@ export const RECIPES: Record<RecipeId, Recipe> = {
     validate: (raw) => {
       const path = str(raw.path);
       const content = typeof raw.content === "string" ? raw.content : null;
-      if (!path || !REL_PATH_RE.test(path) || hasTraversalSegment(path) || path.length > 200) return null;
+      if (!path || !REL_PATH_RE.test(path) || hasTraversalSegment(path) || path.length > 200)
+        return null;
       if (content === null) return null;
       if (Buffer.byteLength(content) > MAX_FILE_BYTES) return null;
       return { path, content };
@@ -538,11 +544,19 @@ export const RECIPES: Record<RecipeId, Recipe> = {
       const content = String(p.content ?? "");
       const preview = content.length > 220 ? content.slice(0, 220) + "…" : content;
       return (
-        "Write " + Buffer.byteLength(content) + " bytes to " + p.path + " in your workspace:\n\n" + preview
+        "Write " +
+        Buffer.byteLength(content) +
+        " bytes to " +
+        p.path +
+        " in your workspace:\n\n" +
+        preview
       );
     },
-    reversal: () => "If it already existed, the old version is kept next to it as a .fadi-bak file.",
-    render: (p) => [{ id: "write", fs: "write", path: String(p.path), content: String(p.content ?? "") }],
+    reversal: () =>
+      "If it already existed, the old version is kept next to it as a .fadi-bak file.",
+    render: (p) => [
+      { id: "write", fs: "write", path: String(p.path), content: String(p.content ?? "") },
+    ],
   },
 
   "dir.create": {
@@ -638,6 +652,53 @@ export const RECIPES: Record<RecipeId, Recipe> = {
   },
 
   /**
+   * Control an existing VMware guest registered by its owner.
+   *
+   * The caller supplies only a resource id. `proposeAction` resolves the VMX path from
+   * that user's resource record and overwrites any path or label supplied by the caller.
+   * The exact resolved path is then shown and compared again at execution.
+   */
+  "vmware.start": {
+    blast: "vm",
+    reversibility: "reversible",
+    confirmToken: (p) => String(p.label ?? p.resourceId),
+    validate: (raw) => {
+      const resourceId = str(raw.resourceId);
+      if (!resourceId || !zUuid(resourceId)) return null;
+      return {
+        resourceId,
+        label: typeof raw.label === "string" ? raw.label : undefined,
+        vmxPath: typeof raw.vmxPath === "string" ? raw.vmxPath : undefined,
+      };
+    },
+    summary: (p) => `Open and start the registered VMware machine ${p.label ?? p.resourceId}.`,
+    reversal: (p) => `Suspend ${p.label ?? p.resourceId}; VMware keeps its memory and disk state.`,
+    render: (p) => [
+      { id: "vmware-start", cmd: "vmrun", args: ["start", String(p.vmxPath), "gui"] },
+    ],
+  },
+
+  "vmware.suspend": {
+    blast: "vm",
+    reversibility: "disruptive",
+    confirmToken: (p) => String(p.label ?? p.resourceId),
+    validate: (raw) => {
+      const resourceId = str(raw.resourceId);
+      if (!resourceId || !zUuid(resourceId)) return null;
+      return {
+        resourceId,
+        label: typeof raw.label === "string" ? raw.label : undefined,
+        vmxPath: typeof raw.vmxPath === "string" ? raw.vmxPath : undefined,
+      };
+    },
+    summary: (p) => `Suspend the registered VMware machine ${p.label ?? p.resourceId}.`,
+    reversal: (p) => `Resume ${p.label ?? p.resourceId} in VMware.`,
+    render: (p) => [
+      { id: "vmware-suspend", cmd: "vmrun", args: ["suspend", String(p.vmxPath), "soft"] },
+    ],
+  },
+
+  /**
    * BUILD A LAB IMAGE FOR THIS PROJECT.
    *
    * The model expresses intent — a base, some packages, some ports — and image.ts renders
@@ -672,9 +733,17 @@ export const RECIPES: Record<RecipeId, Recipe> = {
       "/Dockerfile:\n\n" +
       String(p.dockerfile),
     reversal: (p) =>
-      "Remove the image with docker rmi " + NAME_PREFIX + String(p.name) + "; the Dockerfile stays in your workspace.",
+      "Remove the image with docker rmi " +
+      NAME_PREFIX +
+      String(p.name) +
+      "; the Dockerfile stays in your workspace.",
     render: (p) => [
-      { id: "dockerfile", fs: "write", path: String(p.name) + "/Dockerfile", content: String(p.dockerfile) },
+      {
+        id: "dockerfile",
+        fs: "write",
+        path: String(p.name) + "/Dockerfile",
+        content: String(p.dockerfile),
+      },
       { id: "build", build: String(p.name), tag: NAME_PREFIX + String(p.name) },
     ],
   },
@@ -696,7 +765,8 @@ export const RECIPES: Record<RecipeId, Recipe> = {
     confirmToken: (p) => String(p.path),
     validate: (raw) => {
       const path = str(raw.path);
-      if (!path || !REL_PATH_RE.test(path) || hasTraversalSegment(path) || path.length > 200) return null;
+      if (!path || !REL_PATH_RE.test(path) || hasTraversalSegment(path) || path.length > 200)
+        return null;
       const name = str(raw.name);
       if (!name || !NAME_RE.test(name)) return null;
       return { path, name };
@@ -785,6 +855,20 @@ export const RECIPES: Record<RecipeId, Recipe> = {
     render: (p) => [{ id: "stop", cmd: "docker", args: ["stop", NAME_PREFIX + String(p.name)] }],
   },
 
+  "container.start": {
+    blast: "container",
+    reversibility: "reversible",
+    confirmToken: (p) => NAME_PREFIX + String(p.name),
+    validate: (raw) => {
+      const name = str(raw.name);
+      return name && NAME_RE.test(name) ? { name } : null;
+    },
+    summary: (p) => "Resume " + NAME_PREFIX + String(p.name) + ".",
+    reversal: (p) => "Pause it again: docker stop " + NAME_PREFIX + String(p.name),
+    render: (p) => [{ id: "start", cmd: "docker", args: ["start", NAME_PREFIX + String(p.name)] }],
+    ownWorkOnly: true,
+  },
+
   "container.remove": {
     blast: "container",
     reversibility: "irreversible",
@@ -798,8 +882,11 @@ export const RECIPES: Record<RecipeId, Recipe> = {
       `Remove the container ${NAME_PREFIX}${p.name}. Anything written inside it that is not on a volume is gone.`,
     // Said plainly because it is true. A reversal line that implies an undo which does
     // not exist is worse than none.
-    reversal: () => "Not reversible — the container is recreated from the image, without its contents.",
-    render: (p) => [{ id: "remove", cmd: "docker", args: ["rm", "-f", NAME_PREFIX + String(p.name)] }],
+    reversal: () =>
+      "Not reversible — the container is recreated from the image, without its contents.",
+    render: (p) => [
+      { id: "remove", cmd: "docker", args: ["rm", "-f", NAME_PREFIX + String(p.name)] },
+    ],
   },
 };
 
@@ -830,7 +917,7 @@ async function breakerOpen(userId: string): Promise<string | null> {
   const grants = createLabGrantsRepository(db);
   const denials = await createLabActionsRepository(db).denialsSince(
     userId,
-    new Date(Date.now() - BREAKER_WINDOW_MINUTES * 60_000),
+    new Date(Date.now() - BREAKER_WINDOW_MINUTES * 60_000)
   );
   const state = breakerState(denials);
   if (!state.tripped) return null;
@@ -843,6 +930,34 @@ async function breakerOpen(userId: string): Promise<string | null> {
 
 function isRecipe(value: string): value is RecipeId {
   return (RECIPE_IDS as readonly string[]).includes(value);
+}
+
+/** Resolve machine-specific parameters from an owner-scoped resource record. */
+async function hydrateRecipeParams(
+  userId: string,
+  recipe: RecipeId,
+  params: RecipeParams,
+): Promise<RecipeParams | null> {
+  if (recipe !== "vmware.start" && recipe !== "vmware.suspend") return params;
+
+  const resourceId = String(params.resourceId ?? "");
+  const resource = await createLabResourcesRepository(getDatabase()).get(userId, resourceId);
+  if (!resource?.endpoint) return null;
+  try {
+    const endpoint = new URL(resource.endpoint);
+    const vmxPath = decodeURIComponent(endpoint.pathname);
+    if (
+      endpoint.protocol !== "vmware:" ||
+      (endpoint.hostname && endpoint.hostname !== "local") ||
+      !vmxPath.startsWith("/") ||
+      !vmxPath.toLowerCase().endsWith(".vmx")
+    ) {
+      return null;
+    }
+    return { ...params, label: resource.label, vmxPath };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -897,7 +1012,7 @@ export async function proposeAction(input: {
   }
 
   const recipe = RECIPES[input.recipe];
-  const params = recipe.validate(input.params ?? {});
+  let params = recipe.validate(input.params ?? {});
   if (!params) {
     // A rejected proposal is logged. A model repeatedly submitting parameters that fail
     // validation is worth seeing, and it is invisible if only valid ones are recorded.
@@ -913,12 +1028,32 @@ export async function proposeAction(input: {
     });
     return { ok: false, message: "Those aren't parameters Fadi can express safely." };
   }
+  params = await hydrateRecipeParams(input.userId, input.recipe, params);
+  if (!params) {
+    await audit.record({
+      userId: input.userId,
+      actor: input.actor,
+      origin: input.origin,
+      runId: input.runId ?? null,
+      stepId: input.stepId ?? null,
+      capability: input.recipe,
+      decision: "denied",
+      detail: "Registered machine unavailable or not owned by this account.",
+    });
+    return {
+      ok: false,
+      message: "That registered machine is unavailable in this account. Nothing ran.",
+    };
+  }
 
   // A recipe that may only touch Fadi's own work checks that here, not at execution —
   // so the person is never shown a prompt for something Fadi was never going to be
   // allowed to do.
   if (recipe.ownWorkOnly) {
-    const mine = await requests.createdNames(input.userId, "container.run");
+    const mine = [
+      ...(await requests.createdNames(input.userId, "container.run")),
+      ...(await requests.createdNames(input.userId, "lab.start")),
+    ];
     if (!mine.includes(String(params.name))) {
       await audit.record({
         userId: input.userId,
@@ -928,13 +1063,16 @@ export async function proposeAction(input: {
         stepId: input.stepId ?? null,
         capability: input.recipe,
         decision: "denied",
-        detail: "Refused: " + NAME_PREFIX + String(params.name) + " is not a container Fadi created.",
+        detail:
+          "Refused: " + NAME_PREFIX + String(params.name) + " is not a container Fadi created.",
       });
       return {
         ok: false,
         message:
           "Fadi only stops or removes containers it started itself. " +
-          NAME_PREFIX + String(params.name) + " isn't one of them.",
+          NAME_PREFIX +
+          String(params.name) +
+          " isn't one of them.",
       };
     }
   }
@@ -982,6 +1120,8 @@ export async function proposeAction(input: {
     preflight,
     actor: input.actor,
     origin: input.origin,
+    runId: input.runId ?? null,
+    stepId: input.stepId ?? null,
     // Null lifetime means the prompt waits until it is answered. A far-future timestamp
     // rather than a nullable column, so every query that asks "is this still live?" keeps
     // one shape and cannot forget the null case.
@@ -1070,7 +1210,7 @@ async function runNetStep(step: NetStep): Promise<StepResult> {
         } catch {
           // Silent, unreachable, or simply not there. All the same answer.
         }
-      }),
+      })
     );
   }
 
@@ -1113,8 +1253,8 @@ async function runIdentify(ip: string): Promise<StepResult> {
           socket.once("timeout", () => done(false));
           socket.once("error", () => done(false));
           socket.connect(port, parsed.ip);
-        }),
-    ),
+        })
+    )
   );
 
   let name = "";
@@ -1145,7 +1285,9 @@ async function runIdentify(ip: string): Promise<StepResult> {
 
 function ipToIntSafe(ip: string): number | null {
   const parts = ip.split(".").map(Number);
-  return parts.length === 4 ? ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0 : null;
+  return parts.length === 4
+    ? ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0
+    : null;
 }
 
 /**
@@ -1263,6 +1405,8 @@ export async function approveAndRun(input: {
           userId: input.userId,
           actor: "user",
           origin: "approval",
+          runId: preview.runId ?? null,
+          stepId: preview.stepId ?? null,
           capability: preview.recipe,
           decision: "rejected",
           detail: "Confirmation did not match. Nothing ran.",
@@ -1295,7 +1439,7 @@ export async function approveAndRun(input: {
       });
       const changed = materialChanges(
         (preview.preflight ?? []) as Array<{ kind: "info" | "warn" | "unknown"; text: string }>,
-        fresh,
+        fresh
       );
       if (changed.length > 0) {
         // A new revision, not a refusal: the prompt stays, carrying what changed, and the
@@ -1305,6 +1449,8 @@ export async function approveAndRun(input: {
           userId: input.userId,
           actor: "user",
           origin: "approval",
+          runId: preview.runId ?? null,
+          stepId: preview.stepId ?? null,
           capability: preview.recipe,
           decision: "held",
           detail: "Held: the situation changed since you read it. " + changed[0].text,
@@ -1336,13 +1482,21 @@ export async function approveAndRun(input: {
   }
 
   const recipe = RECIPES[row.recipe];
-  const params = recipe.validate((row.params ?? {}) as RecipeParams);
+  let params = recipe.validate((row.params ?? {}) as RecipeParams);
   if (!params) {
     await requests.finish(input.userId, row.id, {
       status: "failed",
       detail: "Stored parameters no longer validate.",
     });
     return { ok: false, message: "Fadi couldn't re-check that request, so it didn't run it." };
+  }
+  params = await hydrateRecipeParams(input.userId, row.recipe, params);
+  if (!params) {
+    await requests.finish(input.userId, row.id, {
+      status: "failed",
+      detail: "The registered machine is no longer available to this account.",
+    });
+    return { ok: false, message: "That machine changed or was removed, so nothing ran." };
   }
 
   const commands = recipe.render(params);
@@ -1357,6 +1511,8 @@ export async function approveAndRun(input: {
       userId: input.userId,
       actor: "user",
       origin: "approval",
+      runId: row.runId ?? null,
+      stepId: row.stepId ?? null,
       capability: row.recipe,
       decision: "denied",
       detail: "Refused: rendered argv did not match what was approved.",
@@ -1382,6 +1538,8 @@ export async function approveAndRun(input: {
         userId: input.userId,
         actor: "user",
         origin: "approval",
+        runId: row.runId ?? null,
+        stepId: row.stepId ?? null,
         capability: row.recipe,
         command: displayOf(c).join(" "),
         decision: "allowed",
@@ -1394,13 +1552,18 @@ export async function approveAndRun(input: {
         userId: input.userId,
         actor: "user",
         origin: "approval",
+        runId: row.runId ?? null,
+        stepId: row.stepId ?? null,
         capability: row.recipe,
         command: displayOf(c).join(" "),
         decision: "error",
         detail: message.slice(0, 200),
         durationMs: Date.now() - started,
       });
-      await requests.finish(input.userId, row.id, { status: "failed", detail: message.slice(0, 400) });
+      await requests.finish(input.userId, row.id, {
+        status: "failed",
+        detail: message.slice(0, 400),
+      });
       logger.warn("lab.action_failed", { userId: input.userId, recipe: row.recipe });
       return { ok: false, message: message };
     }

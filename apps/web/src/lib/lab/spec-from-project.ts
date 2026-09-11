@@ -1,4 +1,5 @@
 import type { LabSpec } from "./capability";
+import type { TemplateKey } from "./templates";
 
 /**
  * WHAT WOULD THIS PROJECT NEED TO RUN?
@@ -31,7 +32,8 @@ const CONTAINER_RE = /\b(?:docker|containers?|compose|kubernetes|k8s|podman|imag
 
 /** Windows and most enterprise images are x86 only — this is the constraint that most
  *  often makes a Raspberry Pi the wrong answer, and the one a plan must not miss. */
-const X86_RE = /\b(windows|active directory|domain controller|sccm|intune|\.net|hyper-?v|esxi|vmware)\b/i;
+const X86_RE =
+  /\b(windows|active directory|domain controller|sccm|intune|\.net|hyper-?v|esxi|vmware)\b/i;
 
 /** Something a reader has to be able to reach later, not a thing you spin up and kill. */
 const ALWAYS_ON_RE =
@@ -53,7 +55,9 @@ export function specForProject(input: { title: string; detail?: string | null })
 
   if (VM_RE.test(text)) {
     spec.needs = "vms";
-    because.push("it describes a full operating system, so it needs virtual machines rather than containers");
+    because.push(
+      "it describes a full operating system, so it needs virtual machines rather than containers"
+    );
   } else if (CONTAINER_RE.test(text)) {
     spec.needs = "containers";
     because.push("it describes containerised services");
@@ -66,7 +70,9 @@ export function specForProject(input: { title: string; detail?: string | null })
 
   if (ALWAYS_ON_RE.test(text)) {
     spec.alwaysOn = true;
-    because.push("something has to keep running for this to mean anything, so it cannot live on a laptop that closes");
+    because.push(
+      "something has to keep running for this to mean anything, so it cannot live on a laptop that closes"
+    );
   }
 
   // Only claim a memory figure when the text implies more than one machine, and keep it
@@ -78,4 +84,33 @@ export function specForProject(input: { title: string; detail?: string | null })
   }
 
   return { spec, because };
+}
+
+/**
+ * Choose the smallest reviewed lab that can support the work described.
+ *
+ * This is deterministic and deliberately conservative. A project can override the
+ * recommendation later, but an agent cannot turn free-form project text into an image,
+ * flag, port, or host path. It can only select one key from the reviewed catalogue.
+ */
+export function templateForProject(input: { title: string; detail?: string | null }): TemplateKey {
+  const text = `${input.title} ${input.detail ?? ""}`;
+
+  if (/\b(?:active directory|domain controllers?|group policy|windows server)\b/i.test(text)) {
+    return "windows-server-2025";
+  }
+  if (/\b(?:windows 1[01]|windows desktop|endpoint|intune|sccm|edr)\b/i.test(text)) {
+    return "windows-11";
+  }
+  if (
+    /\b(?:postgres(?:ql)?|relational database|sql database|database server|replication)\b/i.test(
+      text
+    )
+  ) {
+    return "linux-postgres";
+  }
+  if (/\b(?:nginx|reverse proxy|web server|tls|static (?:site|hosting))\b/i.test(text)) {
+    return "linux-web";
+  }
+  return "linux-ubuntu";
 }
