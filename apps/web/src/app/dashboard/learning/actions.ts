@@ -67,12 +67,55 @@ export async function suggestForGapAction(input: {
  * regardless of whether the directory exists this second.
  */
 async function attachLocalWorkspace(userId: string, runId: string, title: string): Promise<void> {
-  const { createProjectRunsRepository } = await import("@careeros/database");
-  await createProjectRunsRepository(getDatabase()).setWorkspace(userId, runId, {
+  const slug = workspaceSlug(title);
+  const db = getDatabase();
+  const { createProjectRunsRepository, createLabSettingsRepository, createLabActionsRepository } =
+    await import("@careeros/database");
+
+  await createProjectRunsRepository(db).setWorkspace(userId, runId, {
     workspaceKind: DEFAULT_WORKSPACE,
-    workspaceRef: workspaceSlug(title),
+    workspaceRef: slug,
     repoUrl: null,
   });
+
+  // AND ACTUALLY MAKE IT.
+  //
+  // Recording "this project works locally" and creating nothing left people with a
+  // workspace that existed only in a column. The folder is the point.
+  //
+  // No approval prompt for this one, and the line is worth stating: the person nominated
+  // this directory FOR Fadi to work in, and the path is derived from a project title they
+  // just committed to — no model chose it, so there is no injected instruction to launder.
+  // Writing FILES still goes through approval; making the project's own folder inside the
+  // workspace is what nominating a workspace meant.
+  const root = await createLabSettingsRepository(db).workspaceRoot(userId);
+  if (!root) return;
+
+  try {
+    const { resolveInWorkspace } = await import("@/lib/lab/workspace");
+    const resolved = await resolveInWorkspace(root, slug);
+    if (!resolved.ok) return;
+
+    const fs = await import("node:fs/promises");
+    await fs.mkdir(resolved.path, { recursive: true });
+
+    await createLabActionsRepository(db).record({
+      userId,
+      actor: "user",
+      origin: "learning:commit",
+      capability: "workspace.create",
+      runId,
+      decision: "allowed",
+      detail: "Created the folder " + slug + " in your workspace.",
+    });
+  } catch (error) {
+    // A folder that could not be made must not lose the project. The workspace column
+    // still says where it belongs, and it is created the first time something writes.
+    logger.warn("learning.workspace_create_failed", {
+      userId,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+  }
 }
 
 export async function commitToProjectAction(input: {

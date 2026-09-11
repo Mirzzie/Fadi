@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { BookOpen, Boxes, MonitorCog } from "lucide-react";
+import {
+  History, BookOpen, Boxes, MonitorCog } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
@@ -22,6 +23,11 @@ const destinations = [
     href: "/dashboard/learning/machines",
     label: "Machines",
     icon: MonitorCog,
+  },
+  {
+    href: "/dashboard/learning/activity",
+    label: "Activity",
+    icon: History,
   },
 ];
 
