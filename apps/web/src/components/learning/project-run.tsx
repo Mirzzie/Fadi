@@ -1,15 +1,13 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Check, ChevronRight, Hammer, Loader2, Target, X } from "lucide-react";
+import { ChevronRight, Hammer, Loader2, X } from "lucide-react";
+import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import {
-  completeStepAction,
   listProjectRuns,
   planProjectAction,
-  reopenStepAction,
   stopProjectRun,
   type RunView,
 } from "@/app/dashboard/learning/lab-actions";
@@ -29,9 +27,9 @@ import {
  * Every step asks what it PRODUCED before it counts as done — that answer is what turns
  * a finished project into evidence rather than a memory.
  */
-export function ProjectRuns() {
+export function ProjectRuns({ mode = "overview" }: { mode?: "overview" | "all" }) {
   const [runs, setRuns] = useState<RunView[] | null>(null);
-  const [pending, start] = useTransition();
+  const [, start] = useTransition();
 
   const refresh = () =>
     start(async () => {
@@ -48,27 +46,49 @@ export function ProjectRuns() {
     return () => window.removeEventListener("fadi:runs-changed", onChanged);
   }, []);
 
-  if (!runs || runs.length === 0) return null;
-  const active = runs.filter((r) => r.status !== "done");
-  if (active.length === 0) return null;
+  if (!runs) {
+    return (
+      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <Loader2 className="size-3 animate-spin" aria-hidden="true" /> loading projects…
+      </p>
+    );
+  }
+
+  const visible = mode === "overview" ? runs.filter((r) => r.status !== "done") : runs;
+  if (visible.length === 0) {
+    if (mode === "overview") return null;
+    return (
+      <section className="rounded-xl border border-dashed border-border bg-card/40 p-8 text-center">
+        <Hammer className="mx-auto size-5 text-muted-foreground" aria-hidden="true" />
+        <h2 className="mt-3 text-sm font-semibold">No projects yet</h2>
+        <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+          Turn a skill gap into a project from Overview. Fadi will plan one next step at a time and
+          ask what each step produced.
+        </p>
+        <Link
+          href="/dashboard/learning"
+          className="mt-4 inline-flex text-sm font-medium text-primary hover:underline"
+        >
+          Find a skill gap
+        </Link>
+      </section>
+    );
+  }
 
   return (
     <section className="space-y-3">
       <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
         <Hammer className="size-3.5" aria-hidden="true" />
-        In progress
+        {mode === "overview" ? "Continue your project" : "Your projects"}
       </h2>
-      {active.map((run) => (
-        <RunCard key={run.id} run={run} onChanged={refresh} pending={pending} />
+      {visible.map((run) => (
+        <RunCard key={run.id} run={run} onChanged={refresh} />
       ))}
     </section>
   );
 }
 
-function RunCard({ run, onChanged, pending }: { run: RunView; onChanged: () => void; pending: boolean }) {
-  const [artifact, setArtifact] = useState("");
-  const [saving, start] = useTransition();
-
+function RunCard({ run, onChanged }: { run: RunView; onChanged: () => void }) {
   const done = run.steps.filter((s) => s.status === "done").length;
   const next = run.steps.find((s) => s.status === "pending");
 
@@ -94,7 +114,10 @@ function RunCard({ run, onChanged, pending }: { run: RunView; onChanged: () => v
           A step you ticked and a step that produced something are drawn differently. A
           solid bar across six empty clicks is the same false claim as the copy underneath
           it, just in a medium that is easier to believe. */}
-      <div className="mt-2 flex gap-1" aria-label={`${done} of ${run.steps.length} steps done, ${run.evidencedCount} with something to show`}>
+      <div
+        className="mt-2 flex gap-1"
+        aria-label={`${done} of ${run.steps.length} steps done, ${run.evidencedCount} with something to show`}
+      >
         {run.steps.map((s) => (
           <span
             key={s.id}
@@ -116,111 +139,23 @@ function RunCard({ run, onChanged, pending }: { run: RunView; onChanged: () => v
         ))}
       </div>
 
-      {next ? (
-        <div className="mt-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
-          <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
-            <ChevronRight className="size-3.5" aria-hidden="true" />
-            Step {next.ordinal}
+      <div className="mt-3 flex items-center justify-between gap-3 rounded-lg bg-muted/40 px-3 py-2.5">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            {next ? `Next · step ${next.ordinal}` : "Project complete"}
           </p>
-          <p className="mt-1 text-sm font-medium">{next.title}</p>
-          <p className="mt-1 whitespace-pre-line text-xs text-muted-foreground">{next.instruction}</p>
-
-          {next.verify ? (
-            <p className="mt-2 flex items-start gap-1.5 text-xs">
-              <Target className="mt-0.5 size-3.5 shrink-0 text-emerald-400" aria-hidden="true" />
-              <span>
-                <span className="text-emerald-400">It worked when:</span>{" "}
-                <span className="text-muted-foreground">{next.verify}</span>
-              </span>
-            </p>
-          ) : null}
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Input
-              value={artifact}
-              onChange={(e) => setArtifact(e.target.value)}
-              placeholder={next.produces ? `What you produced — ${next.produces}` : "What did this leave behind?"}
-              className="h-8 max-w-md text-xs"
-            />
-            <Button
-              size="sm"
-              disabled={saving || pending}
-              onClick={() =>
-                start(async () => {
-                  await completeStepAction({ stepId: next.id, artifact: artifact.trim() || null });
-                  setArtifact("");
-                  onChanged();
-                })
-              }
-            >
-              {saving ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <Check className="size-3.5" aria-hidden="true" />}
-              Done
-            </Button>
-          </div>
-          {/* Recording the artefact is what makes this evidence later, so it is asked
-              for every time rather than at the end when nobody remembers. */}
-          {/* Not called "optional" any more. It is still allowed to be empty — sometimes
-              you did the thing and there is genuinely nothing to paste — but the sentence
-              now says what an empty one costs, at the moment the choice is made rather
-              than at the end when the project claims to be evidence. */}
-          <p className="mt-1.5 text-[11px] text-muted-foreground">
-            {artifact.trim()
-              ? "This is what makes the step showable later."
-              : "Leave it empty and this step is marked done on your word alone — it won't count as evidence."}
+          <p className="truncate text-sm font-medium">
+            {next?.title ?? `${run.evidencedCount} of ${run.steps.length} steps have an artifact`}
           </p>
         </div>
-      ) : (
-        /*
-          THE HONEST ENDING.
-
-          This used to say "finishing this will fold what you produced into your evidence"
-          regardless of whether anything was produced — so six empty clicks ended in a
-          promise of achievement. Fadi does not get to describe a memory as a result.
-        */
-        <div className="mt-3 space-y-1.5">
-          {run.evidencedCount === 0 ? (
-            <>
-              <p className="text-xs text-amber-400">
-                All {run.steps.length} steps are ticked, but nothing was recorded against any of
-                them — so there is nothing here to show anyone, and none of it becomes evidence.
-              </p>
-              <p className="text-[11px] text-muted-foreground">
-                If you did the work, reopen a step and paste what it produced: a path, a repo, a
-                screenshot, a command and its output. If you didn&apos;t, drop the project — that
-                is a normal thing to do and it costs you nothing.
-              </p>
-              <div className="flex flex-wrap gap-1.5 pt-0.5">
-                {run.steps.map((st) => (
-                  <Button
-                    key={st.id}
-                    size="sm"
-                    variant="outline"
-                    className="h-6 px-2 text-[10px]"
-                    disabled={saving || pending}
-                    onClick={() =>
-                      start(async () => {
-                        await reopenStepAction({ stepId: st.id });
-                        onChanged();
-                      })
-                    }
-                  >
-                    Reopen step {st.ordinal}
-                  </Button>
-                ))}
-              </div>
-            </>
-          ) : run.evidencedCount < run.steps.length ? (
-            <p className="text-xs text-emerald-400">
-              Every step is done. {run.evidencedCount} of {run.steps.length} left something behind —
-              only those become evidence.
-            </p>
-          ) : (
-            <p className="text-xs text-emerald-400">
-              Every step is done and every one produced something. All of it can become evidence.
-            </p>
-          )}
-        </div>
-      )}
+        <Link
+          href={`/dashboard/learning/projects/${run.id}`}
+          className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline"
+        >
+          {next ? "Continue" : "Review"}
+          <ChevronRight className="size-3" aria-hidden="true" />
+        </Link>
+      </div>
     </div>
   );
 }
@@ -259,7 +194,12 @@ function StopProject({ run, onChanged }: { run: RunView; onChanged: () => void }
         variant="outline"
         className="h-6 px-2 text-[10px]"
         disabled={busy}
-        onClick={() => start(async () => { await stopProjectRun({ runId: run.id, mode: "abandon" }); onChanged(); })}
+        onClick={() =>
+          start(async () => {
+            await stopProjectRun({ runId: run.id, mode: "abandon" });
+            onChanged();
+          })
+        }
       >
         Drop it, keep the record
       </Button>
@@ -268,11 +208,21 @@ function StopProject({ run, onChanged }: { run: RunView; onChanged: () => void }
         variant="destructive"
         className="h-6 px-2 text-[10px]"
         disabled={busy}
-        onClick={() => start(async () => { await stopProjectRun({ runId: run.id, mode: "delete" }); onChanged(); })}
+        onClick={() =>
+          start(async () => {
+            await stopProjectRun({ runId: run.id, mode: "delete" });
+            onChanged();
+          })
+        }
       >
         Delete it entirely
       </Button>
-      <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]" onClick={() => setAsking(false)}>
+      <Button
+        size="sm"
+        variant="ghost"
+        className="h-6 px-2 text-[10px]"
+        onClick={() => setAsking(false)}
+      >
         Cancel
       </Button>
     </div>
@@ -309,7 +259,11 @@ export function PlanProjectButton({
           })
         }
       >
-        {pending ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <Hammer className="size-3.5" aria-hidden="true" />}
+        {pending ? (
+          <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+        ) : (
+          <Hammer className="size-3.5" aria-hidden="true" />
+        )}
         {pending ? "Planning against your hardware…" : "Plan the steps"}
       </Button>
       {msg ? <p className="mt-1 text-[11px] text-destructive">{msg}</p> : null}

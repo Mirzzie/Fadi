@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import { Check, Cpu, HelpCircle, Loader2, Plus, Radar, ShieldQuestion, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -39,11 +39,11 @@ export function LabFit({ title, detail }: { title: string; detail?: string | nul
   const [adding, setAdding] = useState(false);
   const [pending, start] = useTransition();
 
-  const refresh = () =>
+  const refresh = useCallback(() =>
     start(async () => {
       const res = await planLabFor({ title, detail });
       if (res.ok && res.plan) setPlan(res.plan);
-    });
+    }), [title, detail]);
 
   useEffect(() => {
     refresh();
@@ -53,7 +53,7 @@ export function LabFit({ title, detail }: { title: string; detail?: string | nul
     const onChanged = () => refresh();
     window.addEventListener("fadi:resources-changed", onChanged);
     return () => window.removeEventListener("fadi:resources-changed", onChanged);
-  }, [title, detail]);
+  }, [refresh]);
 
   if (!plan) {
     return (
@@ -164,6 +164,37 @@ export function LabFit({ title, detail }: { title: string; detail?: string | nul
         </div>
       )}
       {pending ? <p className="mt-1 text-[11px] text-muted-foreground">updating…</p> : null}
+    </div>
+  );
+}
+
+/** Add capacity from the Machines surface, where the inventory remains available after
+ * the first resource is registered. Project cards still ask just in time; this is the
+ * durable place to inspect and extend the whole lab. */
+export function MachineRegistration() {
+  const [adding, setAdding] = useState(false);
+
+  if (adding) {
+    return (
+      <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+        <AddResource
+          onDone={() => setAdding(false)}
+          onCancel={() => setAdding(false)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      <DetectHere
+        onSaved={() => window.dispatchEvent(new CustomEvent("fadi:resources-changed"))}
+      />
+      <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
+        <Plus className="size-3.5" aria-hidden="true" />
+        Describe a machine
+      </Button>
+      <FindOnNetwork />
     </div>
   );
 }

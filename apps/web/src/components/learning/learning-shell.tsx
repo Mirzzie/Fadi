@@ -5,9 +5,9 @@ import { FadiBadge } from "@/components/ui/fadi-badge";
 import { buttonVariants } from "@/components/ui/button";
 import { CommitmentsList, GapGrowth } from "@/components/learning/gap-growth";
 import { CareerBlueprint } from "@/components/learning/career-blueprint";
+import { LearningNavigation } from "@/components/learning/learning-navigation";
 import type { CommitmentView } from "@/lib/learning/commitments-view";
 import { ProjectRuns } from "@/components/learning/project-run";
-import { MachineAccess } from "@/components/learning/machine-access";
 import type { StoredCareerReport } from "@/lib/career-report/schema";
 import { learningResources } from "@/lib/learning/resources";
 import { cn } from "@/lib/utils";
@@ -55,6 +55,8 @@ export function LearningShell({ report, commitments = [], role = null }: Props) 
 
   return (
     <div className="mx-auto max-w-shell space-y-6">
+      <LearningNavigation />
+
       {/* Header */}
       <section className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
         <div
@@ -85,28 +87,22 @@ export function LearningShell({ report, commitments = [], role = null }: Props) 
                 {report.career_readiness_score}
                 <span className="text-sm text-muted-foreground">/100</span>
               </div>
-              <p className="text-xs text-muted-foreground">readiness</p>
+              <p className="text-xs text-muted-foreground">career report score</p>
             </div>
           ) : null}
         </div>
       </section>
 
-      {/* Direction-level plan: the cert ladder + proof-projects + in-demand skills */}
-      <CareerBlueprint role={role} />
-
       {/* Projects being DONE, one step at a time, against hardware the user owns.
           Above the commitment list on purpose: the next concrete action beats a list
           of things agreed to. */}
-      <ProjectRuns />
+      <ProjectRuns mode="overview" />
+
+      {/* Direction-level plan: the cert ladder + proof-projects + in-demand skills */}
+      <CareerBlueprint role={role} />
 
       {/* In-progress commitments — completing one feeds your Evidence + resume */}
       <CommitmentsList commitments={commitments} />
-
-      {/* What Fadi may do on this machine, and what it actually tried.
-          Lives beside the lab because that is where local access is used; a permission
-          screen filed under Settings is one nobody reads until after something went
-          wrong. */}
-      <MachineAccess />
 
       {!hasContent ? (
         <div className="gradient-border glass-card rounded-xl p-6">
@@ -175,9 +171,7 @@ export function LearningShell({ report, commitments = [], role = null }: Props) 
                 {learningPath.map((step, i) => (
                   <li
                     key={step.title}
-                    className={cn(
-                      "relative rounded-xl border border-border/60 bg-card p-5 pl-14",
-                    )}
+                    className={cn("relative rounded-xl border border-border/60 bg-card p-5 pl-14")}
                   >
                     <span className="glow-primary absolute left-5 top-5 grid size-7 place-items-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.66_0.22_285)] text-xs font-semibold text-primary-foreground tabular-nums">
                       {i + 1}
