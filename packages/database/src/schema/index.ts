@@ -1204,6 +1204,10 @@ export const labActions = pgTable(
      * What happened, and the distinctions here are load-bearing.
      *
      *   allowed     — it ran.
+     *   asked       — refused for want of permission, and the user has been asked. Not a
+     *                 security event: it is the system working exactly as designed, and
+     *                 counting it as hostile made the breaker revoke everything during
+     *                 ordinary use.
      *   denied      — FADI WANTED SOMETHING AND WAS NOT PERMITTED. The only security
      *                 signal in this list. The monitor's alarm counts these and nothing
      *                 else; the circuit breaker counts these by non-human actors.

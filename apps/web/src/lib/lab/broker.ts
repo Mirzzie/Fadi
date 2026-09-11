@@ -347,8 +347,19 @@ export async function requestCapability(input: {
       stepId: input.stepId ?? null,
       capability,
       resourceId,
-      decision: "denied",
-      detail: "No live grant — asked you for permission.",
+      // "asked", not "denied", and this is the third time this column has taught the same
+      // lesson. The breaker counts machine denials — so once a refused read started
+      // raising a permission request, the ordinary act of asking looked like an attack:
+      // model tries, is refused, asks, logs a denial; twelve times in five minutes and the
+      // breaker revoked every permission and stopped asking. The security layer turned on
+      // the person again.
+      //
+      // Being refused for want of permission, and telling the user so, IS THE SYSTEM
+      // WORKING. What remains a denial is asking for something outside the catalogue,
+      // reaching for a container Fadi did not create, or coming back while the breaker is
+      // already open — things no honest caller does.
+      decision: "asked",
+      detail: "Waiting for your permission.",
     });
     return {
       ok: false,

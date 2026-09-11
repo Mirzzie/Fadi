@@ -92,6 +92,27 @@ export async function planProjectRun(
     };
   }
 
+  // WHAT OPERATING SYSTEM IS THIS, ACTUALLY.
+  //
+  // A plan was produced telling the owner to "select the Windows 64-bit .msi" and save it
+  // to C:\Users\%USERNAME%\Downloads — on a Linux laptop. Every step of it was
+  // unfollowable, and nothing in the prompt had ever said what machine they were on, so
+  // the model filled the gap with the most common answer.
+  //
+  // This is process.platform: the OS Fadi itself is running on. It is self-knowledge
+  // rather than an inspection of someone's machine — no capability covers "which OS am I",
+  // and gating it would mean planning blind by default, which is how the Windows steps
+  // happened.
+  const platform = process.platform;
+  const osLine =
+    platform === "linux"
+      ? "This machine runs LINUX. Use Linux paths, package managers and shell commands. Never write a C:\\ path, a .msi, PowerShell or a Windows UI step for it."
+      : platform === "darwin"
+        ? "This machine runs MACOS. Use macOS paths and Homebrew. Never write a C:\\ path or a .msi for it."
+        : platform === "win32"
+          ? "This machine runs WINDOWS. Use Windows paths and PowerShell."
+          : `This machine reports platform "${platform}". Say so rather than assuming a familiar one.`;
+
   const hostLine = host
     ? `Host: ${host.label} — ${host.kind}, ${host.arch}, ${
         host.memoryMb ? `${Math.round((host.memoryMb / 1024) * 10) / 10} GB RAM` : "RAM not recorded"
@@ -101,7 +122,7 @@ export async function planProjectRun(
   try {
     const parsed = await generate.structured(
       SYSTEM,
-      [`Project: ${input.title}`, input.detail ? `Description: ${input.detail}` : "", hostLine]
+      [`Project: ${input.title}`, input.detail ? `Description: ${input.detail}` : "", osLine, hostLine]
         .filter(Boolean)
         .join("\n"),
       planSchema,

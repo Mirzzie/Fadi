@@ -835,7 +835,12 @@ describe("THE REPORTED BUG: the monitor showed a person their own decisions as a
     expect(record.mock.calls[0][0].decision).toBe("denied");
   });
 
-  it("no live grant IS a denial", async () => {
+  it("no live grant is an ASK, not a denial — the distinction the breaker depends on", async () => {
+    // This assertion inverted after the breaker revoked everything during ordinary use. A
+    // refused read now raises a permission request; if that also logged a denial, then
+    // asking twelve times in five minutes looked exactly like an attack, and the security
+    // layer closed every permission and stopped asking. Being refused for want of
+    // permission and telling the user is the system working.
     findLiveForBroker.mockResolvedValue(null);
     const { requestCapability } = await import("./broker");
     await requestCapability({
@@ -844,7 +849,8 @@ describe("THE REPORTED BUG: the monitor showed a person their own decisions as a
       actor: "model",
       origin: "t",
     });
-    expect(record.mock.calls.some((c) => c[0].decision === "denied")).toBe(true);
+    expect(record.mock.calls.some((c) => c[0].decision === "asked")).toBe(true);
+    expect(record.mock.calls.some((c) => c[0].decision === "denied")).toBe(false);
   });
 
   it("a mistyped confirmation is the person, not an attacker", async () => {

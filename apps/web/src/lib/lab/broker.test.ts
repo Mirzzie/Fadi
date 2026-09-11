@@ -92,7 +92,10 @@ describe("deny by default", () => {
 
     expect(record).toHaveBeenCalledTimes(1);
     const row = record.mock.calls[0][0];
-    expect(row.decision).toBe("denied");
+    // "asked", not "denied". Being refused for want of permission and telling the user is
+    // the system working; counting it as hostile made the breaker revoke everything during
+    // ordinary use.
+    expect(row.decision).toBe("asked");
     // Who asked is the information a person actually needs. "Something happened" is not
     // the same fact as "the MCP client asked for this".
     expect(row.actor).toBe("mcp");
@@ -270,6 +273,8 @@ describe("permission is asked at the trigger, not stockpiled in advance", () => 
 
     expect(result.ok).toBe(false);
     expect(execFileMock).not.toHaveBeenCalled();
-    expect(record.mock.calls.some((c) => c[0].decision === "denied")).toBe(true);
+    // Recorded, but as an ask rather than an incident.
+    expect(record.mock.calls.some((c) => c[0].decision === "asked")).toBe(true);
+    expect(record.mock.calls.some((c) => c[0].decision === "denied")).toBe(false);
   });
 });
