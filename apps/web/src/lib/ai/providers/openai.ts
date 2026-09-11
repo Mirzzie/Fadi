@@ -38,6 +38,14 @@ function extractJsonObject(text: string): unknown {
  * OpenAI-compatible provider. Works for OpenAI itself and any compatible
  * endpoint (Groq, Ollama, Google's OpenAI-compat gateway) via `baseURL`.
  */
+/**
+ * How many times Fadi may act before it has to answer.
+ *
+ * Enough for the chains that matter — look, decide, propose; or propose, check, report —
+ * and low enough that a model looping on one tool costs a few calls rather than a bill.
+ */
+const MAX_TOOL_ROUNDS = 5;
+
 export class OpenAIProvider implements AIProvider {
   readonly id: string;
   readonly name: string;
@@ -257,48 +265,84 @@ export class OpenAIProvider implements AIProvider {
     }));
     const toolResults: ToolRunResult["toolResults"] = [];
 
-    // Phase 1 — a single tool-resolution pass (non-streaming, so we can read the
-    // tool calls). Low temperature → far more reliable tool-call JSON on Groq.
-    const first = await client.chat.completions.create({
-      model: this.model,
-      messages: convo,
-      tools,
-      tool_choice: "auto",
-      temperature: 0.2,
-    });
-    const choice = first.choices[0]?.message;
-    const calls = (choice?.tool_calls ?? []).filter((c) => c.type === "function");
+    // THE LOOP, and why it used to be a single pass.
+    //
+    // This was one tool-resolution call, then an answer with the tools taken away. It
+    // meant Fadi got exactly one guess. It could not call inspect_machine, see there was
+    // no Docker, and propose something else; it could not ask for a grant after being
+    // refused and retry; it could not check that the thing it just did had worked. Every
+    // one of those is two rounds, and it only ever had one.
+    //
+    // Bounded, because a loop with no ceiling is a bill with no ceiling — and a model
+    // stuck calling the same tool forever is a real failure mode, not a hypothetical.
+    // The de-dupe below is per ROUND rather than per run, so "check it again now that I
+    // changed something" stays possible while "call it twice in the same breath" does not.
+    const executedAcrossRun = new Set<string>();
+    let rounds = 0;
 
-    if (calls.length === 0) {
-      // No tools needed — return the direct answer (delivered whole).
-      const text = choice?.content ?? "";
-      callbacks?.onToken?.(text);
-      return { text, toolResults };
+    while (rounds < MAX_TOOL_ROUNDS) {
+      rounds += 1;
+
+      const step = await client.chat.completions.create({
+        model: this.model,
+        messages: convo,
+        tools,
+        tool_choice: "auto",
+        // Low temperature → far more reliable tool-call JSON on Groq.
+        temperature: 0.2,
+      });
+      const choice = step.choices[0]?.message;
+      const calls = (choice?.tool_calls ?? []).filter((c) => c.type === "function");
+
+      if (calls.length === 0) {
+        if (rounds === 1) {
+          // Nothing to do at all — return the direct answer whole.
+          const text = choice?.content ?? "";
+          callbacks?.onToken?.(text);
+          return { text, toolResults };
+        }
+        // It has finished working and wants to answer. Fall through to the streamed
+        // answer below rather than keeping this non-streamed one, so the user sees it
+        // arrive token by token like every other reply.
+        break;
+      }
+
+      convo.push(choice as OpenAI.Chat.Completions.ChatCompletionMessageParam);
+
+      const executedThisRound = new Set<string>();
+      for (const call of calls) {
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(call.function.arguments || "{}");
+        } catch {
+          /* leave empty on malformed JSON */
+        }
+        const key = `${call.function.name}:${JSON.stringify(args)}`;
+        if (executedThisRound.has(key)) {
+          convo.push({ role: "tool", tool_call_id: call.id, content: "(already provided above)" });
+          continue;
+        }
+        executedThisRound.add(key);
+        executedAcrossRun.add(key);
+        const result = await executeTool(call.function.name, args);
+        toolResults.push({ name: call.function.name, view: result.view ?? "none", data: result.data });
+        convo.push({ role: "tool", tool_call_id: call.id, content: result.summary });
+      }
+      callbacks?.onToolResults?.(toolResults);
     }
 
-    // Execute the requested tools (de-duped: llama on Groq tends to repeat calls).
-    convo.push(choice as OpenAI.Chat.Completions.ChatCompletionMessageParam);
-    const executed = new Set<string>();
-    for (const call of calls) {
-      let args: Record<string, unknown> = {};
-      try {
-        args = JSON.parse(call.function.arguments || "{}");
-      } catch {
-        /* leave empty on malformed JSON */
-      }
-      const key = `${call.function.name}:${JSON.stringify(args)}`;
-      if (executed.has(key)) {
-        convo.push({ role: "tool", tool_call_id: call.id, content: "(already provided above)" });
-        continue;
-      }
-      executed.add(key);
-      const result = await executeTool(call.function.name, args);
-      toolResults.push({ name: call.function.name, view: result.view ?? "none", data: result.data });
-      convo.push({ role: "tool", tool_call_id: call.id, content: result.summary });
+    if (rounds >= MAX_TOOL_ROUNDS) {
+      // Said to the model rather than hidden, so the answer it writes can be honest about
+      // having stopped early instead of pretending it finished.
+      convo.push({
+        role: "user",
+        content:
+          "You have used all the tool calls available for this turn. Answer now with what you have, and say plainly if something is still unfinished.",
+      });
     }
-    callbacks?.onToolResults?.(toolResults);
 
-    // Phase 2 — STREAM the final answer (no tools offered, so it must answer).
+    // The answer. Tools are withheld here so this call must produce prose — the loop
+    // above is where acting happens, and this is where it reports.
     const stream = await client.chat.completions.create({
       model: this.model,
       messages: convo,
