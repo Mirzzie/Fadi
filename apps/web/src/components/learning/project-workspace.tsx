@@ -33,6 +33,7 @@ import {
   type RunView,
   type StepView,
 } from "@/app/dashboard/learning/lab-actions";
+import { StepText } from "@/components/learning/step-text";
 import { PendingAction } from "@/components/os/pending-action-card";
 import { announceActionsChanged, usePendingActions } from "@/components/os/pending-actions";
 import { Button } from "@/components/ui/button";
@@ -73,23 +74,34 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
   const [pending, startTransition] = useTransition();
   const { pending: approvals, refresh: refreshApprovals } = usePendingActions();
 
-  const refresh = useCallback(() => {
-    startTransition(async () => {
-      const [result, observed] = await Promise.all([
-        listProjectRuns(),
-        projectRuntimeAction({ runId }),
-      ]);
-      setRun(result.ok ? (result.runs.find((candidate) => candidate.id === runId) ?? null) : null);
-      setRuntime(observed.ok ? observed.runtime : null);
-    });
+  // BACKGROUND REFRESH MUST NOT LOOK LIKE A CLICK.
+  //
+  // This used to run inside the same startTransition as every button, on a five-second
+  // timer — so every five seconds `pending` went true and every button in the workspace
+  // disabled and flashed its spinner while nobody had touched anything. Reported as "these
+  // buttons refresh for no reason", which is exactly what they were doing.
+  //
+  // Loading is now a plain async call that updates data quietly. `pending` belongs only to
+  // actions a person started.
+  const refresh = useCallback(async () => {
+    const [result, observed] = await Promise.all([
+      listProjectRuns(),
+      projectRuntimeAction({ runId }),
+    ]);
+    setRun(result.ok ? (result.runs.find((candidate) => candidate.id === runId) ?? null) : null);
+    setRuntime(observed.ok ? observed.runtime : null);
   }, [runId]);
 
   useEffect(() => {
-    refresh();
+    void refresh();
   }, [refresh]);
 
   useEffect(() => {
-    const timer = setInterval(refresh, 5_000);
+    // Only while someone is looking, and not so often that it churns. A lab moving from
+    // "starting" to "ready" is worth seeing within seconds; a background tab is not.
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, 8_000);
     return () => clearInterval(timer);
   }, [refresh]);
 
@@ -232,6 +244,7 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
 
       {panel === "build" ? (
         <>
+          {run.labTemplate ? (
           <section className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
             <div className="grid size-9 place-items-center rounded-lg bg-muted text-muted-foreground">
               <Server className="size-4" aria-hidden="true" />
@@ -286,10 +299,15 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
               <ExternalLink className="size-3.5" aria-hidden="true" />
             </Link>
           </section>
+          ) : (
+            <p className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground shadow-sm">
+              This project needs no lab machine — it&apos;s done in your browser or on your own computer.
+            </p>
+          )}
 
           {message ? <p className="text-xs text-muted-foreground">{message}</p> : null}
 
-          <div className="grid gap-4 lg:grid-cols-[minmax(19rem,0.78fr)_minmax(26rem,1.22fr)]">
+          <div className={run.labTemplate ? "grid gap-4 lg:grid-cols-[minmax(22rem,0.8fr)_minmax(28rem,1.2fr)]" : "mx-auto grid w-full max-w-4xl gap-4"}>
             <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
               <header className="border-b border-border/70 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -359,18 +377,17 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
 
                           {isCurrent ? (
                             <div className="mt-3 space-y-4">
-                              <p className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-                                {step.instruction}
-                              </p>
+                              <StepText text={step.instruction} />
                               {step.verify ? (
                                 <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
                                   <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
                                     <CheckCircle2 className="size-3.5" aria-hidden="true" /> Success
                                     condition
                                   </p>
-                                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                                    {step.verify}
-                                  </p>
+                                  <StepText
+                                    text={step.verify}
+                                    className="mt-1 space-y-2 text-xs leading-relaxed text-muted-foreground"
+                                  />
                                 </div>
                               ) : null}
                               <div>
@@ -427,6 +444,10 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
               </ol>
             </section>
 
+            {/* Only a project that needs a machine gets a machine pane. A ServiceNow project
+                is a website: offering to prepare a lab for it was a promise of a machine that
+                would never exist, and it took half the screen to make it. */}
+            {run.labTemplate ? (
             <section className="min-h-[34rem] overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/70 p-4">
                 <div>
@@ -506,6 +527,7 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
                 </div>
               )}
             </section>
+            ) : null}
           </div>
         </>
       ) : (

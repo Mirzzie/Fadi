@@ -22,7 +22,7 @@ export default async function LearningProjectWorkspacePage({
 
   return (
     <AppShell>
-      <main className="mx-auto max-w-6xl space-y-6">
+      <main className="mx-auto w-full max-w-[112rem] space-y-6 px-2 sm:px-4">
         <LearningNavigation />
         <ProjectWorkspace runId={runId} />
       </main>

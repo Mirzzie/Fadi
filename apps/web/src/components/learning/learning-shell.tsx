@@ -64,7 +64,7 @@ export function LearningShell({ report, commitments = [], role = null }: Props) 
   const direction = role ?? "your next role";
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6">
+    <div className="mx-auto w-full max-w-[96rem] space-y-6 px-2 sm:px-4">
       <LearningNavigation />
 
       <section className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm">

@@ -9,6 +9,8 @@ import { getDatabase } from "@/lib/database/client";
 import { placeLab, type Resource } from "@/lib/lab/capability";
 import { specForProject } from "@/lib/lab/spec-from-project";
 import { completionFor, completionOf, runHonesty } from "@/lib/lab/completion";
+import { templateForProject } from "@/lib/lab/spec-from-project";
+import { LAB_TEMPLATES } from "@/lib/lab/templates";
 
 /**
  * WHERE COULD I ACTUALLY RUN THIS?
@@ -262,6 +264,15 @@ export type RunView = {
    */
   evidencedCount: number;
   doneCount: number;
+  /**
+   * Which lab this project needs, or null when it needs none.
+   *
+   * The same decision the provisioner makes, carried to the page so a ServiceNow project —
+   * a website — stops offering "Prepare lab" and a machine surface for a machine it will
+   * never have.
+   */
+  labTemplate: string | null;
+  labLabel: string | null;
 };
 
 /** Plan a committed project into steps against hardware the user actually owns. */
@@ -287,6 +298,7 @@ export async function listProjectRuns(): Promise<{ ok: boolean; runs: RunView[] 
     const detail = await repo.getWithSteps(user.id, r.id);
     if (!detail) continue;
     const honesty = runHonesty(detail.steps);
+    const template = templateForProject({ title: r.title, detail: r.detail });
     out.push({
       id: r.id,
       title: r.title,
@@ -309,6 +321,8 @@ export async function listProjectRuns(): Promise<{ ok: boolean; runs: RunView[] 
       })),
       doneCount: honesty.done,
       evidencedCount: honesty.evidenced,
+      labTemplate: template,
+      labLabel: template ? LAB_TEMPLATES[template].label : null,
     });
   }
   return { ok: true, runs: out };
