@@ -923,3 +923,30 @@ describe("actions know what they were part of", () => {
     expect(execution?.[0].stepId).toBe("step-3");
   });
 });
+
+describe("found by driving the hub: friction follows what is actually started", () => {
+  it("a Windows VM still has to be typed out", async () => {
+    const res = await propose_({ template: "windows-server-2025", name: "dc01" }, "lab.start");
+    expect(res.ok).toBe(true);
+    // KVM, a TAP device and NET_ADMIN on the host is worth a moment of reading.
+    if (res.ok) expect(res.policy.confirm).toBe("type-name");
+  });
+
+  it("a plain Linux container is one click", async () => {
+    // Driving the hub made someone type "fadi-project-bb94e388" to start a 128MB web
+    // server. Typing a confirmation for everything teaches people to type through them
+    // without reading, which is exactly what the typing is for.
+    const res = await propose_({ template: "linux-web", name: "site" }, "lab.start");
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.policy.confirm).toBe("click");
+  });
+
+  it("never says a container needs 0GB of memory", async () => {
+    const res = await propose_({ template: "linux-web", name: "site" }, "lab.start");
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.summary).not.toMatch(/\b0GB of memory/);
+      expect(res.summary).toMatch(/128MB of memory/);
+    }
+  });
+});

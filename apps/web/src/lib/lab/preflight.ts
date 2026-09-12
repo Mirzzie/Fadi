@@ -215,7 +215,8 @@ export async function preflightFor(input: {
       const os = await import("node:os");
       const totalMb = Math.round(os.totalmem() / (1024 * 1024));
       const freeMb = Math.round(os.freemem() / (1024 * 1024));
-      const gb = (mb: number) => Math.round(mb / 1024);
+      const { formatMemory } = await import("./sizes");
+      const gb = formatMemory;
 
       // TWO DIFFERENT QUESTIONS, and the first version conflated them.
       //
@@ -231,9 +232,9 @@ export async function preflightFor(input: {
           text:
             "This machine has " +
             gb(totalMb) +
-            "GB in total and this needs " +
+            " in total and this needs " +
             gb(t.ramMb) +
-            "GB. There isn't room for it here even with everything closed — it wants a bigger host.",
+            ". There isn't room for it here even with everything closed — it wants a bigger host.",
         });
       } else if (freeMb < t.ramMb) {
         notes.push({
@@ -241,11 +242,11 @@ export async function preflightFor(input: {
           text:
             "Not right now: " +
             gb(freeMb) +
-            "GB is free and this needs " +
+            " is free and this needs " +
             gb(t.ramMb) +
-            "GB. The machine has " +
+            ". The machine has " +
             gb(totalMb) +
-            "GB, so closing a few things is enough — starting it as things stand would push into swap.",
+            ", so closing a few things is enough — starting it as things stand would push into swap.",
         });
       } else if (freeMb - t.ramMb < 1024) {
         notes.push({
@@ -253,16 +254,16 @@ export async function preflightFor(input: {
           text:
             "That leaves under a gigabyte spare (" +
             gb(freeMb) +
-            "GB free of " +
+            " free of " +
             gb(totalMb) +
-            "GB, " +
+            ", " +
             gb(t.ramMb) +
-            "GB needed). It will run, but the machine will feel slow while it does.",
+            " needed). It will run, but the machine will feel slow while it does.",
         });
       } else {
         notes.push({
           kind: "info",
-          text: gb(freeMb) + "GB free of " + gb(totalMb) + "GB, and this needs " + gb(t.ramMb) + "GB.",
+          text: gb(freeMb) + " free of " + gb(totalMb) + ", and this needs " + gb(t.ramMb) + ".",
         });
       }
 

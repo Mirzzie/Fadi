@@ -12,6 +12,7 @@ import {
 } from "@careeros/database";
 
 import { composeDockerfile, validateImageSpec } from "./image";
+import { formatMemory } from "./sizes";
 import { isTemplateKey, LAB_TEMPLATES, renderTemplate, type TemplateKey } from "./templates";
 import {
   cidrLabel,
@@ -509,6 +510,15 @@ export type RecipeParams = Record<string, unknown>;
 type Recipe = {
   /** How far the damage reaches, and how hard it is to take back. */
   blast: Blast;
+  /**
+   * When the reach depends on WHICH thing is being started, the parameters decide it.
+   *
+   * lab.start covers a Windows VM that needs KVM, a TAP device and NET_ADMIN, and a 128MB
+   * nginx container that needs none of them. Giving both the same blast made someone type a
+   * container's full name to start a web server — friction that teaches people to type
+   * through confirmations without reading them, which is what the typing exists to prevent.
+   */
+  blastFor?: (p: RecipeParams) => Blast;
   reversibility: Reversibility;
   /**
    * What the person types to confirm, when the policy demands typing.
@@ -653,6 +663,9 @@ export const RECIPES: Record<RecipeId, Recipe> = {
    */
   "lab.start": {
     blast: "host",
+    // A VM reaches the host's virtualisation; a container reaches a container.
+    blastFor: (p) =>
+      LAB_TEMPLATES[String(p.template) as TemplateKey]?.needsVirtualisation ? "host" : "container",
     // Nothing is destroyed, and the machine can be removed again — but this reaches past a
     // container in a way `docker run nginx` does not, so it is typed out.
     reversibility: "reversible",
@@ -675,8 +688,8 @@ export const RECIPES: Record<RecipeId, Recipe> = {
         ". " +
         t.purpose +
         " It needs " +
-        Math.round(t.ramMb / 1024) +
-        "GB of memory and about " +
+        formatMemory(t.ramMb) +
+        " of memory and about " +
         t.diskGb +
         "GB of disk." +
         (t.caveat ? " " + t.caveat : "")
@@ -969,6 +982,14 @@ async function breakerOpen(userId: string): Promise<string | null> {
   return state.reason;
 }
 
+/** The policy for this recipe with these parameters. One place, so the three callers cannot drift. */
+export function recipePolicy(recipe: Recipe, params: RecipeParams): Policy {
+  return policyFor({
+    blast: recipe.blastFor ? recipe.blastFor(params) : recipe.blast,
+    reversibility: recipe.reversibility,
+  });
+}
+
 function isRecipe(value: string): value is RecipeId {
   return (RECIPE_IDS as readonly string[]).includes(value);
 }
@@ -1118,7 +1139,7 @@ export async function proposeAction(input: {
     }
   }
 
-  const policy = policyFor({ blast: recipe.blast, reversibility: recipe.reversibility });
+  const policy = recipePolicy(recipe, params);
 
   const quota = withinQuota({
     policy,
@@ -1438,7 +1459,7 @@ export async function approveAndRun(input: {
   if (preview && isRecipe(preview.recipe)) {
     const r = RECIPES[preview.recipe];
     const params = r.validate((preview.params ?? {}) as RecipeParams);
-    const policy = policyFor({ blast: r.blast, reversibility: r.reversibility });
+    const policy = recipePolicy(r, params ?? {});
     if (params && policy.confirm === "type-name") {
       const expected = r.confirmToken(params);
       if ((input.confirmation ?? "").trim() !== expected) {

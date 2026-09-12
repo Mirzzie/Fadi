@@ -244,7 +244,7 @@ export async function listPendingActions(): Promise<{
   if (!user) return { ok: false };
 
   const rows = await createLabActionRequestsRepository(getDatabase()).listPending(user.id);
-  const { RECIPES, RECIPE_IDS } = await import("@/lib/lab/broker");
+  const { RECIPES, RECIPE_IDS, recipePolicy } = await import("@/lib/lab/broker");
   const { policyFor } = await import("@/lib/lab/policy");
 
   return {
@@ -255,7 +255,7 @@ export async function listPendingActions(): Promise<{
       const known = (RECIPE_IDS as readonly string[]).includes(r.recipe);
       const recipe = known ? RECIPES[r.recipe as keyof typeof RECIPES] : null;
       const policy = recipe
-        ? policyFor({ blast: recipe.blast, reversibility: recipe.reversibility })
+        ? recipePolicy(recipe, (recipe.validate((r.params ?? {}) as Record<string, unknown>) ?? {}) as Record<string, unknown>)
         : // An unknown recipe is the worst case, not the best. It must not become
           // click-to-approve merely because Fadi no longer recognises it.
           policyFor({ blast: "host", reversibility: "irreversible" });
