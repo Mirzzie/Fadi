@@ -5,7 +5,7 @@ import { z } from "zod";
 import { createLabResourcesRepository, createProjectRunsRepository } from "@careeros/database";
 
 import { getDatabase } from "@/lib/database/client";
-import { getUserDocGenerate } from "@/lib/ai/user-generate";
+import { AiRateLimitError, getUserDocGenerate } from "@/lib/ai/user-generate";
 import { placeLab, type Resource } from "@/lib/lab/capability";
 import { hostOsOf, labOsOf, osViolations, placementBriefing } from "./host-and-lab";
 import { specForProject, templateForProject } from "@/lib/lab/spec-from-project";
@@ -226,10 +226,36 @@ export async function planProjectRun(
     logger.info("lab.run_planned", { userId, steps: parsed.steps.length, host: host?.kind ?? "none" });
     return { ok: true, plan: { runId: run.id, steps: parsed.steps.length } };
   } catch (err) {
-    logger.warn("lab.plan_failed", {
-      userId,
-      error: err instanceof Error ? err.message.slice(0, 200) : "unknown",
-    });
-    return { ok: false, message: "Couldn't plan this one just now — try again in a moment." };
+    const detail = err instanceof Error ? err.message : String(err);
+    logger.warn("lab.plan_failed", { userId, error: detail.slice(0, 200) });
+
+    // Fadi's own hourly allowance already words itself well — it says when it resets and
+    // that nothing is lost. Replacing it with a generic sentence would be a downgrade.
+    if (err instanceof AiRateLimitError) return { ok: false, message: err.message };
+
+    // SAY WHICH FAILURE IT WAS.
+    //
+    // Every failure used to read "Couldn't plan this one just now — try again in a
+    // moment". Driving the hub repeatedly showed what was actually happening: Groq's free
+    // tier returning 429 on tokens-per-minute. For that, "try again in a moment" is right —
+    // but the same sentence was shown for failures that retrying can never fix, and it hid
+    // the one thing that would have prevented it: a fallback provider.
+    if (/\b429\b|rate limit|quota|too many requests/i.test(detail)) {
+      return {
+        ok: false,
+        message:
+          "Your AI provider is rate-limited right now, so Fadi couldn't plan this. Wait a minute and try again — or add a fallback provider in Settings → AI so this doesn't stop you next time.",
+      };
+    }
+    if (/\b401\b|\b403\b|invalid api key|unauthori[sz]ed/i.test(detail)) {
+      return {
+        ok: false,
+        message: "Your AI provider rejected the key. Check it in Settings → AI — retrying won't help until it's fixed.",
+      };
+    }
+    return {
+      ok: false,
+      message: "Fadi couldn't produce a usable plan for this one. Try again, or add more detail to the project description.",
+    };
   }
 }

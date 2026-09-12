@@ -171,7 +171,7 @@ function RunCard({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button render={<Link href={`/dashboard/learning/projects/${run.id}`} />}>
+          <Button nativeButton={false} render={<Link href={`/dashboard/learning/projects/${run.id}`} />}>
             {next ? <Play className="size-3.5" aria-hidden="true" /> : null}
             {next ? "Continue project" : "Review project"}
             <ChevronRight className="size-3.5" aria-hidden="true" />

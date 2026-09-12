@@ -47,11 +47,12 @@ describe("telling the planner where the work happens", () => {
     expect(brief).toMatch(/apt/);
   });
 
-  it("same family is still two machines", () => {
+  it("same family is still two machines, and the work goes in the disposable one", () => {
     const brief = placementBriefing({ hostOs: "linux", template: "linux-ubuntu", hostLabel: "This laptop" });
-    // "on your machine" is the phrase that makes a plan unfollowable when there are two.
-    expect(brief).toMatch(/separate machine/);
-    expect(brief).toMatch(/on your machine/);
+    // The earlier wording only said "say which machine each step happens on", which let a
+    // real plan install nginx on the laptop with sudo. It now says where the work goes.
+    expect(brief).toMatch(/SEPARATE, DISPOSABLE machine/);
+    expect(brief).toMatch(/INSIDE the lab machine/);
   });
 
   it("says plainly that macOS cannot be provisioned", () => {
@@ -136,5 +137,34 @@ describe("briefing a project with no lab", () => {
     expect(brief).toMatch(/browser/i);
     // And it must not invent an OS instruction for a machine that does not exist.
     expect(brief).not.toMatch(/Every command in this plan runs on/);
+  });
+});
+
+describe("found by driving the hub: the work goes IN the lab", () => {
+  it("forbids installing on the person's own computer even when both run Linux", async () => {
+    const { placementBriefing } = await import("./host-and-lab");
+    // A real plan said "On the laptop, run: sudo apt install -y nginx certbot fail2ban
+    // filebeat" for a project with a container lab.
+    const brief = placementBriefing({ hostOs: "linux", template: "linux-web", hostLabel: null });
+    expect(brief).toMatch(/INSIDE the lab machine/);
+    expect(brief).toMatch(/Never tell them to install software, use sudo/);
+    expect(brief).toMatch(/DISPOSABLE/);
+  });
+
+  it("rules out what a local lab cannot do", async () => {
+    const { placementBriefing } = await import("./host-and-lab");
+    // The same plan wanted a Let's Encrypt certificate for a public domain — impossible for
+    // a container on a laptop.
+    const brief = placementBriefing({ hostOs: "linux", template: "linux-web", hostLabel: null });
+    expect(brief).toMatch(/no public domain/);
+    expect(brief).toMatch(/never Let's Encrypt/);
+    expect(brief).toMatch(/self-signed/);
+    expect(brief).toMatch(/default repositories/);
+  });
+
+  it("says none of that when there is no lab", async () => {
+    const { placementBriefing } = await import("./host-and-lab");
+    const brief = placementBriefing({ hostOs: "linux", template: null, hostLabel: null });
+    expect(brief).not.toMatch(/INSIDE the lab machine/);
   });
 });

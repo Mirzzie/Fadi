@@ -1,4 +1,5 @@
-import { specForProject } from "@/lib/lab/spec-from-project";
+import { templateForProject } from "@/lib/lab/spec-from-project";
+import { LAB_TEMPLATES } from "@/lib/lab/templates";
 
 /**
  * DOES THIS ACTUALLY NEED A MACHINE?
@@ -27,19 +28,22 @@ export function labNeedFor(item: {
   // Reading about a thing is not running it.
   if (item.kind !== "project" && item.kind !== "practice") return { needed: false };
 
-  const spec = specForProject({ title: item.title, detail: item.detail });
-  if (spec.spec.needs === "vms") {
-    return {
-      needed: true,
-      kind: "vms",
-      // Said in one clause, because the card has room for one clause.
-      phrase: "needs a virtual machine",
-    };
-  }
-  if (spec.spec.needs === "containers") {
-    return { needed: true, kind: "containers", phrase: "needs a container" };
-  }
-  return { needed: false };
+  // ONE DECISION, NOT TWO.
+  //
+  // This used to ask specForProject, while the provisioner asked templateForProject — two
+  // functions answering "what machine does this need" with different rules. Driving the
+  // real hub showed the result: "Hardened Nginx Reverse Proxy on Ubuntu Server" was badged
+  // "needs a virtual machine" (the words "Ubuntu Server" read as a whole OS) while the
+  // provisioner would have started a 128MB nginx container. The card promised one machine
+  // and the lab delivered another.
+  //
+  // So the card now shows exactly what would be provisioned.
+  const template = templateForProject({ title: item.title, detail: item.detail });
+  if (!template) return { needed: false };
+
+  return LAB_TEMPLATES[template].needsVirtualisation
+    ? { needed: true, kind: "vms", phrase: "needs a virtual machine" }
+    : { needed: true, kind: "containers", phrase: "needs a container" };
 }
 
 /**

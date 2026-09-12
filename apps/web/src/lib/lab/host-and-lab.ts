@@ -94,9 +94,30 @@ export function placementBriefing(input: {
     );
   } else {
     lines.push(
-      `The lab runs the same family as their computer, but it is still a separate machine: say which one each step happens on rather than writing "on your machine".`,
+      `The lab runs the same family as their computer, but it is a SEPARATE, DISPOSABLE machine.`,
     );
   }
+
+  // THE WORK HAPPENS IN THE LAB — stated for every lab, not only when the OS differs.
+  //
+  // Driving the hub end to end produced "On the laptop, run: sudo apt install -y nginx
+  // certbot fail2ban filebeat" for a project with a container lab. Both machines ran Linux,
+  // so nothing had said the laptop was off limits, and the plan installed four services on
+  // the person's own computer with sudo — the exact damage a disposable lab exists to
+  // prevent.
+  lines.push(
+    `ALL hands-on steps — installing packages, editing config, starting services, running tests — happen INSIDE the lab machine and must say so ("in the lab machine, run ..."). Their own ${host} computer is used only to open the lab and approve what Fadi asks for. Never tell them to install software, use sudo, or edit system files on their own computer.`,
+  );
+
+  // AND WHAT A LOCAL LAB CANNOT DO.
+  //
+  // The same plan asked for a Let's Encrypt certificate "for a domain that resolves to"
+  // the server — impossible for a container on a laptop, with no public domain and no
+  // inbound port 80 — and installed filebeat from a repository Ubuntu does not ship. A step
+  // that cannot work is a dead end however well it is written.
+  lines.push(
+    "The lab is local: it has no public domain name and cannot receive traffic from the internet. Use self-signed certificates (openssl or mkcert), localhost, or the lab's own address — never Let's Encrypt or a real domain. Use packages available in the distribution's default repositories, or state the exact commands to add the vendor repository first.",
+  );
 
   // AND WHAT THE LAB IS NOT — always, not only when the two machines differ.
   //

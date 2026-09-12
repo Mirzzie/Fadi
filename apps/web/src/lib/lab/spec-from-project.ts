@@ -117,8 +117,11 @@ const NO_MACHINE =
 const BROWSER_ONLY =
   /\b(?:sign up for|create a free account|developer instance|free tier account|web console|browser-based|no installation|saas|hosted (?:platform|service|instance))\b/i;
 
+// Up to three words may sit between the verb and the document: "write an incident-response
+// runbook" is still a writing task, and requiring the noun directly after the article let it
+// fall through to a container.
 const WRITING_ONLY =
-  /\b(?:write|document|draft|outline|prepare) (?:a|an|the)? ?(?:runbook|policy|report|playbook|case study|post-?mortem|summary|proposal)\b/i;
+  /\b(?:write|document|draft|outline|prepare)\s+(?:(?:a|an|the)\s+)?(?:[\w-]+\s+){0,3}(?:runbook|policy|report|playbook|case study|post-?mortem|summary|proposal)\b/i;
 
 /**
  * Which lab a project needs, or NULL when it needs none.
