@@ -7,7 +7,15 @@ import { createLabResourcesRepository, createProjectRunsRepository } from "@care
 import { getDatabase } from "@/lib/database/client";
 import { AiRateLimitError, getUserDocGenerate } from "@/lib/ai/user-generate";
 import { placeLab, type Resource } from "@/lib/lab/capability";
-import { hostOsOf, labOsOf, osViolations, placementBriefing } from "./host-and-lab";
+import { LAB_TEMPLATES, labContainerForRun } from "./templates";
+import {
+  hostOsOf,
+  labOsOf,
+  osViolations,
+  placementBriefing,
+  installedPackagesIn,
+  toolchainViolations,
+} from "./host-and-lab";
 import { specForProject, templateForProject } from "@/lib/lab/spec-from-project";
 import { logger } from "@/lib/observability/logger";
 
@@ -120,6 +128,9 @@ export async function planProjectRun(
     hostOs: hostOsOf(process.platform),
     template,
     hostLabel: host?.label ?? null,
+    // The same name the lab will be started under, so step one can say exactly how to get
+    // a shell in it rather than "open a terminal in the lab machine".
+    containerName: input.replaceRunId ? labContainerForRun(input.replaceRunId) : null,
   });
 
   const hostLine = host
@@ -149,7 +160,27 @@ export async function planProjectRun(
     // the machine it runs on, and there is no machine.
     const labOs = template ? labOsOf(template) : null;
     const planText = parsed.steps.map((s) => `${s.title} ${s.instruction} ${s.verify ?? ""}`).join("\n");
-    const violations = labOs ? osViolations(planText, labOs) : [];
+    // OS first, then distribution: Windows steps on Linux, and "sudo apt-get" on Alpine,
+    // are both unfollowable on the first line.
+    const violations = template
+      ? [...(labOs ? osViolations(planText, labOs) : []), ...toolchainViolations(planText, template)]
+      : [];
+
+    // And the packages themselves, asked of the real image. A plan's install step failed
+    // inside a real lab because three of six packages are not packaged for Alpine, and apk
+    // installing atomically meant none of them went in.
+    if (template) {
+      const names = installedPackagesIn(planText);
+      if (names.length > 0) {
+        const { packagesMissingFrom } = await import("./broker");
+        const { missing } = await packagesMissingFrom(template, names);
+        if (missing.length > 0) {
+          violations.push(
+            `packages that do not exist in ${LAB_TEMPLATES[template].toolchain.distro}'s repositories (${missing.join(", ")}) — leave them out or install them another documented way`,
+          );
+        }
+      }
+    }
 
     if (violations.length > 0) {
       logger.warn("lab.plan_os_mismatch", { userId, labOs, violations: violations.join(", ") });
@@ -168,7 +199,15 @@ export async function planProjectRun(
         "project_plan",
       );
       const retryText = retry.steps.map((s) => `${s.title} ${s.instruction} ${s.verify ?? ""}`).join("\n");
-      if (labOs && osViolations(retryText, labOs).length === 0) {
+      const retryViolations = template
+        ? [...(labOs ? osViolations(retryText, labOs) : []), ...toolchainViolations(retryText, template)]
+        : [];
+      if (template && retryViolations.length === 0) {
+        const { packagesMissingFrom } = await import("./broker");
+        const { missing } = await packagesMissingFrom(template, installedPackagesIn(retryText));
+        if (missing.length > 0) retryViolations.push("missing packages: " + missing.join(", "));
+      }
+      if (retryViolations.length === 0) {
         parsed.steps = retry.steps;
       } else {
         // Twice is enough. An unfollowable plan saved is worse than no plan: it looks like

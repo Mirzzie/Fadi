@@ -50,6 +50,22 @@ export type LabTemplate = {
    * route from it to the filesystem. Absent for templates that are genuinely disposable.
    */
   persistentPath?: string;
+  /**
+   * WHAT IS ACTUALLY INSIDE, measured from the image rather than assumed.
+   *
+   * A plan told the owner to run "sudo apt-get update" in a lab that was Alpine Linux —
+   * no apt, no sudo. The briefing had said "Linux", which was true and useless: Ubuntu and
+   * Alpine share a kernel and not a single package command. Each value below was read by
+   * running the image, because a template description is exactly the kind of thing that
+   * drifts from what the image really contains.
+   */
+  toolchain: {
+    distro: string;
+    packageManager: "apt" | "apk" | "winget";
+    /** Containers run as root; telling someone to sudo produces "command not found". */
+    hasSudo: boolean;
+    shell: "bash" | "sh" | "powershell";
+  };
   /** Said plainly at the point of consent. */
   caveat?: string;
 };
@@ -61,6 +77,7 @@ export type LabTemplate = {
  */
 export const LAB_TEMPLATES: Record<string, LabTemplate> = {
   "windows-server-2025": {
+    toolchain: { distro: "Windows Server 2025", packageManager: "winget", hasSudo: false, shell: "powershell" },
     label: "Windows Server 2025",
     purpose: "Active Directory, Group Policy, PowerShell administration, domain services.",
     image: "dockurr/windows",
@@ -80,6 +97,7 @@ export const LAB_TEMPLATES: Record<string, LabTemplate> = {
   },
 
   "windows-11": {
+    toolchain: { distro: "Windows 11", packageManager: "winget", hasSudo: false, shell: "powershell" },
     label: "Windows 11 Pro",
     purpose: "Endpoint work: policy, hardening, EDR, anything that needs a real desktop.",
     image: "dockurr/windows",
@@ -104,6 +122,7 @@ export const LAB_TEMPLATES: Record<string, LabTemplate> = {
    * hour. If a project can be done on Linux, it should be.
    */
   "linux-ubuntu": {
+    toolchain: { distro: "Ubuntu 24.04", packageManager: "apt", hasSudo: false, shell: "bash" },
     label: "Ubuntu 24.04",
     purpose: "Services, scripting, containers, CI — most build projects want this.",
     image: "ubuntu:24.04",
@@ -115,6 +134,7 @@ export const LAB_TEMPLATES: Record<string, LabTemplate> = {
   },
 
   "linux-web": {
+    toolchain: { distro: "Alpine Linux", packageManager: "apk", hasSudo: false, shell: "sh" },
     label: "Nginx web server",
     purpose: "Reverse proxies, TLS, headers, static hosting.",
     image: "nginx:1.27-alpine",
@@ -126,6 +146,7 @@ export const LAB_TEMPLATES: Record<string, LabTemplate> = {
   },
 
   "linux-postgres": {
+    toolchain: { distro: "Alpine Linux", packageManager: "apk", hasSudo: false, shell: "bash" },
     label: "PostgreSQL 16",
     purpose: "Backups, replication, tuning, anything that needs a real database.",
     image: "postgres:16-alpine",
@@ -224,4 +245,21 @@ export function specForTemplate(key: TemplateKey): {
     needs: t.needsVirtualisation ? "vms" : "containers",
     arch: ["x86_64"],
   };
+}
+
+
+/**
+ * The name a project's lab is started under, as the parameter the recipe validates.
+ *
+ * One definition, because two places compute it — the lab action that starts the
+ * container, and the planner that tells the person how to open a shell in it. If they
+ * disagreed, step one would hand someone a docker exec for a container that does not exist.
+ */
+export function labNameForRun(runId: string): string {
+  return "project-" + runId.slice(0, 8);
+}
+
+/** The container name docker will actually show, with the prefix the renderer adds. */
+export function labContainerForRun(runId: string): string {
+  return "fadi-" + labNameForRun(runId);
 }

@@ -375,7 +375,7 @@ export async function proposeProjectLabAction(input: { runId: string }): Promise
   }
 
   const { templateForProject } = await import("@/lib/lab/spec-from-project");
-  const { LAB_TEMPLATES } = await import("@/lib/lab/templates");
+  const { LAB_TEMPLATES, labNameForRun } = await import("@/lib/lab/templates");
   const template = templateForProject({
     title: project.run.title,
     detail: project.run.detail,
@@ -396,7 +396,7 @@ export async function proposeProjectLabAction(input: { runId: string }): Promise
   const proposal = await proposeAction({
     userId: user.id,
     recipe: "lab.start",
-    params: { template, name: `project-${project.run.id.slice(0, 8)}` },
+    params: { template, name: labNameForRun(project.run.id) },
     actor: "user",
     origin: "dashboard:project_lab",
     runId: project.run.id,

@@ -1675,3 +1675,71 @@ export async function approveAndRun(input: {
   logger.info("lab.action_executed", { userId: input.userId, recipe: row.recipe });
   return { ok: true, output: out.join(" "), discovered };
 }
+
+
+/* ---------------------------------------------------------------------------
+ * DOES THIS PACKAGE ACTUALLY EXIST IN THE LAB'S DISTRIBUTION?
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Running a plan's install step inside a real lab failed on the first command:
+ * "apk add nginx openssl fail2ban filebeat elasticsearch kibana". Three of those are not
+ * packaged for Alpine at all, and apk is atomic, so NOTHING installed — including the three
+ * that exist. An invented or out-of-repository package is the most common way an AI plan
+ * dies on step two, and the image the lab runs is sitting right here to be asked.
+ *
+ * READ-ONLY, and still held to the broker's rules, which is why it lives in this file. The
+ * script is a fixed literal; package names are passed as ARGUMENTS to it ("$@"), never
+ * interpolated into it, and each is checked against a strict name pattern first. So a
+ * package called "nginx; rm -rf /" is refused before Docker is asked anything, and even if
+ * it were not, it would reach apk as one odd argument rather than as shell.
+ *
+ * Cached per image, because a package index does not change between two plans a minute
+ * apart and asking costs a container start and an index download.
+ */
+const PACKAGE_NAME_RE = /^[a-z0-9][a-z0-9+._-]{0,63}$/;
+const packageCache = new Map<string, Map<string, boolean>>();
+
+const APK_CHECK = 'apk update -q >/dev/null 2>&1; for p in "$@"; do if apk search -e "$p" 2>/dev/null | grep -q .; then echo "ok:$p"; else echo "no:$p"; fi; done';
+const APT_CHECK = 'apt-get update -qq >/dev/null 2>&1; for p in "$@"; do if apt-cache policy "$p" 2>/dev/null | grep -q "Candidate: [^(]"; then echo "ok:$p"; else echo "no:$p"; fi; done';
+
+export async function packagesMissingFrom(
+  template: TemplateKey,
+  names: string[],
+): Promise<{ checked: boolean; missing: string[] }> {
+  const t = LAB_TEMPLATES[template];
+  const manager = t.toolchain.packageManager;
+  if (manager !== "apk" && manager !== "apt") return { checked: false, missing: [] };
+
+  const wanted = [...new Set(names.map((n) => n.trim().toLowerCase()))];
+  // A name that cannot be a package is reported missing without asking anything.
+  const malformed = wanted.filter((n) => !PACKAGE_NAME_RE.test(n));
+  const valid = wanted.filter((n) => PACKAGE_NAME_RE.test(n));
+
+  const cache = packageCache.get(t.image) ?? new Map<string, boolean>();
+  packageCache.set(t.image, cache);
+  const unknown = valid.filter((n) => !cache.has(n));
+
+  if (unknown.length > 0) {
+    try {
+      const { stdout } = await run(
+        "docker",
+        ["run", "--rm", "--entrypoint", "sh", t.image, "-c", manager === "apk" ? APK_CHECK : APT_CHECK, "_", ...unknown],
+        { timeout: 90_000, maxBuffer: 256 * 1024 },
+      );
+      for (const line of stdout.split("\n")) {
+        const m = /^(ok|no):(.+)$/.exec(line.trim());
+        if (m) cache.set(m[2], m[1] === "ok");
+      }
+    } catch {
+      // Docker unavailable, image not pulled, no network for the index. Saying "could not
+      // check" is honest; guessing "missing" would reject good plans for a local problem.
+      return { checked: false, missing: malformed };
+    }
+  }
+
+  return {
+    checked: true,
+    missing: [...malformed, ...valid.filter((n) => cache.get(n) === false)],
+  };
+}

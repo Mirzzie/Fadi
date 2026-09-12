@@ -185,3 +185,14 @@ describe("a lab survives being stopped", () => {
     }
   });
 });
+
+describe("the lab naming convention has one definition", () => {
+  it("names the container the way docker will show it", async () => {
+    const { labContainerForRun, labNameForRun } = await import("./templates");
+    const run = "bb94e388-a775-4892-aed3-3145df33b3d7";
+    // Two places compute this; if they disagreed, step one would hand someone a docker exec
+    // for a container that does not exist.
+    expect(labNameForRun(run)).toBe("project-bb94e388");
+    expect(labContainerForRun(run)).toBe("fadi-project-bb94e388");
+  });
+});

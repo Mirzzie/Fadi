@@ -168,3 +168,105 @@ describe("found by driving the hub: the work goes IN the lab", () => {
     expect(brief).not.toMatch(/INSIDE the lab machine/);
   });
 });
+
+describe("found by running step 1 in the real lab: the distribution matters", () => {
+  it("names Alpine and its package manager, and forbids apt and sudo", async () => {
+    const { placementBriefing } = await import("./host-and-lab");
+    // A real plan said "sudo apt-get update" for a lab that was Alpine Linux — measured: no
+    // apt, no sudo. "Linux" in the briefing was true and useless.
+    const brief = placementBriefing({ hostOs: "linux", template: "linux-web", hostLabel: null });
+    expect(brief).toMatch(/Alpine Linux/);
+    expect(brief).toMatch(/apk add/);
+    expect(brief).toMatch(/NOT apt or apt-get/);
+    expect(brief).toMatch(/do NOT write sudo/);
+    // nginx's image has no bash.
+    expect(brief).toMatch(/bash is not installed/);
+  });
+
+  it("names Ubuntu's package manager, and still forbids sudo", async () => {
+    const { placementBriefing } = await import("./host-and-lab");
+    const brief = placementBriefing({ hostOs: "linux", template: "linux-ubuntu", hostLabel: null });
+    expect(brief).toMatch(/Ubuntu 24\.04/);
+    expect(brief).toMatch(/apt-get install -y/);
+    // Measured: the Ubuntu image does not ship sudo either.
+    expect(brief).toMatch(/do NOT write sudo/);
+  });
+
+  it("tells them exactly how to get a shell in the lab", async () => {
+    const { placementBriefing } = await import("./host-and-lab");
+    // "Open a terminal in the lab machine" was the instruction, with no way to do it.
+    const brief = placementBriefing({
+      hostOs: "linux",
+      template: "linux-web",
+      hostLabel: null,
+      containerName: "fadi-project-bb94e388",
+    });
+    expect(brief).toContain("docker exec -it fadi-project-bb94e388 sh");
+  });
+});
+
+describe("checking a plan against the distribution", () => {
+  it("THE REAL ONE: sudo apt-get on Alpine", async () => {
+    const { toolchainViolations } = await import("./host-and-lab");
+    const v = toolchainViolations("In the lab, run: sudo apt-get update", "linux-web");
+    expect(v.some((x) => /sudo/.test(x))).toBe(true);
+    expect(v.some((x) => /apt/.test(x))).toBe(true);
+  });
+
+  it("apk on Ubuntu, and bash on a shell-only image", async () => {
+    const { toolchainViolations } = await import("./host-and-lab");
+    expect(toolchainViolations("apk add nginx", "linux-ubuntu").some((x) => /apk/.test(x))).toBe(true);
+    expect(toolchainViolations("run bash setup.sh", "linux-web").some((x) => /bash/.test(x))).toBe(true);
+    // postgres:16-alpine DOES ship bash, measured — so it must not be flagged there.
+    expect(toolchainViolations("run bash setup.sh", "linux-postgres")).toEqual([]);
+  });
+
+  it("passes a plan that matches", async () => {
+    const { toolchainViolations } = await import("./host-and-lab");
+    expect(toolchainViolations("apk add openssl && nginx -t", "linux-web")).toEqual([]);
+    expect(toolchainViolations("apt-get update && apt-get install -y nginx", "linux-ubuntu")).toEqual([]);
+  });
+
+  it("does not flag the word sudo in an explanation", async () => {
+    const { toolchainViolations } = await import("./host-and-lab");
+    // Only as a command. "you don't need sudo here" is exactly the right thing to write.
+    expect(toolchainViolations("Commands run as root, so pseudo-privileges are not needed.", "linux-web")).toEqual([]);
+  });
+});
+
+describe("finding the packages a plan installs", () => {
+  it("THE REAL STEP: pulls every package from an apk add", async () => {
+    const { installedPackagesIn } = await import("./host-and-lab");
+    expect(installedPackagesIn("apk update\napk add nginx openssl fail2ban filebeat elasticsearch kibana")).toEqual([
+      "nginx", "openssl", "fail2ban", "filebeat", "elasticsearch", "kibana",
+    ]);
+  });
+
+  it("handles apt, flags and redirections", async () => {
+    const { installedPackagesIn } = await import("./host-and-lab");
+    expect(installedPackagesIn("apt-get install -y --no-install-recommends nginx curl > /tmp/log 2>&1")).toEqual([
+      "nginx", "curl",
+    ]);
+    expect(installedPackagesIn("apk add --no-cache openssl")).toEqual(["openssl"]);
+  });
+
+  it("ignores packages merely mentioned outside an install command", async () => {
+    const { installedPackagesIn } = await import("./host-and-lab");
+    expect(installedPackagesIn("Kibana would normally visualise this, but we use grep.")).toEqual([]);
+  });
+
+  it("stops where the package list ends — the bug that rejected a good plan", async () => {
+    const { installedPackagesIn } = await import("./host-and-lab");
+    // A re-plan was refused for "missing packages: apk, info", read out of prose after the
+    // list.
+    expect(installedPackagesIn("apk add nginx openssl then apk info nginx")).toEqual(["nginx", "openssl"]);
+    expect(installedPackagesIn("apk add nginx, openssl. Then check it.")).toEqual(["nginx", "openssl"]);
+    // And a redirection is not a package called "2".
+    expect(installedPackagesIn("apt-get install -y curl 2>&1")).toEqual(["curl"]);
+  });
+
+  it("stops at a shell separator rather than swallowing the next command", async () => {
+    const { installedPackagesIn } = await import("./host-and-lab");
+    expect(installedPackagesIn("apk add nginx && nginx -t")).toEqual(["nginx"]);
+  });
+});

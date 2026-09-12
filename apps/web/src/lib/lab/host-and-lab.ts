@@ -52,6 +52,8 @@ export function placementBriefing(input: {
   hostOs: HostOs;
   template: TemplateKey | null;
   hostLabel: string | null;
+  /** The lab's container name, when known, so the plan can say exactly how to get in. */
+  containerName?: string | null;
 }): string {
   const host = HOST_LABEL[input.hostOs];
 
@@ -108,6 +110,30 @@ export function placementBriefing(input: {
   lines.push(
     `ALL hands-on steps — installing packages, editing config, starting services, running tests — happen INSIDE the lab machine and must say so ("in the lab machine, run ..."). Their own ${host} computer is used only to open the lab and approve what Fadi asks for. Never tell them to install software, use sudo, or edit system files on their own computer.`,
   );
+
+  // WHICH DISTRIBUTION, AND HOW TO GET IN.
+  //
+  // "Linux" was true and useless. A plan said "in the lab machine, open a terminal and run:
+  // sudo apt-get update" for a lab that was Alpine — no apt, no sudo — and never said how to
+  // open a terminal in a container at all. Both facts are now stated exactly, including the
+  // command that gets them in, so step one is something they can actually do.
+  const tc = lab.toolchain;
+  if (tc.shell === "powershell") {
+    lines.push(
+      `The lab is ${tc.distro}. Use PowerShell and ${tc.packageManager} for installs. They reach it through the desktop viewer Fadi opens, not a terminal on their own computer.`,
+    );
+  } else {
+    lines.push(
+      `The lab is ${tc.distro}. Install packages with \`${tc.packageManager === "apk" ? "apk add" : "apt-get install -y"}\`${
+        tc.packageManager === "apt" ? " after `apt-get update`" : ""
+      } — ${tc.packageManager === "apk" ? "NOT apt or apt-get, which do not exist here" : "NOT apk"}.`,
+      `Commands in the lab run as root: do NOT write sudo, which is not installed and fails with "command not found".`,
+      `The lab's shell is ${tc.shell}${tc.shell === "sh" ? " (bash is not installed — avoid bash-only syntax)" : ""}.`,
+      input.containerName
+        ? `Their first step must be opening a shell in the lab, with exactly: docker exec -it ${input.containerName} ${tc.shell}`
+        : `Their first step must be opening a shell in the lab with docker exec -it <lab-name> ${tc.shell}.`,
+    );
+  }
 
   // AND WHAT A LOCAL LAB CANNOT DO.
   //
@@ -181,4 +207,62 @@ export function osViolations(text: string, labOs: LabOs): string[] {
   }
 
   return [...new Set(found)];
+}
+
+
+/**
+ * DOES THIS PLAN MATCH THE DISTRIBUTION, not just the operating system?
+ *
+ * osViolations catches Windows steps on Linux. It cannot catch "sudo apt-get update" on
+ * Alpine, which is Linux and still fails on the first line. Measured, not assumed: none of
+ * the Linux template images ship sudo, and the Alpine ones have apk and not apt.
+ */
+export function toolchainViolations(text: string, template: TemplateKey): string[] {
+  const tc = LAB_TEMPLATES[template].toolchain;
+  if (tc.shell === "powershell") return [];
+  const found: string[] = [];
+
+  if (!tc.hasSudo && /(?:^|[\s;&|`(])sudo\s/m.test(text)) found.push("sudo, which is not installed in the lab");
+  if (tc.packageManager === "apk" && /\bapt(?:-get)?\s+(?:install|update|upgrade)\b/i.test(text)) {
+    found.push("apt, which does not exist on Alpine");
+  }
+  if (tc.packageManager === "apt" && /\bapk\s+(?:add|update)\b/i.test(text)) {
+    found.push("apk, which does not exist on Ubuntu");
+  }
+  if (tc.shell === "sh" && /\bbash\s|#!\/bin\/bash/.test(text)) found.push("bash, which is not installed in the lab");
+  return found;
+}
+
+
+/**
+ * The package names a plan asks the lab's package manager to install.
+ *
+ * Pulled from install commands only — "apk add", "apt-get install" — and stripped of
+ * flags, so a package mentioned in passing is not checked and a flag is not mistaken for a
+ * package.
+ */
+export function installedPackagesIn(text: string): string[] {
+  const names: string[] = [];
+  const re = /\b(?:apk\s+add|apt(?:-get)?\s+install)\s+([^\n;&|`<>(]+)/gi;
+  // Words that end a package list rather than belong to it. A re-plan was rejected for
+  // "missing packages: apk, info" because the capture ran on past the list into "... then
+  // apk info nginx" — reading the next command as more packages.
+  const STOP = new Set(["apk", "apt", "apt-get", "then", "and", "or", "to", "with", "run", "sudo", "verify", "check", "using", "via"]);
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    // "curl 2>&1": the capture stops at ">", leaving the file descriptor behind as if it
+    // were a package called "2". A bare trailing digit before a redirection is not a package.
+    const list = m[1].replace(/\s+\d$/, "");
+    for (const raw of list.split(/\s+/)) {
+      const token = raw.replace(/[.,:)'"]+$/, "").trim();
+      if (!token) continue;
+      if (token.startsWith("-")) continue; // a flag, not a package
+      if (STOP.has(token.toLowerCase())) break;
+      // The first thing that cannot be a package name ends the list — prose, a path, a
+      // redirection target — instead of being quietly skipped and reading on.
+      if (!/^[a-z0-9][a-z0-9+._-]*$/.test(token)) break;
+      names.push(token);
+    }
+  }
+  return [...new Set(names)];
 }
