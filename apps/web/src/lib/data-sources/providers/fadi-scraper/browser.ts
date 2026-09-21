@@ -3,6 +3,7 @@ import "server-only";
 import { getCountry } from "@/lib/jobs/locations";
 
 import type { SignalQuery } from "../../types";
+import { postingLinksFrom } from "./board-links";
 import type { ScrapedRecord, SiteRecipe } from "./recipes";
 
 /**
@@ -214,10 +215,19 @@ export async function scrapeRendered(
  * Visit many job pages IN PARALLEL in a real browser — the "open a bunch of tabs, scan each"
  * flow — and read the FULL posting off each (title, company, location, full JD, the real apply
  * link, posted date, and the closing date for the expiry check). Structured JobPosting JSON-LD
- * is the primary source; a text fallback covers pages without it. Concurrency-bounded so we
- * don't open hundreds of tabs at once. Returns [] if Playwright is unavailable.
+ * is the primary source.
+ *
+ * A result that turns out to be a company's BOARD rather than a posting is not discarded: its
+ * own postings are opened, once, up to a cap. Measured live (21 Sep 2026), stopping at the board
+ * cost most of the crawl — 29 results, 5 pages readable, 2 jobs — because search engines rank a
+ * company's job index above any single opening. Returns [] if Playwright is unavailable.
  */
-export async function scrapeJobPages(urls: string[], concurrency = 4): Promise<ScrapedRecord[]> {
+export async function scrapeJobPages(
+  urls: string[],
+  concurrency = 4,
+  /** How many postings may be opened from boards in the second pass, across the whole crawl. */
+  expandLimit = 12
+): Promise<ScrapedRecord[]> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let pw: any;
   try {
@@ -233,62 +243,100 @@ export async function scrapeJobPages(urls: string[], concurrency = 4): Promise<S
       viewport: { width: 1280, height: 900 },
       locale: "en-IE",
     });
-    const out: ScrapedRecord[] = [];
-    // Process in bounded parallel batches — the "multiple tabs at once" the user wants.
-    for (let i = 0; i < urls.length; i += concurrency) {
-      const batch = urls.slice(i, i + concurrency);
-      const settled = await Promise.allSettled(
-        batch.map(async (u) => {
-          const page = await context.newPage();
-          try {
-            await page.goto(u, { waitUntil: "domcontentloaded", timeout: 20_000 });
-            await page.waitForTimeout(jitter(1400, 2400));
-            await page.evaluate(() => window.scrollTo(0, 1600)); // scan the page
-            const rec: ScrapedRecord | null = await page.evaluate((pageUrl: string) => {
-              const clean = (s: string | null | undefined) => (s ? s.replace(/\s+/g, " ").trim() : "");
-              for (const s of document.querySelectorAll('script[type="application/ld+json"]')) {
-                try {
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  const d: any = JSON.parse(s.textContent || "{}");
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  const arr: any[] = Array.isArray(d) ? d : [d, ...(d["@graph"] || [])];
-                  for (const j of arr) {
-                    const ty = j?.["@type"];
-                    if (j && (ty === "JobPosting" || (Array.isArray(ty) && ty.includes("JobPosting")))) {
-                      const org =
-                        typeof j.hiringOrganization === "string" ? j.hiringOrganization : j.hiringOrganization?.name;
-                      const addr = (Array.isArray(j.jobLocation) ? j.jobLocation[0] : j.jobLocation)?.address;
-                      const loc =
-                        typeof addr === "string"
-                          ? addr
-                          : [addr?.addressLocality, addr?.addressRegion, addr?.addressCountry]
-                              .filter(Boolean)
-                              .join(", ");
-                      return {
+
+    type PageRead = { url: string; record: ScrapedRecord | null; links: string[] };
+
+    const readPage = async (u: string): Promise<PageRead> => {
+      const page = await context.newPage();
+      try {
+        await page.goto(u, { waitUntil: "domcontentloaded", timeout: 20_000 });
+        await page.waitForTimeout(jitter(1400, 2400));
+        await page.evaluate(() => window.scrollTo(0, 1600)); // scan the page
+        const read: { record: ScrapedRecord | null; links: string[] } = await page.evaluate(
+          (pageUrl: string) => {
+            const clean = (s: string | null | undefined) => (s ? s.replace(/\s+/g, " ").trim() : "");
+            for (const s of document.querySelectorAll('script[type="application/ld+json"]')) {
+              try {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const d: any = JSON.parse(s.textContent || "{}");
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const arr: any[] = Array.isArray(d) ? d : [d, ...(d["@graph"] || [])];
+                for (const j of arr) {
+                  const ty = j?.["@type"];
+                  if (j && (ty === "JobPosting" || (Array.isArray(ty) && ty.includes("JobPosting")))) {
+                    const org =
+                      typeof j.hiringOrganization === "string" ? j.hiringOrganization : j.hiringOrganization?.name;
+                    const addr = (Array.isArray(j.jobLocation) ? j.jobLocation[0] : j.jobLocation)?.address;
+                    const loc =
+                      typeof addr === "string"
+                        ? addr
+                        : [addr?.addressLocality, addr?.addressRegion, addr?.addressCountry]
+                            .filter(Boolean)
+                            .join(", ");
+                    return {
+                      record: {
                         title: clean(j.title),
                         company: clean(org),
                         location: clean(loc) || undefined,
                         url: clean(j.url) || pageUrl,
-                        description: clean(String(j.description ?? "").replace(/<[^>]+>/g, " ")).slice(0, 8000) || undefined,
+                        description:
+                          clean(String(j.description ?? "").replace(/<[^>]+>/g, " ")).slice(0, 8000) || undefined,
                         postedAt: clean(j.datePosted) || undefined,
                         validThrough: clean(j.validThrough) || undefined,
-                      };
-                    }
+                      },
+                      links: [],
+                    };
                   }
-                } catch {
-                  /* ignore malformed */
                 }
+              } catch {
+                /* ignore malformed */
               }
-              return null;
-            }, u);
-            return rec;
-          } finally {
-            await page.close();
-          }
-        }),
-      );
-      for (const r of settled) {
-        if (r.status === "fulfilled" && r.value?.title) out.push(r.value);
+            }
+            // No posting here. Hand back what this page links to; the caller decides which of
+            // those are postings on the same board and worth opening.
+            const links = Array.from(document.querySelectorAll("a[href]"))
+              .map((a) => (a as HTMLAnchorElement).href)
+              .filter(Boolean)
+              .slice(0, 400);
+            return { record: null, links };
+          },
+          u
+        );
+        return { url: u, record: read.record, links: read.links };
+      } finally {
+        await page.close();
+      }
+    };
+
+    // Bounded parallel batches — the "multiple tabs at once" the user wants.
+    const readAll = async (list: string[]): Promise<PageRead[]> => {
+      const reads: PageRead[] = [];
+      for (let i = 0; i < list.length; i += concurrency) {
+        const settled = await Promise.allSettled(list.slice(i, i + concurrency).map(readPage));
+        for (const r of settled) if (r.status === "fulfilled") reads.push(r.value);
+      }
+      return reads;
+    };
+
+    const out: ScrapedRecord[] = [];
+    const follow: string[] = [];
+    const visited = new Set(urls.map((u) => u.replace(/[?#].*$/, "")));
+    for (const read of await readAll(urls)) {
+      if (read.record?.title) {
+        out.push(read.record);
+        continue;
+      }
+      for (const link of postingLinksFrom(read.url, read.links)) {
+        if (visited.has(link)) continue;
+        visited.add(link);
+        follow.push(link);
+      }
+    }
+
+    // One level down, capped: a board's own postings, never a walk across the web.
+    if (follow.length > 0) {
+      for (const read of await readAll(follow.slice(0, expandLimit))) {
+        if (read.record?.title) out.push(read.record);
       }
     }
     return out;

@@ -1,5 +1,7 @@
 import { getCountry } from "@/lib/jobs/locations";
 
+import { matchesAnyKeyword } from "./keyword-match";
+
 /**
  * Job filtering — strict location + employment type + work mode + visa. Live
  * sources give sparse/inconsistent metadata, so we INFER from the available
@@ -118,8 +120,7 @@ export function passesFilters(j: FilterableJob, f: JobFilters): boolean {
   if (!remoteAccepted && !jobMatchesLocation(j, f.country, f.city)) return false;
 
   if (f.keywords && f.keywords.length > 0) {
-    const hay = `${j.title} ${j.description ?? ""}`.toLowerCase();
-    if (!f.keywords.some((k) => k.trim() && hay.includes(k.trim().toLowerCase()))) return false;
+    if (!matchesAnyKeyword({ title: j.title, description: j.description }, f.keywords)) return false;
   }
 
   if (f.types && f.types.length > 0) {

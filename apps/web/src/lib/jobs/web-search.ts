@@ -35,6 +35,22 @@ export function parseSearxng(json: any): SearchHit[] {
     .filter((r: SearchHit) => r.url.startsWith("http"));
 }
 
+/**
+ * Did SearXNG actually search, or did every engine turn it away?
+ *
+ * A local instance is rate-limited and CAPTCHA'd by the big engines within a few queries. The
+ * response is still 200 with an empty `results` — indistinguishable, downstream, from "there are
+ * no such jobs". Measured 21 Sep 2026: three query variants in a row came back empty with
+ * duckduckgo on CAPTCHA and brave suspended, and the crawler reported a clean zero for Dublin.
+ * Empty results WITH every engine unresponsive is a failed search, and is reported as one.
+ */
+export function searxngSearchFailed(json: any): boolean {
+  const results = Array.isArray(json?.results) ? json.results : [];
+  if (results.length > 0) return false;
+  const dead = json?.unresponsive_engines;
+  return Array.isArray(dead) && dead.length > 0;
+}
+
 /** Google Programmable Search `items` → hits. Pure. */
 export function parseGoogle(json: any): SearchHit[] {
   const items = json?.items;
@@ -94,7 +110,11 @@ export async function searchJobUrls(keywords: string, location: string, limit = 
     // 1) SearXNG — free, self-hosted, unlimited.
     if (serverEnv.SEARXNG_URL) {
       const base = serverEnv.SEARXNG_URL.replace(/\/$/, "");
-      return keepCrawlable(parseSearxng(await getJson(`${base}/search?q=${enc}&format=json&categories=general`))).slice(0, limit);
+      const json = await getJson(`${base}/search?q=${enc}&format=json&categories=general`);
+      if (searxngSearchFailed(json)) {
+        throw new Error("every engine the local SearXNG asked was rate-limited or blocked");
+      }
+      return keepCrawlable(parseSearxng(json)).slice(0, limit);
     }
     // 2) Google Programmable Search — 100/day free.
     if (serverEnv.GOOGLE_CSE_KEY && serverEnv.GOOGLE_CSE_CX) {
