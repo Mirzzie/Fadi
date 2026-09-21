@@ -1,26 +1,35 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { BookmarkPlus, Check, ChevronRight, Headphones, Mic, Square, Volume2, Wand2 } from "lucide-react";
+import { BookmarkPlus, Check, ChevronRight, Mic, Square, Volume2, Wand2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { speakFadi, subscribeFadiSpeaking } from "@/lib/voice/fadi-speech";
+import { speakFadi, stopFadiSpeech } from "@/lib/voice/fadi-speech";
 import { useGroqVoice } from "@/lib/voice/use-groq-voice";
 import { INTERVIEWER_PERSONAS } from "@/lib/interview/personas";
 import type { AnswerScore, MockQuestion } from "@/lib/interview/mock";
-import { saveMockAnswerAsStory, scoreMockAnswer, startMockInterview } from "@/app/dashboard/interview/actions";
+import {
+  saveMockAnswerAsStory,
+  scoreMockAnswer,
+  startMockInterview,
+} from "@/app/dashboard/interview/actions";
 
 type SaveState = "idle" | "saving" | "saved";
 
 type Defaults = { role: string; country: string; seniority: string };
 
-export function MockInterview({ defaults }: { defaults: Defaults }) {
-  const [config, setConfig] = useState(defaults);
-  const [jd, setJd] = useState("");
+/** A real posting to practise against — its title, employer and description seed the session. */
+export type PracticeJob = { title: string; company: string; description: string | null };
+
+export function MockInterview({ defaults, job }: { defaults: Defaults; job?: PracticeJob | null }) {
+  // Practising for a specific posting: the questions come from THAT job's description and title,
+  // not the profile's generic direction. Everything stays editable — this is a starting point.
+  const [config, setConfig] = useState(job ? { ...defaults, role: job.title } : defaults);
+  const [jd, setJd] = useState(job?.description ?? "");
   const [persona, setPersona] = useState<string>("hiring_manager");
   const [questions, setQuestions] = useState<MockQuestion[] | null>(null);
   const [idx, setIdx] = useState(0);
@@ -28,59 +37,53 @@ export function MockInterview({ defaults }: { defaults: Defaults }) {
   const [score, setScore] = useState<AnswerScore | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [convo, setConvo] = useState(false);
+  const [readAloud, setReadAloud] = useState(false);
+  const turn = useRef(0);
   const [pending, startTransition] = useTransition();
 
-  // Record the mic and transcribe on the server via /api/fadi/transcribe, which is
-  // wired to a LOCAL self-hosted Whisper (faster-whisper) — $0, private, and works in
-  // any browser (including Linux Chromium, where the Web Speech API is disabled).
   const voice = useGroqVoice({
-    onTranscript: (t) => {
-      if (t.trim()) setAnswer((prev) => (prev ? `${prev} ${t}` : t));
+    autoStop: false,
+    maxMs: 180_000,
+    onError: setError,
+    onTranscript: (text) => {
+      setAnswer((previous) => (previous ? `${previous} ${text}` : text));
+      setScore(null);
+      setSaveState("idle");
     },
   });
+  const captureBusy = ["requesting", "recording", "transcribing"].includes(voice.state);
 
-  // Conversation mode = the "live talk" loop, all $0 (browser TTS + STT): Fadi speaks
-  // each new question aloud, then auto-starts listening when he finishes; and speaks a
-  // one-line verdict when a score lands. Manual controls stay for anyone who prefers them.
-  const spokeForIdx = useRef(-1);
   useEffect(() => {
-    if (!convo || !questions) return;
-    if (spokeForIdx.current === idx) return;
-    spokeForIdx.current = idx;
-    let started = false;
-    let done = false;
-    void speakFadi(questions[idx].question);
-    // Auto-listen once Fadi finishes speaking the question (true → false transition).
-    const unsub = subscribeFadiSpeaking((speaking) => {
-      if (speaking) started = true;
-      else if (started && !done) {
-        done = true;
-        unsub();
-        if (voice.isSupported && voice.state === "idle") voice.start();
-      }
-    });
-    return () => {
-      done = true;
-      unsub();
-    };
-    // voice is intentionally omitted — it changes every render; we only re-run per question.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [convo, idx, questions]);
+    if (readAloud && questions) void speakFadi(questions[idx].question);
+    return () => stopFadiSpeech();
+  }, [readAloud, idx, questions]);
 
-  // Speak a short spoken verdict when a fresh score arrives (conversation mode).
-  const spokenScore = useRef<AnswerScore | null>(null);
-  useEffect(() => {
-    if (!convo || !score || spokenScore.current === score) return;
-    spokenScore.current = score;
-    const tip = score.improvements[0] ?? score.strengths[0] ?? "";
-    void speakFadi(`${score.overall.toFixed(1)} out of 5. ${tip}`);
-  }, [convo, score]);
+  function endInterview() {
+    turn.current += 1;
+    voice.cancel();
+    stopFadiSpeech();
+    setQuestions(null);
+    setError(null);
+  }
+
+  function recordAnswer() {
+    setError(null);
+    stopFadiSpeech();
+    void voice.start();
+  }
 
   function start() {
+    const ownTurn = ++turn.current;
+    voice.cancel();
+    stopFadiSpeech();
     setError(null);
     startTransition(async () => {
-      const res = await startMockInterview({ ...config, persona, jobDescription: jd || undefined });
+      const res = await startMockInterview({
+        ...config,
+        persona,
+        jobDescription: jd || undefined,
+      });
+      if (ownTurn !== turn.current) return;
       if (!res.ok) return setError(res.message);
       setQuestions(res.questions);
       setIdx(0);
@@ -90,11 +93,17 @@ export function MockInterview({ defaults }: { defaults: Defaults }) {
   }
 
   function scoreCurrent() {
-    if (!questions) return;
+    if (!questions || captureBusy) return;
+    const ownTurn = turn.current;
     setError(null);
     setSaveState("idle");
     startTransition(async () => {
-      const res = await scoreMockAnswer({ question: questions[idx].question, answer, role: config.role });
+      const res = await scoreMockAnswer({
+        question: questions[idx].question,
+        answer,
+        role: config.role,
+      });
+      if (ownTurn !== turn.current) return;
       if (!res.ok) return setError(res.message);
       setScore(res.score);
     });
@@ -104,12 +113,14 @@ export function MockInterview({ defaults }: { defaults: Defaults }) {
     if (!questions || saveState !== "idle") return;
     setError(null);
     setSaveState("saving");
+    const ownTurn = turn.current;
     void saveMockAnswerAsStory({
       question: questions[idx].question,
       answer,
       role: config.role,
       competency: questions[idx].competency,
     }).then((res) => {
+      if (ownTurn !== turn.current) return;
       if (!res.ok) {
         setError(res.message);
         setSaveState("idle");
@@ -120,7 +131,11 @@ export function MockInterview({ defaults }: { defaults: Defaults }) {
   }
 
   function next() {
-    if (!questions) return;
+    if (!questions || captureBusy) return;
+    turn.current += 1;
+    voice.cancel();
+    stopFadiSpeech();
+    setError(null);
     setIdx((i) => Math.min(i + 1, questions.length - 1));
     setAnswer("");
     setScore(null);
@@ -132,50 +147,86 @@ export function MockInterview({ defaults }: { defaults: Defaults }) {
     return (
       <section className="space-y-4 rounded-xl border bg-card p-5">
         <div>
-          <h2 className="text-base font-semibold">Voice mock interview</h2>
+          <h2 className="text-base font-semibold">Practise an interview</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            A realistic round tuned to your role, seniority, and country&apos;s interview norms. Fadi
-            asks; you answer out loud; you get a scored autopsy of each answer.
+            Practise one question at a time. Speak or type your answer, then review the feedback.
           </p>
+          {job ? (
+            <p className="mt-2 rounded-md bg-muted px-3 py-2 text-sm">
+              Practising for <span className="font-medium">{job.title}</span> at{" "}
+              <span className="font-medium">{job.company}</span>
+              {job.description ? " — questions come from this posting." : " — no description was saved, so questions follow the role."}
+            </p>
+          ) : null}
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Field label="Role">
-            <Input value={config.role} onChange={(e) => setConfig((c) => ({ ...c, role: e.target.value }))} placeholder="e.g. Staff Nurse" />
-          </Field>
-          <Field label="Country / region">
-            <Input value={config.country} onChange={(e) => setConfig((c) => ({ ...c, country: e.target.value }))} placeholder="e.g. Germany" />
-          </Field>
-          <Field label="Seniority">
-            <Input value={config.seniority} onChange={(e) => setConfig((c) => ({ ...c, seniority: e.target.value }))} placeholder="e.g. mid" />
-          </Field>
-        </div>
-        <div className="space-y-1.5">
-          <span className="text-xs text-muted-foreground">Interviewer style</span>
-          <div className="flex flex-wrap gap-2">
-            {INTERVIEWER_PERSONAS.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                onClick={() => setPersona(p.id)}
-                title={p.blurb}
-                className={cn(
-                  "rounded-full border px-3 py-1 text-xs transition-colors",
-                  persona === p.id
-                    ? "border-primary bg-primary/10 text-primary"
-                    : "border-border text-muted-foreground hover:border-primary/50",
-                )}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-          <p className="text-[0.7rem] text-muted-foreground">
-            {INTERVIEWER_PERSONAS.find((p) => p.id === persona)?.blurb}
-          </p>
-        </div>
-        <Field label="Paste a job description (optional, sharpens the questions)">
-          <Textarea rows={3} value={jd} onChange={(e) => setJd(e.target.value)} />
+        <Field label="Role">
+          <Input
+            value={config.role}
+            onChange={(event) =>
+              setConfig((previous) => ({
+                ...previous,
+                role: event.target.value,
+              }))
+            }
+            placeholder="e.g. IT Support Specialist"
+          />
         </Field>
+        <details className="rounded-lg border border-border px-3 py-2">
+          <summary className="cursor-pointer text-sm text-muted-foreground">
+            Tailor the questions
+          </summary>
+          <div className="mt-3 space-y-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Country / region">
+                <Input
+                  value={config.country}
+                  onChange={(event) =>
+                    setConfig((previous) => ({
+                      ...previous,
+                      country: event.target.value,
+                    }))
+                  }
+                />
+              </Field>
+              <Field label="Seniority">
+                <Input
+                  value={config.seniority}
+                  onChange={(event) =>
+                    setConfig((previous) => ({
+                      ...previous,
+                      seniority: event.target.value,
+                    }))
+                  }
+                />
+              </Field>
+            </div>
+            <label className="block space-y-1 text-xs text-muted-foreground">
+              <span>Interviewer style</span>
+              <select
+                className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm text-foreground"
+                value={persona}
+                onChange={(event) => setPersona(event.target.value)}
+              >
+                {INTERVIEWER_PERSONAS.map((person) => (
+                  <option key={person.id} value={person.id}>
+                    {person.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Field label="Job description (optional)">
+              <Textarea rows={3} value={jd} onChange={(event) => setJd(event.target.value)} />
+            </Field>
+          </div>
+        </details>
+        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={readAloud}
+            onChange={(event) => setReadAloud(event.target.checked)}
+          />
+          Read questions aloud
+        </label>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         <Button size="sm" onClick={start} disabled={pending || !config.role.trim()}>
           <Wand2 className="size-4" aria-hidden="true" />
@@ -193,72 +244,96 @@ export function MockInterview({ defaults }: { defaults: Defaults }) {
         <span className="text-xs text-muted-foreground">
           Question {idx + 1} of {questions.length}
         </span>
-        <Button size="sm" variant="ghost" onClick={() => setQuestions(null)} className="text-muted-foreground">
-          End
+        <Button size="sm" variant="ghost" onClick={endInterview} className="text-muted-foreground">
+          End interview
         </Button>
       </div>
 
       <div className="flex items-start gap-2">
-        <Badge variant="secondary" className="mt-0.5 shrink-0 text-[0.6rem] capitalize">{q.kind}</Badge>
+        <Badge variant="secondary" className="mt-0.5 shrink-0 text-[0.6rem] capitalize">
+          {q.kind}
+        </Badge>
         <p className="text-base font-medium">{q.question}</p>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" variant="outline" onClick={() => void speakFadi(q.question)}>
-          <Volume2 className="size-4" aria-hidden="true" />
-          Hear it
-        </Button>
-        <Button
-          size="sm"
-          variant={convo ? "default" : "outline"}
-          onClick={() => setConvo((v) => !v)}
-          title="Fadi speaks questions and verdicts aloud and auto-listens for your answer"
-        >
-          <Headphones className="size-4" aria-hidden="true" />
-          {convo ? "Conversation: on" : "Conversation mode"}
-        </Button>
-      </div>
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={captureBusy}
+        onClick={() => void speakFadi(q.question)}
+      >
+        <Volume2 className="size-4" aria-hidden="true" /> Hear question
+      </Button>
 
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-medium text-muted-foreground">Your answer</span>
+      <div className="space-y-3 rounded-xl border border-border bg-background/40 p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <label htmlFor="interview-answer" className="text-sm font-medium">
+            Your answer
+          </label>
           {voice.isSupported ? (
-            <Button
-              size="sm"
-              variant={voice.state === "recording" ? "default" : "outline"}
-              onClick={() => (voice.state === "recording" ? voice.stop() : voice.start())}
-              disabled={voice.state === "transcribing"}
-            >
+            <div className="flex flex-wrap items-center gap-2">
               {voice.state === "recording" ? (
-                <><Square className="size-3.5" aria-hidden="true" /> Stop</>
-              ) : voice.state === "transcribing" ? (
-                "…"
-              ) : (
-                <><Mic className="size-3.5" aria-hidden="true" /> Speak</>
-              )}
-            </Button>
+                <Button size="sm" onClick={voice.stop}>
+                  <Square className="size-3.5" aria-hidden="true" /> Finish answer
+                </Button>
+              ) : !captureBusy ? (
+                <Button size="sm" variant="outline" disabled={pending} onClick={recordAnswer}>
+                  <Mic className="size-3.5" aria-hidden="true" />{" "}
+                  {answer ? "Add more by voice" : "Record answer"}
+                </Button>
+              ) : null}
+              {captureBusy ? (
+                <Button size="sm" variant="ghost" onClick={voice.cancel}>
+                  {voice.state === "recording" ? "Discard recording" : "Cancel"}
+                </Button>
+              ) : null}
+            </div>
           ) : null}
         </div>
-        <Textarea
-          rows={5}
-          value={answer}
-          onChange={(e) => setAnswer(e.target.value)}
-          placeholder="Speak your answer (Speak), or type it here."
-        />
         {voice.state === "recording" ? (
-          <p className="text-xs text-primary">Recording… speak your answer, then press Stop.</p>
+          <p role="status" className="text-sm text-primary">
+            Recording · {Math.floor(voice.elapsedMs / 60000)}:
+            {String(Math.floor(voice.elapsedMs / 1000) % 60).padStart(2, "0")} / 3:00. Pauses are
+            fine; press Finish answer when ready.
+          </p>
+        ) : voice.state === "requesting" ? (
+          <p role="status" className="text-sm text-muted-foreground">
+            Waiting for microphone permission…
+          </p>
         ) : voice.state === "transcribing" ? (
-          <p className="text-xs text-muted-foreground">Transcribing…</p>
-        ) : null}
+          <p role="status" className="text-sm text-muted-foreground">
+            Transcribing your answer…
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">
+            Type or record up to 3 minutes at a time. Review the transcript before getting feedback.
+          </p>
+        )}
+        <Textarea
+          id="interview-answer"
+          rows={6}
+          value={answer}
+          disabled={captureBusy || pending}
+          onChange={(event) => {
+            setAnswer(event.target.value);
+            setScore(null);
+            setSaveState("idle");
+          }}
+          placeholder="Your answer appears here. You can edit it before getting feedback."
+        />
       </div>
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={scoreCurrent} disabled={pending || !answer.trim()}>
-          Score my answer
+        <Button
+          size="sm"
+          onClick={scoreCurrent}
+          disabled={pending || captureBusy || !answer.trim()}
+        >
+          Get feedback
         </Button>
         {idx < questions.length - 1 ? (
-          <Button size="sm" variant="outline" onClick={next} disabled={pending}>
+          <Button size="sm" variant="outline" onClick={next} disabled={pending || captureBusy}>
             Next question <ChevronRight className="size-4" aria-hidden="true" />
           </Button>
         ) : null}
@@ -288,7 +363,8 @@ function ScoreCard({
     <div className="space-y-3 rounded-md border bg-muted/30 p-3">
       <div className="flex items-center gap-3">
         <span className="text-xl font-semibold tabular-nums">
-          {score.overall.toFixed(1)}<span className="text-sm text-muted-foreground">/5</span>
+          {score.overall.toFixed(1)}
+          <span className="text-sm text-muted-foreground">/5</span>
         </span>
         <span className="text-xs text-muted-foreground">{score.deliveryNote}</span>
       </div>
@@ -297,7 +373,10 @@ function ScoreCard({
           <div key={label} className="grid grid-cols-[8rem_1fr_1.5rem] items-center gap-2">
             <span className="text-xs text-muted-foreground">{label}</span>
             <span className="h-1.5 overflow-hidden rounded-full bg-muted">
-              <span className="block h-full rounded-full bg-primary" style={{ width: `${(v / 5) * 100}%` }} />
+              <span
+                className="block h-full rounded-full bg-primary"
+                style={{ width: `${(v / 5) * 100}%` }}
+              />
             </span>
             <span className="text-right text-xs tabular-nums text-muted-foreground">{v}</span>
           </div>
@@ -311,8 +390,12 @@ function ScoreCard({
       ) : null}
       {score.strongerVersion ? (
         <div>
-          <p className="text-xs font-medium text-muted-foreground">Stronger version (your content, tightened)</p>
-          <p className="mt-1 whitespace-pre-wrap text-sm text-foreground/90">{score.strongerVersion}</p>
+          <p className="text-xs font-medium text-muted-foreground">
+            Stronger version (your content, tightened)
+          </p>
+          <p className="mt-1 whitespace-pre-wrap text-sm text-foreground/90">
+            {score.strongerVersion}
+          </p>
         </div>
       ) : null}
 
@@ -328,7 +411,9 @@ function ScoreCard({
             {saveState === "saving" ? "Saving…" : "Save to story bank"}
           </Button>
         )}
-        <span className="text-[0.7rem] text-muted-foreground">Reuse this in real interviews, prep, and documents.</span>
+        <span className="text-[0.7rem] text-muted-foreground">
+          Reuse this in real interviews, prep, and documents.
+        </span>
       </div>
     </div>
   );
@@ -340,7 +425,13 @@ function Lines({ title, items, tone }: { title: string; items: string[]; tone: s
       <p className="text-xs font-medium text-muted-foreground">{title}</p>
       <ul className="space-y-0.5">
         {items.map((it, i) => (
-          <li key={i} className={cn("text-sm", tone === "text-emerald-400" ? "text-foreground/90" : "text-foreground/90")}>
+          <li
+            key={i}
+            className={cn(
+              "text-sm",
+              tone === "text-emerald-400" ? "text-foreground/90" : "text-foreground/90"
+            )}
+          >
             • {it}
           </li>
         ))}

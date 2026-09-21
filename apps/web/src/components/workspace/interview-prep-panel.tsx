@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { MessageSquareQuote, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { MessageSquareQuote, Mic, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,10 +17,12 @@ const STAR_ROWS: Array<[keyof Pick<PrepQuestion, "situation" | "task" | "action"
 ];
 
 export function InterviewPrepPanel({
+  jobId,
   jobTitle,
   jobCompany,
   jobDescription,
 }: {
+  jobId?: string;
   jobTitle: string;
   jobCompany: string;
   jobDescription?: string;
@@ -52,10 +55,19 @@ export function InterviewPrepPanel({
           <MessageSquareQuote className="size-4 text-primary" aria-hidden="true" />
           <h2 className="text-sm font-semibold">Interview prep for this role</h2>
         </div>
-        <Button size="sm" variant={questions ? "outline" : "default"} onClick={run} disabled={pending || !hasJd}>
-          <Sparkles className="size-3.5" aria-hidden="true" />
-          {pending ? "Prepping…" : questions ? "Re-prep" : "Prep me"}
-        </Button>
+        <div className="flex items-center gap-2">
+          {jobId ? (
+            // Practise out loud against THIS posting — same job, same description, spoken answers.
+            <Button size="sm" variant="outline" nativeButton={false} render={<Link href={`/dashboard/interview?jobId=${jobId}`} />}>
+              <Mic className="size-3.5" aria-hidden="true" />
+              Practise out loud
+            </Button>
+          ) : null}
+          <Button size="sm" variant={questions ? "outline" : "default"} onClick={run} disabled={pending || !hasJd}>
+            <Sparkles className="size-3.5" aria-hidden="true" />
+            {pending ? "Prepping…" : questions ? "Re-prep" : "Prep me"}
+          </Button>
+        </div>
       </div>
 
       {!hasJd ? (

@@ -194,6 +194,7 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
             hint="Likely questions + STAR answers from your real experience"
           >
             <InterviewPrepPanel
+              jobId={job.id}
               jobTitle={job.title}
               jobCompany={job.company}
               jobDescription={job.description ?? undefined}

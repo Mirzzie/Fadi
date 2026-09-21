@@ -11,6 +11,9 @@ type Listener = (speaking: boolean) => void;
 
 let audioEl: HTMLAudioElement | null = null;
 let speaking = false;
+let generation = 0;
+let pendingSpeech: AbortController | null = null;
+let releaseAudio: (() => void) | null = null;
 const listeners = new Set<Listener>();
 
 // Once the cloud TTS endpoint returns a hard failure (no/expired key → 503), stop
@@ -44,11 +47,17 @@ export function isFadiVoiceEnabled(): boolean {
 }
 
 export function stopFadiSpeech(): void {
+  // Stop owns generation too: an old network response must not restart a question.
+  generation += 1;
+  pendingSpeech?.abort();
+  pendingSpeech = null;
   if (audioEl) {
     audioEl.pause();
     audioEl.src = "";
     audioEl = null;
   }
+  releaseAudio?.();
+  releaseAudio = null;
   if (typeof window !== "undefined" && "speechSynthesis" in window) {
     window.speechSynthesis.cancel();
   }
@@ -75,7 +84,7 @@ function pickMaleVoice(): SpeechSynthesisVoice | undefined {
   return [...pool].sort((a, b) => score(b) - score(a))[0];
 }
 
-function browserFallback(text: string) {
+function browserFallback(text: string, ownGeneration: number) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
@@ -88,13 +97,19 @@ function browserFallback(text: string) {
     console.warn(
       "[Fadi] No system text-to-speech voice is available, so Fadi can't speak aloud. " +
         "On Linux, install a speech engine (e.g. `sudo pacman -S speech-dispatcher espeak-ng`) " +
-        "and restart the browser — or switch on the upcoming local Kokoro voice.",
+        "and restart the browser — or switch on the upcoming local Kokoro voice."
     );
   }
   utterance.rate = 1.0;
-  utterance.onstart = () => emit(true);
-  utterance.onend = () => emit(false);
-  utterance.onerror = () => emit(false);
+  utterance.onstart = () => {
+    if (ownGeneration === generation) emit(true);
+  };
+  utterance.onend = () => {
+    if (ownGeneration === generation) emit(false);
+  };
+  utterance.onerror = () => {
+    if (ownGeneration === generation) emit(false);
+  };
   window.speechSynthesis.speak(utterance);
 }
 
@@ -103,25 +118,42 @@ export async function speakFadi(text: string): Promise<void> {
   const clean = text.trim();
   if (!clean || typeof window === "undefined") return;
   stopFadiSpeech();
+  const ownGeneration = generation;
 
   // Skip the cloud endpoint once it's known-down, so we don't fire a failing request
   // (and log a 503) on every single utterance.
   if (!cloudTtsDown) {
+    const controller = new AbortController();
+    pendingSpeech = controller;
     try {
       const res = await fetch("/api/fadi/speak", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: clean }),
+        signal: controller.signal,
       });
+      if (ownGeneration !== generation) return;
       if (res.ok) {
-        const url = URL.createObjectURL(await res.blob());
+        const blob = await res.blob();
+        if (ownGeneration !== generation) return;
+        const url = URL.createObjectURL(blob);
         const el = new Audio(url);
         audioEl = el;
-        el.onplay = () => emit(true);
-        const done = () => {
-          emit(false);
+        let released = false;
+        const release = () => {
+          if (released) return;
+          released = true;
           URL.revokeObjectURL(url);
           if (audioEl === el) audioEl = null;
+          if (releaseAudio === release) releaseAudio = null;
+        };
+        releaseAudio = release;
+        el.onplay = () => {
+          if (ownGeneration === generation) emit(true);
+        };
+        const done = () => {
+          release();
+          if (ownGeneration === generation) emit(false);
         };
         el.onended = done;
         el.onerror = done;
@@ -132,9 +164,13 @@ export async function speakFadi(text: string): Promise<void> {
       // unavailable this session — don't retry it every time.
       cloudTtsDown = true;
     } catch {
+      if (ownGeneration !== generation) return;
+      releaseAudio?.();
       // Network error or an autoplay block — fall back this once, but DON'T disable
       // the cloud path (autoplay unlocks after a user gesture; the key may be fine).
+    } finally {
+      if (pendingSpeech === controller) pendingSpeech = null;
     }
   }
-  browserFallback(clean);
+  if (ownGeneration === generation) browserFallback(clean, ownGeneration);
 }

@@ -39,7 +39,9 @@ const answers = (text: string) => ({
 });
 
 /** A non-streaming round that asks for nothing — the model saying it is done. */
-const done = () => ({ choices: [{ message: { role: "assistant", content: null, tool_calls: [] } }] });
+const done = () => ({
+  choices: [{ message: { role: "assistant", content: null, tool_calls: [] } }],
+});
 
 /**
  * Script the rounds. After each tool round the loop asks again — that is the whole point of
@@ -60,15 +62,19 @@ beforeEach(() => {
   create.mockReset();
 });
 
-async function run(executeTool: (n: string, a: Record<string, unknown>) => Promise<{ summary: string }>) {
+async function run(
+  executeTool: (n: string, a: Record<string, unknown>) => Promise<{ summary: string }>
+) {
   const { OpenAIProvider } = await import("./openai");
   const provider = new OpenAIProvider("k", "m", { id: "test", name: "Test" });
   return provider.runWithTools!(
     [{ role: "user", content: "get my lab going" }],
-    [{ type: "function", function: { name: "inspect_machine", description: "", parameters: {} } }] as never,
+    [
+      { type: "function", function: { name: "inspect_machine", description: "", parameters: {} } },
+    ] as never,
     executeTool as never,
     {},
-    {},
+    {}
   );
 }
 
@@ -76,8 +82,11 @@ describe("the tool loop", () => {
   it("CHAINS: a second call informed by the first result", async () => {
     // The shape that was impossible: look, then decide what to do about what you saw.
     script(
-      [asks(toolCall("inspect_machine")), asks(toolCall("start_lab_machine", { template: "linux-ubuntu" }))],
-      "Started Ubuntu, since there was no Docker.",
+      [
+        asks(toolCall("inspect_machine")),
+        asks(toolCall("start_lab_machine", { template: "linux-ubuntu" })),
+      ],
+      "Started Ubuntu, since there was no Docker."
     );
 
     const seen: string[] = [];
@@ -92,7 +101,9 @@ describe("the tool loop", () => {
   });
 
   it("answers directly when no tool is needed, without a second call", async () => {
-    create.mockResolvedValueOnce({ choices: [{ message: { role: "assistant", content: "Hello." } }] });
+    create.mockResolvedValueOnce({
+      choices: [{ message: { role: "assistant", content: "Hello." } }],
+    });
     const result = await run(async () => ({ summary: "" }));
     expect(result.text).toBe("Hello.");
     expect(create).toHaveBeenCalledTimes(1);
@@ -107,9 +118,21 @@ describe("the tool loop", () => {
     expect(create).toHaveBeenCalledTimes(3);
   });
 
+  it("returns an answer already produced after tools without buying a second answer", async () => {
+    create.mockResolvedValueOnce(asks(toolCall("inspect_machine")));
+    create.mockResolvedValueOnce({
+      choices: [{ message: { role: "assistant", content: "Docker is available." } }],
+    });
+    const result = await run(async () => ({ summary: "Docker available" }));
+    expect(result.text).toBe("Docker is available.");
+    expect(create).toHaveBeenCalledTimes(2);
+  });
+
   it("IS BOUNDED: a model that loops forever costs a few calls, not a bill", async () => {
     create.mockImplementation(async (body: { stream?: boolean }) =>
-      body.stream ? answers("Stopping there.") : asks(toolCall("inspect_machine", { n: Math.random() })),
+      body.stream
+        ? answers("Stopping there.")
+        : asks(toolCall("inspect_machine", { n: Math.random() }))
     );
 
     const result = await run(async () => ({ summary: "again" }));
@@ -121,7 +144,9 @@ describe("the tool loop", () => {
 
   it("tells the model it ran out, so the answer can admit it", async () => {
     create.mockImplementation(async (body: { stream?: boolean; messages?: Msg[] }) =>
-      body.stream ? answers("I did not finish.") : asks(toolCall("inspect_machine", { n: Math.random() })),
+      body.stream
+        ? answers("I did not finish.")
+        : asks(toolCall("inspect_machine", { n: Math.random() }))
     );
 
     await run(async () => ({ summary: "again" }));
@@ -133,7 +158,10 @@ describe("the tool loop", () => {
   });
 
   it("does not repeat an identical call inside one round", async () => {
-    script([asks(toolCall("inspect_machine", {}, "a"), toolCall("inspect_machine", {}, "b"))], "Done.");
+    script(
+      [asks(toolCall("inspect_machine", {}, "a"), toolCall("inspect_machine", {}, "b"))],
+      "Done."
+    );
 
     let executions = 0;
     await run(async () => {
@@ -148,8 +176,11 @@ describe("the tool loop", () => {
   it("ALLOWS the same call in a LATER round, because the world may have changed", async () => {
     // "Check it again now that I have changed something" is the whole point of looping.
     script(
-      [asks(toolCall("inspect_machine", {}, "first")), asks(toolCall("inspect_machine", {}, "second"))],
-      "Now it is there.",
+      [
+        asks(toolCall("inspect_machine", {}, "first")),
+        asks(toolCall("inspect_machine", {}, "second")),
+      ],
+      "Now it is there."
     );
 
     let executions = 0;

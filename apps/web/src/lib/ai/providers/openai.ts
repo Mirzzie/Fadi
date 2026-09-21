@@ -20,7 +20,10 @@ import type {
  * and stray prose around it, which non-strict providers often add.
  */
 function extractJsonObject(text: string): unknown {
-  const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+  const cleaned = text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "");
   try {
     return JSON.parse(cleaned);
   } catch {
@@ -72,7 +75,7 @@ export class OpenAIProvider implements AIProvider {
       name?: string;
       keyless?: boolean;
       headers?: Record<string, string>;
-    } = {},
+    } = {}
   ) {
     this.id = options.id ?? "openai";
     this.name = options.name ?? "OpenAI";
@@ -104,7 +107,7 @@ export class OpenAIProvider implements AIProvider {
 
   async openChatStream(
     messages: AIMessage[],
-    options?: ChatOptions,
+    options?: ChatOptions
   ): Promise<AsyncIterable<string>> {
     if (!this.client) throw new Error("AI provider is not configured.");
     // create() throws here on auth/quota/rate-limit, before any tokens.
@@ -152,7 +155,7 @@ export class OpenAIProvider implements AIProvider {
     messages: AIMessage[],
     schema: ZodSchema<T>,
     schemaName: string,
-    options?: ChatOptions,
+    options?: ChatOptions
   ): Promise<T> {
     if (!this.client) {
       throw new Error("AI provider is not configured.");
@@ -254,7 +257,7 @@ export class OpenAIProvider implements AIProvider {
     tools: ToolSpec[],
     executeTool: ToolExecutor,
     options?: ChatOptions,
-    callbacks?: ToolRunCallbacks,
+    callbacks?: ToolRunCallbacks
   ): Promise<ToolRunResult> {
     if (!this.client) throw new Error("AI provider is not configured.");
     const client = this.client;
@@ -277,7 +280,6 @@ export class OpenAIProvider implements AIProvider {
     // stuck calling the same tool forever is a real failure mode, not a hypothetical.
     // The de-dupe below is per ROUND rather than per run, so "check it again now that I
     // changed something" stays possible while "call it twice in the same breath" does not.
-    const executedAcrossRun = new Set<string>();
     let rounds = 0;
 
     while (rounds < MAX_TOOL_ROUNDS) {
@@ -295,15 +297,15 @@ export class OpenAIProvider implements AIProvider {
       const calls = (choice?.tool_calls ?? []).filter((c) => c.type === "function");
 
       if (calls.length === 0) {
-        if (rounds === 1) {
-          // Nothing to do at all — return the direct answer whole.
-          const text = choice?.content ?? "";
+        // The model may already have answered using the tool results. Preserve that
+        // answer instead of paying for a second, potentially different completion.
+        const text = choice?.content ?? "";
+        if (text.trim()) {
           callbacks?.onToken?.(text);
           return { text, toolResults };
         }
-        // It has finished working and wants to answer. Fall through to the streamed
-        // answer below rather than keeping this non-streamed one, so the user sees it
-        // arrive token by token like every other reply.
+        // Some compatible providers end a tool round with no content. Ask for prose
+        // once in that case, using the same fallback as the round limit.
         break;
       }
 
@@ -323,9 +325,12 @@ export class OpenAIProvider implements AIProvider {
           continue;
         }
         executedThisRound.add(key);
-        executedAcrossRun.add(key);
         const result = await executeTool(call.function.name, args);
-        toolResults.push({ name: call.function.name, view: result.view ?? "none", data: result.data });
+        toolResults.push({
+          name: call.function.name,
+          view: result.view ?? "none",
+          data: result.data,
+        });
         convo.push({ role: "tool", tool_call_id: call.id, content: result.summary });
       }
       callbacks?.onToolResults?.(toolResults);
@@ -368,11 +373,7 @@ export class OpenAIProvider implements AIProvider {
   async transcribe(file: File): Promise<string> {
     if (!this.client) throw new Error("AI provider is not configured.");
     const model =
-      this.id === "groq"
-        ? "whisper-large-v3-turbo"
-        : this.id === "openai"
-          ? "whisper-1"
-          : null;
+      this.id === "groq" ? "whisper-large-v3-turbo" : this.id === "openai" ? "whisper-1" : null;
     if (!model) {
       throw new Error(`${this.name} doesn't support audio transcription.`);
     }

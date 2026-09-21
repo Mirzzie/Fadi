@@ -49,8 +49,8 @@ function specFor(id: string): Omit<TtsSpec, "apiKey"> | null {
   if (id === "groq") {
     return {
       base: "https://api.groq.com/openai/v1",
-      model: process.env.FADI_TTS_GROQ_MODEL || "playai-tts",
-      voice: process.env.FADI_TTS_GROQ_VOICE || "Fritz-PlayAI", // male PlayAI voice
+      model: process.env.FADI_TTS_GROQ_MODEL || "canopylabs/orpheus-v1-english",
+      voice: process.env.FADI_TTS_GROQ_VOICE || "troy", // Orpheus voice
       format: "wav",
       contentType: "audio/wav",
     };
@@ -60,7 +60,7 @@ function specFor(id: string): Omit<TtsSpec, "apiKey"> | null {
 
 export async function synthesizeFadiSpeech(
   userId: string,
-  text: string,
+  text: string
 ): Promise<{ audio: ArrayBuffer; contentType: string } | null> {
   const input = text.trim().slice(0, 1200); // keep requests snappy
   if (!input) return null;
@@ -84,7 +84,12 @@ export async function synthesizeFadiSpeech(
       const res = await fetch(`${spec.base}/audio/speech`, {
         method: "POST",
         headers: { Authorization: `Bearer ${spec.apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: spec.model, voice: spec.voice, input, response_format: spec.format }),
+        body: JSON.stringify({
+          model: spec.model,
+          voice: spec.voice,
+          input,
+          response_format: spec.format,
+        }),
         signal: AbortSignal.timeout(30000), // local CPU TTS can be a touch slower than cloud
       });
       if (!res.ok) continue;
