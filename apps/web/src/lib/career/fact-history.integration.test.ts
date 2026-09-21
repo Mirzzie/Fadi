@@ -135,6 +135,20 @@ suite("my career: history of every change", () => {
     expect(last?.snapshot.detail).toBe("An import nobody wanted.");
   });
 
+  it("keeps whose work it was, and the market's labels, apart from the person's words", async () => {
+    const row = await evidence.create(
+      userId,
+      item({ attribution: "employment", tags: ["linux"], marketTags: ["it support", "windows"] }) as never
+    );
+    await evidence.update(userId, row.id, { title: "IT Support Engineer" });
+
+    const current = await career.currentFactVersion(userId, row.id);
+    expect(current?.snapshot.attribution).toBe("employment");
+    expect(current?.snapshot.marketTags).toEqual(["it support", "windows"]);
+    // The person's own tags stay the person's own.
+    expect(current?.snapshot.tags).toEqual(["linux"]);
+  });
+
   it("editing one wording does not rewrite the fact's history with it", async () => {
     const leader = await evidence.create(userId, item() as never);
     const rendering = await evidence.create(

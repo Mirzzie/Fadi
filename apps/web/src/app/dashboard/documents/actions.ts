@@ -7,6 +7,8 @@ import {
   createResumeTemplatesRepository,
   type DocumentKind,
 } from "@careeros/database";
+import { preserveCareerSource } from "@/lib/career/sources";
+import { fileFingerprint } from "@/lib/career/uploaded-file";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getUserDocGenerate } from "@/lib/ai/user-generate";
 import { getDatabase } from "@/lib/database/client";
@@ -69,6 +71,14 @@ export async function importJsonResumeAction(jsonText: string, title?: string): 
 
   let content: string;
   let resolvedTitle: string;
+  // KEEP WHAT ARRIVED. Everything below is a rewording of this text, and until now the text
+  // itself was never stored — so "where did this claim come from?" had no answer.
+  await preserveCareerSource(user.id, {
+    sourceKind: "resume",
+    sourceKey: "json-import",
+    content: jsonText,
+  });
+
   try {
     const jr = parseJsonResume(jsonText);
     const data = fromJsonResume(jr);
@@ -132,6 +142,21 @@ export async function importResumeFileAction(formData: FormData): Promise<Result
     if (text.trim().length < 30) {
       return { ok: false, message: "Couldn't read meaningful text from that file (is it a scan/image?)." };
     }
+
+    // Two versions, because they answer different questions: the extracted text says what the CV
+    // SAID, and the fingerprint says which FILE said it — two exports of the same CV extract to
+    // different text, so the text alone cannot tell you it is the same document. The bytes
+    // themselves are deliberately not kept; see lib/career/uploaded-file.ts.
+    await preserveCareerSource(user.id, {
+      sourceKind: "resume",
+      sourceKey: "file-import",
+      content: text,
+    });
+    await preserveCareerSource(user.id, {
+      sourceKind: "resume-file",
+      sourceKey: "file-import",
+      content: fileFingerprint({ name: file.name, size: file.size, type: file.type, bytes: buffer }),
+    });
 
     const generate = await getUserDocGenerate(user.id);
     if (generate) {

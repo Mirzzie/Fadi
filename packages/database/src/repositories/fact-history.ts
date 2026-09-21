@@ -33,6 +33,8 @@ export function snapshotOf(row: EvidenceItem): CareerRecordSnapshot {
     metrics: row.metrics,
     tags: row.tags ?? [],
     origin: row.origin,
+    attribution: row.attribution,
+    marketTags: row.marketTags ?? [],
   };
 }
 

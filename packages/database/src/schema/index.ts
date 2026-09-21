@@ -1721,6 +1721,20 @@ export type CareerRecordSnapshot = {
   metrics: string | null;
   tags: string[];
   origin: string;
+  /**
+   * WHOSE WORK THIS WAS, and what the market called it.
+   *
+   * Codex read stage 1 and found both missing. Without `attribution`, a history of a personal
+   * project and a history of employment are the same shape, so the one thing a reader most needs
+   * to check — "were you employed there?" — could not be answered from the record of what was
+   * said. `marketTags` are Fadi's own labels rather than the person's words, so keeping them
+   * apart from `tags` is what stops a machine label ageing into a claim.
+   *
+   * Optional because versions written before this existed are not being rewritten to pretend
+   * they carried it.
+   */
+  attribution?: string;
+  marketTags?: string[];
 };
 
 /**
