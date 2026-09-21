@@ -9,11 +9,13 @@ import {
 } from "@careeros/database";
 
 import { getDatabase } from "@/lib/database/client";
+import { logger } from "@/lib/observability/logger";
 import { getUserDocGenerate } from "@/lib/ai/user-generate";
 import { getJobSyncStatus, startBackgroundSync, type JobSyncStatus } from "@/lib/jobs/sync";
 import { createJobScorer } from "@/lib/jobs/job-matching";
 import { expandRoleSynonyms } from "@/lib/jobs/role-synonyms";
 import { passesFilters, type JobFilters } from "@/lib/jobs/filters";
+import { isLegitJob } from "@/lib/jobs/job-validation";
 import { getCountry } from "@/lib/jobs/locations";
 import { checkPostingLiveness } from "@/lib/jobs/liveness";
 import { sweepJobsLiveness } from "@/lib/jobs/liveness-sweep";
@@ -127,15 +129,27 @@ export async function getRecommendedJobsForUser(
   }
 
   const jobs = await jobsRepository.listActiveForUser(userId);
-  const jobIds = jobs.map((job) => job.id);
+  // BY VACANCY, NOT BY ROW. The same posting arrives from several boards and the reader keeps one
+  // row per canonical key; saves and applications were looked up by that row's id, so saving the
+  // Reed copy and being shown the Jooble copy lost the flag — and an application in progress
+  // disappeared from the board.
+  const keys = [...new Set(jobs.map((job) => job.canonicalKey))];
   const [savedJobs, applications] = await Promise.all([
-    savedJobsRepository.listForUserByJobIds(userId, jobIds),
-    applicationsRepository.listForUserByJobIds(userId, jobIds),
+    savedJobsRepository.listForUserByCanonicalKeys(userId, keys),
+    applicationsRepository.listForUserByCanonicalKeys(userId, keys),
   ]);
-  const savedByJobId = new Map(savedJobs.map((savedJob) => [savedJob.jobId, savedJob]));
-  const applicationByJobId = new Map(
-    applications.map((application) => [application.jobId, application])
+  const savedByKey = new Map(savedJobs.map((savedJob) => [savedJob.canonicalKey, savedJob]));
+  const applicationByKey = new Map(
+    applications.map((application) => [application.canonicalKey, application])
   );
+  const savedByJobId = new Map(jobs.flatMap((job) => {
+    const saved = savedByKey.get(job.canonicalKey);
+    return saved ? [[job.id, saved] as const] : [];
+  }));
+  const applicationByJobId = new Map(jobs.flatMap((job) => {
+    const application = applicationByKey.get(job.canonicalKey);
+    return application ? [[job.id, application] as const] : [];
+  }));
 
   // When the user actively searched a location, score against THAT location
   // rather than only their profile's home region.
@@ -174,6 +188,7 @@ export async function getRecommendedJobsForUser(
         firstSeenAt: job.createdAt,
         matchScore: lex,
         matchReason: savedJob?.matchSummary ?? match.matchReason,
+        sources: [] as string[],
         matchedKeywords: savedJob?.matchedSkills ?? match.matchedKeywords,
         onRole: match.onRole,
         fieldRelated: match.fieldRelated,
@@ -197,18 +212,31 @@ export async function getRecommendedJobsForUser(
     j.isSaved || Boolean(j.applicationStatus);
   const overBar = (j: (typeof recommendedJobs)[number]) => j.matchScore >= MIN_RELEVANCE;
 
+  // LEGITIMACY OUTRANKS RELEVANCE. `isLegitJob` (expired wording, survey/MLM/advance-fee tells)
+  // ran only on crawled pages, so a posting from a paid aggregator could say "position has been
+  // filled" or "earn €900/week from home, no experience" and still lead the board on a high
+  // keyword score. A posting that fails this is not shown, whatever it scores. Saved and applied
+  // roles stay — the person chose those, and their workspace explains the state instead.
+  const notGenuine = new Set(
+    hardFiltered
+      .filter((j) => !tracked(j) && !isLegitJob({ title: j.title, description: j.description, url: j.url }))
+      .map((j) => j.id)
+  );
+  const genuine = hardFiltered.filter((j) => !notGenuine.has(j.id));
+
+
   // 1) Strong: on-role AND above the bar.
-  const strong = hardFiltered.filter((j) => (j.onRole && overBar(j)) || tracked(j));
+  const strong = genuine.filter((j) => (j.onRole && overBar(j)) || tracked(j));
   // 2) Fallback: on-role at any score — the right KIND of role, just weaker —
   //    but still never off-role.
-  const onRoleAny = hardFiltered.filter((j) => j.onRole || tracked(j));
+  const onRoleAny = genuine.filter((j) => j.onRole || tracked(j));
   // 3) Last resort: SAME FIELD, different role (e.g. a Security Engineer for a SOC
   //    Analyst seeker). Only when there are NO exact-role matches — so an empty
   //    board becomes honest, labelled adjacent roles instead of nothing. Still
   //    never off-field noise (sales/academia in the field are excluded upstream),
   //    and never a role far above the user's experience (an 8–10-yr Staff role for
   //    an early-career profile is not a realistic "related" suggestion).
-  const fieldRelated = hardFiltered.filter((j) => (j.fieldRelated && !j.overLevel) || tracked(j));
+  const fieldRelated = genuine.filter((j) => (j.fieldRelated && !j.overLevel) || tracked(j));
   // Show on-role roles FIRST, then same-field roles (SRE / Support / Security Engineer for a
   // Sys-Admin seeker are what they actually want). Exact-title-only hid ~all fresh jobs behind
   // one stale pinned posting. Still domain-gated (in-field), just not word-for-word — deduped,
@@ -235,7 +263,7 @@ export async function getRecommendedJobsForUser(
     // In-area jobs the lexical pass dropped, kept realistic (right level/function);
     // the vector judges field fit. Used for both rescue and background backfill.
     const rescuePool = inFallback
-      ? hardFiltered
+      ? genuine
           .filter((j) => {
             const m = metaById.get(j.id);
             return !j.onRole && !j.fieldRelated && !j.overLevel && !(m?.differentFunction ?? true);
@@ -385,10 +413,48 @@ export async function getRecommendedJobsForUser(
   const STALE_MS = 30 * 24 * 60 * 60 * 1000;
   const isStale = (j: (typeof shown)[number]) =>
     j.postedAt ? Date.now() - new Date(j.postedAt).getTime() > STALE_MS : false;
+  // Then LEVEL. An entry-level profile was shown "Engineering Manager, Server Networking
+  // Security" and senior security roles above the one deskside support role on its Dublin board
+  // (reported 20 Sep): overLevel demoted the score but never the position, and the semantic
+  // re-rank could lift it back. A role well above the person sits below the ones they can take.
   shown = [...shown].sort((a, b) => {
     const staleDelta = (isStale(a) ? 1 : 0) - (isStale(b) ? 1 : 0);
-    return staleDelta !== 0 ? staleDelta : b.matchScore - a.matchScore;
+    if (staleDelta !== 0) return staleDelta;
+    const levelDelta = (a.overLevel ? 1 : 0) - (b.overLevel ? 1 : 0);
+    if (levelDelta !== 0) return levelDelta;
+    return b.matchScore - a.matchScore;
   });
+
+  // Which boards listed the vacancies being shown — one query for the page. A grouped vacancy
+  // that appeared on Reed and Jooble says so, instead of looking like a different posting.
+  if (shown.length > 0) {
+    try {
+      const sourcesByJob = await jobsRepository.sourcesForJobs(shown.map((j) => j.id));
+      for (const job of shown) job.sources = sourcesByJob.get(job.id) ?? [];
+    } catch {
+      // Provenance is a nicety; a failure here must never cost the person their results.
+    }
+  }
+
+  // WHERE THE POSTINGS WENT. Six numbers, one line, on the server — so "the board is empty"
+  // can be answered with the stage that emptied it instead of a guess. A saved full-time
+  // preference silently removing 85% of postings (20 Sep) was invisible precisely because
+  // nothing counted the losses. Diagnostics, not a dashboard.
+  if (!opts.skipSync) {
+    logger.info("jobs.board_losses", {
+      userId,
+      role: careerProfile?.targetRole ?? "none",
+      where: [filters?.city, filters?.country].filter(Boolean).join(",") || (filters?.worldwide ? "worldwide" : "profile"),
+      stored: jobs.length,
+      afterFilters: hardFiltered.length,
+      excludedByFilters: jobs.length - hardFiltered.length,
+      excludedAsNotGenuine: notGenuine.size,
+      onRole: onRoleAny.length,
+      fieldRelated: fieldRelated.length,
+      excludedByRelevance: genuine.length - new Set([...onRoleAny, ...fieldRelated].map((j) => j.id)).size,
+      displayed: shown.length,
+    });
+  }
 
   return typeof limit === "number" ? shown.slice(0, limit) : shown;
 }

@@ -112,3 +112,20 @@ describe("Lightcast Open Skills provider", () => {
     expect(skillsToSignal([], ["frontend"])).toBeNull();
   });
 });
+
+describe("a source says when it does not cover a country", () => {
+  it("THE REPORTED SILENCE: Adzuna reports no Ireland coverage instead of zero jobs", async () => {
+    // Verified live 20 Sep 2026: https://api.adzuna.com/v1/api/jobs/ie/... → 404
+    // UNSUPPORTED_COUNTRY, while the adapter returned [] and the board said "live, 0 jobs".
+    const { AdzunaSource } = await import("./providers/adzuna");
+    const adzuna = new AdzunaSource("id", "key");
+    expect(adzuna.covers({ keywords: [], country: "ie", limit: 10 })).toBe("no");
+    expect(adzuna.covers({ keywords: [], country: "gb", limit: 10 })).toBe("yes");
+    expect(adzuna.covers({ keywords: [], country: "us", limit: 10 })).toBe("yes");
+  });
+
+  it("says unknown when no country was asked for", async () => {
+    const { AdzunaSource } = await import("./providers/adzuna");
+    expect(new AdzunaSource("id", "key").covers({ keywords: [], limit: 10 })).toBe("unknown");
+  });
+});

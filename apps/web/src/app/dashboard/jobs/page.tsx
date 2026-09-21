@@ -43,6 +43,8 @@ export default async function JobsPage({
     modes?: string;
     types?: string;
     visa?: string;
+    /** Words from the search box, comma-separated. */
+    q?: string;
   }>;
 }) {
   const user = await getCurrentAuthUser();
@@ -63,7 +65,12 @@ export default async function JobsPage({
   // Default search location: an explicit URL filter wins; then the user's saved
   // default (e.g. from private browser-region detection); then their profile region.
   const fromProfile = parseLocation(profile?.locationPreference);
-  const savedLoc = prefs.location;
+  // A DETECTED location must never outrank the one the person stated. The owner's saved default
+  // was {country: "us", precise: false} — auto-detected — while their profile says Ireland, so
+  // opening Jobs searched the United States and found nothing. An explicitly chosen saved
+  // location (precise) still wins over the profile region.
+  const saved = prefs.location;
+  const savedLoc = saved?.precise === false && fromProfile.country ? undefined : saved;
   // "any" = the user explicitly chose "Any country": search worldwide and don't
   // fall back to a default (that fallback is why only Ireland showed).
   const worldwide = params.country === "any";
@@ -76,6 +83,13 @@ export default async function JobsPage({
   const types = parseList(params.types ?? (prefs.types ?? []).join(","), TYPES);
   const visa: VisaFilter =
     params.visa === "sponsored" || params.visa === "none" ? params.visa : "any";
+  // What the person typed. Carried in the URL so a refresh, a share or a back button repeats
+  // the same search, and both search paths filter identically.
+  const keywords = (params.q ?? "")
+    .split(",")
+    .map((word) => word.trim())
+    .filter(Boolean)
+    .slice(0, 6);
 
   const jobs = await getRecommendedJobsForUser(user.id, undefined, {
     country,
@@ -84,6 +98,7 @@ export default async function JobsPage({
     modes,
     types,
     visa,
+    keywords,
   });
 
   // Live crawl status (getRecommendedJobsForUser just kicked off the background run) — drives
@@ -106,6 +121,7 @@ export default async function JobsPage({
           selectedModes={modes}
           selectedTypes={types}
           selectedVisa={visa}
+          selectedKeywords={keywords}
         />
         <JobControlBar
           sources={sourcesHealth.sources}
@@ -117,6 +133,23 @@ export default async function JobsPage({
         <JobSearchProgress status={syncStatus} />
       </div>
       <JobsShell
+        observedAt={
+          // When this scope's last run finished; failing that, the freshest posting we hold.
+          syncStatus?.finishedAt ??
+          (jobs.length > 0
+            ? Math.max(...jobs.map((job) => new Date(job.firstSeenAt).getTime()))
+            : null)
+        }
+        searchOutcome={{
+          keywords,
+          failed: sourcesHealth.sources
+            .filter((s) => s.lastRun?.status === "error")
+            .map((s) => s.name),
+          noCoverage: sourcesHealth.sources
+            .filter((s) => s.lastRun?.status === "unsupported_here")
+            .map((s) => s.name),
+          returning: sourcesHealth.sources.filter((s) => (s.lastRun?.count ?? 0) > 0).length,
+        }}
         jobs={jobs}
         activeRole={profile?.targetRole ?? null}
         selectedCountry={worldwide ? "any" : (getCountry(country)?.code ?? null)}

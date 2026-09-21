@@ -489,7 +489,7 @@ export function createJobScorer({
 
     const reasonParts = [
       role.onRole && targetRole ? `role fit with ${targetRole}` : null,
-      locationPref ? `location: ${locationPref}` : null,
+      locationReason(job, locationPref),
       keywordMatch.matchedKeywords.length > 0
         ? `keyword overlap: ${keywordMatch.matchedKeywords.slice(0, 4).join(", ")}`
         : null,
@@ -526,4 +526,24 @@ export function scoreJobForUser(input: {
   locationOverride?: string | null;
 }): JobMatch {
   return createJobScorer(input)(input.job);
+}
+
+/**
+ * What the card may say about WHERE this job is.
+ *
+ * It used to print the location the person SEARCHED, so a posting that says only "Remote" was
+ * explained as "location: Dublin, Ireland" — Fadi asserting something the posting never said
+ * (reported 20 Sep). Now it quotes the posting, and says plainly when the posting is silent.
+ */
+export function locationReason(
+  job: { location?: string | null; remoteMode?: string | null },
+  locationPref: string | null
+): string | null {
+  const stated = job.location?.trim();
+  if (stated) {
+    const known = /^(remote|hybrid|onsite|on-site|anywhere|flexible)$/i.test(stated);
+    return known ? `${stated.toLowerCase()} — no place stated` : `location: ${stated}`;
+  }
+  if (job.remoteMode?.toLowerCase().includes("remote")) return "remote — no place stated";
+  return locationPref ? `your search area: ${locationPref}` : null;
 }

@@ -11,7 +11,15 @@ import type { JobSourceHealth } from "@/lib/data-sources/service";
 // sources" cards. The search bar above is the primary action and the board below is the
 // content — this is deliberately quiet, with both halves behind progressive disclosure.
 
-type Health = "returning" | "live-empty" | "error" | "idle" | "needs-key" | "off-optin";
+type Health =
+  | "returning"
+  | "live-empty"
+  | "error"
+  | "idle"
+  | "needs-key"
+  | "off-optin"
+  /** The source does not serve the country being searched — not a failure, not an empty market. */
+  | "no-coverage";
 
 // These sources are SCRAPERS gated by a feature flag (FADI_SCRAPER_ENABLED / SCRAPERS_ENABLED)
 // — they take NO API key. Server-side scraping is largely blocked anyway; the browser
@@ -20,6 +28,7 @@ const SCRAPER_IDS = new Set(["fadi-scraper", "linkedin-guest", "indeed-public"])
 
 function healthOf(s: JobSourceHealth): Health {
   if (!s.configured) return SCRAPER_IDS.has(s.id) ? "off-optin" : "needs-key";
+  if (s.lastRun?.status === "unsupported_here") return "no-coverage";
   if (s.lastRun?.status === "error") return "error";
   if (!s.lastRun) return "idle"; // configured, but no pull has run this session yet
   if (s.lastRun.count > 0) return "returning";
@@ -33,6 +42,7 @@ const DOT: Record<Health, string> = {
   idle: "bg-sky-400",
   "needs-key": "bg-muted-foreground/40",
   "off-optin": "bg-muted-foreground/40",
+  "no-coverage": "bg-muted-foreground/40",
 };
 
 const LABEL: Record<Health, string> = {
@@ -42,6 +52,7 @@ const LABEL: Record<Health, string> = {
   idle: "ready — not searched yet",
   "needs-key": "needs an API key",
   "off-optin": "off · no key needed",
+  "no-coverage": "doesn't cover this country",
 };
 
 export function JobControlBar({

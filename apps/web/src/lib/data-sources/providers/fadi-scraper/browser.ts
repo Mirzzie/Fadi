@@ -5,6 +5,22 @@ import { getCountry } from "@/lib/jobs/locations";
 import type { SignalQuery } from "../../types";
 import type { ScrapedRecord, SiteRecipe } from "./recipes";
 
+/**
+ * How to start a browser here.
+ *
+ * Playwright's own Chromium download is optional and was missing on the owner's laptop
+ * ("Executable doesn't exist at ~/.cache/ms-playwright/chromium"), which silently disabled every
+ * scraper recipe. A Chromium-family browser already installed on the machine works just as well:
+ * set FADI_BROWSER_PATH (e.g. /usr/bin/brave, /usr/bin/chromium, Chrome) and nothing is
+ * downloaded. Without either, the launch throws and the source reports a failure — never an
+ * empty market.
+ */
+function launchOptions(): { headless: true; executablePath?: string } {
+  const executablePath = process.env.FADI_BROWSER_PATH?.trim();
+  return executablePath ? { headless: true, executablePath } : { headless: true };
+}
+
+
 // The browser engine: drives a real Chromium (Playwright) the way a human would — realistic
 // UA/viewport, jittered pauses, scrolling, pagination — then reads each listing. Loaded ONLY
 // when the scraper is enabled (dynamic import in the provider), so Playwright never bundles
@@ -35,7 +51,7 @@ export async function scrapeRecipe(
   const selectors = recipe.selectors;
   if (!selectors) return []; // selector-mode only; AI mode uses scrapePageText instead.
 
-  const browser = await pw.chromium.launch({ headless: true });
+  const browser = await pw.chromium.launch(launchOptions());
   try {
     const context = await browser.newContext({
       userAgent: HUMAN_UA,
@@ -97,7 +113,7 @@ export async function scrapeRendered(
     return [];
   }
 
-  const browser = await pw.chromium.launch({ headless: true });
+  const browser = await pw.chromium.launch(launchOptions());
   try {
     const context = await browser.newContext({
       userAgent: HUMAN_UA,
@@ -210,7 +226,7 @@ export async function scrapeJobPages(urls: string[], concurrency = 4): Promise<S
   } catch {
     return [];
   }
-  const browser = await pw.chromium.launch({ headless: true });
+  const browser = await pw.chromium.launch(launchOptions());
   try {
     const context = await browser.newContext({
       userAgent: HUMAN_UA,
@@ -296,7 +312,7 @@ export async function scrapePageText(recipe: SiteRecipe, query: SignalQuery): Pr
     return "";
   }
 
-  const browser = await pw.chromium.launch({ headless: true });
+  const browser = await pw.chromium.launch(launchOptions());
   try {
     const context = await browser.newContext({
       userAgent: HUMAN_UA,

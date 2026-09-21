@@ -216,6 +216,29 @@ export function createJobsRepository(db: Database) {
     },
 
     /** Every provider's occurrence of a vacancy — provenance for the workspace. */
+    /**
+     * Which boards listed each of these vacancies, for the cards about to be shown.
+     *
+     * A vacancy can be grouped from several providers; the board showed one of them and said
+     * nothing about the rest, so "is this the same job I already saw on Reed?" had no answer.
+     * One query for the whole page rather than one per card.
+     */
+    async sourcesForJobs(jobIds: string[]): Promise<Map<string, string[]>> {
+      if (jobIds.length === 0) return new Map();
+      const rows = await db
+        .selectDistinct({ jobId: jobOccurrences.jobId, source: jobOccurrences.source })
+        .from(jobOccurrences)
+        .where(inArray(jobOccurrences.jobId, jobIds));
+      const bySource = new Map<string, string[]>();
+      for (const row of rows) {
+        const list = bySource.get(row.jobId) ?? [];
+        list.push(row.source);
+        bySource.set(row.jobId, list);
+      }
+      for (const [jobId, list] of bySource) bySource.set(jobId, [...new Set(list)].sort());
+      return bySource;
+    },
+
     async listOccurrencesForJob(jobId: string): Promise<JobOccurrence[]> {
       return db
         .select()

@@ -106,8 +106,20 @@ export async function searchJobUrls(keywords: string, location: string, limit = 
       const u = `https://api.search.brave.com/res/v1/web/search?q=${enc}&count=20`;
       return keepCrawlable(parseBrave(await getJson(u, { "X-Subscription-Token": serverEnv.BRAVE_SEARCH_API_KEY }))).slice(0, limit);
     }
-  } catch {
-    return [];
+  } catch (error) {
+    // A search backend that cannot be reached is NOT "no results". SEARXNG_URL pointed at a
+    // container that was not running, so every crawl returned zero in milliseconds and the UI
+    // reported the crawler as live with nothing found (measured 20 Sep 2026). The caller turns
+    // this into a source error, which the board shows as a failure the person can retry.
+    throw new SearchBackendUnavailable(error instanceof Error ? error.message : "search failed");
   }
   return [];
+}
+
+/** The configured search backend could not be reached. Distinct from "it found nothing". */
+export class SearchBackendUnavailable extends Error {
+  constructor(detail: string) {
+    super(`The web-search backend is not reachable (${detail}).`);
+    this.name = "SearchBackendUnavailable";
+  }
 }

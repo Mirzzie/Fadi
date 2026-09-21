@@ -2,8 +2,9 @@
  * Adzuna — job aggregator across ~19 countries, with salary data and
  * country/city filtering. Free developer key (app_id + app_key), attribution
  * required. This is how we get LinkedIn/Indeed/Glassdoor-grade breadth legally:
- * Adzuna already crawls + dedupes those sources. NOTE: Adzuna does NOT cover
- * Ireland — IE falls back to the keyless EU/remote sources + JSearch.
+ * Adzuna already crawls + dedupes those sources. It does NOT cover every country —
+ * `covers()` below declares the real list, so an unsupported country is reported as
+ * "no coverage here" instead of an empty result that looks like an empty market.
  * https://developer.adzuna.com/
  */
 
@@ -39,6 +40,15 @@ function formatSalary(r: AdzunaResult): string | undefined {
   return `${fmt(one)}${predicted}`;
 }
 
+/**
+ * The countries Adzuna actually serves. Anything else answers 404 UNSUPPORTED_COUNTRY —
+ * verified live on 20 Sep 2026 for "ie", which is why an Irish search saw Adzuna report zero.
+ */
+const ADZUNA_COUNTRIES = new Set([
+  "at", "au", "be", "br", "ca", "ch", "de", "es", "fr", "gb", "in", "it", "mx", "nl", "nz", "pl",
+  "sg", "us", "za",
+]);
+
 export class AdzunaSource implements JobSource {
   readonly id = "adzuna";
   readonly name = "Adzuna (aggregator + salary)";
@@ -51,6 +61,11 @@ export class AdzunaSource implements JobSource {
     private readonly appKey?: string,
   ) {
     this.isConfigured = Boolean(appId && appKey);
+  }
+
+  covers(query: SignalQuery): "yes" | "no" | "unknown" {
+    if (!query.country) return "unknown";
+    return ADZUNA_COUNTRIES.has(query.country.toLowerCase()) ? "yes" : "no";
   }
 
   async fetchJobs(query: SignalQuery): Promise<JobPosting[]> {
