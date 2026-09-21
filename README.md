@@ -125,6 +125,11 @@ GROQ_API_KEY=your-key-here
 npm run dev
 ```
 
+`npm run dev` starts PostgreSQL **and SearXNG** (the crawler's search backend) beside the app,
+so the job search can reach the open web. Without SearXNG the crawler has nothing to search
+with — it says so rather than reporting an empty market, but you get fewer jobs. Start or stop
+them on their own with `npm run services:up` / `npm run services:down`.
+
 Open **http://localhost:3000**, then **sign up** (email/password) and follow onboarding —
 that first run creates your user and walks the full Career Intelligence flow as a brand-new
 user would experience it.
@@ -142,6 +147,7 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
 # 3. database (Docker running):
 npm run db:up          # PostgreSQL 17, host port 5433
+npm run services:up    # ...plus SearXNG on 8888, the web crawler's search backend
 npm run db:migrate     # committed Drizzle migrations
 npm run db:seed:jobs   # seed job data
 ```
@@ -180,7 +186,8 @@ everything needed to see the product's core surface. Every key lives in
 
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | Start the app (Next.js dev server) |
+| `npm run dev` | Start the app, with Postgres and the crawler's search backend |
+| `npm run services:up` / `npm run services:down` | Start / stop Postgres **and** SearXNG on their own |
 | `npm run db:up` / `npm run db:down` | Start / stop the local Postgres container |
 | `npm run db:migrate` | Apply migrations |
 | `npm run db:reset` | **Destroy** the DB volume, recreate, and re-migrate (fresh slate) |
