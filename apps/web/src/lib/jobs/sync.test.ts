@@ -120,3 +120,73 @@ describe("job discovery commit outcome", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
   });
 });
+
+/**
+ * TWO TABS ARE THE NORMAL CASE, NOT THE RARE ONE.
+ *
+ * The Jobs page starts a crawl on load and auto-refreshes while one is running, so a person with
+ * the board open twice — or one who reloads impatiently — is the ordinary user. Each extra crawl
+ * costs real requests to the boards and the browser legs, and two runs writing the same postings
+ * is how a board fills with duplicates.
+ */
+describe("a crawl already in flight is not started again", () => {
+  const profile = { targetRole: "Support Engineer", skills: [], skillGaps: [] };
+
+  it("two tabs loading the board at the same moment crawl once", async () => {
+    let finish: ((rows: unknown[]) => void) | undefined;
+    mocks.discover.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    const { startBackgroundSync } = await import("./sync");
+
+    await Promise.all([
+      startBackgroundSync(profile, { country: "IE", city: "Dublin" }),
+      startBackgroundSync(profile, { country: "IE", city: "Dublin" }),
+      startBackgroundSync(profile, { country: "IE", city: "Dublin" }),
+    ]);
+
+    expect(mocks.discover).toHaveBeenCalledTimes(1);
+    finish?.([]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  it("a reload while the first crawl is still running does not start a second", async () => {
+    let finish: ((rows: unknown[]) => void) | undefined;
+    mocks.discover.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    const { startBackgroundSync } = await import("./sync");
+
+    await startBackgroundSync(profile);
+    await startBackgroundSync(profile); // the impatient reload
+    expect(mocks.discover).toHaveBeenCalledTimes(1);
+
+    finish?.([]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  it("a different city is a different search, and does run", async () => {
+    let finish: ((rows: unknown[]) => void) | undefined;
+    mocks.discover.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    const { startBackgroundSync } = await import("./sync");
+
+    await startBackgroundSync(profile, { country: "IE", city: "Dublin" });
+    await startBackgroundSync(profile, { country: "IE", city: "Cork" });
+
+    expect(mocks.discover).toHaveBeenCalledTimes(2);
+    finish?.([]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  it("a crawl whose process died is retryable — the lease is gone, so the next tab may start one", async () => {
+    let finish: ((rows: unknown[]) => void) | undefined;
+    mocks.discover.mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+    const { startBackgroundSync } = await import("./sync");
+
+    await startBackgroundSync(profile);
+    const lockKey = [...mocks.values.keys()].find((key) => key.endsWith(":lock"));
+    mocks.values.delete(lockKey!); // the lease expired without a completed result
+
+    await startBackgroundSync(profile);
+    expect(mocks.discover).toHaveBeenCalledTimes(2);
+
+    finish?.([]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+});

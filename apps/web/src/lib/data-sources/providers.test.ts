@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { ApifyLinkedInSource, normalizeApifyJobs } from "./providers/apify-linkedin";
 import { BlsSource, snapshotToSignal } from "./providers/bls";
@@ -127,5 +127,62 @@ describe("a source says when it does not cover a country", () => {
   it("says unknown when no country was asked for", async () => {
     const { AdzunaSource } = await import("./providers/adzuna");
     expect(new AdzunaSource("id", "key").covers({ keywords: [], limit: 10 })).toBe("unknown");
+  });
+});
+
+/**
+ * A DEEP RUN MUST ACTUALLY ASK FOR DEPTH.
+ *
+ * The background crawl asks discoverJobs for 200 postings, and each board caps that at whatever
+ * one page of its API will give — Adzuna 50, Reed 100, Jooble 50. Nothing in the code stops
+ * someone "tidying" that limit back to the default 20, and the board would simply get thinner
+ * with no test failing and no error anywhere. These pin the page size each board is asked for.
+ */
+describe("the boards are asked for a full page, not a default handful", () => {
+  const asked = (url: string, param: string) => Number(new URL(url).searchParams.get(param));
+
+  it("Adzuna asks for its maximum page, and clamps a larger request", async () => {
+    const { AdzunaSource } = await import("./providers/adzuna");
+    const calls: string[] = [];
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      calls.push(String(input));
+      return new Response(JSON.stringify({ results: [] }), { status: 200 });
+    });
+    try {
+      await new AdzunaSource("app-id", "app-key").fetchJobs({
+        keywords: ["it support"],
+        country: "ie",
+        limit: 200,
+      } as never);
+      await new AdzunaSource("app-id", "app-key").fetchJobs({
+        keywords: ["it support"],
+        country: "gb",
+        limit: 200,
+      } as never);
+    } finally {
+      fetchSpy.mockRestore();
+    }
+    expect(calls).toHaveLength(2);
+    expect(calls.map((url) => asked(url, "results_per_page"))).toEqual([50, 50]);
+  });
+
+  it("Reed asks for its maximum page", async () => {
+    const { ReedSource } = await import("./providers/reed");
+    const calls: string[] = [];
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      calls.push(String(input));
+      return new Response(JSON.stringify({ results: [] }), { status: 200 });
+    });
+    try {
+      await new ReedSource("key").fetchJobs({
+        keywords: ["it support"],
+        country: "gb",
+        limit: 200,
+      } as never);
+    } finally {
+      fetchSpy.mockRestore();
+    }
+    expect(calls).toHaveLength(1);
+    expect(asked(calls[0], "resultsToTake")).toBe(100);
   });
 });
