@@ -1000,6 +1000,12 @@ export const evidenceItems = pgTable(
      * never something Fadi infers from a word that happens to appear in a title.
      */
     attribution: text("attribution").notNull().default("personal"),
+    /** Pending identity candidates are retained, but excluded from normal evidence reads. */
+    reviewStatus: text("review_status").notNull().default("accepted"),
+    reviewTargetId: uuid("review_target_id"),
+    reviewReasons: jsonb("review_reasons").$type<string[]>().notNull().default([]),
+    /** Persisted distinct-fact decisions; no more component-only dismissal. */
+    distinctFrom: jsonb("distinct_from").$type<string[]>().notNull().default([]),
     isCanonical: boolean("is_canonical").notNull().default(true),
     /** Which audience/track this wording was tailored for; null = the plain record. */
     renderingFor: text("rendering_for"),
@@ -1353,6 +1359,14 @@ export const projectRuns = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     /** The learning commitment this came from, if any. */
     commitmentId: uuid("commitment_id"),
+    /**
+     * The career direction this project belongs to. Projects were shown under every direction,
+     * so switching from SOC Analyst to IT System Administrator still listed SOC labs. Null only
+     * for someone with no direction at all.
+     */
+    careerProfileId: uuid("career_profile_id").references(() => careerProfiles.id, {
+      onDelete: "set null",
+    }),
     title: text("title").notNull(),
     detail: text("detail"),
     /** Which machine it was planned against — steps differ by host. */
@@ -1378,9 +1392,23 @@ export const projectRuns = pgTable(
     /** planned | running | done | abandoned */
     status: text("status").notNull().default("planned"),
     completedAt: timestamp("completed_at", { withTimezone: true }),
+    /**
+     * The evidence this finished project was saved as — its source key.
+     *
+     * Saving is serialized on this row: a second save (a retry, a double click, a model tool
+     * calling it again) finds the id already here and returns that item instead of admitting
+     * the same project twice. Null means finished without evidence, or not finished.
+     */
+    evidenceItemId: uuid("evidence_item_id").references(() => evidenceItems.id, {
+      onDelete: "set null",
+    }),
     ...timestamps,
   },
-  (table) => [index("project_runs_user_idx").on(table.userId, table.status)]
+  (table) => [
+    index("project_runs_user_idx").on(table.userId, table.status),
+    index("project_runs_track_idx").on(table.userId, table.careerProfileId),
+    uniqueIndex("project_runs_evidence_item_idx").on(table.evidenceItemId),
+  ]
 );
 
 export type ProjectRun = typeof projectRuns.$inferSelect;
@@ -1629,3 +1657,101 @@ export type PortfolioItem = typeof portfolioItems.$inferSelect;
 export type NewPortfolioItem = typeof portfolioItems.$inferInsert;
 export type GithubConnection = typeof githubConnections.$inferSelect;
 export type NewGithubConnection = typeof githubConnections.$inferInsert;
+
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * MY CAREER: the facts, and where they came from.
+ *
+ * Fadi held career history in several overlapping places — a résumé text per direction, a shared
+ * LinkedIn paste, an evidence pool — and each import overwrote what was there. Two consequences
+ * the owner saw: an employer they had never worked for survived in documents long after it was
+ * removed from the portfolio, and an externally edited CV could not be compared with what Fadi
+ * already held, because the previous text no longer existed.
+ *
+ * These two tables are the foundation of the researched model (docs/reviews,
+ * 2026-09-21 career-data-model proposal): keep what was imported, and keep every approved state
+ * of a fact. They record history; they do not by themselves make a claim true.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/**
+ * An imported source, exactly as it arrived, kept forever.
+ *
+ * Every upload or paste becomes a new version rather than replacing the last, so a later import
+ * can be compared against what the person previously said. Identical text reuses its version:
+ * re-saving the same CV must not manufacture a new one.
+ */
+export const careerSourceVersions = pgTable(
+  "career_source_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** resume | linkedin | project | lab | external — where this text came from. */
+    sourceKind: text("source_kind").notNull(),
+    /** Which stream within that kind (a track id, a profile id, "self"), so versions line up. */
+    sourceKey: text("source_key").notNull(),
+    version: integer("version").notNull(),
+    content: text("content").notNull(),
+    /** sha256 of the content, so an identical re-import reuses the version it already has. */
+    contentHash: text("content_hash").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("career_source_version_key").on(
+      table.userId,
+      table.sourceKind,
+      table.sourceKey,
+      table.version
+    ),
+    index("career_source_hash_idx").on(table.userId, table.contentHash),
+  ]
+);
+
+export type CareerSourceVersion = typeof careerSourceVersions.$inferSelect;
+
+/** One approved state of one fact, kept so a correction never erases what it replaced. */
+export type CareerRecordSnapshot = {
+  evidenceItemId: string;
+  kind: string;
+  title: string;
+  organization: string | null;
+  period: string | null;
+  detail: string;
+  metrics: string | null;
+  tags: string[];
+  origin: string;
+};
+
+/**
+ * The history of one career fact.
+ *
+ * Identity stays `factId` (the evidence pool's existing fact identity). Each time the facts
+ * change, the new state is appended here. Correcting an employer or a date is then a change with
+ * a before and an after, instead of an overwrite nobody can see.
+ */
+export const careerRecordVersions = pgTable(
+  "career_record_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    factId: uuid("fact_id").notNull(),
+    version: integer("version").notNull(),
+    /** active | retracted — a withdrawn claim stays visible as withdrawn. */
+    status: text("status").notNull().default("active"),
+    snapshot: jsonb("snapshot").$type<CareerRecordSnapshot>().notNull(),
+    /** The source version this state came from, when it came from an import. */
+    sourceVersionId: uuid("source_version_id").references(() => careerSourceVersions.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("career_record_version_key").on(table.userId, table.factId, table.version),
+    index("career_record_fact_idx").on(table.userId, table.factId),
+  ]
+);
+
+export type CareerRecordVersion = typeof careerRecordVersions.$inferSelect;

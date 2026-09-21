@@ -1,0 +1,3 @@
+ALTER TABLE "project_runs" ADD COLUMN "evidence_item_id" uuid;--> statement-breakpoint
+ALTER TABLE "project_runs" ADD CONSTRAINT "project_runs_evidence_item_id_evidence_items_id_fk" FOREIGN KEY ("evidence_item_id") REFERENCES "public"."evidence_items"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE UNIQUE INDEX "project_runs_evidence_item_idx" ON "project_runs" USING btree ("evidence_item_id");

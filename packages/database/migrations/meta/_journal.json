@@ -337,6 +337,34 @@
       "when": 1789158498280,
       "tag": "0047_capability_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1789255578645,
+      "tag": "0048_project_evidence",
+      "breakpoints": true
+    },
+    {
+      "idx": 49,
+      "version": "7",
+      "when": 1789329813796,
+      "tag": "0049_project_track",
+      "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1789991992466,
+      "tag": "0050_evidence_identity_review",
+      "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1789995831071,
+      "tag": "0051_career_core",
+      "breakpoints": true
     }
   ]
 }
