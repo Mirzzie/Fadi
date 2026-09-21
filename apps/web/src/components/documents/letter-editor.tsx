@@ -46,6 +46,7 @@ export function LetterEditor({
   initialContent,
   initialVersion,
   hasJob = false,
+  freshnessAsk = null,
 }: {
   id: string;
   kind: ProseKind;
@@ -54,6 +55,8 @@ export function LetterEditor({
   initialVersion: number;
   /** Whether this letter belongs to a posting — Fadi tailors to it when asked to change things. */
   hasJob?: boolean;
+  /** When the person's record has moved on, the one-click way to act on it. */
+  freshnessAsk?: string | null;
 }) {
   const fields = LETTER_FIELDS[kind];
   const [title, setTitle] = useState(initialTitle);
@@ -182,6 +185,7 @@ export function LetterEditor({
           setData(parseLetter(content, kind));
         }}
         quick={[
+          ...(freshnessAsk ? [freshnessAsk] : []),
           hasJob ? "Tailor it to this posting" : "Make it specific to the role",
           "Shorter — cut it by a third",
           "Open with something concrete, not a stock line",

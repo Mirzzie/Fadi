@@ -5,12 +5,14 @@ import { AppShell } from "@/components/layout/app-shell";
 import { DocumentEditor } from "@/components/documents/document-editor";
 import { LetterEditor } from "@/components/documents/letter-editor";
 import { ResumeEditor } from "@/components/documents/resume-editor";
+import { FreshnessNote } from "@/components/documents/freshness-note";
 import { TailoringPanel } from "@/components/documents/tailoring-panel";
 import { TruthReport } from "@/components/documents/truth-report";
 import { isProseKind } from "@/lib/documents/letter";
 import { checkDocumentTruth } from "@/lib/documents/corpus";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
+import { documentFreshness } from "@/lib/documents/freshness.server";
 import { resolveLocaleNorm } from "@/lib/documents/locale-norms";
 import {
   createCareerProfilesRepository,
@@ -52,6 +54,12 @@ export default async function DocumentEditorPage({ params }: { params: Promise<{
   const standard = resolveLocaleNorm(job?.location ?? careerProfile?.location ?? null);
   const truthFindings = await checkDocumentTruth(user.id, doc.content, jobDescription);
 
+  // Has the person's record moved on since this was written? Compared against the material
+  // generation captured, so the answer names what changed instead of nagging — see
+  // lib/documents/freshness.ts.
+  const freshness = await documentFreshness(user.id, doc);
+  const freshnessAsk = freshness.state === "stale" ? freshness.ask : null;
+
   return (
     <AppShell>
       {/* ONE WIDTH FOR THE PAGE. The panels were 1180px and the editor 1152px, so their edges
@@ -75,6 +83,7 @@ export default async function DocumentEditorPage({ params }: { params: Promise<{
             notes: standard.notes,
           }}
         />
+        <FreshnessNote freshness={freshness} />
         <TruthReport findings={truthFindings} />
 
         {doc.kind === "resume" ? (
@@ -85,6 +94,7 @@ export default async function DocumentEditorPage({ params }: { params: Promise<{
             initialTemplate={doc.template}
             initialVersion={doc.version}
             hasJob={Boolean(job)}
+            freshnessAsk={freshnessAsk}
             experienceLevel={careerProfile?.experienceLevel ?? null}
             customTemplates={savedTemplates.map((t) => ({
               id: t.id,
@@ -96,6 +106,7 @@ export default async function DocumentEditorPage({ params }: { params: Promise<{
           <LetterEditor
             id={doc.id}
             hasJob={Boolean(job)}
+            freshnessAsk={freshnessAsk}
             kind={doc.kind}
             initialTitle={doc.title}
             initialContent={doc.content}

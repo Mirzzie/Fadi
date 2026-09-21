@@ -86,6 +86,7 @@ export function ResumeEditor({
   experienceLevel,
   customTemplates = [],
   hasJob = false,
+  freshnessAsk = null,
 }: {
   id: string;
   initialTitle: string;
@@ -96,6 +97,8 @@ export function ResumeEditor({
   customTemplates?: { id: string; name: string; config: Record<string, unknown> }[];
   /** Whether this résumé belongs to a posting — Fadi tailors to it when asked to change things. */
   hasJob?: boolean;
+  /** When the person's record has moved on, the one-click way to act on it. */
+  freshnessAsk?: string | null;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
@@ -540,6 +543,9 @@ export function ResumeEditor({
           setData(parseResume(content));
         }}
         quick={[
+          // What changed in their record leads, because it is the only one of these that is
+          // about THIS document being out of date rather than a general improvement.
+          ...(freshnessAsk ? [freshnessAsk] : []),
           hasJob ? "Tailor it to this posting" : "Sharpen it for my target role",
           "Stronger bullets — action, thing, outcome",
           "Cut it to one page",
