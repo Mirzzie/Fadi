@@ -1,6 +1,7 @@
 export * from "./agent-messages.repository";
 export * from "./agent-runs.repository";
 export * from "./applications.repository";
+export * from "./career-core.repository";
 export * from "./career-profiles.repository";
 export * from "./career-reports.repository";
 export * from "./documents.repository";

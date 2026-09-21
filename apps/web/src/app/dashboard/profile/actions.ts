@@ -12,6 +12,7 @@ import { revalidatePath } from "next/cache";
 import { signOutAction } from "@/app/auth/actions";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
+import { preserveCareerSource } from "@/lib/career/sources";
 import { invalidateJobSync } from "@/lib/jobs/sync";
 import { detectDocType, extractDocumentText } from "@/lib/documents/extract-text";
 import { logger } from "@/lib/observability/logger";
@@ -108,6 +109,14 @@ export async function updateProfileAction(input: UpdateProfileInput): Promise<Re
     const linkedInUrl = input.linkedInUrl.trim();
     const linkedInText = input.linkedInText.trim();
     if (linkedInUrl || linkedInText) {
+      // Keep the pasted history before it replaces what is stored — see lib/career/sources.ts.
+      if (linkedInText) {
+        await preserveCareerSource(user.id, {
+          sourceKind: "linkedin",
+          sourceKey: "self",
+          content: linkedInText,
+        });
+      }
       await createLinkedInProfilesRepository(db).upsertLatestForUser(user.id, {
         profileUrl: linkedInUrl || null,
         rawText: linkedInText || null,
@@ -116,6 +125,11 @@ export async function updateProfileAction(input: UpdateProfileInput): Promise<Re
 
     const resumeText = input.resumeText.trim();
     if (resumeText) {
+      await preserveCareerSource(user.id, {
+        sourceKind: "resume",
+        sourceKey: activeTrack?.id ?? "no-direction",
+        content: resumeText,
+      });
       await createResumesRepository(db).upsertLatestForTrack(
         user.id,
         activeTrack?.id ?? null,
