@@ -1,7 +1,7 @@
-import { and, count, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, ne, or, sql } from "drizzle-orm";
 
 import type { DbOrTx } from "../client";
-import { evidenceItems, type EvidenceItem, type NewEvidenceItem } from "../schema";
+import { evidenceItems, portfolioItems, type EvidenceItem, type NewEvidenceItem } from "../schema";
 
 import { recordCanonicalState, recordFactState } from "./fact-history";
 
@@ -349,6 +349,20 @@ export function createEvidenceRepository(db: DbOrTx) {
 
     async delete(userId: string, id: string): Promise<void> {
       await db.transaction(async (tx) => {
+        // Stamp the live portfolio items this record was standing on, BEFORE the row goes: the
+        // foreign key nulls their link on delete, and afterwards a published claim the person
+        // deliberately removed is indistinguishable from one they wrote by hand.
+        await tx
+          .update(portfolioItems)
+          .set({ unbackedSince: new Date() })
+          .where(
+            and(
+              eq(portfolioItems.userId, userId),
+              eq(portfolioItems.evidenceItemId, id),
+              eq(portfolioItems.isPublished, true),
+              isNull(portfolioItems.unbackedSince)
+            )
+          );
         const [removed] = await tx
           .delete(evidenceItems)
           .where(and(eq(evidenceItems.id, id), eq(evidenceItems.userId, userId)))

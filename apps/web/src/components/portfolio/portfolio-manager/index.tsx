@@ -10,6 +10,7 @@ import {
   ExternalLink,
   Eye,
   EyeOff,
+  History,
   Loader2,
   Plus,
   Rocket,
@@ -21,6 +22,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { driftNote } from "@/lib/portfolio/freshness";
 import { GithubPublishPanel } from "@/components/portfolio/github-publish";
 import { HistoryCapture } from "@/components/evidence/history-capture";
 import {
@@ -64,6 +66,7 @@ export function PortfolioManager({
   isPublished,
   items,
   pendingProof,
+  drift = { withdrawn: [], reworded: [] },
 }: {
   site: PortfolioSiteView;
   handle: string;
@@ -72,6 +75,8 @@ export function PortfolioManager({
   /** Count of Evidence proof not yet on the portfolio — drives the proactive
    *  "pull it in" nudge (detect → propose → approve; never auto-mutate). */
   pendingProof: number;
+  /** Live items the record has moved past: withdrawn evidence, or wording since corrected. */
+  drift?: { withdrawn: { id: string; title: string }[]; reworded: { id: string; title: string }[] };
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -330,6 +335,24 @@ export function PortfolioManager({
           </Button>
         </div>
       </header>
+
+      {/* PUBLISHED AND OUT OF DATE is worse than missing: a stale document is only the owner's
+          problem, while a stale public page is a claim a stranger reads. Named, never acted on
+          automatically — see lib/portfolio/freshness.ts. */}
+      {drift.withdrawn.length + drift.reworded.length > 0 ? (
+        <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4">
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-amber-500/10 text-amber-500">
+            <History className="size-4" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 space-y-1">
+            <p className="text-sm font-medium">{driftNote(drift)}</p>
+            <p className="text-xs text-muted-foreground">
+              Nothing was changed on your site. Open the item to update it, or hide it while you
+              decide.
+            </p>
+          </div>
+        </div>
+      ) : null}
 
       {pendingProof > 0 ? (
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/25 bg-primary/5 p-4">

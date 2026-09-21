@@ -1534,6 +1534,16 @@ export const portfolioItems = pgTable(
     sortOrder: integer("sort_order").notNull().default(0),
     isPublished: boolean("is_published").notNull().default(true),
     /**
+     * WHEN THE RECORD BEHIND A LIVE ITEM WAS REMOVED.
+     *
+     * Deleting evidence sets `evidence_item_id` to NULL, which makes a published item look like
+     * an ordinary portfolio-only entry — so a claim the person deliberately removed from their
+     * record carried on greeting strangers, indistinguishable from one they wrote by hand.
+     * Stamped at the moment of the deletion, because afterwards there is nothing left to notice.
+     * Null means the item still stands on something.
+     */
+    unbackedSince: timestamp("unbacked_since", { withTimezone: true }),
+    /**
      * THE PUBLISH GATE.
      *
      * `isPublished` is the owner's intent for a section of their site. This is

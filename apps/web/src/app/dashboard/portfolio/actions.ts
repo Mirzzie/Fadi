@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getUserDocGenerate } from "@/lib/ai/user-generate";
 import { getDatabase } from "@/lib/database/client";
+import { portfolioFreshness } from "@/lib/portfolio/freshness";
 import { checkPortfolioIntegrityAI, type IntegrityAiResult } from "@/lib/portfolio/integrity";
 import type { EvidenceKind } from "@/lib/evidence/pool";
 import type { FeedbackNote, PortfolioStats, TimelineEntry } from "@/lib/portfolio/analytics";
@@ -94,6 +95,8 @@ export async function loadPortfolio(): Promise<
     /** Proof from Evidence not on the portfolio yet — so the CMS can proactively ask
      *  the user to pull it in (detect → propose → approve; never auto-mutate). */
     pendingProof: number;
+    /** The other direction: live items the record has moved PAST — see lib/portfolio/freshness.ts. */
+    drift: { withdrawn: { id: string; title: string }[]; reworded: { id: string; title: string }[] };
   }>
 > {
   const user = await getCurrentAuthUser();
@@ -117,6 +120,20 @@ export async function loadPortfolio(): Promise<
       !items.some((x) => isSameEntry(r, x)),
   ).length;
 
+  // What is LIVE but no longer matches the record. Read-only: a public page is the owner's, and
+  // a projection that has drifted is a decision to put to them, never a silent unpublish.
+  const drift = portfolioFreshness(
+    items.map((i) => ({
+      id: i.id,
+      title: i.title,
+      evidenceItemId: i.evidenceItemId,
+      isPublished: i.isPublished,
+      updatedAt: i.updatedAt,
+      unbackedSince: i.unbackedSince,
+    })),
+    evidence.map((e) => ({ id: e.id, title: e.title, updatedAt: e.updatedAt }))
+  );
+
   return {
     ok: true,
     site: toSiteView(site),
@@ -124,6 +141,7 @@ export async function loadPortfolio(): Promise<
     isPublished: site.isPublished,
     items: items.map(toItemView),
     pendingProof,
+    drift,
   };
 }
 
