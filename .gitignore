@@ -40,3 +40,6 @@ claude-backup.tar.gz
 # Playwright
 test-results/
 playwright-report/
+
+# Local agent settings — machine-specific, never shared
+.claude/settings.local.json
