@@ -5,7 +5,6 @@ import { sql } from "drizzle-orm";
 import { createEvidenceRepository, type Database, type EvidenceItem } from "@careeros/database";
 import { findSameThings, identicalRecord, type IdentityInput } from "@careeros/portfolio";
 import { getDatabase } from "@/lib/database/client";
-import { logger } from "@/lib/observability/logger";
 
 // Legacy rendering markers remain readable; new uncertainty lives in reviewStatus.
 export const UNCONFIRMED_LINK = "unconfirmed-auto-link";
@@ -200,32 +199,12 @@ export async function admitEvidenceBatch(
 /**
  * Append this fact's current state to My Career.
  *
- * Best-effort by design: history is a record ABOUT the fact, and failing to write it must never
- * stop the person saving their own career. A miss is logged and the next change re-records the
- * state, because the snapshot is the whole state rather than a diff.
+ * In the SAME transaction as the fact itself, and NOT best-effort. Codex's review was right that
+ * catching the failure cannot support the claim that a fact never loses its history — a caught
+ * error is exactly a lost version. If the history of a change cannot be written, the change does
+ * not happen and the person is told, rather than saving a record whose past silently has a hole.
  */
 async function recordAdmittedVersion(db: Database, userId: string, row: EvidenceItem): Promise<void> {
-  try {
-    const { createCareerCoreRepository } = await import("@careeros/database");
-    await createCareerCoreRepository(db).recordFactVersion(userId, {
-      factId: row.factId ?? row.id,
-      status: row.reviewStatus === "pending" ? "retracted" : "active",
-      snapshot: {
-        evidenceItemId: row.id,
-        kind: row.kind,
-        title: row.title,
-        organization: row.organization,
-        period: row.period,
-        detail: row.detail,
-        metrics: row.metrics,
-        tags: row.tags ?? [],
-        origin: row.origin,
-      },
-    });
-  } catch (error) {
-    logger.warn("career.record_version_failed", {
-      userId,
-      error: error instanceof Error ? error.message : "unknown",
-    });
-  }
+  const { recordFactState } = await import("@careeros/database");
+  await recordFactState(db, userId, row);
 }

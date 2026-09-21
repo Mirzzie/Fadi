@@ -3,6 +3,8 @@ import { and, count, desc, eq, inArray, ne, or, sql } from "drizzle-orm";
 import type { DbOrTx } from "../client";
 import { evidenceItems, type EvidenceItem, type NewEvidenceItem } from "../schema";
 
+import { recordCanonicalState, recordFactState } from "./fact-history";
+
 /**
  * The shared evidence pool — the user's real experience stored once, independent
  * of any single career track. Tracks rank/frame this pool differently; this repo
@@ -70,6 +72,9 @@ export function createEvidenceRepository(db: DbOrTx) {
               updatedAt: new Date(),
             })
             .where(and(eq(evidenceItems.userId, userId), eq(evidenceItems.id, id)));
+          // Accepting a held import is a state change: its history said "retracted" from the
+          // moment it arrived, and stays wrong until this is written.
+          await recordCanonicalState(tx, userId, item.factId ?? item.id);
           return;
         }
         for (const [row, counterpart] of [
@@ -89,22 +94,32 @@ export function createEvidenceRepository(db: DbOrTx) {
             })
             .where(and(eq(evidenceItems.userId, userId), eq(evidenceItems.id, row.id)));
         }
+        // Both facts changed: one was accepted, and each now says it is not the other.
+        await recordCanonicalState(tx, userId, item.factId ?? item.id);
+        await recordCanonicalState(tx, userId, other.factId ?? other.id);
       });
     },
 
     /** Remove only an unresolved import; a stale button cannot delete accepted work. */
     async discardPending(userId: string, id: string): Promise<boolean> {
-      const removed = await db
-        .delete(evidenceItems)
-        .where(
-          and(
-            eq(evidenceItems.userId, userId),
-            eq(evidenceItems.id, id),
-            eq(evidenceItems.reviewStatus, "pending")
+      return db.transaction(async (tx) => {
+        const removed = await tx
+          .delete(evidenceItems)
+          .where(
+            and(
+              eq(evidenceItems.userId, userId),
+              eq(evidenceItems.id, id),
+              eq(evidenceItems.reviewStatus, "pending")
+            )
           )
-        )
-        .returning({ id: evidenceItems.id });
-      return removed.length === 1;
+          .returning();
+        const discarded = removed[0];
+        if (!discarded) return false;
+        // The import is gone from the pool, but it DID arrive. History keeps what it said and
+        // that the person discarded it, so the same text arriving again is recognisable.
+        await recordCanonicalState(tx, userId, discarded.factId ?? discarded.id, discarded);
+        return true;
+      });
     },
 
     /** Every row including alternative wordings — for the merge UI and for export. */
@@ -214,15 +229,38 @@ export function createEvidenceRepository(db: DbOrTx) {
           .update(evidenceItems)
           .set({ factId, isCanonical: true, updatedAt: new Date() })
           .where(and(eq(evidenceItems.userId, userId), eq(evidenceItems.id, canonicalId)));
+
+        // Two histories move here. The keeper's fact now carries the absorbed wording, and the
+        // absorbed fact stops standing on its own — recorded as a retraction of what it said,
+        // never as a deletion of the fact that it was once counted separately.
+        await recordCanonicalState(tx, userId, factId);
+        if (absorbedFact !== factId) {
+          await recordFactState(tx, userId, absorbed, "retracted");
+        }
       });
     },
 
     /** Undo a merge: the row becomes its own fact again. */
     async splitOut(userId: string, id: string): Promise<void> {
-      await db
-        .update(evidenceItems)
-        .set({ factId: id, isCanonical: true, updatedAt: new Date() })
-        .where(and(eq(evidenceItems.userId, userId), eq(evidenceItems.id, id)));
+      await db.transaction(async (tx) => {
+        const [before] = await tx
+          .select()
+          .from(evidenceItems)
+          .where(and(eq(evidenceItems.userId, userId), eq(evidenceItems.id, id)))
+          .limit(1);
+        if (!before) return;
+        const [split] = await tx
+          .update(evidenceItems)
+          .set({ factId: id, isCanonical: true, updatedAt: new Date() })
+          .where(and(eq(evidenceItems.userId, userId), eq(evidenceItems.id, id)))
+          .returning();
+
+        // Undoing a merge changes two facts: the one that was left, and the one that now exists
+        // again on its own.
+        await recordFactState(tx, userId, split, "active");
+        const parent = before.factId ?? before.id;
+        if (parent !== id) await recordCanonicalState(tx, userId, parent, before);
+      });
     },
 
     /** The most recent change to the pool — powers report/output staleness. Cheap:
@@ -295,18 +333,31 @@ export function createEvidenceRepository(db: DbOrTx) {
         >
       >
     ): Promise<EvidenceItem | null> {
-      const [updated] = await db
-        .update(evidenceItems)
-        .set({ ...patch, updatedAt: new Date() })
-        .where(and(eq(evidenceItems.id, id), eq(evidenceItems.userId, userId)))
-        .returning();
-      return updated ?? null;
+      return db.transaction(async (tx) => {
+        const [updated] = await tx
+          .update(evidenceItems)
+          .set({ ...patch, updatedAt: new Date() })
+          .where(and(eq(evidenceItems.id, id), eq(evidenceItems.userId, userId)))
+          .returning();
+        if (!updated) return null;
+        // A correction IS a version. Which words the fact now leads with is read back from the
+        // pool, so editing a rendering does not overwrite the fact's history with it.
+        await recordCanonicalState(tx, userId, updated.factId ?? updated.id, updated);
+        return updated;
+      });
     },
 
     async delete(userId: string, id: string): Promise<void> {
-      await db
-        .delete(evidenceItems)
-        .where(and(eq(evidenceItems.id, id), eq(evidenceItems.userId, userId)));
+      await db.transaction(async (tx) => {
+        const [removed] = await tx
+          .delete(evidenceItems)
+          .where(and(eq(evidenceItems.id, id), eq(evidenceItems.userId, userId)))
+          .returning();
+        if (!removed) return;
+        // Deleting the last row of a fact ends its history with what it last said; deleting one
+        // wording of a fact that still has a leader records the fact as it now stands.
+        await recordCanonicalState(tx, userId, removed.factId ?? removed.id, removed);
+      });
     },
 
     async count(userId: string): Promise<number> {
