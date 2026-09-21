@@ -129,11 +129,43 @@ suite("my career: sources and fact history", () => {
     expect((await repo.listFactVersions(userId, factId)).length).toBeGreaterThanOrEqual(3);
   });
 
-  it("two concurrent imports of different text cannot claim the same version", async () => {
-    const [a, b] = await Promise.all([
-      repo.preserveSource(userId, { sourceKind: "resume", sourceKey: "race", content: "A" }),
-      repo.preserveSource(userId, { sourceKind: "resume", sourceKey: "race", content: "B" }),
-    ]);
-    expect(new Set([a.version.version, b.version.version]).size).toBe(2);
+  // Codex read stage 1 and pointed out that reading max() and inserting is not serialized by a
+  // transaction alone, and that a two-call race test can pass on timing. These contend properly:
+  // eight writers on ONE stream, started together. Without the advisory lock they read the same
+  // maximum and the unique index rejects the losers - the run fails outright rather than
+  // numbering them.
+  it("eight concurrent imports each get their own version, and none is rejected", async () => {
+    const results = await Promise.all(
+      Array.from({ length: 8 }, (_, i) =>
+        repo.preserveSource(userId, {
+          sourceKind: "resume",
+          sourceKey: "race",
+          content: `resume revision ${i}`,
+        })
+      )
+    );
+    const versions = results.map((r) => r.version.version);
+    expect(new Set(versions).size).toBe(8);
+    expect([...versions].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+
+    const kept = await repo.listSourceVersions(userId, "resume", "race");
+    expect(kept.map((v) => v.content).sort()).toEqual(
+      Array.from({ length: 8 }, (_, i) => `resume revision ${i}`).sort()
+    );
+  });
+
+  it("eight concurrent corrections to one fact append in order, losing none", async () => {
+    const raced = "33333333-3333-4333-8333-333333333333";
+    const results = await Promise.all(
+      Array.from({ length: 8 }, (_, i) =>
+        repo.recordFactVersion(userId, { factId: raced, snapshot: snapshot({ period: `202${i}` }) })
+      )
+    );
+    expect(new Set(results.map((r) => r.version.version)).size).toBe(8);
+
+    const history = await repo.listFactVersions(userId, raced);
+    expect(history.map((v) => v.version)).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+    const current = await repo.currentFactVersion(userId, raced);
+    expect(current?.version).toBe(8);
   });
 });

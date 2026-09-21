@@ -34,8 +34,17 @@ export function createCareerCoreRepository(db: Database) {
       const content = input.content;
       const contentHash = createHash("sha256").update(content).digest("hex");
 
-      // Serialized per stream: two imports landing together must not both claim version N.
       return db.transaction(async (tx) => {
+        // Two imports landing together must not both read version N and both try to write it.
+        // Reading max() and inserting is not serialized on its own - READ COMMITTED lets both
+        // transactions see the same maximum, and the unique index then rejects one of them
+        // instead of giving it the next number. A transaction-scoped advisory lock on the STREAM
+        // (this owner, this source) makes the second writer wait for the first to commit, so it
+        // reads the number that now exists. The lock is released with the transaction, including
+        // on failure.
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`career-source:${userId}:${input.sourceKind}:${input.sourceKey}`}, 0))`
+        );
         const [existing] = await tx
           .select()
           .from(careerSourceVersions)
@@ -115,6 +124,11 @@ export function createCareerCoreRepository(db: Database) {
     ): Promise<{ version: CareerRecordVersion; unchanged: boolean }> {
       const status = input.status ?? "active";
       return db.transaction(async (tx) => {
+        // Same reasoning as preserveSource: serialize the writers on one fact, so a correction
+        // arriving while another is committing appends after it rather than colliding with it.
+        await tx.execute(
+          sql`select pg_advisory_xact_lock(hashtextextended(${`career-fact:${userId}:${input.factId}`}, 0))`
+        );
         const [latest] = await tx
           .select()
           .from(careerRecordVersions)
