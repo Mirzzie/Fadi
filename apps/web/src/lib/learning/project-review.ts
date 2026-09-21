@@ -1,0 +1,70 @@
+import { completionOf, type CompletableStep } from "@/lib/lab/completion";
+
+/**
+ * WHAT A FINISHED PROJECT CAN HONESTLY SAY.
+ *
+ * The draft a person reviews before saving a project as evidence. Built from what the steps
+ * recorded and nothing else — no model call — because this text becomes a résumé line and a
+ * post, and every sentence in it has to trace back to something they wrote down or a check that
+ * passed. The person edits it; Fadi does not embellish it.
+ *
+ * Wording follows what each step can show: a typed result is "result recorded", not "artifact
+ * attached" (a path in a text box does not prove a file exists), and a step ticked with nothing
+ * written is "self-reported" and never appears in the summary as an outcome.
+ */
+
+export type ReviewStep = CompletableStep & { ordinal: number; title: string };
+
+export type ReviewLine = {
+  ordinal: number;
+  title: string;
+  proof: "checked" | "result recorded" | "self-reported";
+  result: string | null;
+};
+
+export type CompletionReview = {
+  lines: ReviewLine[];
+  /** Editable starting text. Only steps with a recorded result or a check contribute outcomes. */
+  summary: string;
+  /** Steps backed by more than the person's word. Zero means there is nothing to show yet. */
+  shownCount: number;
+};
+
+export function completionReview(title: string, steps: ReviewStep[]): CompletionReview {
+  const lines: ReviewLine[] = [...steps]
+    .sort((a, b) => a.ordinal - b.ordinal)
+    .map((step) => {
+      const kind = completionOf(step);
+      return {
+        ordinal: step.ordinal,
+        title: step.title,
+        proof: kind === "verified" ? "checked" : kind === "evidenced" ? "result recorded" : "self-reported",
+        result: readableResult(step.artifact),
+      };
+    });
+
+  const shown = lines.filter((line) => line.proof !== "self-reported");
+  const summary = [
+    `Worked through "${title}" in a local lab.`,
+    ...shown.map((line) =>
+      line.proof === "checked"
+        ? `- ${line.title} (checked in the lab${line.result ? `: ${line.result}` : ""})`
+        : `- ${line.title}${line.result ? `: ${line.result}` : ""}`
+    ),
+  ].join("\n");
+
+  return { lines, summary, shownCount: shown.length };
+}
+
+/**
+ * A check's stored result is "Checked in the lab: <Fadi's command> → <what it found>". The command
+ * is Fadi's, not the person's — so the review shows what was found, not how Fadi looked.
+ */
+function readableResult(artifact: string | null | undefined): string | null {
+  const text = artifact?.trim();
+  if (!text) return null;
+  if (text.startsWith("Checked in the lab:") && text.includes(" → ")) {
+    return text.slice(text.lastIndexOf(" → ") + 3).trim() || null;
+  }
+  return text;
+}

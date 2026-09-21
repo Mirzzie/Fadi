@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  History, BookOpen, Boxes, MonitorCog } from "lucide-react";
+import { History, BookOpen, Boxes, MonitorCog } from "lucide-react";
 import { usePathname } from "next/navigation";
 
 import { cn } from "@/lib/utils";
@@ -24,11 +23,6 @@ const destinations = [
     label: "Machines",
     icon: MonitorCog,
   },
-  {
-    href: "/dashboard/learning/activity",
-    label: "Activity",
-    icon: History,
-  },
 ];
 
 /** The Learning Hub has three jobs. Keeping them visible prevents machine control,
@@ -39,7 +33,7 @@ export function LearningNavigation() {
   return (
     <nav
       aria-label="Learning Hub"
-      className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border border-border/70 bg-card/80 p-1 shadow-sm"
+      className="flex w-full max-w-full flex-wrap items-center gap-1 border-b border-border pb-2"
     >
       {destinations.map(({ href, label, icon: Icon, exact }) => {
         const active = exact ? pathname === href : pathname.startsWith(href);
@@ -60,6 +54,13 @@ export function LearningNavigation() {
           </Link>
         );
       })}
+      <Link
+        href="/dashboard/learning/activity"
+        aria-current={pathname.startsWith("/dashboard/learning/activity") ? "page" : undefined}
+        className="ml-auto inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+      >
+        <History className="size-3.5" aria-hidden="true" /> Activity
+      </Link>
     </nav>
   );
 }

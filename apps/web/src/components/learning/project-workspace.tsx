@@ -2,23 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import {
-  AlertCircle,
-  ArrowLeft,
-  BookOpen,
-  Check,
-  CheckCircle2,
-  Circle,
-  ExternalLink,
-  FileCheck2,
-  ListChecks,
-  Loader2,
-  Monitor,
-  Paperclip,
-  RotateCcw,
-  Server,
-  ShieldQuestion,
-} from "lucide-react";
+import { ArrowLeft, Check, ExternalLink, LifeBuoy, Loader2, RotateCcw } from "lucide-react";
 
 import {
   completeStepAction,
@@ -29,76 +13,56 @@ import {
   proposeProjectLabStopAction,
   reopenStepAction,
   replanProjectAction,
+  runOnThisComputerAction,
   type ProjectRuntimeView,
   type RunView,
   type StepView,
 } from "@/app/dashboard/learning/lab-actions";
-import { StepText } from "@/components/learning/step-text";
+import {
+  projectFinishAction,
+  saveProjectEvidenceAction,
+  type FinishView,
+} from "@/app/dashboard/learning/project-finish-actions";
+import {
+  helpWithStepAction,
+  acceptRevisedStepAction,
+  proposeStepCheckAction,
+  type StepHelp,
+} from "@/app/dashboard/learning/step-help-actions";
+import { PostComposer } from "@/components/learning/post-composer";
+import { CommandBlock, StepText } from "@/components/learning/step-text";
 import { PendingAction } from "@/components/os/pending-action-card";
 import { announceActionsChanged, usePendingActions } from "@/components/os/pending-actions";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { reachableSurface, runtimeMessage } from "@/lib/lab/runtime-contract";
 
-function proofLabel(step: StepView) {
-  if (step.completion === "verified") {
-    return {
-      title: "Machine check recorded",
-      detail: `${step.verify ? `Recorded check: ${step.verify}. ` : ""}This confirms an output condition, not who performed the work.`,
-      className: "text-sky-400",
-      icon: FileCheck2,
-    };
-  }
-  if (step.completion === "evidenced") {
-    return {
-      title: "Artifact attached",
-      detail: step.artifact ?? "A result was recorded for this step.",
-      className: "text-emerald-400",
-      icon: Paperclip,
-    };
-  }
-  return {
-    title: "Self-reported · no artifact",
-    detail: "This records completion in your own account. It does not count as evidence.",
-    className: "text-muted-foreground",
-    icon: ShieldQuestion,
-  };
-}
-
+/**
+ * ONE PROJECT: the step you are on, and the machine you do it on. Nothing else earns a place.
+ *
+ * The previous version had a hero, a meta row, tabs, an evidence panel repeating the task
+ * list, a lab banner repeating the machine pane, and a sentence under every control. Reported
+ * as "a lot of things to see, but nothing to see". Completion kinds are still recorded
+ * separately; they are shown as a word on the finished step, not a paragraph.
+ */
 export function ProjectWorkspace({ runId }: { runId: string }) {
   const [run, setRun] = useState<RunView | null | undefined>(undefined);
   const [runtime, setRuntime] = useState<ProjectRuntimeView | undefined>(undefined);
   const [artifact, setArtifact] = useState("");
   const [message, setMessage] = useState<string | null>(null);
-  const [panel, setPanel] = useState<"build" | "evidence">("build");
+  const [labMessage, setLabMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const { pending: approvals, refresh: refreshApprovals } = usePendingActions();
 
-  // BACKGROUND REFRESH MUST NOT LOOK LIKE A CLICK.
-  //
-  // This used to run inside the same startTransition as every button, on a five-second
-  // timer — so every five seconds `pending` went true and every button in the workspace
-  // disabled and flashed its spinner while nobody had touched anything. Reported as "these
-  // buttons refresh for no reason", which is exactly what they were doing.
-  //
-  // Loading is now a plain async call that updates data quietly. `pending` belongs only to
-  // actions a person started.
+  // Background refresh is a plain async call, never inside startTransition: otherwise every
+  // poll flips `pending` and every button flashes ("buttons refresh for no reason").
   const refresh = useCallback(async () => {
-    const [result, observed] = await Promise.all([
-      listProjectRuns(),
-      projectRuntimeAction({ runId }),
-    ]);
+    const [result, observed] = await Promise.all([listProjectRuns(), projectRuntimeAction({ runId })]);
     setRun(result.ok ? (result.runs.find((candidate) => candidate.id === runId) ?? null) : null);
     setRuntime(observed.ok ? observed.runtime : null);
   }, [runId]);
 
   useEffect(() => {
     void refresh();
-  }, [refresh]);
-
-  useEffect(() => {
-    // Only while someone is looking, and not so often that it churns. A lab moving from
-    // "starting" to "ready" is worth seeing within seconds; a background tab is not.
     const timer = setInterval(() => {
       if (document.visibilityState === "visible") void refresh();
     }, 8_000);
@@ -110,27 +74,18 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
 
   if (run === undefined) {
     return (
-      <div className="grid min-h-72 place-items-center rounded-xl border border-border bg-card">
-        <p className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Loading project…
-        </p>
-      </div>
+      <p className="flex min-h-72 items-center justify-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Loading…
+      </p>
     );
   }
 
   if (!run) {
     return (
-      <div className="rounded-xl border border-border bg-card p-8 text-center">
-        <AlertCircle className="mx-auto size-5 text-muted-foreground" aria-hidden="true" />
-        <h1 className="mt-3 font-semibold">Project unavailable</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          It may have been removed, or it does not belong to this account.
-        </p>
-        <Link
-          href="/dashboard/learning/projects"
-          className="mt-4 inline-flex text-sm font-medium text-primary hover:underline"
-        >
-          Return to projects
+      <div className="py-16 text-center">
+        <p className="font-semibold">This project isn&apos;t available.</p>
+        <Link href="/dashboard/learning/projects" className="mt-2 inline-block text-sm text-primary hover:underline">
+          Back to projects
         </Link>
       </div>
     );
@@ -140,522 +95,482 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
     if (!current) return;
     setMessage(null);
     startTransition(async () => {
-      const result = await completeStepAction({
-        stepId: current.id,
-        artifact: artifact.trim() || null,
-      });
-      if (!result.ok) {
-        setMessage("Fadi could not record this step. Nothing was changed.");
-        return;
-      }
+      const result = await completeStepAction({ stepId: current.id, artifact: artifact.trim() || null });
+      if (!result.ok) return setMessage("Couldn't save that. Nothing changed.");
       setArtifact("");
-      refresh();
+      await refresh();
     });
   };
 
-  const percent = run.steps.length === 0 ? 0 : Math.round((run.doneCount / run.steps.length) * 100);
-  const surface = runtime ? reachableSurface(runtime) : null;
-
-  const proposeLab = (mode: "prepare" | "stop" | "resume") => {
-    setMessage(null);
+  const proposeLab = (mode: "prepare" | "stop" | "resume" | "restart") => {
+    setLabMessage(null);
     startTransition(async () => {
-      const result =
+      let result =
         mode === "stop"
           ? await proposeProjectLabStopAction({ runId })
-          : mode === "resume"
-            ? await proposeProjectLabResumeAction({ runId })
-            : await proposeProjectLabAction({ runId });
-      setMessage(
-        result.message ?? (result.ok ? "Waiting for your decision." : "That did not work.")
-      );
-      if (result.ok) {
+          : mode === "prepare"
+            ? await proposeProjectLabAction({ runId })
+            : await proposeProjectLabResumeAction({ runId });
+      // A lab that failed before its container existed has nothing to start: create it.
+      if (mode === "restart" && !result.ok) result = await proposeProjectLabAction({ runId });
+      if (!result.ok) setLabMessage(result.message ?? "That didn't work.");
+      else {
         announceActionsChanged();
         refreshApprovals();
       }
-      refresh();
+      await refresh();
     });
   };
 
+  const total = run.steps.length;
+  const percent = total === 0 ? 0 : Math.round((run.doneCount / total) * 100);
+  const hasLab = Boolean(run.labTemplate);
+
   return (
-    <div className="space-y-5">
-      <section className="relative overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/12 via-transparent to-[oklch(0.7_0.17_230/0.08)]" />
-        <div className="relative p-5 sm:p-7">
-          <div className="flex flex-wrap items-start gap-4">
-            <Link
-              href="/dashboard/learning/projects"
-              aria-label="Back to projects"
-              className="grid size-9 shrink-0 place-items-center rounded-lg border border-border/70 bg-background/50 text-muted-foreground hover:text-foreground"
-            >
-              <ArrowLeft className="size-4" aria-hidden="true" />
-            </Link>
-            <div className="grid size-12 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary">
-              <BookOpen className="size-5" aria-hidden="true" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium text-primary">Learning project</p>
-              <h1 className="mt-1 font-heading text-2xl font-semibold sm:text-3xl">{run.title}</h1>
-              <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-muted-foreground">
-                <span className="flex items-center gap-1.5">
-                  <ListChecks className="size-3.5" aria-hidden="true" /> {run.steps.length} guided
-                  steps
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Paperclip className="size-3.5" aria-hidden="true" /> {run.evidencedCount}{" "}
-                  artifacts
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <Server className="size-3.5" aria-hidden="true" />
-                  {run.resourceLabel ?? "No machine placed"}
-                </span>
-              </div>
-            </div>
-            <span className="rounded-full border border-border bg-background/50 px-3 py-1 text-xs font-medium text-muted-foreground">
-              {current ? "In progress" : "Completed"}
-            </span>
-          </div>
-        </div>
-        <div className="relative border-t border-border/60 bg-background/40 px-5 py-3 sm:px-7">
-          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>Project progress</span>
-            <span className="font-mono font-semibold tabular-nums">{percent}%</span>
-          </div>
-          <div
-            className="mt-2 h-1.5 overflow-hidden rounded-full bg-border"
-            role="progressbar"
-            aria-label="Project progress"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={percent}
-          >
+    <div className="space-y-4 pb-28">
+      <header className="flex flex-wrap items-center gap-3">
+        <Link
+          href="/dashboard/learning/projects"
+          aria-label="Back to projects"
+          className="grid size-8 place-items-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" aria-hidden="true" />
+        </Link>
+        <h1 className="min-w-0 flex-1 font-heading text-xl font-semibold sm:text-2xl">{run.title}</h1>
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+          <span className="tabular-nums">
+            {current ? `Step ${current.ordinal} of ${total}` : "All steps done"}
+          </span>
+          <div className="h-1.5 w-28 overflow-hidden rounded-full bg-border" aria-hidden="true">
             <div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} />
           </div>
         </div>
-      </section>
+      </header>
 
-      <div className="flex items-center gap-1 border-b border-border">
-        <WorkspaceTab active={panel === "build"} onClick={() => setPanel("build")}>
-          <BookOpen className="size-3.5" aria-hidden="true" /> Guided build
-        </WorkspaceTab>
-        <WorkspaceTab active={panel === "evidence"} onClick={() => setPanel("evidence")}>
-          <Paperclip className="size-3.5" aria-hidden="true" /> Evidence ({run.evidencedCount})
-        </WorkspaceTab>
-      </div>
-
-      {panel === "build" ? (
-        <>
-          {run.labTemplate ? (
-          <section className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-sm">
-            <div className="grid size-9 place-items-center rounded-lg bg-muted text-muted-foreground">
-              <Server className="size-4" aria-hidden="true" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold">Lab environment</p>
-              <p className="text-xs text-muted-foreground">
-                {runtime
-                  ? runtimeMessage(runtime)
-                  : run.resourceLabel
-                    ? `${run.resourceLabel} is the planned host. Prepare a local isolated lab when you are ready.`
-                    : "Fadi can prepare an isolated local lab and keep its actions attached to this project."}
-              </p>
-            </div>
-            {!runtime ? (
-              <Button
-                size="sm"
-                disabled={pending || Boolean(approval)}
-                onClick={() => proposeLab("prepare")}
-              >
-                {pending ? (
-                  <Loader2 className="animate-spin" aria-hidden="true" />
-                ) : (
-                  <Server aria-hidden="true" />
-                )}
-                Prepare lab
-              </Button>
-            ) : runtime.phase === "stopped" ? (
-              <Button
-                size="sm"
-                disabled={pending || Boolean(approval)}
-                onClick={() => proposeLab("resume")}
-              >
-                Resume lab
-              </Button>
-            ) : runtime.phase !== "queued" && runtime.phase !== "failed" ? (
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={pending || Boolean(approval)}
-                onClick={() => proposeLab("stop")}
-              >
-                Pause lab
-              </Button>
-            ) : null}
-            <Link
-              href="/dashboard/learning/machines"
-              aria-label="Manage machines"
-              title="Manage machines"
-              className="grid size-8 place-items-center rounded-lg border border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground"
-            >
-              <ExternalLink className="size-3.5" aria-hidden="true" />
-            </Link>
-          </section>
+      <div
+        className={
+          hasLab
+            ? "grid items-start gap-4 lg:grid-cols-[minmax(24rem,5fr)_minmax(28rem,7fr)]"
+            : "mx-auto max-w-3xl space-y-4"
+        }
+      >
+        <div className="space-y-4">
+          {current ? (
+            <CurrentStep
+              key={current.id}
+              runId={runId}
+              step={current}
+              artifact={artifact}
+              setArtifact={setArtifact}
+              pending={pending}
+              message={message}
+              onComplete={completeCurrent}
+              onRevised={refresh}
+              canCheck={Boolean(
+                run.labShell &&
+                  run.target.kind === "local-docker" &&
+                  runtime &&
+                  !["stopped", "failed", "queued", "stopping"].includes(runtime.phase)
+              )}
+              onCheckProposed={() => {
+                announceActionsChanged();
+                refreshApprovals();
+              }}
+            />
           ) : (
-            <p className="rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground shadow-sm">
-              This project needs no lab machine — it&apos;s done in your browser or on your own computer.
-            </p>
+            <FinishPanel runId={runId} stepsKey={run.steps.map((s) => s.status).join()} />
           )}
 
-          {message ? <p className="text-xs text-muted-foreground">{message}</p> : null}
+          <StepList
+            steps={run.steps}
+            currentId={current?.id ?? null}
+            pending={pending}
+            onReopen={(stepId) =>
+              startTransition(async () => {
+                await reopenStepAction({ stepId });
+                await refresh();
+              })
+            }
+          />
+          <Replan runId={runId} onReplanned={refresh} />
+        </div>
 
-          <div className={run.labTemplate ? "grid gap-4 lg:grid-cols-[minmax(22rem,0.8fr)_minmax(28rem,1.2fr)]" : "mx-auto grid w-full max-w-4xl gap-4"}>
-            <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-              <header className="border-b border-border/70 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Tasks
+        {hasLab ? (
+          <section className="overflow-hidden rounded-2xl border border-border bg-card lg:sticky lg:top-4">
+            <div className="flex flex-wrap items-center gap-3 border-b border-border/70 px-4 py-3">
+              <span
+                className={`size-2 rounded-full ${
+                  runtime?.phase === "ready"
+                    ? "bg-emerald-500"
+                    : runtime && !["failed", "stopped"].includes(runtime.phase)
+                      ? "animate-pulse bg-amber-500"
+                      : runtime?.phase === "failed"
+                        ? "bg-destructive"
+                        : "bg-muted-foreground/40"
+                }`}
+                aria-hidden="true"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">
+                  {run.labLabel}{" "}
+                  <span className="font-normal text-muted-foreground">
+                    · {run.target.kind === "local-docker" ? "on this computer" : `on ${run.target.label}`}
+                  </span>
                 </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Complete the current task before the next one becomes active.
+                <p className="text-xs text-muted-foreground">
+                  {run.target.kind === "unconnected"
+                    ? `Fadi can't reach ${run.target.label} yet. Connect it in Machines, or run here.`
+                    : runtime
+                      ? runtimeMessage(runtime)
+                      : "Not started"}
                 </p>
-                {/*
-                  A WAY OUT OF A WRONG PLAN.
-
-                  A plan was produced describing a Windows .msi installer against a lab
-                  running Ubuntu — unfollowable from step one, with nothing to do about it
-                  but abandon the project and lose its workspace and history. Re-planning
-                  replaces the steps and keeps everything else.
-                */}
-                <Replan runId={runId} onReplanned={refresh} />
-              </header>
-              <ol className="divide-y divide-border/60">
-                {run.steps.map((step) => {
-                  const isCurrent = current?.id === step.id;
-                  const isDone = step.status === "done";
-                  return (
-                    <li key={step.id} className={isCurrent ? "bg-primary/[0.04]" : undefined}>
-                      <div className="flex gap-3 p-4">
-                        <span
-                          className={`grid size-7 shrink-0 place-items-center rounded-full border text-xs font-semibold ${
-                            isDone
-                              ? "border-primary/40 bg-primary/15 text-primary"
-                              : isCurrent
-                                ? "border-primary bg-primary text-primary-foreground"
-                                : "border-border text-muted-foreground"
-                          }`}
-                        >
-                          {isDone ? (
-                            <Check className="size-3.5" aria-hidden="true" />
-                          ) : (
-                            step.ordinal
-                          )}
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                                Task {step.ordinal}
-                              </p>
-                              <h2 className="mt-0.5 text-sm font-semibold">{step.title}</h2>
-                            </div>
-                            {isDone ? (
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="h-6 shrink-0 text-[10px]"
-                                disabled={pending}
-                                onClick={() =>
-                                  startTransition(async () => {
-                                    const result = await reopenStepAction({ stepId: step.id });
-                                    if (!result.ok) setMessage("Fadi could not reopen this step.");
-                                    else refresh();
-                                  })
-                                }
-                              >
-                                <RotateCcw className="size-3" aria-hidden="true" /> Reopen
-                              </Button>
-                            ) : null}
-                          </div>
-
-                          {isCurrent ? (
-                            <div className="mt-3 space-y-4">
-                              <StepText text={step.instruction} />
-                              {step.verify ? (
-                                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3">
-                                  <p className="flex items-center gap-1.5 text-xs font-semibold text-emerald-400">
-                                    <CheckCircle2 className="size-3.5" aria-hidden="true" /> Success
-                                    condition
-                                  </p>
-                                  <StepText
-                                    text={step.verify}
-                                    className="mt-1 space-y-2 text-xs leading-relaxed text-muted-foreground"
-                                  />
-                                </div>
-                              ) : null}
-                              <div>
-                                <label htmlFor="step-artifact" className="text-xs font-medium">
-                                  What did this task produce?
-                                </label>
-                                <p className="mt-1 text-[11px] text-muted-foreground">
-                                  {step.produces ??
-                                    "Add a path, repository, screenshot reference, command, or output."}
-                                </p>
-                                <Input
-                                  id="step-artifact"
-                                  value={artifact}
-                                  onChange={(event) => setArtifact(event.target.value)}
-                                  placeholder="Paste or describe the result"
-                                  className="mt-2 h-9 text-xs"
-                                />
-                                <p className="mt-1.5 text-[11px] text-muted-foreground">
-                                  {artifact.trim()
-                                    ? "This result will be attached to the task."
-                                    : "Without a result, completion is recorded as self-reported and does not count as evidence."}
-                                </p>
-                              </div>
-                              {message ? (
-                                <p className="text-xs text-destructive">{message}</p>
-                              ) : null}
-                              <Button
-                                onClick={completeCurrent}
-                                disabled={pending}
-                                className="w-full"
-                              >
-                                {pending ? (
-                                  <Loader2 className="animate-spin" aria-hidden="true" />
-                                ) : (
-                                  <Check aria-hidden="true" />
-                                )}
-                                {artifact.trim()
-                                  ? "Save artifact and continue"
-                                  : "Mark self-reported and continue"}
-                              </Button>
-                            </div>
-                          ) : isDone ? (
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {proofLabel(step).title}
-                            </p>
-                          ) : (
-                            <p className="mt-1 text-xs text-muted-foreground">Up next</p>
-                          )}
-                        </div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ol>
-            </section>
-
-            {/* Only a project that needs a machine gets a machine pane. A ServiceNow project
-                is a website: offering to prepare a lab for it was a promise of a machine that
-                would never exist, and it took half the screen to make it. */}
-            {run.labTemplate ? (
-            <section className="min-h-[34rem] overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border/70 p-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Machine surface
-                  </p>
-                  <h2 className="mt-1 font-semibold">
-                    {run.resourceLabel ?? "No machine selected"}
-                  </h2>
-                </div>
-                <span className="rounded-full border border-border px-2.5 py-1 text-xs text-muted-foreground">
-                  {runtime ? runtime.phase.replace("_", " ") : "Not prepared"}
-                </span>
               </div>
-              {approval ? (
-                <div className="grid min-h-[29rem] place-items-center bg-background/30 p-5">
-                  <div className="w-full max-w-xl">
-                    <p className="mb-3 text-center text-sm text-muted-foreground">
-                      Review the effect, then approve or decline it here.
-                    </p>
-                    <PendingAction
-                      w={approval}
-                      onSettled={(result) => {
-                        setMessage(result);
-                        refreshApprovals();
-                        refresh();
-                      }}
-                    />
-                  </div>
-                </div>
-              ) : surface?.sessionPath ? (
-                <div className="relative min-h-[29rem] bg-black">
-                  <iframe
-                    src={surface.sessionPath}
-                    title={`${runtime?.templateLabel ?? "Lab"} ${surface.kind}`}
-                    className="h-[34rem] w-full border-0"
-                    allow="clipboard-read; clipboard-write; fullscreen"
-                    sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts"
-                  />
-                  <a
-                    href={surface.sessionPath}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="absolute right-3 top-3 rounded-md border border-white/20 bg-black/70 px-2.5 py-1.5 text-xs text-white hover:bg-black"
-                  >
-                    Open separately
-                  </a>
-                </div>
-              ) : (
-                <div className="grid min-h-[29rem] place-items-center bg-background/30 p-8 text-center">
-                  <div className="max-w-md">
-                    <div className="mx-auto grid size-14 place-items-center rounded-2xl border border-border bg-card">
-                      {runtime && !["failed", "stopped"].includes(runtime.phase) ? (
-                        <Loader2 className="size-6 animate-spin text-primary" aria-hidden="true" />
-                      ) : (
-                        <Monitor className="size-6 text-muted-foreground" aria-hidden="true" />
-                      )}
-                    </div>
-                    <h3 className="mt-4 font-semibold">
-                      {runtime?.templateLabel ?? "Prepare the practical environment"}
-                    </h3>
-                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                      {runtime
-                        ? runtimeMessage(runtime)
-                        : "Fadi chooses a reviewed lab from the project, shows the exact machine change for approval, then checks the real service before calling it ready."}
-                    </p>
-                    {!runtime ? (
-                      <Button
-                        className="mt-4"
-                        disabled={pending}
-                        onClick={() => proposeLab("prepare")}
-                      >
-                        Prepare lab
-                      </Button>
-                    ) : null}
-                  </div>
-                </div>
-              )}
-            </section>
+              {run.target.kind === "unconnected" ? (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={pending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      const result = await runOnThisComputerAction({ runId });
+                      setLabMessage(result.message ?? null);
+                      await refresh();
+                    })
+                  }
+                >
+                  Run on this computer instead
+                </Button>
+              ) : !runtime ? (
+                <Button size="sm" disabled={pending || Boolean(approval)} onClick={() => proposeLab("prepare")}>
+                  Start lab
+                </Button>
+              ) : runtime.phase === "stopped" ? (
+                <Button size="sm" disabled={pending || Boolean(approval)} onClick={() => proposeLab("resume")}>
+                  Resume
+                </Button>
+              ) : runtime.phase === "failed" ? (
+                <Button size="sm" disabled={pending || Boolean(approval)} onClick={() => proposeLab("restart")}>
+                  Start again
+                </Button>
+              ) : runtime.phase !== "queued" ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={pending || Boolean(approval)}
+                  onClick={() => proposeLab("stop")}
+                >
+                  Pause
+                </Button>
+              ) : null}
+            </div>
+
+            {labMessage ? (
+              <p className="border-b border-border/70 px-4 py-2 text-xs text-muted-foreground">{labMessage}</p>
             ) : null}
-          </div>
-        </>
-      ) : (
-        <EvidencePanel
-          run={run}
-          pending={pending}
-          refresh={refresh}
-          startTransition={startTransition}
-        />
-      )}
+            {approval ? (
+              <div className="p-4">
+                <PendingAction
+                  w={approval}
+                  onSettled={(result) => {
+                    setLabMessage(result);
+                    refreshApprovals();
+                    void refresh();
+                  }}
+                />
+              </div>
+            ) : runtime && run.labShell && runtime.phase !== "stopped" ? (
+              <div className="border-b border-border/70 p-4">
+                <p className="mb-2 text-xs text-muted-foreground">Open a terminal on your computer and run:</p>
+                <CommandBlock code={run.labShell} lang="terminal" />
+              </div>
+            ) : null}
+
+            <LabSurface runtime={runtime} labLabel={run.labLabel} hasApproval={Boolean(approval)} />
+          </section>
+        ) : null}
+      </div>
     </div>
   );
 }
 
-function WorkspaceTab({
-  active,
-  onClick,
-  children,
+function LabSurface({
+  runtime,
+  labLabel,
+  hasApproval,
 }: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
+  runtime: ProjectRuntimeView | undefined;
+  labLabel: string | null;
+  hasApproval: boolean;
 }) {
+  if (hasApproval) return null;
+  const surface = runtime ? reachableSurface(runtime) : null;
+  if (surface?.sessionPath) {
+    return (
+      <div className="relative bg-black">
+        <iframe
+          src={surface.sessionPath}
+          title={`${labLabel ?? "Lab"} ${surface.kind}`}
+          className="h-[calc(100vh-22rem)] min-h-96 w-full border-0 bg-white"
+          allow="clipboard-read; clipboard-write; fullscreen"
+          sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts"
+        />
+        <a
+          href={surface.sessionPath}
+          target="_blank"
+          rel="noreferrer"
+          className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-md bg-black/70 px-2 py-1 text-xs text-white hover:bg-black"
+        >
+          <ExternalLink className="size-3" aria-hidden="true" /> Open
+        </a>
+      </div>
+    );
+  }
+  // Stopped, failed or ready-without-a-viewer: the header already says it. Repeating the same
+  // sentence in a large empty box below was noise.
+  if (!runtime || ["stopped", "failed", "ready"].includes(runtime.phase)) return null;
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`relative inline-flex h-10 items-center gap-1.5 px-3 text-sm font-medium transition-colors ${
-        active ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-      }`}
-    >
-      {children}
-      {active ? <span className="absolute inset-x-2 bottom-[-1px] h-0.5 bg-primary" /> : null}
-    </button>
+    <p className="flex items-center justify-center gap-2 p-8 text-sm text-muted-foreground">
+      {!["failed", "stopped", "ready"].includes(runtime.phase) ? (
+        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+      ) : null}
+      {runtimeMessage(runtime)}
+    </p>
   );
 }
 
-function EvidencePanel({
-  run,
+function CurrentStep({
+  runId,
+  step,
+  artifact,
+  setArtifact,
   pending,
-  refresh,
-  startTransition,
+  message,
+  onComplete,
+  onRevised,
+  canCheck,
+  onCheckProposed,
 }: {
-  run: RunView;
+  runId: string;
+  step: StepView;
+  artifact: string;
+  setArtifact: (value: string) => void;
   pending: boolean;
-  refresh: () => void;
-  startTransition: React.TransitionStartFunction;
+  message: string | null;
+  onComplete: () => void;
+  onRevised: () => Promise<void>;
+  canCheck: boolean;
+  onCheckProposed: () => void;
 }) {
+  const [stuck, setStuck] = useState(false);
+  const [checkNote, setCheckNote] = useState<string | null>(null);
+  const [checking, startCheck] = useTransition();
+
   return (
-    <section className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-      <div className="flex flex-wrap items-end justify-between gap-2">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-            Evidence record
-          </p>
-          <h2 className="mt-1 font-semibold">What this project can support</h2>
+    <section className="rounded-2xl border border-primary/30 bg-card p-5">
+      <p className="text-xs font-medium text-primary">Step {step.ordinal}</p>
+      <h2 className="mt-0.5 text-lg font-semibold">{step.title}</h2>
+
+      <StepText text={step.instruction} className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground" />
+
+      {step.verify ? (
+        <div className="mt-4 rounded-lg bg-emerald-500/5 px-3 py-2.5 ring-1 ring-emerald-500/25">
+          <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Done when</p>
+          <StepText text={step.verify} className="mt-1 space-y-2 text-sm text-muted-foreground" />
         </div>
-        <p className="text-xs text-muted-foreground">
-          Completion, artifacts, and machine observations remain separate.
-        </p>
+      ) : null}
+
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+        <input
+          value={artifact}
+          onChange={(event) => setArtifact(event.target.value)}
+          placeholder={step.produces ? `Result (optional): ${step.produces}` : "Result (optional): a path, output or link"}
+          aria-label="Result of this step"
+          className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm"
+        />
+        <Button onClick={onComplete} disabled={pending}>
+          {pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Check aria-hidden="true" />}
+          Done, next step
+        </Button>
+        {canCheck ? (
+          <Button
+            variant="outline"
+            disabled={checking || pending}
+            onClick={() =>
+              startCheck(async () => {
+                setCheckNote(null);
+                const result = await proposeStepCheckAction({ runId, stepId: step.id });
+                setCheckNote(result.message);
+                if (result.ok) onCheckProposed();
+              })
+            }
+          >
+            {checking ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
+            Check it for me
+          </Button>
+        ) : null}
       </div>
-      <ol className="mt-4 divide-y divide-border/60">
-        {run.steps.map((step) => {
-          const proof = step.status === "done" ? proofLabel(step) : null;
-          const ProofIcon = proof?.icon;
-          return (
-            <li key={step.id} className="flex gap-3 py-4 first:pt-0 last:pb-0">
-              {step.status === "done" ? (
-                <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
-              ) : (
-                <Circle
-                  className="mt-0.5 size-4 shrink-0 text-muted-foreground"
-                  aria-hidden="true"
-                />
-              )}
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">
-                  {step.ordinal}. {step.title}
-                </p>
-                {proof && ProofIcon ? (
-                  <div className="mt-1.5">
-                    <p
-                      className={`flex items-center gap-1.5 text-xs font-medium ${proof.className}`}
-                    >
-                      <ProofIcon className="size-3.5" aria-hidden="true" />
-                      {proof.title}
-                    </p>
-                    <p className="mt-0.5 break-words text-xs text-muted-foreground">
-                      {proof.detail}
-                    </p>
-                  </div>
-                ) : (
-                  <p className="mt-1 text-xs text-muted-foreground">No completion claim recorded</p>
-                )}
-              </div>
-              {step.status === "done" ? (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 shrink-0 text-xs"
-                  disabled={pending}
-                  onClick={() =>
-                    startTransition(async () => {
-                      await reopenStepAction({ stepId: step.id });
-                      refresh();
-                    })
-                  }
-                >
-                  <RotateCcw className="size-3" aria-hidden="true" /> Reopen
-                </Button>
-              ) : null}
-            </li>
-          );
-        })}
-      </ol>
+      {message ? <p className="mt-2 text-xs text-muted-foreground">{message}</p> : null}
+      {checkNote ? <p className="mt-2 text-xs text-muted-foreground">{checkNote}</p> : null}
+
+      {stuck ? (
+        <StuckPanel runId={runId} step={step} onClose={() => setStuck(false)} onRevised={onRevised} />
+      ) : (
+        <button
+          type="button"
+          onClick={() => setStuck(true)}
+          className="mt-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <LifeBuoy className="size-4" aria-hidden="true" /> Stuck? Show Fadi the error
+        </button>
+      )}
     </section>
   );
 }
 
-
 /**
- * Plan this project again.
- *
- * Behind a confirmation, because it discards the current steps — and anything recorded
- * against a step goes with the step. That is worth a sentence rather than a surprise.
+ * Paste what the terminal printed; get what went wrong and a fix that fits this lab. Text,
+ * not screenshots — see step-help-actions.ts.
  */
-function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => void }) {
+function StuckPanel({
+  runId,
+  step,
+  onClose,
+  onRevised,
+}: {
+  runId: string;
+  step: StepView;
+  onClose: () => void;
+  onRevised: () => Promise<void>;
+}) {
+  const [output, setOutput] = useState("");
+  const [help, setHelp] = useState<StepHelp | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, start] = useTransition();
+
+  const ask = () =>
+    start(async () => {
+      setError(null);
+      const result = await helpWithStepAction({ runId, stepId: step.id, output });
+      if (result.ok) setHelp(result.help);
+      else setError(result.message);
+    });
+
+  const accept = () =>
+    start(async () => {
+      if (!help) return;
+      const result = await acceptRevisedStepAction({
+        stepId: step.id,
+        instruction: help.revisedInstruction,
+        verify: help.revisedVerify,
+      });
+      if (!result.ok) return setError("Couldn't update the step.");
+      await onRevised();
+      onClose();
+    });
+
+  return (
+    <div className="mt-4 space-y-3 border-t border-border/70 pt-4">
+      {!help ? (
+        <>
+          <textarea
+            value={output}
+            onChange={(event) => setOutput(event.target.value)}
+            rows={6}
+            spellCheck={false}
+            placeholder="Paste what your terminal printed (select the text in the terminal and copy it)"
+            className="w-full rounded-md border border-border bg-zinc-950 p-3 font-mono text-xs text-zinc-100 placeholder:text-zinc-500"
+          />
+          <div className="flex items-center gap-2">
+            <Button size="sm" disabled={busy || !output.trim()} onClick={ask}>
+              {busy ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
+              {busy ? "Reading it…" : "Find the problem"}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="text-sm font-medium">{help.whatHappened}</p>
+          <StepText text={help.fix} className="space-y-3 text-sm leading-relaxed text-muted-foreground" />
+          <div className="flex flex-wrap items-center gap-2">
+            {help.stepWasWrong && help.revisedInstruction ? (
+              <Button size="sm" disabled={busy} onClick={accept}>
+                Fix this step
+              </Button>
+            ) : null}
+            <Button size="sm" variant="ghost" onClick={() => setHelp(null)}>
+              Paste more output
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onClose}>
+              Close
+            </Button>
+          </div>
+        </>
+      )}
+      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+    </div>
+  );
+}
+
+function StepList({
+  steps,
+  currentId,
+  pending,
+  onReopen,
+}: {
+  steps: StepView[];
+  currentId: string | null;
+  pending: boolean;
+  onReopen: (stepId: string) => void;
+}) {
+  return (
+    <ol className="rounded-2xl border border-border bg-card py-1">
+      {steps.map((step) => {
+        const done = step.status === "done";
+        const isCurrent = step.id === currentId;
+        return (
+          <li key={step.id} className="group flex items-center gap-3 px-4 py-2 text-sm">
+            <span
+              className={`grid size-6 shrink-0 place-items-center rounded-full text-xs font-medium ${
+                done
+                  ? "bg-primary/15 text-primary"
+                  : isCurrent
+                    ? "bg-primary text-primary-foreground"
+                    : "border border-border text-muted-foreground"
+              }`}
+            >
+              {done ? <Check className="size-3.5" aria-hidden="true" /> : step.ordinal}
+            </span>
+            <span className={`min-w-0 flex-1 truncate ${isCurrent ? "font-medium" : done ? "text-muted-foreground" : ""}`}>
+              {step.title}
+            </span>
+            {done ? (
+              <>
+                <span className="hidden text-xs text-muted-foreground sm:inline">
+                  {step.completion === "verified" ? "checked" : step.artifact ? "result saved" : "no result"}
+                </span>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => onReopen(step.id)}
+                  aria-label={`Reopen step ${step.ordinal}`}
+                  className="rounded p-1 text-muted-foreground opacity-0 hover:bg-muted hover:text-foreground focus-visible:opacity-100 group-hover:opacity-100"
+                >
+                  <RotateCcw className="size-3.5" aria-hidden="true" />
+                </button>
+              </>
+            ) : null}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/** Behind a confirmation: unfinished steps are replaced; finished steps and their results are kept. */
+function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => Promise<void> }) {
   const [asking, setAsking] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [busy, start] = useTransition();
@@ -665,46 +580,165 @@ function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => void
       <button
         type="button"
         onClick={() => setAsking(true)}
-        className="mt-2 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+        className="px-1 text-xs text-muted-foreground hover:text-foreground hover:underline"
       >
-        These steps don&apos;t match my machine — plan it again
+        Plan these steps again
       </button>
     );
   }
 
   return (
-    <div className="mt-2 space-y-1.5 rounded-lg border border-border/60 p-2.5">
-      <p className="text-xs">
-        Fadi will write new steps for this project, against the machine it actually runs on.
+    <div className="flex flex-wrap items-center gap-2 px-1 text-xs">
+      <span>Replan the steps you haven&apos;t finished? Finished steps and their results stay.</span>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={busy}
+        onClick={() =>
+          start(async () => {
+            const res = await replanProjectAction({ runId });
+            if (!res.ok) return setNote(res.message ?? "Couldn't plan it again.");
+            setAsking(false);
+            setNote(null);
+            await onReplanned();
+          })
+        }
+      >
+        {busy ? "Planning…" : "Replace"}
+      </Button>
+      <Button size="sm" variant="ghost" disabled={busy} onClick={() => setAsking(false)}>
+        Cancel
+      </Button>
+      {note ? <span className="text-amber-600">{note}</span> : null}
+    </div>
+  );
+}
+
+/**
+ * The finish line: read what the project can honestly say, then save it as evidence once.
+ * One primary action. Everything else — a post, a résumé line, an interview story — is optional
+ * and stays available afterwards, so nobody has to click through suggestions to be done.
+ */
+function FinishPanel({ runId, stepsKey }: { runId: string; stepsKey: string }) {
+  const [view, setView] = useState<FinishView | null>(null);
+  const [summary, setSummary] = useState("");
+  const [skipped, setSkipped] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [busy, start] = useTransition();
+
+  useEffect(() => {
+    let alive = true;
+    void projectFinishAction({ runId }).then((result) => {
+      if (!alive || !result.ok) return;
+      setView(result.view);
+      setSummary((current) => current || result.view.review.summary);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [runId, stepsKey]);
+
+  if (!view) {
+    return (
+      <p className="flex items-center gap-2 rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Checking the project…
       </p>
-      <p className="text-[11px] text-muted-foreground">
-        The current steps are replaced, and anything you recorded against them goes too. The
-        project, its workspace and its history stay.
-      </p>
-      {note ? <p className="text-[11px] text-amber-500">{note}</p> : null}
-      <div className="flex items-center gap-2">
+    );
+  }
+
+  if (view.savedEvidenceId) {
+    return (
+      <section className="rounded-2xl border border-primary/30 bg-card p-5">
+        <p className="text-xs font-medium text-primary">Project complete</p>
+        <h2 className="mt-0.5 text-lg font-semibold">Saved to your evidence</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          It now counts toward your résumé and the documents Fadi drafts. You can edit it in Evidence.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button nativeButton={false} variant="outline" size="sm" render={<Link href="/dashboard/evidence" />}>
+            Open evidence
+          </Button>
+          <Button nativeButton={false} variant="ghost" size="sm" render={<Link href="/dashboard/interview" />}>
+            Practise telling it
+          </Button>
+        </div>
+        <div className="mt-4">
+          <PostComposer runId={runId} />
+        </div>
+      </section>
+    );
+  }
+
+  if (skipped) {
+    return (
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <p className="font-semibold">Project complete.</p>
+        <button
+          type="button"
+          onClick={() => setSkipped(false)}
+          className="mt-1 text-sm text-muted-foreground hover:text-foreground hover:underline"
+        >
+          Save it as evidence after all
+        </button>
+      </section>
+    );
+  }
+
+  const { review } = view;
+  return (
+    <section className="rounded-2xl border border-primary/30 bg-card p-5">
+      <p className="text-xs font-medium text-primary">Project complete</p>
+      <h2 className="mt-0.5 text-lg font-semibold">Review what you built</h2>
+
+      <ul className="mt-3 space-y-1 text-sm">
+        {review.lines.map((line) => (
+          <li key={line.ordinal} className="flex gap-2">
+            <span className="w-28 shrink-0 text-xs leading-5 text-muted-foreground">{line.proof}</span>
+            <span className="min-w-0">
+              {line.title}
+              {line.result ? <span className="text-muted-foreground"> — {line.result}</span> : null}
+            </span>
+          </li>
+        ))}
+      </ul>
+
+      <label htmlFor="finish-summary" className="mt-4 block text-sm font-medium">
+        In your words
+      </label>
+      <textarea
+        id="finish-summary"
+        value={summary}
+        onChange={(event) => setSummary(event.target.value)}
+        rows={6}
+        className="mt-1 w-full rounded-md border border-border bg-background p-3 text-sm"
+      />
+      {review.shownCount === 0 ? (
+        <p className="mt-1 text-xs text-muted-foreground">
+          No step recorded a result, so add what you actually did before saving.
+        </p>
+      ) : null}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
         <Button
-          size="sm"
-          disabled={busy}
+          disabled={busy || summary.trim().length < 20}
           onClick={() =>
             start(async () => {
-              const res = await replanProjectAction({ runId });
-              if (!res.ok) {
-                setNote(res.message ?? "Couldn't plan it again.");
-                return;
+              const result = await saveProjectEvidenceAction({ runId, summary });
+              setNote(result.ok ? null : result.message);
+              if (result.ok && result.evidenceItemId) {
+                setView({ ...view, savedEvidenceId: result.evidenceItemId });
               }
-              setAsking(false);
-              setNote(null);
-              onReplanned();
             })
           }
         >
-          {busy ? "Planning…" : "Plan it again"}
+          {busy ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Check aria-hidden="true" />}
+          Save as evidence
         </Button>
-        <Button size="sm" variant="ghost" disabled={busy} onClick={() => setAsking(false)}>
-          Cancel
+        <Button variant="ghost" disabled={busy} onClick={() => setSkipped(true)}>
+          Finish without evidence
         </Button>
       </div>
-    </div>
+      {note ? <p className="mt-2 text-xs text-destructive">{note}</p> : null}
+    </section>
   );
 }

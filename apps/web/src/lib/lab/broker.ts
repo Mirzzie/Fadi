@@ -444,6 +444,7 @@ export const RECIPE_IDS = [
   "container.start",
   "container.stop",
   "container.remove",
+  "lab.check",
   "file.write",
   "dir.create",
   "file.remove",
@@ -466,6 +467,9 @@ const IMAGES: Record<string, string> = {
   grafana: "grafana/grafana:11.2.0",
   portainer: "portainer/portainer-ce:2.21.4",
 };
+
+/** Appended to a check so its exit status is read from output, not thrown as an error. */
+const CHECK_MARKER = "__FADI_CHECK_EXIT";
 
 /** Fadi's own containers carry this prefix, and it is added here, never supplied. */
 const NAME_PREFIX = "fadi-";
@@ -907,6 +911,54 @@ export const RECIPES: Record<RecipeId, Recipe> = {
     summary: (p) => `Stop the container ${NAME_PREFIX}${p.name}. Its data stays where it is.`,
     reversal: (p) => `Start it again: docker start ${NAME_PREFIX}${p.name}`,
     render: (p) => [{ id: "stop", cmd: "docker", args: ["stop", NAME_PREFIX + String(p.name)] }],
+  },
+
+  /**
+   * CHECK A STEP INSIDE ITS OWN LAB.
+   *
+   * The first thing Fadi does inside a machine rather than to it: run one command in the
+   * project's container and look for the output the step's success condition names. It is
+   * how "Done" stops resting on the person's word — and, from a real lab, how "apk add ..."
+   * failing for a package Alpine doesn't ship shows up as a failed check instead of a tick.
+   *
+   * Bounded: only a container Fadi created (ownWorkOnly), no host mounts exist on it, 30s,
+   * output capped. The command is model-written, so it is shown in full before approval;
+   * nothing here pretends a word list could make arbitrary shell read-only. The appended
+   * echo makes a failing command a failed CHECK rather than a broken action, and is shown too.
+   */
+  "lab.check": {
+    blast: "container",
+    // Meant to read. Labelled "interrupts something" it told people a check would disturb
+    // their lab, which it is not written to do; the full command is shown either way.
+    reversibility: "reversible",
+    confirmToken: (p) => NAME_PREFIX + String(p.name),
+    ownWorkOnly: true,
+    validate: (raw) => {
+      const name = str(raw.name);
+      const command = typeof raw.command === "string" ? raw.command.trim() : "";
+      const expect = typeof raw.expect === "string" ? raw.expect.trim() : "";
+      const shell = raw.shell === "bash" ? "bash" : "sh";
+      if (!name || !NAME_RE.test(name)) return null;
+      if (!command || command.length > 600 || command.includes("\0") || command.includes(CHECK_MARKER)) return null;
+      if (!expect || expect.length > 200) return null;
+      return { name, command, expect, shell };
+    },
+    summary: (p) =>
+      `Run a check inside ${NAME_PREFIX}${p.name}: ${p.command} — it passes if the output contains "${p.expect}".`,
+    reversal: () => "A check is meant to only read. If the command changes something, it changes it inside the lab only.",
+    render: (p) => [
+      {
+        id: "check",
+        cmd: "docker",
+        args: [
+          "exec",
+          NAME_PREFIX + String(p.name),
+          String(p.shell),
+          "-c",
+          `${String(p.command)}\necho "${CHECK_MARKER}=$?"`,
+        ],
+      },
+    ],
   },
 
   "container.start": {
@@ -1630,7 +1682,9 @@ export async function approveAndRun(input: {
           ? await runNetStep(c)
           : isFileStep(c)
             ? await runFileStep(input.userId, c)
-            : await runCommand(c);
+            : row.recipe === "lab.check"
+              ? await runCheck(c)
+              : await runCommand(c);
       out.push(result.text);
       if (result.discovered) discovered = result.discovered;
       await audit.record({
@@ -1668,6 +1722,36 @@ export async function approveAndRun(input: {
     }
   }
 
+  // A CHECK CONTINUES THE STEP IT BELONGS TO — here, where it ran, not in whichever page
+  // approved it. Approving from the global queue, another tab or after a reload all land on
+  // the same step, because the step travels with the request.
+  if (row.recipe === "lab.check") {
+    const verdict = checkVerdict(out.join("\n"), String(params.expect));
+    const detail = verdict.passed
+      ? `Check passed: found "${params.expect}".`
+      : `Check did not pass: "${params.expect}" was not in the output${verdict.exit !== null ? ` (exit ${verdict.exit})` : ""}.`;
+    if (verdict.passed && row.stepId) {
+      const { createProjectRunsRepository } = await import("@careeros/database");
+      await createProjectRunsRepository(db).setStepStatus(input.userId, row.stepId, {
+        status: "done",
+        completion: "verified",
+        artifact: `Checked in the lab: ${String(params.command)} → ${verdict.excerpt}`.slice(0, 1_000),
+      });
+    }
+    await requests.finish(input.userId, row.id, { status: "executed", detail: detail.slice(0, 400) });
+    await audit.record({
+      userId: input.userId,
+      actor: "user",
+      origin: "approval",
+      runId: row.runId ?? null,
+      stepId: row.stepId ?? null,
+      capability: "lab.check",
+      decision: "allowed",
+      detail: detail.slice(0, 200),
+    });
+    return { ok: true, output: `${detail}\n\n${verdict.excerpt}` };
+  }
+
   await requests.finish(input.userId, row.id, {
     status: "executed",
     detail: out.join(" ").slice(0, 400),
@@ -1676,70 +1760,26 @@ export async function approveAndRun(input: {
   return { ok: true, output: out.join(" "), discovered };
 }
 
+/** A check's whole output, bounded — the evidence is often not on the first line. */
+async function runCheck(c: Command): Promise<StepResult> {
+  const { stdout, stderr } = await run(c.cmd, c.args, { timeout: 30_000, maxBuffer: 256 * 1024 });
+  return { text: `${stdout}${stderr ? `\n${stderr}` : ""}`.slice(-8_000) };
+}
 
-/* ---------------------------------------------------------------------------
- * DOES THIS PACKAGE ACTUALLY EXIST IN THE LAB'S DISTRIBUTION?
- * ------------------------------------------------------------------------- */
-
-/**
- * Running a plan's install step inside a real lab failed on the first command:
- * "apk add nginx openssl fail2ban filebeat elasticsearch kibana". Three of those are not
- * packaged for Alpine at all, and apk is atomic, so NOTHING installed — including the three
- * that exist. An invented or out-of-repository package is the most common way an AI plan
- * dies on step two, and the image the lab runs is sitting right here to be asked.
- *
- * READ-ONLY, and still held to the broker's rules, which is why it lives in this file. The
- * script is a fixed literal; package names are passed as ARGUMENTS to it ("$@"), never
- * interpolated into it, and each is checked against a strict name pattern first. So a
- * package called "nginx; rm -rf /" is refused before Docker is asked anything, and even if
- * it were not, it would reach apk as one odd argument rather than as shell.
- *
- * Cached per image, because a package index does not change between two plans a minute
- * apart and asking costs a container start and an index download.
- */
-const PACKAGE_NAME_RE = /^[a-z0-9][a-z0-9+._-]{0,63}$/;
-const packageCache = new Map<string, Map<string, boolean>>();
-
-const APK_CHECK = 'apk update -q >/dev/null 2>&1; for p in "$@"; do if apk search -e "$p" 2>/dev/null | grep -q .; then echo "ok:$p"; else echo "no:$p"; fi; done';
-const APT_CHECK = 'apt-get update -qq >/dev/null 2>&1; for p in "$@"; do if apt-cache policy "$p" 2>/dev/null | grep -q "Candidate: [^(]"; then echo "ok:$p"; else echo "no:$p"; fi; done';
-
-export async function packagesMissingFrom(
-  template: TemplateKey,
-  names: string[],
-): Promise<{ checked: boolean; missing: string[] }> {
-  const t = LAB_TEMPLATES[template];
-  const manager = t.toolchain.packageManager;
-  if (manager !== "apk" && manager !== "apt") return { checked: false, missing: [] };
-
-  const wanted = [...new Set(names.map((n) => n.trim().toLowerCase()))];
-  // A name that cannot be a package is reported missing without asking anything.
-  const malformed = wanted.filter((n) => !PACKAGE_NAME_RE.test(n));
-  const valid = wanted.filter((n) => PACKAGE_NAME_RE.test(n));
-
-  const cache = packageCache.get(t.image) ?? new Map<string, boolean>();
-  packageCache.set(t.image, cache);
-  const unknown = valid.filter((n) => !cache.has(n));
-
-  if (unknown.length > 0) {
-    try {
-      const { stdout } = await run(
-        "docker",
-        ["run", "--rm", "--entrypoint", "sh", t.image, "-c", manager === "apk" ? APK_CHECK : APT_CHECK, "_", ...unknown],
-        { timeout: 90_000, maxBuffer: 256 * 1024 },
-      );
-      for (const line of stdout.split("\n")) {
-        const m = /^(ok|no):(.+)$/.exec(line.trim());
-        if (m) cache.set(m[2], m[1] === "ok");
-      }
-    } catch {
-      // Docker unavailable, image not pulled, no network for the index. Saying "could not
-      // check" is honest; guessing "missing" would reject good plans for a local problem.
-      return { checked: false, missing: malformed };
-    }
-  }
-
-  return {
-    checked: true,
-    missing: [...malformed, ...valid.filter((n) => cache.get(n) === false)],
-  };
+/** Pure: did the check find what the step said to look for? */
+export function checkVerdict(
+  output: string,
+  expect: string
+): { passed: boolean; exit: number | null; excerpt: string } {
+  const marker = new RegExp(`${CHECK_MARKER}=(\\d+)\\s*$`, "m");
+  const match = marker.exec(output);
+  const exit = match ? Number(match[1]) : null;
+  const body = output.replace(marker, "").trim();
+  const passed = body.toLowerCase().includes(expect.toLowerCase());
+  const at = body.toLowerCase().indexOf(expect.toLowerCase());
+  const excerpt =
+    at >= 0
+      ? body.slice(Math.max(0, at - 120), at + expect.length + 120).trim()
+      : body.slice(-300).trim();
+  return { passed, exit, excerpt };
 }

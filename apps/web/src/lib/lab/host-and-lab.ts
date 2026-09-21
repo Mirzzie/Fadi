@@ -133,6 +133,22 @@ export function placementBriefing(input: {
         ? `Their first step must be opening a shell in the lab, with exactly: docker exec -it ${input.containerName} ${tc.shell}`
         : `Their first step must be opening a shell in the lab with docker exec -it <lab-name> ${tc.shell}.`,
     );
+    if (tc.serviceManager === "none") {
+      lines.push(
+        "The lab is a container with NO service manager: rc-service, systemctl and service do not exist. Start a background program by running it directly (for example `fail2ban-client start`, or `crond -b`) and check it with `ps`.",
+      );
+    }
+    if (tc.mainService) {
+      lines.push(
+        `${tc.mainService.name} is ALREADY RUNNING as the lab's main process. Never tell them to start it; apply config changes with \`${tc.mainService.reload}\`.`,
+      );
+      if (tc.mainService.logs) lines.push(tc.mainService.logs);
+    }
+    if (!tc.firewall) {
+      lines.push(
+        "The lab cannot change firewall rules (no iptables/nftables permission). Anything that works by blocking traffic — fail2ban bans, iptables rules — will not take effect; if the project needs it, have them verify detection (logs, fail2ban-client status/regex tests) and say plainly that enforcement is out of scope for this lab.",
+      );
+    }
   }
 
   // AND WHAT A LOCAL LAB CANNOT DO.
@@ -230,39 +246,8 @@ export function toolchainViolations(text: string, template: TemplateKey): string
     found.push("apk, which does not exist on Ubuntu");
   }
   if (tc.shell === "sh" && /\bbash\s|#!\/bin\/bash/.test(text)) found.push("bash, which is not installed in the lab");
-  return found;
-}
-
-
-/**
- * The package names a plan asks the lab's package manager to install.
- *
- * Pulled from install commands only — "apk add", "apt-get install" — and stripped of
- * flags, so a package mentioned in passing is not checked and a flag is not mistaken for a
- * package.
- */
-export function installedPackagesIn(text: string): string[] {
-  const names: string[] = [];
-  const re = /\b(?:apk\s+add|apt(?:-get)?\s+install)\s+([^\n;&|`<>(]+)/gi;
-  // Words that end a package list rather than belong to it. A re-plan was rejected for
-  // "missing packages: apk, info" because the capture ran on past the list into "... then
-  // apk info nginx" — reading the next command as more packages.
-  const STOP = new Set(["apk", "apt", "apt-get", "then", "and", "or", "to", "with", "run", "sudo", "verify", "check", "using", "via"]);
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
-    // "curl 2>&1": the capture stops at ">", leaving the file descriptor behind as if it
-    // were a package called "2". A bare trailing digit before a redirection is not a package.
-    const list = m[1].replace(/\s+\d$/, "");
-    for (const raw of list.split(/\s+/)) {
-      const token = raw.replace(/[.,:)'"]+$/, "").trim();
-      if (!token) continue;
-      if (token.startsWith("-")) continue; // a flag, not a package
-      if (STOP.has(token.toLowerCase())) break;
-      // The first thing that cannot be a package name ends the list — prose, a path, a
-      // redirection target — instead of being quietly skipped and reading on.
-      if (!/^[a-z0-9][a-z0-9+._-]*$/.test(token)) break;
-      names.push(token);
-    }
+  if (tc.serviceManager === "none" && /\b(?:rc-service|systemctl|rc-update)\s|\bservice\s+[\w.-]+\s+(?:start|restart|stop|reload)\b/.test(text)) {
+    found.push("rc-service/systemctl/service, which do not exist in a container");
   }
-  return [...new Set(names)];
+  return found;
 }

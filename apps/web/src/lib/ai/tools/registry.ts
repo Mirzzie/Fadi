@@ -667,6 +667,28 @@ async function proposeThrough(
     }
     runId = detail.run.id;
     stepId = requestedStep?.id ?? null;
+
+    // A model starting a container for a project must start it where the project runs. If the
+    // project is placed on a machine Fadi can't reach, or a VMware guest, a local container would
+    // be the "named one machine, used another" failure (A07) — so the tool refuses instead.
+    if (recipe === "lab.start" || recipe === "lab.build" || recipe === "lab.buildFile") {
+      const { createLabResourcesRepository } = await import("@careeros/database");
+      const { resolveTarget, unconnectedMessage } = await import("@/lib/lab/target");
+      const resource = detail.run.resourceId
+        ? await createLabResourcesRepository(getDatabase()).get(ctx.userId, detail.run.resourceId)
+        : null;
+      const target = resolveTarget(
+        detail.run,
+        resource ? { id: resource.id, label: resource.label, endpoint: resource.endpoint } : null,
+      );
+      if (target.kind === "unconnected") return { summary: unconnectedMessage(target), view: "none" };
+      if (target.kind !== "local-docker") {
+        return {
+          summary: `This project runs on the VMware machine ${target.label}, not in a local container. Nothing was proposed.`,
+          view: "none",
+        };
+      }
+    }
   }
   const result = await proposeAction({
     userId: ctx.userId,
@@ -704,7 +726,12 @@ const projectStatusTool: FadiTool = {
     const { createProjectRunsRepository } = await import("@careeros/database");
     const { getDatabase } = await import("@/lib/database/client");
     const repo = createProjectRunsRepository(getDatabase());
-    const runs = (await repo.listForUser(ctx.userId)).filter((r) => r.status === "running");
+    // The active direction's projects only — the same scope the Learning hub shows.
+    const { createCareerProfilesRepository } = await import("@careeros/database");
+    const track = await createCareerProfilesRepository(getDatabase()).getActiveForUser(ctx.userId);
+    const runs = (await repo.listForUser(ctx.userId)).filter(
+      (r) => r.status === "running" && (r.careerProfileId ?? null) === (track?.id ?? null)
+    );
     if (runs.length === 0) {
       return { summary: "No project is in progress. plan_project turns an idea into steps.", view: "none" };
     }

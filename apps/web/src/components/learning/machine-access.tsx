@@ -1,29 +1,20 @@
 "use client";
 
 import { useCallback, useEffect, useState, useTransition } from "react";
-import {
-  AlertTriangle,
-  ChevronDown,
-  FolderOpen,
-  History,
-  Loader2,
-  Settings2,
-  ShieldCheck,
-  ShieldOff,
-} from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, FolderOpen, History, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
   getWorkspace,
   listPermissions,
   registerDiscovered,
-  revokeAllCapabilities,
   revokeCapability,
   setWorkspace,
   type ActionView,
   type CapabilityView,
 } from "@/app/dashboard/learning/permission-actions";
-import { ACTOR_LABEL, PendingAction, type Discovered } from "@/components/os/pending-action-card";
+import { PendingAction, type Discovered } from "@/components/os/pending-action-card";
 import { usePendingActions } from "@/components/os/pending-actions";
 
 /**
@@ -39,17 +30,17 @@ import { usePendingActions } from "@/components/os/pending-actions";
  * under a chronological feed is decoration.
  */
 
-function timeLeft(iso: string | null): string | null {
+function timeLeft(iso: string | null, now: number): string | null {
   if (!iso) return null;
-  const ms = new Date(iso).getTime() - Date.now();
+  const ms = new Date(iso).getTime() - now;
   if (ms <= 0) return null;
   const mins = Math.round(ms / 60_000);
   return mins >= 60 ? Math.round(mins / 60) + "h left" : mins + "m left";
 }
 
-
 export function MachineAccess() {
   const [caps, setCaps] = useState<CapabilityView[] | null>(null);
+  const [checkedAt, setCheckedAt] = useState(0);
   const [recent, setRecent] = useState<ActionView[]>([]);
   // The queue is owned by the shell, not by this panel. It used to poll for itself, which
   // meant a decision existed only while someone was looking at this page.
@@ -57,18 +48,16 @@ export function MachineAccess() {
   const [workspace, setWorkspaceRoot] = useState<string | null>(null);
   const [found, setFound] = useState<Discovered | null>(null);
   const [note, setNote] = useState<string | null>(null);
-  const [openPanel, setOpenPanel] = useState<"decisions" | "permissions" | "activity" | null>(null);
   const [pending, start] = useTransition();
 
-  const refresh = useCallback(() => {
-    start(async () => {
-      const [perms, ws] = await Promise.all([listPermissions(), getWorkspace()]);
-      if (perms.ok) {
-        setCaps(perms.capabilities ?? []);
-        setRecent(perms.recent ?? []);
-      }
-      if (ws.ok) setWorkspaceRoot(ws.root ?? null);
-    });
+  const refresh = useCallback(async () => {
+    const [perms, ws] = await Promise.all([listPermissions(), getWorkspace()]);
+    if (perms.ok) {
+      setCheckedAt(Date.now());
+      setCaps(perms.capabilities ?? []);
+      setRecent(perms.recent ?? []);
+    }
+    if (ws.ok) setWorkspaceRoot(ws.root ?? null);
   }, []);
 
   useEffect(() => {
@@ -76,7 +65,9 @@ export function MachineAccess() {
     // Real-time enough to matter: a grant that expired or an attempt made while the page
     // was open should not need a reload to become visible. Polling, not a socket — the
     // truth lives in Postgres and this is a single-user machine.
-    const t = setInterval(refresh, 15_000);
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, 15_000);
     return () => clearInterval(t);
   }, [refresh]);
 
@@ -88,91 +79,35 @@ export function MachineAccess() {
     );
   }
 
-  const live = caps.filter((c) => c.grantedUntil);
-  // Proposals are not blocked attempts. Counting them here was the same conflation that
-  // tripped the circuit breaker, and it would have made ordinary work look like an attack.
+  const live = caps.filter((c) => c.grantedUntil && Date.parse(c.grantedUntil) > checkedAt);
   const denials = recent.filter((a) => a.decision === "denied");
 
+  // Rows, and only the rows that have something in them. This was three summary cards, a
+  // header, a warning box and a caption on each — around one setting and a link.
   return (
-    <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-      <header className="flex flex-wrap items-center gap-3 border-b border-border/60 p-4">
-        <div className="grid size-9 place-items-center rounded-lg bg-primary/10 text-primary">
-          <ShieldCheck className="size-4" aria-hidden="true" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold">Fadi access</h3>
-          <p className="text-xs text-muted-foreground">
-            {live.length === 0
-              ? "No temporary inspection access is active."
-              : `Inspection allowed for ${live.length} area${live.length === 1 ? "" : "s"}; each expires automatically.`}
-          </p>
-        </div>
-        {live.length > 0 ? (
-          <Button
-            size="sm"
-            variant="destructive"
-            disabled={pending}
-            onClick={() =>
-              start(async () => {
-                await revokeAllCapabilities();
-                refresh();
-              })
-            }
-          >
-            <ShieldOff className="size-3.5" aria-hidden="true" /> Close access
-          </Button>
-        ) : null}
-      </header>
-
-      <div className="grid gap-2 p-4 sm:grid-cols-3">
-        <SummaryButton
-          active={openPanel === "decisions"}
-          icon={AlertTriangle}
-          title={waiting.length ? `${waiting.length} waiting` : "No decisions waiting"}
-          detail="Every machine change still needs approval."
-          onClick={() => setOpenPanel(openPanel === "decisions" ? null : "decisions")}
-          urgent={waiting.length > 0}
-        />
-        <SummaryButton
-          active={openPanel === "permissions"}
-          icon={Settings2}
-          title="Permissions"
-          detail={`${live.length} of ${caps.length} inspection areas open`}
-          onClick={() => setOpenPanel(openPanel === "permissions" ? null : "permissions")}
-        />
-        <SummaryButton
-          active={openPanel === "activity"}
-          icon={History}
-          title="Activity"
-          detail={`${recent.length} recent events${denials.length ? ` · ${denials.length} blocked` : ""}`}
-          onClick={() => setOpenPanel(openPanel === "activity" ? null : "activity")}
-          urgent={denials.length > 0}
-        />
-      </div>
-
-      <div className="border-t border-border/60 p-4">
+    <div className="divide-y divide-border/60 rounded-xl border border-border bg-card">
+      <div className="px-4 py-3">
         <WorkspaceSetting root={workspace} onChanged={refresh} />
       </div>
 
-      {openPanel === "decisions" ? (
-        <div className="space-y-3 border-t border-border/60 bg-background/25 p-4">
-          {waiting.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Nothing is waiting. Fadi has not changed the machine.
-            </p>
-          ) : (
-            waiting.map((request) => (
-              <PendingAction
-                key={request.id}
-                w={request}
-                onSettled={(message) => {
-                  setNote(message);
-                  refresh();
-                }}
-                onDiscovered={setFound}
-              />
-            ))
-          )}
+      {waiting.length > 0 ? (
+        <div className="space-y-3 px-4 py-3">
+          <p className="text-sm font-semibold">Waiting for you</p>
+          {waiting.map((request) => (
+            <PendingAction
+              key={request.id}
+              w={request}
+              onSettled={(message) => {
+                setNote(message);
+                refresh();
+              }}
+              onDiscovered={setFound}
+            />
+          ))}
+        </div>
+      ) : null}
+      {note || found ? (
+        <div className="space-y-2 px-4 py-3">
           {note ? <p className="text-xs text-muted-foreground">{note}</p> : null}
           {found ? (
             <RecordMachine
@@ -186,152 +121,56 @@ export function MachineAccess() {
         </div>
       ) : null}
 
-      {openPanel === "permissions" ? (
-        <div className="space-y-2 border-t border-border/60 bg-background/25 p-4">
-          {/*
-            WHAT IS OPEN, NOT WHAT COULD BE.
-
-            This listed every capability Fadi understands with an "Allow for 2h" button
-            beside it — a standing menu asking people to grant access in advance, for things
-            that may never happen. A permission granted speculatively is one nobody
-            remembers giving.
-
-            Fadi asks at the moment it needs something, and the ask arrives in the same
-            queue as everything else, wherever the person happens to be. So this panel only
-            shows what is currently open, and the only thing it offers is taking it back.
-          */}
-          {live.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              Nothing is open. Fadi will ask when it needs something, and the request will appear
-              wherever you are — there is no list here to grant in advance.
-            </p>
-          ) : (
-            live.map((capability) => (
-              <div
-                key={capability.capability}
-                className="flex flex-wrap items-center gap-3 rounded-lg border border-border/60 bg-card p-3"
+      <details className="px-4 py-3">
+        <summary className="cursor-pointer text-sm">
+          {live.length
+            ? `${live.length} active permissions · manage access`
+            : "No active machine permissions"}
+        </summary>
+        <div className="mt-2 divide-y divide-border/60">
+          {live.map((capability) => (
+            <div
+              key={capability.capability}
+              className="flex flex-wrap items-center gap-3 px-4 py-3"
+            >
+              <p className="min-w-0 flex-1 text-sm">{capability.summary}</p>
+              <span className="text-xs text-muted-foreground">
+                {timeLeft(capability.grantedUntil, checkedAt)}
+              </span>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={pending}
+                onClick={() =>
+                  start(async () => {
+                    await revokeCapability({
+                      capability: capability.capability,
+                    });
+                    refresh();
+                  })
+                }
               >
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium">{capability.summary}</p>
-                  <p className="mt-0.5 text-[11px] text-muted-foreground">{capability.limit}</p>
-                </div>
-                <span className="text-[11px] text-emerald-500">{timeLeft(capability.grantedUntil)}</span>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={pending}
-                  onClick={() =>
-                    start(async () => {
-                      await revokeCapability({ capability: capability.capability });
-                      refresh();
-                    })
-                  }
-                >
-                  Revoke
-                </Button>
-              </div>
-            ))
-          )}
-        </div>
-      ) : null}
-
-      {openPanel === "activity" ? (
-        <div className="border-t border-border/60 bg-background/25 p-4">
-          {denials.length > 0 ? (
-            <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
-              <p className="text-xs font-medium text-amber-500">
-                {denials.length} request{denials.length === 1 ? " was" : "s were"} blocked. Nothing
-                ran.
-              </p>
-              <p className="mt-1 text-[11px] text-muted-foreground">
-                Review the requester below. Close access if you do not recognise the activity.
-              </p>
+                Revoke
+              </Button>
             </div>
-          ) : null}
-          <ul className="divide-y divide-border/60">
-            {recent.length === 0 ? (
-              <li className="py-3 text-sm text-muted-foreground">No machine activity yet.</li>
-            ) : (
-              recent.slice(0, 12).map((action) => (
-                <li key={action.id} className="py-2.5 text-xs">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span
-                      className={
-                        action.decision === "denied"
-                          ? "font-medium text-amber-500"
-                          : action.decision === "allowed"
-                            ? "font-medium text-emerald-500"
-                            : "font-medium text-muted-foreground"
-                      }
-                    >
-                      {action.decision}
-                    </span>
-                    <span>{ACTOR_LABEL[action.actor] ?? action.actor}</span>
-                    <span className="text-muted-foreground">· {action.capability}</span>
-                    <span className="ml-auto text-[10px] text-muted-foreground">
-                      {new Date(action.at).toLocaleString()}
-                    </span>
-                  </div>
-                  {action.detail ? (
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">{action.detail}</p>
-                  ) : null}
-                  {action.command ? (
-                    <details className="mt-1 text-[10px] text-muted-foreground">
-                      <summary className="cursor-pointer">Exact command</summary>
-                      <code className="mt-1 block overflow-x-auto rounded bg-muted p-1.5">
-                        {action.command}
-                      </code>
-                    </details>
-                  ) : null}
-                </li>
-              ))
-            )}
-          </ul>
+          ))}
         </div>
-      ) : null}
-    </section>
-  );
-}
+      </details>
 
-function SummaryButton({
-  active,
-  icon: Icon,
-  title,
-  detail,
-  onClick,
-  urgent = false,
-}: {
-  active: boolean;
-  icon: typeof ShieldCheck;
-  title: string;
-  detail: string;
-  onClick: () => void;
-  urgent?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-expanded={active}
-      className={`flex items-center gap-3 rounded-xl border p-3 text-left transition-colors ${
-        active ? "border-primary/40 bg-primary/5" : "border-border/60 hover:bg-muted/40"
-      }`}
-    >
-      <Icon
-        className={`size-4 shrink-0 ${urgent ? "text-amber-500" : "text-muted-foreground"}`}
-        aria-hidden="true"
-      />
-      <span className="min-w-0 flex-1">
-        <span className="block text-xs font-semibold">{title}</span>
-        <span className="mt-0.5 block text-[10px] leading-tight text-muted-foreground">
-          {detail}
-        </span>
-      </span>
-      <ChevronDown
-        className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${active ? "rotate-180" : ""}`}
-        aria-hidden="true"
-      />
-    </button>
+      <Link
+        href="/dashboard/learning/activity"
+        className="flex items-center gap-3 px-4 py-3 text-sm hover:bg-muted/40"
+      >
+        <History className="size-4 text-muted-foreground" aria-hidden="true" />
+        <span className="flex-1">Everything Fadi did or tried</span>
+        {denials.length > 0 ? (
+          <span className="text-xs text-amber-600 dark:text-amber-500">
+            {denials.length} blocked
+          </span>
+        ) : null}
+        <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />
+      </Link>
+    </div>
   );
 }
 
@@ -348,30 +187,36 @@ function WorkspaceSetting({ root, onChanged }: { root: string | null; onChanged:
   const [busy, start] = useTransition();
 
   return (
-    <div className="rounded-md border border-border/60 p-2.5">
-      <div className="flex flex-wrap items-center gap-2">
-        <FolderOpen className="size-3.5 text-muted-foreground" aria-hidden="true" />
-        <span className="text-xs font-medium">Workspace</span>
+    <div>
+      <div className="flex flex-wrap items-center gap-3">
+        <FolderOpen className="size-4 text-muted-foreground" aria-hidden="true" />
+        <span className="text-sm">Project folder</span>
         {root ? (
-          <code className="text-[11px] text-muted-foreground">{root}</code>
+          <code className="truncate text-xs text-muted-foreground">{root}</code>
         ) : (
-          <span className="text-[11px] text-muted-foreground">
-            Not set — Fadi has no filesystem access at all.
+          <span className="text-xs text-muted-foreground">
+            Not set — Fadi can&apos;t touch your files
           </span>
         )}
         <Button
           size="sm"
           variant="ghost"
-          className="ml-auto h-6 px-2 text-[10px]"
-          onClick={() => setEditing((v) => !v)}
+          className="ml-auto"
+          onClick={() => {
+            setPath(root ?? "");
+            setError(null);
+            setEditing((value) => !value);
+          }}
         >
-          {root ? "Change" : "Set one"}
+          {editing ? "Cancel" : root ? "Change" : "Choose"}
         </Button>
       </div>
 
       {editing ? (
         <div className="mt-2 space-y-1.5">
           <input
+            aria-label="Project folder path"
+            autoFocus
             value={path}
             onChange={(e) => setPath(e.target.value)}
             placeholder="/home/you/fadi-labs"
@@ -379,9 +224,7 @@ function WorkspaceSetting({ root, onChanged }: { root: string | null; onChanged:
             className="h-7 w-full max-w-md rounded border border-border bg-background px-2 font-mono text-[11px]"
           />
           <p className="text-[11px] text-muted-foreground">
-            An existing folder, absolute path. Fadi can read and write inside it and nowhere else —
-            symlinks pointing out of it are refused. Leave blank and press Save to take the access
-            away again.
+            Fadi can read and write inside this folder only. Clear it to remove access.
           </p>
           {error ? <p className="text-[11px] text-destructive">{error}</p> : null}
           <Button

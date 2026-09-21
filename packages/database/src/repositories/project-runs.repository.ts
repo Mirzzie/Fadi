@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, ne } from "drizzle-orm";
 
 import type { Database } from "../client";
 import {
@@ -8,6 +8,30 @@ import {
   type ProjectRun,
   type ProjectStep,
 } from "../schema/index";
+
+/**
+ * Decide whether a run is finished from its steps. Done means every step done, from a nonempty
+ * set; a skipped step is not a met requirement; reopening reopens. Abandoned runs are left alone.
+ */
+async function settleRun(db: Database, runId: string, status: string): Promise<void> {
+  if (status === "abandoned") return;
+  const steps = await db
+    .select({ status: projectSteps.status })
+    .from(projectSteps)
+    .where(eq(projectSteps.runId, runId));
+  const allDone = steps.length > 0 && steps.every((s) => s.status === "done");
+  if (allDone && status !== "done") {
+    await db
+      .update(projectRuns)
+      .set({ status: "done", completedAt: new Date(), updatedAt: new Date() })
+      .where(eq(projectRuns.id, runId));
+  } else if (!allDone && status === "done") {
+    await db
+      .update(projectRuns)
+      .set({ status: "running", completedAt: null, updatedAt: new Date() })
+      .where(eq(projectRuns.id, runId));
+  }
+}
 
 export function createProjectRunsRepository(db: Database) {
   return {
@@ -44,7 +68,14 @@ export function createProjectRunsRepository(db: Database) {
      */
     async createWithSteps(
       userId: string,
-      run: { title: string; detail?: string | null; commitmentId?: string | null; resourceId?: string | null; resourceLabel?: string | null },
+      run: {
+        title: string;
+        detail?: string | null;
+        commitmentId?: string | null;
+        careerProfileId?: string | null;
+        resourceId?: string | null;
+        resourceLabel?: string | null;
+      },
       steps: Array<Omit<NewProjectStep, "id" | "runId" | "createdAt" | "updatedAt">>,
     ): Promise<{ run: ProjectRun; steps: ProjectStep[] }> {
       return db.transaction(async (tx) => {
@@ -55,6 +86,7 @@ export function createProjectRunsRepository(db: Database) {
             title: run.title,
             detail: run.detail ?? null,
             commitmentId: run.commitmentId ?? null,
+            careerProfileId: run.careerProfileId ?? null,
             resourceId: run.resourceId ?? null,
             resourceLabel: run.resourceLabel ?? null,
             status: "running",
@@ -80,24 +112,124 @@ export function createProjectRunsRepository(db: Database) {
         completion?: "attested" | "evidenced" | "verified" | null;
       },
     ): Promise<ProjectStep | null> {
-      // Scope by owner through the run, so a step id alone cannot reach another user's row.
+      return db.transaction(async (tx) => {
+        // Scope by owner through the run, so a step id alone cannot reach another user's row.
+        const [step] = await tx
+          .select({ id: projectSteps.id, runId: projectSteps.runId })
+          .from(projectSteps)
+          .innerJoin(projectRuns, eq(projectRuns.id, projectSteps.runId))
+          .where(and(eq(projectSteps.id, stepId), eq(projectRuns.userId, userId)))
+          .limit(1);
+        if (!step) return null;
+
+        // Serialize completion per run: two steps finishing at once must agree on the run.
+        const [run] = await tx
+          .select({ status: projectRuns.status })
+          .from(projectRuns)
+          .where(eq(projectRuns.id, step.runId))
+          .for("update");
+
+        const [updated] = await tx
+          .update(projectSteps)
+          .set({
+            status: patch.status,
+            artifact: patch.artifact ?? undefined,
+            // Cleared when a step is reopened, so a step cannot keep a completion kind it
+            // is no longer completed under.
+            completion: patch.status === "done" ? (patch.completion ?? "attested") : null,
+            completedAt: patch.status === "done" ? new Date() : null,
+            updatedAt: new Date(),
+          })
+          .where(eq(projectSteps.id, stepId))
+          .returning();
+
+        // THE RUN FINISHES HERE, not in a page.
+        //
+        // Nothing ever marked a run done: every step could be finished and the project stayed
+        // "running" forever, so nothing downstream — evidence, résumé, portfolio — had anything
+        // to start from. Decided in the same transaction as the step, so the page, AI tools and
+        // retries all see one answer. Done means every step done, from a nonempty set; a skipped
+        // step is not a met requirement. Reopening a step reopens the run and leaves any saved
+        // evidence alone.
+        if (run) await settleRun(tx as unknown as Database, step.runId, run.status);
+        return updated ?? null;
+      });
+    },
+
+    /**
+     * Bring a run's status in line with its steps — for runs whose steps were all finished
+     * before completion was decided here. Safe to call repeatedly.
+     */
+    async settle(userId: string, runId: string): Promise<void> {
+      await db.transaction(async (tx) => {
+        const [run] = await tx
+          .select({ status: projectRuns.status })
+          .from(projectRuns)
+          .where(and(eq(projectRuns.id, runId), eq(projectRuns.userId, userId)))
+          .for("update");
+        if (run) await settleRun(tx as unknown as Database, runId, run.status);
+      });
+    },
+
+    /**
+     * Save a finished project as evidence, exactly once.
+     *
+     * The run row is locked for the whole save. If it already points at an evidence item, that
+     * item is returned and `create` is never called — so a retry, a double click or a second
+     * tool call cannot admit the same project twice. `create` runs inside the same transaction,
+     * so the link and the evidence land together or not at all.
+     */
+    async saveEvidenceOnce<T extends { id: string }>(
+      userId: string,
+      runId: string,
+      create: (tx: Database) => Promise<T>,
+    ): Promise<
+      | { status: "created"; evidenceItemId: string; commitmentId: string | null }
+      | { status: "existing"; evidenceItemId: string }
+      | { status: "not_finished" | "not_found" }
+    > {
+      return db.transaction(async (tx) => {
+        const [run] = await tx
+          .select()
+          .from(projectRuns)
+          .where(and(eq(projectRuns.id, runId), eq(projectRuns.userId, userId)))
+          .for("update");
+        if (!run) return { status: "not_found" as const };
+        if (run.evidenceItemId) return { status: "existing" as const, evidenceItemId: run.evidenceItemId };
+        if (run.status !== "done") return { status: "not_finished" as const };
+
+        const created = await create(tx as unknown as Database);
+        await tx
+          .update(projectRuns)
+          .set({ evidenceItemId: created.id, updatedAt: new Date() })
+          .where(eq(projectRuns.id, runId));
+        return { status: "created" as const, evidenceItemId: created.id, commitmentId: run.commitmentId };
+      });
+    },
+
+    /**
+     * Rewrite a step that has NOT been completed — the fix for a step that could not run as
+     * written. A completed step is never rewritten: what someone did against it, and the
+     * receipt for it, must keep describing what they actually did.
+     */
+    async reviseOpenStep(
+      userId: string,
+      stepId: string,
+      patch: { instruction: string; verify?: string | null },
+    ): Promise<ProjectStep | null> {
       const [step] = await db
-        .select({ id: projectSteps.id })
+        .select({ id: projectSteps.id, status: projectSteps.status })
         .from(projectSteps)
         .innerJoin(projectRuns, eq(projectRuns.id, projectSteps.runId))
         .where(and(eq(projectSteps.id, stepId), eq(projectRuns.userId, userId)))
         .limit(1);
-      if (!step) return null;
+      if (!step || step.status === "done") return null;
 
       const [updated] = await db
         .update(projectSteps)
         .set({
-          status: patch.status,
-          artifact: patch.artifact ?? undefined,
-          // Cleared when a step is reopened, so a step cannot keep a completion kind it
-          // is no longer completed under.
-          completion: patch.status === "done" ? (patch.completion ?? "attested") : null,
-          completedAt: patch.status === "done" ? new Date() : null,
+          instruction: patch.instruction,
+          ...(patch.verify ? { verify: patch.verify } : {}),
           updatedAt: new Date(),
         })
         .where(eq(projectSteps.id, stepId))
@@ -144,38 +276,63 @@ export function createProjectRunsRepository(db: Database) {
      * One transaction: a run must never be left with the old steps deleted and the new
      * ones unwritten, which is a project that has become an empty shell.
      */
+    /**
+     * Replace the steps someone has NOT finished, keeping the ones they have.
+     *
+     * This used to delete every step — and with them every result and receipt — so improving a
+     * plan erased what the person had already accomplished. Finished steps now stay exactly as
+     * they are; the new steps are numbered after them. The machine the run is placed on is not
+     * changed here: a lab may already be running there, and moving it is its own decision.
+     */
     async replaceSteps(
       userId: string,
       runId: string,
       steps: Array<Omit<NewProjectStep, "id" | "runId" | "createdAt" | "updatedAt">>,
-      placement: { resourceId?: string | null; resourceLabel?: string | null },
-    ): Promise<ProjectStep[]> {
+    ): Promise<{ kept: ProjectStep[]; added: ProjectStep[] } | null> {
       return db.transaction(async (tx) => {
-        const [owned] = await tx
-          .select({ id: projectRuns.id })
+        const [run] = await tx
+          .select({ id: projectRuns.id, status: projectRuns.status })
           .from(projectRuns)
           .where(and(eq(projectRuns.userId, userId), eq(projectRuns.id, runId)))
-          .limit(1);
-        if (!owned) return [];
+          .for("update");
+        if (!run) return null;
 
-        await tx.delete(projectSteps).where(eq(projectSteps.runId, runId));
+        const existing = await tx
+          .select()
+          .from(projectSteps)
+          .where(eq(projectSteps.runId, runId))
+          .orderBy(asc(projectSteps.ordinal));
+        const kept = existing.filter((step) => step.status === "done");
+        const after = kept.reduce((max, step) => Math.max(max, step.ordinal), 0);
+
         await tx
-          .update(projectRuns)
-          .set({
-            resourceId: placement.resourceId ?? null,
-            resourceLabel: placement.resourceLabel ?? null,
-            status: "running",
-            updatedAt: new Date(),
-          })
-          .where(eq(projectRuns.id, runId));
+          .delete(projectSteps)
+          .where(and(eq(projectSteps.runId, runId), ne(projectSteps.status, "done")));
 
-        return steps.length
+        const added = steps.length
           ? await tx
               .insert(projectSteps)
-              .values(steps.map((step) => ({ ...step, runId })))
+              .values(steps.map((step, index) => ({ ...step, ordinal: after + index + 1, runId })))
               .returning()
           : [];
+
+        await tx
+          .update(projectRuns)
+          .set({ updatedAt: new Date() })
+          .where(eq(projectRuns.id, runId));
+        await settleRun(tx as unknown as Database, runId, run.status);
+        return { kept, added };
       });
+    },
+
+    /** Move a run to this computer, as its own explicit decision (never a side effect of a replan). */
+    async placeOnThisComputer(userId: string, runId: string): Promise<boolean> {
+      const updated = await db
+        .update(projectRuns)
+        .set({ resourceId: null, resourceLabel: null, updatedAt: new Date() })
+        .where(and(eq(projectRuns.id, runId), eq(projectRuns.userId, userId)))
+        .returning({ id: projectRuns.id });
+      return updated.length > 0;
     },
 
     async setWorkspace(

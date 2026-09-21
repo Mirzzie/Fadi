@@ -53,7 +53,7 @@ describe("what a suggested project needs", () => {
   it("puts a monitoring stack on the machine that stays up", () => {
     const { spec } = specForProject({
       title: "Log aggregation and dashboards",
-      detail: "Run a container stack that scrapes metrics and keeps a dashboard available.",
+      detail: "Run a container stack that scrapes metrics and keeps a dashboard available 24/7.",
     });
     const { fits } = placeLab(spec, ALL);
 
@@ -138,7 +138,7 @@ describe("Windows is detected wherever it is said", () => {
       templateForProject({
         title: "Splunk SIEM Lab",
         detail: "Install Splunk Enterprise on Windows, select the Windows 64-bit .msi.",
-      }),
+      })
     ).toBe("windows-server-2025");
   });
 
@@ -158,10 +158,10 @@ describe("Windows is detected wherever it is said", () => {
   it("still prefers the server when the project is clearly server work", async () => {
     const { templateForProject } = await import("./spec-from-project");
     expect(
-      templateForProject({ title: "Active Directory lab", detail: "Domain controller and GPO." }),
+      templateForProject({ title: "Active Directory lab", detail: "Domain controller and GPO." })
     ).toBe("windows-server-2025");
     expect(
-      templateForProject({ title: "Endpoint hardening", detail: "Windows 11 with Intune." }),
+      templateForProject({ title: "Endpoint hardening", detail: "Windows 11 with Intune." })
     ).toBe("windows-11");
   });
 
@@ -170,10 +170,13 @@ describe("Windows is detected wherever it is said", () => {
     // The risk of widening the match: "windows" appears in plenty of prose that is not
     // about running Windows.
     expect(
-      templateForProject({ title: "Nginx TLS lab", detail: "Reverse proxy with certificates." }),
+      templateForProject({ title: "Nginx TLS lab", detail: "Reverse proxy with certificates." })
     ).toBe("linux-web");
     expect(
-      templateForProject({ title: "Postgres replication", detail: "Streaming replication on Linux." }),
+      templateForProject({
+        title: "Postgres replication",
+        detail: "Streaming replication on Linux.",
+      })
     ).toBe("linux-postgres");
   });
 });
@@ -188,8 +191,9 @@ describe("work that needs no machine at all", () => {
     expect(
       templateForProject({
         title: "ServiceNow SOC Incident Management Demo",
-        detail: "Create a ServiceNow Personal Developer Instance and configure incident management.",
-      }),
+        detail:
+          "Create a ServiceNow Personal Developer Instance and configure incident management.",
+      })
     ).toBeNull();
   });
 
@@ -207,7 +211,10 @@ describe("work that needs no machine at all", () => {
   it("a writing project gets no lab either", async () => {
     const { templateForProject } = await import("./spec-from-project");
     expect(
-      templateForProject({ title: "Incident response", detail: "Write a runbook for phishing triage." }),
+      templateForProject({
+        title: "Incident response",
+        detail: "Write a runbook for phishing triage.",
+      })
     ).toBeNull();
   });
 
@@ -215,13 +222,16 @@ describe("work that needs no machine at all", () => {
     const { templateForProject } = await import("./spec-from-project");
     // The risk of a "no machine" answer is that it swallows real lab work.
     expect(
-      templateForProject({ title: "AD lab", detail: "Build a Windows Server domain controller." }),
+      templateForProject({ title: "AD lab", detail: "Build a Windows Server domain controller." })
     ).toBe("windows-server-2025");
     expect(
-      templateForProject({ title: "Reverse proxy", detail: "Configure nginx with TLS certificates." }),
+      templateForProject({
+        title: "Reverse proxy",
+        detail: "Configure nginx with TLS certificates.",
+      })
     ).toBe("linux-web");
     expect(templateForProject({ title: "Scripting", detail: "Automate backups with bash." })).toBe(
-      "linux-ubuntu",
+      "linux-ubuntu"
     );
   });
 
@@ -233,7 +243,7 @@ describe("work that needs no machine at all", () => {
       templateForProject({
         title: "ServiceNow incident management",
         detail: "Configure the server, groups and windows for change management.",
-      }),
+      })
     ).toBeNull();
   });
 });

@@ -37,7 +37,7 @@ const X86_RE =
 
 /** Something a reader has to be able to reach later, not a thing you spin up and kill. */
 const ALWAYS_ON_RE =
-  /\b(monitor(ing)?|uptime|always[- ]on|24\/7|server that stays|persistent|siem|log (collection|aggregation)|dashboard|scrape)\b/i;
+  /\b(?:always[- ]on|24\/7|around the clock|continuously available|server that stays on)\b/i;
 
 /** Rough working memory, only where the text implies a multi-machine environment. */
 const MULTI_HOST_RE = /\b(two|three|multiple|several|cluster|fleet|network of|lab of)\b/i;
@@ -70,9 +70,7 @@ export function specForProject(input: { title: string; detail?: string | null })
 
   if (ALWAYS_ON_RE.test(text)) {
     spec.alwaysOn = true;
-    because.push(
-      "something has to keep running for this to mean anything, so it cannot live on a laptop that closes"
-    );
+    because.push("the description explicitly requires continuous availability");
   }
 
   // Only claim a memory figure when the text implies more than one machine, and keep it
@@ -129,13 +127,20 @@ const WRITING_ONLY =
  * Null is a real answer, not a failure to classify. Defaulting to Ubuntu made "no machine
  * required" unrepresentable, so every project got one.
  */
-export function templateForProject(input: { title: string; detail?: string | null }): TemplateKey | null {
+export function templateForProject(input: {
+  title: string;
+  detail?: string | null;
+}): TemplateKey | null {
   const text = `${input.title} ${input.detail ?? ""}`;
 
-  // Asked first: a hosted product needs no machine however much infrastructure vocabulary
-  // its description carries. "Incident management" sounds like a server; ServiceNow is a
-  // website.
-  if (NO_MACHINE.test(text) || BROWSER_ONLY.test(text) || WRITING_ONLY.test(text)) {
+  // A hosted service or final report may be only one part of a practical project.
+  // Explicit local execution takes precedence over those incidental mentions. This is
+  // a recommendation heuristic, not an execution target or permission to provision.
+  const localWork =
+    /\b(?:install|deploy|build|run|start|configure)\s+(?:(?:a|an|the)\s+)?(?:local(?:ly)?\b|docker\b|podman\b|vmware\b|nginx\b|postgres(?:ql)?\b|(?:[\w-]+\s+){0,3}(?:locally|in docker|in a (?:container|vm))\b)/i.test(
+      text
+    );
+  if (!localWork && (NO_MACHINE.test(text) || BROWSER_ONLY.test(text) || WRITING_ONLY.test(text))) {
     return null;
   }
 
@@ -151,7 +156,8 @@ function templateForProjectInner(input: { title: string; detail?: string | null 
   // describing a .msi, a C:\ path, PowerShell or plainly "on Windows" fell through to
   // Ubuntu — so the guide could be Windows while the machine was Linux, which is the
   // incoherence that gets someone stuck on step one.
-  const SERVER = /\b(?:active directory|domain controllers?|group policy|windows server|gpo|adds|dcpromo)\b/i;
+  const SERVER =
+    /\b(?:active directory|domain controllers?|group policy|windows server|gpo|adds|dcpromo)\b/i;
   const DESKTOP = /\b(?:windows ?1[01]|windows desktop|intune|sccm|edr|winget)\b/i;
   const ANY_WINDOWS = /\b(?:windows|win64|win32|powershell|\.msi\b|c:\\|msiexec|winrm|hyper-?v)\b/i;
 

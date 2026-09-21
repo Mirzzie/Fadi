@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { MonitorCog, ShieldCheck } from "lucide-react";
+import { Laptop } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { ComputerLabs } from "@/components/learning/computer-labs";
 import { LearningNavigation } from "@/components/learning/learning-navigation";
 import { MachineRegistration } from "@/components/learning/lab-fit";
-import { LabEngineExplainer } from "@/components/learning/lab-engine-explainer";
 import { MachineAccess } from "@/components/learning/machine-access";
 import { MachineInventory } from "@/components/learning/machine-inventory";
 import { getCurrentAuthUser } from "@/lib/auth/session";
@@ -14,6 +14,11 @@ import { getOnboardingStatus } from "@/lib/onboarding/status";
 export const metadata: Metadata = { title: "Learning machines" };
 export const dynamic = "force-dynamic";
 
+/**
+ * Where labs run, and what Fadi may touch. Reported as "a lot of things to see, but nothing
+ * to see": a header essay, a caption under every section, a five-stage explainer and three
+ * summary cards around two real controls. What stays is what you can see or do.
+ */
 export default async function LearningMachinesPage() {
   const user = await getCurrentAuthUser();
   if (!user) redirect("/auth/sign-in");
@@ -21,59 +26,31 @@ export default async function LearningMachinesPage() {
 
   return (
     <AppShell>
-      <main className="mx-auto max-w-shell space-y-6">
+      <main className="mx-auto w-full max-w-5xl space-y-6 px-2 pb-28 sm:px-4">
         <LearningNavigation />
-        <header className="flex items-start gap-3">
-          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
-            <MonitorCog className="size-5" aria-hidden="true" />
-          </div>
-          <div>
-            <h1 className="font-heading text-xl font-semibold">Machines</h1>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              See what Fadi knows about your lab, where projects are placed, and what access is
-              currently allowed. Registration, reachability, and readiness are different facts.
-            </p>
-          </div>
-        </header>
-
 
         <section className="space-y-3">
-          <div>
-            <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              <MonitorCog className="size-3.5" aria-hidden="true" /> Registered machines
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Capacity and placement records. These cards do not claim that a machine is online.
-            </p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h1 className="font-heading text-xl font-semibold">Machines</h1>
+            <MachineRegistration />
+          </div>
+          {/* The laptop is where labs run by default. It was never listed, so projects said
+              "No machine selected" while a lab was running on it. */}
+          <div className="overflow-hidden rounded-xl border border-border bg-card">
+            <div className="flex items-center gap-3 px-4 py-3">
+              <Laptop className="size-5 text-primary" aria-hidden="true" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">This computer</p>
+                <p className="text-xs text-muted-foreground">Labs run here in Docker, after you approve them.</p>
+              </div>
+            </div>
+            <ComputerLabs />
           </div>
           <MachineInventory />
-          <MachineRegistration />
         </section>
 
-        {/*
-          The five-stage explanation used to open this page, above the machines. It is good
-          writing and it is reference material: a page called Machines should start with
-          your machines, and explain itself to whoever goes looking. Folded to the bottom,
-          behind a disclosure, rather than deleted.
-        */}
-        <details className="rounded-lg border border-border/60 p-3">
-          <summary className="cursor-pointer text-xs font-medium text-muted-foreground">
-            How Fadi runs a lab, stage by stage
-          </summary>
-          <div className="mt-3">
-            <LabEngineExplainer />
-          </div>
-        </details>
-
         <section className="space-y-3">
-          <div>
-            <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              <ShieldCheck className="size-3.5" aria-hidden="true" /> Access and safety
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Permissions, pending decisions, the local workspace, and the machine audit record.
-            </p>
-          </div>
+          <h2 className="text-sm font-semibold">Access</h2>
           <MachineAccess />
         </section>
       </main>

@@ -1,16 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import {
-  CheckCircle2,
-  ChevronRight,
-  Hammer,
-  Loader2,
-  Monitor,
-  Paperclip,
-  Play,
-  X,
-} from "lucide-react";
+import { ChevronRight, Hammer, Loader2, Play, X } from "lucide-react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -72,15 +63,18 @@ export function ProjectRuns({ mode = "overview" }: { mode?: "overview" | "all" }
           {mode === "overview" ? "No active project" : "No projects yet"}
         </h2>
         <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-          Turn a skill gap into a project from Overview. Fadi will plan one next step at a time and
-          ask what each step produced.
+          {mode === "overview"
+            ? "Pick a skill below and turn it into a project."
+            : "Projects for this direction appear here once you turn a skill into one."}
         </p>
-        <Link
-          href="/dashboard/learning"
-          className="mt-4 inline-flex text-sm font-medium text-primary hover:underline"
-        >
-          Find a skill gap
-        </Link>
+        {mode === "all" ? (
+          <Link
+            href="/dashboard/learning"
+            className="mt-4 inline-flex text-sm font-medium text-primary hover:underline"
+          >
+            Find a skill gap
+          </Link>
+        ) : null}
       </section>
     );
   }
@@ -109,75 +103,28 @@ function RunCard({
 
   return (
     <article
-      className={`overflow-hidden rounded-2xl border bg-card shadow-sm ${featured ? "border-primary/30" : "border-border"}`}
+      className={`rounded-2xl border bg-card p-4 sm:p-5 ${featured ? "border-primary/30" : "border-border"}`}
     >
-      <div className="relative border-b border-border/60 bg-gradient-to-r from-primary/10 via-transparent to-transparent p-4 sm:p-5">
-        <div className="flex items-start gap-3">
-          <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary">
-            <Hammer className="size-4" aria-hidden="true" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="font-semibold">{run.title}</h3>
-              <span className="rounded-full border border-border bg-background/50 px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-                {next ? "In progress" : "Completed"}
-              </span>
-            </div>
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <CheckCircle2 className="size-3" aria-hidden="true" /> {done}/{run.steps.length}{" "}
-                steps
-              </span>
-              <span className="flex items-center gap-1">
-                <Paperclip className="size-3" aria-hidden="true" /> {run.evidencedCount} artifacts
-              </span>
-              <span className="flex items-center gap-1">
-                <Monitor className="size-3" aria-hidden="true" />
-                {run.resourceLabel ?? "No machine placed"}
-              </span>
-            </div>
-          </div>
-        </div>
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+        <h3 className="min-w-0 font-semibold">{run.title}</h3>
+        <span className="text-xs text-muted-foreground">
+          {run.labLabel ? `${run.labLabel} lab` : "No lab needed"}
+        </span>
       </div>
-
-      <div className="space-y-4 p-4 sm:p-5">
-        <div>
-          <div className="mb-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>Project progress</span>
-            <span className="font-mono tabular-nums">{percent}%</span>
-          </div>
-          <div
-            className="h-1.5 overflow-hidden rounded-full bg-border/70"
-            role="progressbar"
-            aria-label="Project progress"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={percent}
-          >
-            <div
-              className="h-full rounded-full bg-primary transition-[width]"
-              style={{ width: `${percent}%` }}
-            />
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-border/60 bg-background/40 p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
-            {next ? `Next · step ${next.ordinal}` : "Project record"}
-          </p>
-          <p className="mt-1 truncate text-sm font-medium">
-            {next?.title ?? `${run.evidencedCount} of ${run.steps.length} steps have an artifact`}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <Button nativeButton={false} render={<Link href={`/dashboard/learning/projects/${run.id}`} />}>
-            {next ? <Play className="size-3.5" aria-hidden="true" /> : null}
-            {next ? "Continue project" : "Review project"}
-            <ChevronRight className="size-3.5" aria-hidden="true" />
-          </Button>
-          <StopProject run={run} onChanged={onChanged} />
-        </div>
+      <p className="mt-1 truncate text-sm text-muted-foreground">
+        {next ? `Step ${next.ordinal} of ${run.steps.length}: ${next.title}` : "Completed"}
+      </p>
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-border/70" aria-hidden="true">
+        <div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} />
+      </div>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <Button nativeButton={false} render={<Link href={`/dashboard/learning/projects/${run.id}`} />}>
+          {next ? <Play className="size-3.5" aria-hidden="true" /> : null}
+          {next ? "Continue" : "Review"}
+          <ChevronRight className="size-3.5" aria-hidden="true" />
+        </Button>
+        {/* A finished project has nothing to stop. */}
+        {next ? <StopProject run={run} onChanged={onChanged} /> : null}
       </div>
     </article>
   );

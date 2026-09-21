@@ -109,6 +109,6 @@ export function runtimeMessage(runtime: LabRuntime): string {
   }
   if (runtimeIsReady(runtime)) return "Lab ready · required checks passed.";
   if (runtime.phase === "failed") return runtime.phaseDetail ?? "Lab preparation failed.";
-  if (runtime.phase === "stopped") return "Lab stopped.";
+  if (runtime.phase === "stopped") return runtime.phaseDetail ?? "Lab stopped.";
   return runtime.phaseDetail ?? `Lab ${runtime.phase.replace("_", " ")}.`;
 }

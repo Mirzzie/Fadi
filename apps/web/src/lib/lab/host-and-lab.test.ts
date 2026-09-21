@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { hostOsOf, labOsOf, placementBriefing } from "./host-and-lab";
+import { hostOsOf, labOsOf, placementBriefing, toolchainViolations } from "./host-and-lab";
 
 /**
  * The bug: a Windows .msi and a C:\ path in a plan for a Linux laptop.
@@ -234,39 +234,28 @@ describe("checking a plan against the distribution", () => {
   });
 });
 
-describe("finding the packages a plan installs", () => {
-  it("THE REAL STEP: pulls every package from an apk add", async () => {
-    const { installedPackagesIn } = await import("./host-and-lab");
-    expect(installedPackagesIn("apk update\napk add nginx openssl fail2ban filebeat elasticsearch kibana")).toEqual([
-      "nginx", "openssl", "fail2ban", "filebeat", "elasticsearch", "kibana",
-    ]);
+describe("a container has no service manager", () => {
+  it("THE REPORTED STEP: rc-service in the nginx lab is flagged", () => {
+    const step = "rc-service nginx start\nrc-service fail2ban start";
+    expect(toolchainViolations(step, "linux-web")).toContain(
+      "rc-service/systemctl/service, which do not exist in a container",
+    );
   });
 
-  it("handles apt, flags and redirections", async () => {
-    const { installedPackagesIn } = await import("./host-and-lab");
-    expect(installedPackagesIn("apt-get install -y --no-install-recommends nginx curl > /tmp/log 2>&1")).toEqual([
-      "nginx", "curl",
-    ]);
-    expect(installedPackagesIn("apk add --no-cache openssl")).toEqual(["openssl"]);
+  it("systemctl and `service x restart` are flagged on Ubuntu too", () => {
+    expect(toolchainViolations("systemctl enable --now nginx", "linux-ubuntu")).toHaveLength(1);
+    expect(toolchainViolations("service nginx restart", "linux-ubuntu")).toHaveLength(1);
   });
 
-  it("ignores packages merely mentioned outside an install command", async () => {
-    const { installedPackagesIn } = await import("./host-and-lab");
-    expect(installedPackagesIn("Kibana would normally visualise this, but we use grep.")).toEqual([]);
+  it("prose that merely says 'service' is not flagged", () => {
+    expect(toolchainViolations("Check the service responds on port 8080.", "linux-web")).toEqual([]);
   });
 
-  it("stops where the package list ends — the bug that rejected a good plan", async () => {
-    const { installedPackagesIn } = await import("./host-and-lab");
-    // A re-plan was refused for "missing packages: apk, info", read out of prose after the
-    // list.
-    expect(installedPackagesIn("apk add nginx openssl then apk info nginx")).toEqual(["nginx", "openssl"]);
-    expect(installedPackagesIn("apk add nginx, openssl. Then check it.")).toEqual(["nginx", "openssl"]);
-    // And a redirection is not a package called "2".
-    expect(installedPackagesIn("apt-get install -y curl 2>&1")).toEqual(["curl"]);
-  });
-
-  it("stops at a shell separator rather than swallowing the next command", async () => {
-    const { installedPackagesIn } = await import("./host-and-lab");
-    expect(installedPackagesIn("apk add nginx && nginx -t")).toEqual(["nginx"]);
+  it("the briefing says nginx is already running and the lab cannot enforce bans", () => {
+    const b = placementBriefing({ hostOs: "linux", template: "linux-web", hostLabel: "laptop" });
+    expect(b).toMatch(/NO service manager/);
+    expect(b).toMatch(/nginx is ALREADY RUNNING/);
+    expect(b).toMatch(/nginx -s reload/);
+    expect(b).toMatch(/cannot change firewall rules/);
   });
 });

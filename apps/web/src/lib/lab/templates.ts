@@ -65,6 +65,20 @@ export type LabTemplate = {
     /** Containers run as root; telling someone to sudo produces "command not found". */
     hasSudo: boolean;
     shell: "bash" | "sh" | "powershell";
+    /**
+     * How long-running programs are started. A container has no init system: rc-service,
+     * systemctl and service all fail with "not found" — reported from a real lab, where a
+     * plan's "rc-service nginx start" and "rc-service fail2ban start" both died that way.
+     */
+    serviceManager: "none" | "windows";
+    /**
+     * Whether the lab may change packet filtering. Containers run without NET_ADMIN, so
+     * iptables/nftables — and anything that bans by writing them, like fail2ban — cannot
+     * take effect. A plan that promises bans the lab cannot make is a false success.
+     */
+    firewall: boolean;
+    /** The program already running as the container's main process, and how to reload it. */
+    mainService?: { name: string; reload: string; logs?: string };
   };
   /** Said plainly at the point of consent. */
   caveat?: string;
@@ -77,7 +91,7 @@ export type LabTemplate = {
  */
 export const LAB_TEMPLATES: Record<string, LabTemplate> = {
   "windows-server-2025": {
-    toolchain: { distro: "Windows Server 2025", packageManager: "winget", hasSudo: false, shell: "powershell" },
+    toolchain: { distro: "Windows Server 2025", packageManager: "winget", hasSudo: false, shell: "powershell", serviceManager: "windows", firewall: true },
     label: "Windows Server 2025",
     purpose: "Active Directory, Group Policy, PowerShell administration, domain services.",
     image: "dockurr/windows",
@@ -97,7 +111,7 @@ export const LAB_TEMPLATES: Record<string, LabTemplate> = {
   },
 
   "windows-11": {
-    toolchain: { distro: "Windows 11", packageManager: "winget", hasSudo: false, shell: "powershell" },
+    toolchain: { distro: "Windows 11", packageManager: "winget", hasSudo: false, shell: "powershell", serviceManager: "windows", firewall: true },
     label: "Windows 11 Pro",
     purpose: "Endpoint work: policy, hardening, EDR, anything that needs a real desktop.",
     image: "dockurr/windows",
@@ -122,7 +136,7 @@ export const LAB_TEMPLATES: Record<string, LabTemplate> = {
    * hour. If a project can be done on Linux, it should be.
    */
   "linux-ubuntu": {
-    toolchain: { distro: "Ubuntu 24.04", packageManager: "apt", hasSudo: false, shell: "bash" },
+    toolchain: { distro: "Ubuntu 24.04", packageManager: "apt", hasSudo: false, shell: "bash", serviceManager: "none", firewall: false },
     label: "Ubuntu 24.04",
     purpose: "Services, scripting, containers, CI — most build projects want this.",
     image: "ubuntu:24.04",
@@ -134,7 +148,21 @@ export const LAB_TEMPLATES: Record<string, LabTemplate> = {
   },
 
   "linux-web": {
-    toolchain: { distro: "Alpine Linux", packageManager: "apk", hasSudo: false, shell: "sh" },
+    toolchain: {
+      distro: "Alpine Linux",
+      packageManager: "apk",
+      hasSudo: false,
+      shell: "sh",
+      serviceManager: "none",
+      firewall: false,
+      mainService: {
+        name: "nginx",
+        reload: "nginx -t && nginx -s reload",
+        // Measured in a running lab: the official image links both logs to the container's
+        // output, so fail2ban (or tail) inside the lab has no file to read.
+        logs: "/var/log/nginx/access.log and error.log are symlinks to /dev/stdout and /dev/stderr, not files. Anything that reads logs inside the lab (fail2ban, tail, grep) needs nginx to write a real file first: in /etc/nginx/nginx.conf the line is `access_log  /var/log/nginx/access.log  main;` — add a second line `access_log /var/log/nginx/access-file.log main;` next to it, then reload. 404 and 403 responses are in the ACCESS log, not the error log.",
+      },
+    },
     label: "Nginx web server",
     purpose: "Reverse proxies, TLS, headers, static hosting.",
     image: "nginx:1.27-alpine",
@@ -146,7 +174,15 @@ export const LAB_TEMPLATES: Record<string, LabTemplate> = {
   },
 
   "linux-postgres": {
-    toolchain: { distro: "Alpine Linux", packageManager: "apk", hasSudo: false, shell: "bash" },
+    toolchain: {
+      distro: "Alpine Linux",
+      packageManager: "apk",
+      hasSudo: false,
+      shell: "bash",
+      serviceManager: "none",
+      firewall: false,
+      mainService: { name: "postgres", reload: "su postgres -c 'pg_ctl reload'" },
+    },
     label: "PostgreSQL 16",
     purpose: "Backups, replication, tuning, anything that needs a real database.",
     image: "postgres:16-alpine",

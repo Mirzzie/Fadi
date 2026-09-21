@@ -34,27 +34,87 @@ async function portAnswers(port: number): Promise<boolean> {
   });
 }
 
-async function containerState(name: string): Promise<{
+export async function containerState(name: string): Promise<{
   status: string;
   running: boolean;
   exitCode: number;
   error: string;
+  oomKilled: boolean;
+  /** Volumes attached, named or anonymous. Both outlive `docker rm` without -v. */
+  volumes: number;
 } | null> {
   try {
     const { stdout } = await run(
       "docker",
-      ["inspect", "--format", "{{json .State}}", `fadi-${name}`],
+      ["inspect", "--format", '{"State":{{json .State}},"Mounts":{{json .Mounts}}}', `fadi-${name}`],
       { timeout: 2500, maxBuffer: 64 * 1024 }
     );
-    const state = JSON.parse(stdout.trim()) as Record<string, unknown>;
+    const parsed = JSON.parse(stdout.trim()) as {
+      State?: Record<string, unknown>;
+      Mounts?: Array<{ Type?: string }> | null;
+    };
+    const state = parsed.State ?? {};
     return {
       status: typeof state.Status === "string" ? state.Status : "unknown",
       running: state.Running === true,
       exitCode: typeof state.ExitCode === "number" ? state.ExitCode : 0,
       error: typeof state.Error === "string" ? state.Error : "",
+      oomKilled: state.OOMKilled === true,
+      volumes: (parsed.Mounts ?? []).filter((mount) => mount.Type === "volume").length,
     };
   } catch {
     return null;
+  }
+}
+
+/**
+ * WHY A CONTAINER ISN'T RUNNING, in words a person can act on.
+ *
+ * Every non-zero exit was "failed", and a failed lab offered no button. A Windows lab that
+ * was simply stopped showed "The lab container exited with exit code 143" with no way to
+ * start it again. 143 is SIGTERM — `docker stop`, a reboot, Docker Desktop quitting — and 137
+ * without an out-of-memory kill is the same stop after its grace period ran out. Those are
+ * stops. Only an out-of-memory kill or the program itself exiting with an error is a failure.
+ */
+export function classifyExit(state: {
+  exitCode: number;
+  oomKilled: boolean;
+  error: string;
+}): { phase: "stopped" | "failed"; detail: string } {
+  // Docker's own error first: a runtime that recorded one did not simply stop.
+  if (state.error.trim()) return { phase: "failed", detail: state.error.trim() };
+  if (state.oomKilled) {
+    return {
+      phase: "failed",
+      detail: "The lab ran out of memory and was stopped. Close other apps or labs, then start it again.",
+    };
+  }
+  if (state.exitCode === 0) {
+    return { phase: "stopped", detail: "The lab is stopped. Its disk is kept — resume to carry on." };
+  }
+  // A signal says how it ended, not who or what ended it — so the code is stated, not a cause.
+  if (state.exitCode === 143 || state.exitCode === 137) {
+    return {
+      phase: "stopped",
+      detail: `The lab was stopped by a signal (exit ${state.exitCode}). Its disk is kept — resume to carry on.`,
+    };
+  }
+  return {
+    phase: "failed",
+    detail: `The lab stopped with an error (exit code ${state.exitCode}). Start it again, or check its logs.`,
+  };
+}
+
+/** Whether a named Docker volume exists. Exact name only; nothing is listed or read from it. */
+export async function volumeExists(name: string): Promise<boolean> {
+  try {
+    await run("docker", ["volume", "inspect", "--format", "{{.Name}}", name], {
+      timeout: 2500,
+      maxBuffer: 16 * 1024,
+    });
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -266,12 +326,11 @@ export async function observeProjectRuntime(
     };
   }
   if (!state.running) {
+    const exit = classifyExit(state);
     return {
       ...base,
-      phase: state.exitCode === 0 ? "stopped" : "failed",
-      phaseDetail:
-        state.error ||
-        `The lab container ${state.status}${state.exitCode ? ` with exit code ${state.exitCode}` : ""}.`,
+      phase: exit.phase,
+      phaseDetail: exit.detail,
       endpoints: [],
       readinessChecks: [],
     };

@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 
 import {
   createCareerProfilesRepository,
-  createEvidenceRepository,
   createLearningCommitmentsRepository,
 } from "@careeros/database";
 
@@ -216,17 +215,7 @@ export async function completeCommitmentAction(input: {
     if (!commitment) return { ok: false, message: "Commitment not found." };
     if (commitment.status === "completed") return { ok: true, message: "Already completed." };
 
-    // ATOMIC: the evidence insert and the commitment update are one unit.
-    //
-    // Run as two independent writes, a failure between them left the user with an
-    // orphaned evidence item AND a commitment still marked in-progress — so the
-    // obvious retry inserted the evidence a SECOND time. The idempotence guard above
-    // only holds if the status update is guaranteed to land with the insert.
-    // Resolve BEFORE opening the transaction: the read is what needs the whole pool,
-    // and doing it inside would hold the transaction open across it for no benefit.
-    // A finished commitment is very often work the user already recorded by hand while
-    // they were doing it — that is the duplicate this catches.
-    const { admitAgainst, toIdentity, UNCONFIRMED_LINK } = await import("@/lib/identity/admit");
+    const { admitEvidence } = await import("@/lib/identity/admit");
     const candidate = {
       kind: commitment.kind === "project" ? "project" : "education",
       title: commitment.title,
@@ -237,38 +226,10 @@ export async function completeCommitmentAction(input: {
       tags: commitment.gap ? [commitment.gap.toLowerCase().trim()] : [],
       origin: "learning",
     };
-    const poolRows = await createEvidenceRepository(db).listForUser(user.id);
-    const metaOf = new Map(
-      poolRows.map((e) => [e.id, { factId: e.factId ?? e.id, origin: e.origin, detail: e.detail }]),
-    );
-    const admission = admitAgainst(
-      candidate,
-      poolRows.map((e) =>
-        toIdentity(
-          { kind: e.kind, title: e.title, organization: e.organization, period: e.period, detail: e.detail, tags: e.tags },
-          e.id,
-        ),
-      ),
-      (id) => metaOf.get(id) ?? { factId: id },
-    );
-
     const evidence = await db.transaction(async (tx) => {
-      const created = await createEvidenceRepository(tx).create(user.id, {
-        ...candidate,
-        ...(admission.decision === "absorb"
-          ? {
-              factId: admission.factId,
-              isCanonical: false,
-              renderingFor: admission.sure ? null : UNCONFIRMED_LINK,
-            }
-          : {}),
-      });
-      await createLearningCommitmentsRepository(tx).completeForUser(
-        user.id,
-        commitment.id,
-        created.id,
-      );
-      return created;
+      const admitted = await admitEvidence(user.id, candidate, { db: tx });
+      await createLearningCommitmentsRepository(tx).completeForUser(user.id, commitment.id, admitted.insertedId);
+      return admitted.row;
     });
 
     // Momentum and the event stay OUTSIDE the transaction on purpose. They are
@@ -304,8 +265,9 @@ export async function completeCommitmentAction(input: {
     });
     return {
       ok: true,
-      message:
-        "Done — added to your Evidence, so it now strengthens this direction's resume and every document Fadi drafts. You can edit it any time in Evidence.",
+      message: evidence.reviewStatus === "pending"
+        ? "Completed and saved for review. Open Your evidence to decide whether this work is already recorded."
+        : "Saved to Your evidence for future drafts. Existing documents have not been changed.",
       momentum: { value: motion.momentum, delta: motion.delta, band: motion.band },
     };
   } catch (error) {

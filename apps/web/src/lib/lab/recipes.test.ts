@@ -393,6 +393,8 @@ describe("the catalogue itself stays safe as it grows", () => {
         resourceId: "11111111-1111-4111-8111-111111111111",
         label: "Windows lab",
         vmxPath: "/home/user/VMs/windows/windows.vmx",
+        command: "nginx -t",
+        expect: "syntax is ok",
       });
       expect(params, `${id} should accept a legal parameter bag`).not.toBeNull();
 

@@ -10,7 +10,7 @@ import { placeLab, type Resource } from "@/lib/lab/capability";
 import { specForProject } from "@/lib/lab/spec-from-project";
 import { completionFor, completionOf, runHonesty } from "@/lib/lab/completion";
 import { templateForProject } from "@/lib/lab/spec-from-project";
-import { LAB_TEMPLATES } from "@/lib/lab/templates";
+import { LAB_TEMPLATES, labContainerForRun } from "@/lib/lab/templates";
 
 /**
  * WHERE COULD I ACTUALLY RUN THIS?
@@ -273,6 +273,10 @@ export type RunView = {
    */
   labTemplate: string | null;
   labLabel: string | null;
+  /** The exact command that opens a shell in this project's lab; null for desktop labs. */
+  labShell: string | null;
+  /** Where the lab runs, resolved from stored identity: "This computer", a VM, or unconnected. */
+  target: { kind: "local-docker" | "vmware" | "unconnected"; label: string };
 };
 
 /** Plan a committed project into steps against hardware the user actually owns. */
@@ -292,7 +296,18 @@ export async function listProjectRuns(): Promise<{ ok: boolean; runs: RunView[] 
   if (!user) return { ok: false, runs: [] };
   const { createProjectRunsRepository } = await import("@careeros/database");
   const repo = createProjectRunsRepository(getDatabase());
-  const runs = await repo.listForUser(user.id);
+  // Only the active direction's projects. A project belongs to the direction it was planned
+  // under; after switching from SOC Analyst to IT System Administrator the SOC labs were still
+  // listed. (Someone with no direction at all sees projects with none.)
+  const { createCareerProfilesRepository } = await import("@careeros/database");
+  const track = await createCareerProfilesRepository(getDatabase()).getActiveForUser(user.id);
+  const runs = (await repo.listForUser(user.id)).filter(
+    (run) => (run.careerProfileId ?? null) === (track?.id ?? null)
+  );
+  const { resolveTarget } = await import("@/lib/lab/target");
+  const resourcesById = new Map(
+    (await createLabResourcesRepository(getDatabase()).listForUser(user.id)).map((r) => [r.id, r])
+  );
   const out: RunView[] = [];
   for (const r of runs.filter((x) => x.status !== "abandoned")) {
     const detail = await repo.getWithSteps(user.id, r.id);
@@ -323,9 +338,39 @@ export async function listProjectRuns(): Promise<{ ok: boolean; runs: RunView[] 
       evidencedCount: honesty.evidenced,
       labTemplate: template,
       labLabel: template ? LAB_TEMPLATES[template].label : null,
+      target: (() => {
+        const resource = r.resourceId ? resourcesById.get(r.resourceId) : undefined;
+        const resolved = resolveTarget(
+          r,
+          resource ? { id: resource.id, label: resource.label, endpoint: resource.endpoint } : null
+        );
+        return { kind: resolved.kind, label: resolved.label };
+      })(),
+      labShell:
+        template && LAB_TEMPLATES[template].toolchain.shell !== "powershell"
+          ? `docker exec -it ${labContainerForRun(r.id)} ${LAB_TEMPLATES[template].toolchain.shell}`
+          : null,
     });
   }
   return { ok: true, runs: out };
+}
+
+/** The one place a project's lab target is decided — see lib/lab/target.ts. */
+async function targetFor(
+  userId: string,
+  run: { resourceId: string | null }
+): Promise<{
+  target: import("@/lib/lab/target").LabTarget;
+  resource: Awaited<ReturnType<ReturnType<typeof createLabResourcesRepository>["get"]>>;
+}> {
+  const { resolveTarget } = await import("@/lib/lab/target");
+  const resource = run.resourceId
+    ? await createLabResourcesRepository(getDatabase()).get(userId, run.resourceId)
+    : null;
+  return {
+    target: resolveTarget(run, resource ? { id: resource.id, label: resource.label, endpoint: resource.endpoint } : null),
+    resource,
+  };
 }
 
 /**
@@ -345,11 +390,7 @@ export async function proposeProjectLabAction(input: { runId: string }): Promise
   const id = z.string().uuid().safeParse(input.runId);
   if (!id.success) return { ok: false, message: "Unknown project." };
 
-  const {
-    createLabActionRequestsRepository,
-    createLabResourcesRepository,
-    createProjectRunsRepository,
-  } =
+  const { createLabActionRequestsRepository, createProjectRunsRepository } =
     await import("@careeros/database");
   const db = getDatabase();
   const project = await createProjectRunsRepository(db).getWithSteps(user.id, id.data);
@@ -366,10 +407,12 @@ export async function proposeProjectLabAction(input: { runId: string }): Promise
   }
 
   const { proposeAction } = await import("@/lib/lab/broker");
-  const resource = project.run.resourceId
-    ? await createLabResourcesRepository(db).get(user.id, project.run.resourceId)
-    : null;
-  if (resource?.endpoint?.startsWith("vmware:")) {
+  const { target, resource } = await targetFor(user.id, project.run);
+  if (target.kind === "unconnected") {
+    const { unconnectedMessage } = await import("@/lib/lab/target");
+    return { ok: false, message: unconnectedMessage(target) };
+  }
+  if (target.kind === "vmware" && resource) {
     const proposal = await proposeAction({
       userId: user.id,
       recipe: "vmware.start",
@@ -452,19 +495,17 @@ export async function proposeProjectLabStopAction(input: { runId: string }): Pro
   const id = z.string().uuid().safeParse(input.runId);
   if (!id.success) return { ok: false, message: "Unknown project." };
 
-  const {
-    createLabActionRequestsRepository,
-    createLabResourcesRepository,
-    createProjectRunsRepository,
-  } =
+  const { createLabActionRequestsRepository, createProjectRunsRepository } =
     await import("@careeros/database");
   const db = getDatabase();
   const project = await createProjectRunsRepository(db).getWithSteps(user.id, id.data);
   if (!project) return { ok: false, message: "That project is unavailable." };
-  const resource = project.run.resourceId
-    ? await createLabResourcesRepository(db).get(user.id, project.run.resourceId)
-    : null;
-  if (resource?.endpoint?.startsWith("vmware:")) {
+  const { target, resource } = await targetFor(user.id, project.run);
+  if (target.kind === "unconnected") {
+    const { unconnectedMessage } = await import("@/lib/lab/target");
+    return { ok: false, message: unconnectedMessage(target) };
+  }
+  if (target.kind === "vmware" && resource) {
     const { proposeAction } = await import("@/lib/lab/broker");
     const proposal = await proposeAction({
       userId: user.id,
@@ -517,19 +558,17 @@ export async function proposeProjectLabResumeAction(input: { runId: string }): P
   const id = z.string().uuid().safeParse(input.runId);
   if (!id.success) return { ok: false, message: "Unknown project." };
 
-  const {
-    createLabActionRequestsRepository,
-    createLabResourcesRepository,
-    createProjectRunsRepository,
-  } =
+  const { createLabActionRequestsRepository, createProjectRunsRepository } =
     await import("@careeros/database");
   const db = getDatabase();
   const project = await createProjectRunsRepository(db).getWithSteps(user.id, id.data);
   if (!project) return { ok: false, message: "That project is unavailable." };
-  const resource = project.run.resourceId
-    ? await createLabResourcesRepository(db).get(user.id, project.run.resourceId)
-    : null;
-  if (resource?.endpoint?.startsWith("vmware:")) {
+  const { target, resource } = await targetFor(user.id, project.run);
+  if (target.kind === "unconnected") {
+    const { unconnectedMessage } = await import("@/lib/lab/target");
+    return { ok: false, message: unconnectedMessage(target) };
+  }
+  if (target.kind === "vmware" && resource) {
     const { proposeAction } = await import("@/lib/lab/broker");
     const proposal = await proposeAction({
       userId: user.id,
@@ -630,6 +669,9 @@ export async function replanProjectAction(input: {
     title: existing.run.title,
     detail: existing.run.detail,
     replaceRunId: input.runId,
+    completedSteps: existing.steps
+      .filter((step) => step.status === "done")
+      .map((step) => ({ title: step.title, result: step.artifact })),
   });
 
   if (!planned.ok) return { ok: false, message: planned.message };
@@ -739,4 +781,164 @@ export async function detectLocalResources(): Promise<{
   }));
 
   return { ok: true, detected, absent: scan.absent, needsGrant: scan.needsGrant };
+}
+
+export type ComputerLabView = {
+  runId: string;
+  projectTitle: string;
+  labLabel: string;
+  phase: string;
+  detail: string;
+};
+
+/**
+ * The labs on this computer, for the Machines page — one row per project that has one.
+ *
+ * Reported: "why are these lab containers not listed in Machines?" They were only visible
+ * inside their own project. Read through the same observer the project page uses, so it
+ * needs no broader Docker access than that page does, and says the same thing.
+ */
+export type LeftoverLabView = {
+  name: string;
+  /** False when only the saved disk remains. */
+  container: boolean;
+  /** A named volume survives `docker rm`; removing the container does not free this. */
+  keptData: boolean;
+  detail: string;
+};
+
+export async function listComputerLabsAction(): Promise<{
+  ok: boolean;
+  labs: ComputerLabView[];
+  leftovers: LeftoverLabView[];
+}> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, labs: [], leftovers: [] };
+  const { createProjectRunsRepository } = await import("@careeros/database");
+  const { observeProjectRuntime } = await import("@/lib/lab/runtime-observer");
+  const { runtimeMessage } = await import("@/lib/lab/runtime-contract");
+  const runs = (await createProjectRunsRepository(getDatabase()).listForUser(user.id)).filter(
+    (run) => run.status !== "abandoned"
+  );
+  const observed = await Promise.all(
+    runs.map(async (run) => ({ run, runtime: await observeProjectRuntime(user.id, run.id) }))
+  );
+  // LEFTOVERS. Deleting a project left its container behind — found with a stopped nginx lab
+  // and a Windows disk nobody could see or remove. Only containers Fadi itself created for this
+  // person are considered, the same list the broker enforces for removal.
+  //
+  // Association comes from durable records — the lab.start request each current project made —
+  // not from whether observing it succeeded: a failed observation must not make a project's lab
+  // look like a leftover someone could remove.
+  const { createLabActionRequestsRepository } = await import("@careeros/database");
+  const { containerState, classifyExit, volumeExists } = await import("@/lib/lab/runtime-observer");
+  const requests = createLabActionRequestsRepository(getDatabase());
+  const created = new Set([
+    ...(await requests.createdNames(user.id, "lab.start")),
+    ...(await requests.createdNames(user.id, "container.run")),
+  ]);
+  const inProjects = new Set(
+    (
+      await Promise.all(runs.map((run) => requests.latestForRun(user.id, run.id, "lab.start")))
+    ).flatMap((request) => {
+      const name = (request?.params as { name?: unknown } | null)?.name;
+      return typeof name === "string" ? [name] : [];
+    })
+  );
+  const leftovers = (
+    await Promise.all(
+      [...created]
+        .filter((name) => !inProjects.has(name))
+        .map(async (name): Promise<LeftoverLabView | null> => {
+          const [state, hasData] = await Promise.all([
+            containerState(name),
+            volumeExists(`fadi-${name}-storage`),
+          ]);
+          if (!state && !hasData) return null;
+          return {
+            name,
+            container: Boolean(state),
+            // An older lab may keep its disk in an unnamed volume; that survives removal too.
+            keptData: hasData || (state?.volumes ?? 0) > 0,
+            detail: !state
+              ? "Container removed · its saved disk is still on this computer"
+              : state.running
+                ? "Running"
+                : classifyExit(state).phase === "failed"
+                  ? "Stopped with an error"
+                  : "Stopped",
+          };
+        })
+    )
+  ).filter((lab): lab is LeftoverLabView => Boolean(lab));
+
+  return {
+    ok: true,
+    leftovers,
+    labs: observed.flatMap(({ run, runtime }) =>
+      runtime
+        ? [
+            {
+              runId: run.id,
+              projectTitle: run.title,
+              labLabel: runtime.templateLabel,
+              phase: runtime.phase,
+              detail: runtimeMessage(runtime),
+            },
+          ]
+        : []
+    ),
+  };
+}
+
+/** Ask to remove a leftover lab container. Irreversible, so the broker asks for its name. */
+export async function proposeRemoveLeftoverLabAction(input: {
+  name: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  // Revalidated now, not trusted from the page: a project may have claimed this lab since.
+  const current = await listComputerLabsAction();
+  if (!current.leftovers.some((lab) => lab.name === input.name && lab.container)) {
+    return { ok: false, message: "That lab belongs to a current project, or is already gone." };
+  }
+  const { proposeAction } = await import("@/lib/lab/broker");
+  const proposal = await proposeAction({
+    userId: user.id,
+    recipe: "container.remove",
+    params: { name: input.name },
+    actor: "user",
+    origin: "dashboard:machines",
+  });
+  return proposal.ok
+    ? { ok: true, message: "Waiting for your approval." }
+    : { ok: false, message: proposal.message };
+}
+
+/**
+ * Run a project on this computer instead of a machine Fadi can't reach. Explicit, and only for an
+ * unconnected target: a project on a reachable VM keeps its placement unless that is a decision.
+ */
+export async function runOnThisComputerAction(input: {
+  runId: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  const id = z.string().uuid().safeParse(input.runId);
+  if (!id.success) return { ok: false, message: "Unknown project." };
+  const { createProjectRunsRepository } = await import("@careeros/database");
+  const runs = createProjectRunsRepository(getDatabase());
+  const project = await runs.getWithSteps(user.id, id.data);
+  if (!project) return { ok: false, message: "That project is unavailable." };
+  const { target } = await targetFor(user.id, project.run);
+  if (target.kind !== "unconnected") {
+    return { ok: false, message: "This project already runs somewhere Fadi can reach." };
+  }
+  await runs.placeOnThisComputer(user.id, id.data);
+  await recordRegistryChange(user.id, {
+    capability: "project.placement",
+    resourceId: target.resourceId,
+    detail: `Moved "${project.run.title}" from ${target.label} to this computer.`,
+  });
+  return { ok: true, message: "This project now runs on this computer." };
 }

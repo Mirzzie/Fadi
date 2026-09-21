@@ -5,6 +5,7 @@ import { Check, Cpu, HelpCircle, Loader2, Plus, Radar, ShieldQuestion, X } from 
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import {
   addLabResource,
   detectLocalResources,
@@ -40,11 +41,14 @@ export function LabFit({ title, detail }: { title: string; detail?: string | nul
   const [adding, setAdding] = useState(false);
   const [pending, start] = useTransition();
 
-  const refresh = useCallback(() =>
-    start(async () => {
-      const res = await planLabFor({ title, detail });
-      if (res.ok && res.plan) setPlan(res.plan);
-    }), [title, detail]);
+  const refresh = useCallback(
+    () =>
+      start(async () => {
+        const res = await planLabFor({ title, detail });
+        if (res.ok && res.plan) setPlan(res.plan);
+      }),
+    [title, detail]
+  );
 
   useEffect(() => {
     refresh();
@@ -59,7 +63,8 @@ export function LabFit({ title, detail }: { title: string; detail?: string | nul
   if (!plan) {
     return (
       <p className="mt-1.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <Loader2 className="size-3 animate-spin" aria-hidden="true" /> checking what you could run this on…
+        <Loader2 className="size-3 animate-spin" aria-hidden="true" /> checking what you could run
+        this on…
       </p>
     );
   }
@@ -91,13 +96,15 @@ export function LabFit({ title, detail }: { title: string; detail?: string | nul
         ) : (
           <div className="mt-2">
             <p className="text-[11px] text-muted-foreground">
-              Fadi doesn&apos;t know what you have to work with yet, so it can&apos;t tell you whether
-              this is runnable. Describe one machine and it will.
+              Fadi doesn&apos;t know what you have to work with yet, so it can&apos;t tell you
+              whether this is runnable. Describe one machine and it will.
             </p>
             <div className="mt-1.5 flex flex-wrap gap-2">
               {/* Fadi is running on this machine — asking the user to transcribe what is
                   installed is asking them to copy out something Fadi can read. */}
-              <DetectHere onSaved={() => window.dispatchEvent(new CustomEvent("fadi:resources-changed"))} />
+              <DetectHere
+                onSaved={() => window.dispatchEvent(new CustomEvent("fadi:resources-changed"))}
+              />
               <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
                 <Plus className="size-3.5" aria-hidden="true" />
                 Describe one myself
@@ -130,8 +137,8 @@ export function LabFit({ title, detail }: { title: string; detail?: string | nul
           ))}
           {plan.fits.length === 0 && plan.unverified.length === 0 ? (
             <p className="text-[11px] text-muted-foreground">
-              Nothing you&apos;ve registered can host this as described. That is worth knowing before
-              you start, not after.
+              Nothing you&apos;ve registered can host this as described. That is worth knowing
+              before you start, not after.
             </p>
           ) : null}
 
@@ -154,7 +161,9 @@ export function LabFit({ title, detail }: { title: string; detail?: string | nul
             />
           ) : (
             <div className="flex flex-wrap gap-2 pt-1">
-              <DetectHere onSaved={() => window.dispatchEvent(new CustomEvent("fadi:resources-changed"))} />
+              <DetectHere
+                onSaved={() => window.dispatchEvent(new CustomEvent("fadi:resources-changed"))}
+              />
               <Button size="sm" variant="outline" onClick={() => setAdding(true)}>
                 <Plus className="size-3.5" aria-hidden="true" />
                 Add another machine
@@ -173,55 +182,57 @@ export function LabFit({ title, detail }: { title: string; detail?: string | nul
  * the first resource is registered. Project cards still ask just in time; this is the
  * durable place to inspect and extend the whole lab. */
 export function MachineRegistration() {
-  const [mode, setMode] = useState<"choose" | "describe" | "vmware" | null>(null);
-
-  if (mode === "describe") {
-    return (
-      <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-        <AddResource
-          onDone={() => setMode(null)}
-          onCancel={() => setMode("choose")}
-        />
-      </div>
-    );
-  }
-  if (mode === "vmware") {
-    return (
-      <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-        <AddVmwareResource onDone={() => setMode(null)} onCancel={() => setMode("choose")} />
-      </div>
-    );
-  }
-  if (mode === "choose") {
-    return (
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card p-4 shadow-sm">
-        <DetectHere
-          onSaved={() => {
-            window.dispatchEvent(new CustomEvent("fadi:resources-changed"));
-            setMode(null);
-          }}
-        />
-        <Button size="sm" variant="outline" onClick={() => setMode("vmware")}>
-          Existing VMware VM
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => setMode("describe")}>
-          Describe a machine
-        </Button>
-        <FindOnNetwork />
-        <Button size="sm" variant="ghost" className="ml-auto" onClick={() => setMode(null)}>
-          Cancel
-        </Button>
-      </div>
-    );
-  }
-
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState<"choose" | "describe" | "vmware">("choose");
+  const close = () => setOpen(false);
   return (
-    <div>
-      <Button size="sm" onClick={() => setMode("choose")}>
-        <Plus className="size-3.5" aria-hidden="true" />
-        Add machine
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Button
+        size="sm"
+        onClick={() => {
+          setMode("choose");
+          setOpen(true);
+        }}
+      >
+        <Plus className="size-3.5" aria-hidden="true" /> Add machine
       </Button>
-    </div>
+      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
+        <DialogTitle>Add a machine</DialogTitle>
+        <DialogDescription>
+          Choose how to add it. Starting or changing a machine needs your approval.
+        </DialogDescription>
+        {mode === "describe" ? (
+          <AddResource onDone={close} onCancel={() => setMode("choose")} />
+        ) : mode === "vmware" ? (
+          <AddVmwareResource onDone={close} onCancel={() => setMode("choose")} />
+        ) : (
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <DetectHere
+                onSaved={() => {
+                  window.dispatchEvent(new CustomEvent("fadi:resources-changed"));
+                  close();
+                }}
+              />
+              <Button size="sm" variant="outline" onClick={() => setMode("vmware")}>
+                Add an existing VMware VM
+              </Button>
+            </div>
+            <details className="rounded-lg border border-border p-3">
+              <summary className="cursor-pointer text-sm text-muted-foreground">
+                Other ways to add a machine
+              </summary>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => setMode("describe")}>
+                  Enter machine details
+                </Button>
+                <FindOnNetwork />
+              </div>
+            </details>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -243,6 +254,7 @@ function AddVmwareResource({ onDone, onCancel }: { onDone: () => void; onCancel:
         <Input
           value={label}
           onChange={(event) => setLabel(event.target.value)}
+          aria-label="Machine name"
           placeholder="Name, e.g. Windows lab"
           className="h-8 text-xs"
           autoFocus
@@ -250,14 +262,15 @@ function AddVmwareResource({ onDone, onCancel }: { onDone: () => void; onCancel:
         <Input
           value={path}
           onChange={(event) => setPath(event.target.value)}
+          aria-label="VMX file path"
           placeholder="/absolute/path/to/machine.vmx"
           className="h-8 font-mono text-xs"
           spellCheck={false}
         />
       </div>
       <p className="text-[11px] text-muted-foreground">
-        The path is resolved and read once before it is saved. It is never accepted from project text
-        or an AI model; those callers can only name this registered machine by id.
+        Use the full path to the existing VMX file on this computer. Adding it does not start or
+        change the VM.
       </p>
       {message ? <p className="text-xs text-destructive">{message}</p> : null}
       <div className="flex justify-end gap-2">
@@ -358,7 +371,11 @@ function AddResource({ onDone, onCancel }: { onDone: () => void; onCancel: () =>
           inputMode="decimal"
         />
         <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
-          <input type="checkbox" checked={alwaysOn} onChange={(e) => setAlwaysOn(e.target.checked)} />
+          <input
+            type="checkbox"
+            checked={alwaysOn}
+            onChange={(e) => setAlwaysOn(e.target.checked)}
+          />
           It stays on — I can reach it at 3am
         </label>
       </div>
@@ -465,12 +482,16 @@ function DetectHere({ onSaved }: { onSaved: () => void }) {
       <div className="w-full space-y-1.5">
         {found.length === 0 ? (
           <p className="text-[11px] text-muted-foreground">
-            Nothing detectable here{absent.length ? ` — no ${absent.slice(0, 3).join(", ")}` : ""}. Describe a
-            machine instead.
+            Nothing detectable here
+            {absent.length ? ` — no ${absent.slice(0, 3).join(", ")}` : ""}. Describe a machine
+            instead.
           </p>
         ) : (
           found.map((d) => (
-            <div key={d.label} className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 p-2">
+            <div
+              key={d.label}
+              className="flex flex-wrap items-center gap-2 rounded-md border border-border/60 p-2"
+            >
               <span className="text-xs font-medium">{d.label}</span>
               <span className="text-[11px] text-muted-foreground">{d.detail}</span>
               <Button
@@ -504,17 +525,16 @@ function DetectHere({ onSaved }: { onSaved: () => void }) {
   }
 
   return (
-    <Button
-      size="sm"
-      disabled={pending}
-      onClick={look}
-    >
-      {pending ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <Cpu className="size-3.5" aria-hidden="true" />}
+    <Button size="sm" disabled={pending} onClick={look}>
+      {pending ? (
+        <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+      ) : (
+        <Cpu className="size-3.5" aria-hidden="true" />
+      )}
       {pending ? "Looking…" : "Detect what's on this machine"}
     </Button>
   );
 }
-
 
 /**
  * "What else is on my network?"
@@ -539,7 +559,10 @@ function FindOnNetwork() {
         return;
       }
       if (res.needsGrant) {
-        setAsk({ summary: res.needsGrant.summary, limit: res.needsGrant.limit });
+        setAsk({
+          summary: res.needsGrant.summary,
+          limit: res.needsGrant.limit,
+        });
         return;
       }
       setKnown(res.known ?? []);
@@ -581,7 +604,9 @@ function FindOnNetwork() {
     return (
       <div className="w-full space-y-1.5 rounded-md border border-border/60 p-2.5">
         <p className="text-[11px] font-medium">
-          {known.length ? "Already spoken to: " + known.join(", ") : "This machine hasn't spoken to anything recently."}
+          {known.length
+            ? "Already spoken to: " + known.join(", ")
+            : "This machine hasn't spoken to anything recently."}
         </p>
         {/* The honest caveat: a passive read only shows recent conversations, so absence
             here is not evidence that a machine isn't there. */}
@@ -600,7 +625,11 @@ function FindOnNetwork() {
               // The narrowing is disclosed in the label rather than applied quietly —
               // scanning something other than what the button said would be worse than
               // refusing to scan at all.
-              title={s.narrowedFrom ? "Narrowed from " + s.narrowedFrom + ", which is too wide to sweep" : undefined}
+              title={
+                s.narrowedFrom
+                  ? "Narrowed from " + s.narrowedFrom + ", which is too wide to sweep"
+                  : undefined
+              }
               onClick={() =>
                 start(async () => {
                   const res = await proposeNetworkSweep({ cidr: s.cidr });
@@ -620,7 +649,11 @@ function FindOnNetwork() {
 
   return (
     <Button size="sm" variant="outline" disabled={busy} onClick={look}>
-      {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <Radar className="size-3.5" aria-hidden="true" />}
+      {busy ? (
+        <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+      ) : (
+        <Radar className="size-3.5" aria-hidden="true" />
+      )}
       Find machines on my network
     </Button>
   );

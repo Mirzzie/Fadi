@@ -104,7 +104,7 @@ export function PendingAction({
 
       <p className="text-[11px] text-muted-foreground">
         Asked by {ACTOR_LABEL[w.actor] ?? w.actor}
-        {w.origin ? " (" + w.origin + ")" : ""}.{w.reversal ? " " + w.reversal : ""}
+        {originLabel(w.origin) ? " " + originLabel(w.origin) : ""}.{w.reversal ? " " + w.reversal : ""}
       </p>
 
       {mustType ? (
@@ -131,9 +131,7 @@ export function PendingAction({
           onClick={() =>
             start(async () => {
               const res = await approveAction({ requestId: w.id, confirmation: typed });
-              onSettled(
-                res.ok ? "Done. " + (res.message ?? "") : (res.message ?? "It didn't run.")
-              );
+              onSettled(res.ok ? settledText(res.message) : (res.message ?? "It didn't run."));
               // Every surface showing this queue hears about it, so the prompt does not
               // linger on one screen after being answered on another.
               announceActionsChanged();
@@ -171,4 +169,22 @@ export function PendingAction({
       </div>
     </div>
   );
+}
+
+/** Where a request came from, in words — never an internal route name like "dashboard:step_check". */
+function originLabel(origin: string | null | undefined): string {
+  if (!origin) return "";
+  if (origin === "dashboard:step_check") return "from a step check";
+  if (origin.startsWith("dashboard:project")) return "from a project";
+  if (origin.startsWith("dashboard:machines")) return "from Machines";
+  if (origin.startsWith("tool:")) return "from a chat";
+  if (origin.startsWith("mcp")) return "through a connected app";
+  return "";
+}
+
+/** What approval produced, readable: a bare container id says nothing to a person. */
+function settledText(output: string | undefined): string {
+  const text = (output ?? "").trim();
+  if (!text || /^[0-9a-f]{12,64}$/.test(text) || /^fadi-[a-z0-9-]+$/.test(text)) return "Done.";
+  return text;
 }

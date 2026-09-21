@@ -3,6 +3,8 @@
 Status: target architecture
 Date: 2026-09-11
 
+Implementation sequencing revised 2026-09-12: see the [agentic lab simplification review](../reviews/2026-09-12-codex-agentic-lab-simplification.md). Start with explicit target binding, one durable operation runner, and one guest action/check/continue journey. The records below describe distinct concepts; they are not a requirement to introduce every table or a separate orchestration service before that journey works. The runtime observer currently implements only part of this target.
+
 ## Product model
 
 The Learning Hub has three durable places:
@@ -78,7 +80,7 @@ Local ports bind to `127.0.0.1` using broker-assigned ports. Remote publishing i
 Each template declares required checks. A check records its exact name, status, observation, and timestamp. Examples:
 
 - viewer HTTP response: proves the setup console is reachable;
-- RDP accepts a connection: supports Windows guest readiness;
+- a protocol-level RDP response from the identified guest: supports Windows service readiness; a TCP listener alone is insufficient;
 - guest-agent health: proves the expected operating system booted;
 - project service probe: proves the service required by the current task responds.
 

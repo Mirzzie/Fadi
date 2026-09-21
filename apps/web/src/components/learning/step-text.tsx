@@ -49,7 +49,7 @@ function Inline({ parts }: { parts: InlinePart[] }) {
   );
 }
 
-function CommandBlock({ code, lang }: { code: string; lang: string | null }) {
+export function CommandBlock({ code, lang }: { code: string; lang: string | null }) {
   const [copied, setCopied] = useState(false);
 
   async function copy() {

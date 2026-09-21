@@ -7,13 +7,12 @@ import { createLabResourcesRepository, createProjectRunsRepository } from "@care
 import { getDatabase } from "@/lib/database/client";
 import { AiRateLimitError, getUserDocGenerate } from "@/lib/ai/user-generate";
 import { placeLab, type Resource } from "@/lib/lab/capability";
-import { LAB_TEMPLATES, labContainerForRun } from "./templates";
+import { labContainerForRun, type TemplateKey } from "./templates";
 import {
   hostOsOf,
   labOsOf,
   osViolations,
   placementBriefing,
-  installedPackagesIn,
   toolchainViolations,
 } from "./host-and-lab";
 import { specForProject, templateForProject } from "@/lib/lab/spec-from-project";
@@ -43,10 +42,12 @@ const planSchema = z.object({
         instruction: z.string().min(1).max(1200),
         verify: z.string().max(500).optional().default(""),
         produces: z.string().max(300).optional().default(""),
-      }),
+      })
     )
-    .min(3)
-    .max(12),
+    // One, not three: a re-plan of a project with most steps finished needs only what is left,
+    // and forcing three would pad it. The prompt still asks new plans for 3 to 8.
+    .min(1)
+    .max(8),
 });
 
 const SYSTEM = `You plan hands-on technical projects for one person, to be done on hardware they own.
@@ -59,6 +60,18 @@ Write steps that person can actually execute tonight. Rules:
 - Assume competence but not familiarity: they can use a terminal, they have not done THIS before.
 - 3 to 8 steps. A plan longer than that is a course, and it will not be finished.
 - Never invent details about their environment beyond what you are told.`;
+
+// Static checks catch known contradictions. They do not prove commands or packages work;
+// those checks belong to execution in the approved environment.
+function planViolations(
+  steps: z.infer<typeof planSchema>["steps"],
+  template: TemplateKey | null
+): string[] {
+  if (!template) return [];
+  const text = steps.map((s) => `${s.title}\n${s.instruction}\n${s.verify ?? ""}`).join("\n");
+  const os = labOsOf(template);
+  return [...(os ? osViolations(text, os) : []), ...toolchainViolations(text, template)];
+}
 
 export type PlannedRun = { runId: string; steps: number };
 
@@ -74,18 +87,26 @@ export async function planProjectRun(
      * instructions that do not match the machine they run on.
      */
     replaceRunId?: string;
-  },
+    /** On a re-plan: steps already finished. They are kept, and the new plan continues from them. */
+    completedSteps?: Array<{ title: string; result: string | null }>;
+  }
 ): Promise<{ ok: true; plan: PlannedRun } | { ok: false; message: string }> {
   const generate = await getUserDocGenerate(userId);
   if (!generate) {
     return {
       ok: false,
-      message: "Planning a project needs an AI provider — add one in Settings → AI, then try again.",
+      message:
+        "Planning a project needs an AI provider — add one in Settings → AI, then try again.",
     };
   }
 
   const db = getDatabase();
-  const rows = await createLabResourcesRepository(db).listForUser(userId);
+  // Only machines Fadi can actually act on are placement candidates. Placing a project on a
+  // registered-but-unconnected server produced plans for one machine and labs on another (A07).
+  const { isConnected } = await import("./target");
+  const rows = (await createLabResourcesRepository(db).listForUser(userId)).filter((r) =>
+    isConnected({ id: r.id, label: r.label, endpoint: r.endpoint })
+  );
   const resources: Resource[] = rows.map((r) => ({
     id: r.id,
     label: r.label,
@@ -97,13 +118,14 @@ export async function planProjectRun(
     alwaysOn: r.alwaysOn,
   }));
 
+  const template = templateForProject(input);
   const { spec } = specForProject(input);
   const { fits, unverified } = placeLab(spec, resources);
   // Prefer a confirmed host; fall back to an unverified one, because "we have not
   // recorded your RAM" should not stop someone starting — it should be said out loud.
-  const host = fits[0] ?? unverified[0]?.resource ?? null;
+  const host = template ? (fits[0] ?? unverified[0]?.resource ?? null) : null;
 
-  if (resources.length > 0 && !host) {
+  if (template && resources.length > 0 && !host) {
     return {
       ok: false,
       message:
@@ -123,7 +145,6 @@ export async function planProjectRun(
   // Fadi runs on, not an inspection of anyone's computer, so it needs no capability;
   // gating it would mean planning blind by default, which is how the Windows steps
   // happened.
-  const template = templateForProject(input);
   const placement = placementBriefing({
     hostOs: hostOsOf(process.platform),
     template,
@@ -133,20 +154,40 @@ export async function planProjectRun(
     containerName: input.replaceRunId ? labContainerForRun(input.replaceRunId) : null,
   });
 
-  const hostLine = host
-    ? `Host: ${host.label} — ${host.kind}, ${host.arch}, ${
-        host.memoryMb ? `${Math.round((host.memoryMb / 1024) * 10) / 10} GB RAM` : "RAM not recorded"
-      }, runs ${host.virtualization}, ${host.alwaysOn ? "stays on" : "not always on"}.`
-    : "Host: not recorded. Plan for a single ordinary laptop and say so in step one.";
+  const hostLine = !template
+    ? "No local lab is required. Work in the hosted service or document workspace; do not invent a lab host."
+    : host
+      ? `Host: ${host.label} — ${host.kind}, ${host.arch}, ${
+          host.memoryMb
+            ? `${Math.round((host.memoryMb / 1024) * 10) / 10} GB RAM`
+            : "RAM not recorded"
+        }, runs ${host.virtualization}, ${host.alwaysOn ? "stays on" : "not always on"}.`
+      : "Host: not recorded. Plan for a single ordinary laptop and say so in step one.";
+
+  // A re-plan continues from what is done instead of starting the project over.
+  const doneLine = input.completedSteps?.length
+    ? [
+        "ALREADY COMPLETED — these steps stay as they are. Do not repeat them; plan only the remaining work, continuing from here (1 to 8 steps):",
+        ...input.completedSteps.map(
+          (step, index) => `${index + 1}. ${step.title}${step.result ? ` (result: ${step.result})` : ""}`
+        ),
+      ].join("\n")
+    : "";
 
   try {
     const parsed = await generate.structured(
       SYSTEM,
-      [`Project: ${input.title}`, input.detail ? `Description: ${input.detail}` : "", placement, hostLine]
+      [
+        `Project: ${input.title}`,
+        input.detail ? `Description: ${input.detail}` : "",
+        placement,
+        hostLine,
+        doneLine,
+      ]
         .filter(Boolean)
         .join("\n"),
       planSchema,
-      "project_plan",
+      "project_plan"
     );
 
     // CHECK THE PLAN AGAINST ITS OWN MACHINE.
@@ -159,28 +200,7 @@ export async function planProjectRun(
     // A project with no lab has no OS to contradict — the check is about a plan matching
     // the machine it runs on, and there is no machine.
     const labOs = template ? labOsOf(template) : null;
-    const planText = parsed.steps.map((s) => `${s.title} ${s.instruction} ${s.verify ?? ""}`).join("\n");
-    // OS first, then distribution: Windows steps on Linux, and "sudo apt-get" on Alpine,
-    // are both unfollowable on the first line.
-    const violations = template
-      ? [...(labOs ? osViolations(planText, labOs) : []), ...toolchainViolations(planText, template)]
-      : [];
-
-    // And the packages themselves, asked of the real image. A plan's install step failed
-    // inside a real lab because three of six packages are not packaged for Alpine, and apk
-    // installing atomically meant none of them went in.
-    if (template) {
-      const names = installedPackagesIn(planText);
-      if (names.length > 0) {
-        const { packagesMissingFrom } = await import("./broker");
-        const { missing } = await packagesMissingFrom(template, names);
-        if (missing.length > 0) {
-          violations.push(
-            `packages that do not exist in ${LAB_TEMPLATES[template].toolchain.distro}'s repositories (${missing.join(", ")}) — leave them out or install them another documented way`,
-          );
-        }
-      }
-    }
+    const violations = planViolations(parsed.steps, template);
 
     if (violations.length > 0) {
       logger.warn("lab.plan_os_mismatch", { userId, labOs, violations: violations.join(", ") });
@@ -191,22 +211,15 @@ export async function planProjectRun(
           input.detail ? `Description: ${input.detail}` : "",
           placement,
           hostLine,
+          doneLine,
           `Your previous plan used ${violations.join(", ")}, which cannot run on this ${labOs === "linux" ? "Linux" : "Windows"} machine. Write it again for the machine it actually runs on.`,
         ]
           .filter(Boolean)
           .join("\n"),
         planSchema,
-        "project_plan",
+        "project_plan"
       );
-      const retryText = retry.steps.map((s) => `${s.title} ${s.instruction} ${s.verify ?? ""}`).join("\n");
-      const retryViolations = template
-        ? [...(labOs ? osViolations(retryText, labOs) : []), ...toolchainViolations(retryText, template)]
-        : [];
-      if (template && retryViolations.length === 0) {
-        const { packagesMissingFrom } = await import("./broker");
-        const { missing } = await packagesMissingFrom(template, installedPackagesIn(retryText));
-        if (missing.length > 0) retryViolations.push("missing packages: " + missing.join(", "));
-      }
+      const retryViolations = planViolations(retry.steps, template);
       if (retryViolations.length === 0) {
         parsed.steps = retry.steps;
       } else {
@@ -217,7 +230,7 @@ export async function planProjectRun(
           ok: false,
           message:
             "Fadi kept writing " +
-            violations.join(", ") +
+            retryViolations.join(", ") +
             " for a " +
             (labOs === "linux" ? "Linux" : "Windows") +
             " machine, so it hasn't saved the plan rather than give you steps that cannot run. Try again, or say in the project description which OS you want.",
@@ -239,30 +252,36 @@ export async function planProjectRun(
     // only the steps. A wrong plan was otherwise a dead end: abandon the project and start
     // over, or follow instructions that do not match the machine they run on.
     if (input.replaceRunId) {
-      const replaced = await repo.replaceSteps(userId, input.replaceRunId, rows, {
-        resourceId: host?.id ?? null,
-        resourceLabel: host?.label ?? null,
-      });
-      if (replaced.length === 0) {
+      const replaced = await repo.replaceSteps(userId, input.replaceRunId, rows);
+      if (!replaced) {
         return { ok: false, message: "That project is gone." };
       }
       logger.info("lab.run_replanned", { userId, steps: rows.length, host: host?.kind ?? "none" });
       return { ok: true, plan: { runId: input.replaceRunId, steps: rows.length } };
     }
 
+    // Every new project belongs to the direction it was planned under, so switching direction
+    // shows that direction's projects rather than every project ever planned.
+    const { createCareerProfilesRepository } = await import("@careeros/database");
+    const track = await createCareerProfilesRepository(db).getActiveForUser(userId);
     const { run } = await repo.createWithSteps(
       userId,
       {
+        careerProfileId: track?.id ?? null,
         title: input.title,
         detail: input.detail ?? null,
         commitmentId: input.commitmentId ?? null,
         resourceId: host?.id ?? null,
         resourceLabel: host?.label ?? null,
       },
-      rows,
+      rows
     );
 
-    logger.info("lab.run_planned", { userId, steps: parsed.steps.length, host: host?.kind ?? "none" });
+    logger.info("lab.run_planned", {
+      userId,
+      steps: parsed.steps.length,
+      host: host?.kind ?? "none",
+    });
     return { ok: true, plan: { runId: run.id, steps: parsed.steps.length } };
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
@@ -289,12 +308,14 @@ export async function planProjectRun(
     if (/\b401\b|\b403\b|invalid api key|unauthori[sz]ed/i.test(detail)) {
       return {
         ok: false,
-        message: "Your AI provider rejected the key. Check it in Settings → AI — retrying won't help until it's fixed.",
+        message:
+          "Your AI provider rejected the key. Check it in Settings → AI — retrying won't help until it's fixed.",
       };
     }
     return {
       ok: false,
-      message: "Fadi couldn't produce a usable plan for this one. Try again, or add more detail to the project description.",
+      message:
+        "Fadi couldn't produce a usable plan for this one. Try again, or add more detail to the project description.",
     };
   }
 }
