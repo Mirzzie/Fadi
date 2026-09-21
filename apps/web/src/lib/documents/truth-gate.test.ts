@@ -61,3 +61,45 @@ describe("truthCheck — a genuinely grounded draft passes clean", () => {
     expect(f).toHaveLength(0);
   });
 });
+
+describe("the job-description check flags terms, not English", () => {
+  const jd = "We are building a regular programme where each graduate delivers real consulting work with Kubernetes.";
+  const corpus = "IT support technician. Windows, Microsoft 365, Linux.";
+
+  it("THE REPORTED NOISE: ordinary words are not things to justify", () => {
+    // Seen on a real EY cover letter, 20 Sep: twelve warnings, including "while", "also",
+    // "each", "over", "regular" and "real".
+    const draft = "While building each regular part of the real work, I also delivered over time.";
+    const flagged = truthCheck(draft, { corpus, jobDescription: jd }).filter(
+      (f) => f.category === "jd-only-term"
+    );
+    expect(flagged.map((f) => f.offending)).toEqual([]);
+  });
+
+  it("still flags a real term borrowed from the posting", () => {
+    const draft = "I ran Kubernetes clusters in production.";
+    const flagged = truthCheck(draft, { corpus, jobDescription: jd }).filter(
+      (f) => f.category === "jd-only-term"
+    );
+    expect(flagged.map((f) => f.offending)).toContain("kubernetes");
+  });
+});
+
+describe("a term that ends a sentence is still the same term", () => {
+  it("matches a posting word written before a full stop", () => {
+    // "…with Kubernetes." tokenised as "kubernetes." and matched nothing.
+    const flagged = truthCheck("I ran Kubernetes clusters.", {
+      corpus: "IT support technician.",
+      jobDescription: "You will work with Kubernetes.",
+    }).filter((f) => f.category === "jd-only-term");
+    expect(flagged.map((f) => f.offending)).toContain("kubernetes");
+  });
+
+  it("keeps a dot inside a technology name", () => {
+    const flagged = truthCheck("I build with Node.js daily.", {
+      corpus: "IT support technician.",
+      jobDescription: "Our stack is Node.js and Postgres.",
+    }).filter((f) => f.category === "jd-only-term");
+    expect(flagged.map((f) => f.offending)).toContain("node.js");
+  });
+});

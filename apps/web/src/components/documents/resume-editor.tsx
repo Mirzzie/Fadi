@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ImproveBox } from "@/components/documents/improve-box";
 import { AiTellCheck } from "@/components/documents/ai-tell-check";
 import { DictatableTextarea } from "@/components/documents/dictatable-textarea";
 import { ResumeAdvisor } from "@/components/documents/resume-advisor";
@@ -84,6 +85,7 @@ export function ResumeEditor({
   initialVersion,
   experienceLevel,
   customTemplates = [],
+  hasJob = false,
 }: {
   id: string;
   initialTitle: string;
@@ -92,6 +94,8 @@ export function ResumeEditor({
   initialVersion: number;
   experienceLevel?: string | null;
   customTemplates?: { id: string; name: string; config: Record<string, unknown> }[];
+  /** Whether this résumé belongs to a posting — Fadi tailors to it when asked to change things. */
+  hasJob?: boolean;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
@@ -267,7 +271,7 @@ export function ResumeEditor({
             </div>
             <DictatableTextarea
               className={`${field} mt-2 min-h-16`}
-              placeholder="What you built and the impact"
+              placeholder="What you built and the impact — one line becomes one bullet"
               value={p.description}
               onChange={(description) => updateList(data, patch, "projects", i, { description })}
               label="what you built"
@@ -368,7 +372,7 @@ export function ResumeEditor({
   }
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-7rem)] max-w-6xl flex-col gap-3">
+    <div className="flex h-[calc(100vh-9rem)] w-full flex-col gap-3">
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -524,6 +528,24 @@ export function ResumeEditor({
 
       {/* Honest reads-human check across the resume's prose */}
       <AiTellCheck text={proseText} />
+
+      {/* Ask for a change and get the change — applied here, autosaved as a new version. */}
+      <ImproveBox
+        documentId={id}
+        hasJob={hasJob}
+        currentContent={() => serializeResume(data)}
+        onApply={(content) => {
+          dirty.current = true;
+          markDirty();
+          setData(parseResume(content));
+        }}
+        quick={[
+          hasJob ? "Tailor it to this posting" : "Sharpen it for my target role",
+          "Stronger bullets — action, thing, outcome",
+          "Cut it to one page",
+          "Lead with my most relevant experience",
+        ]}
+      />
 
       <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-2">
         {/* Live preview (HTML) */}

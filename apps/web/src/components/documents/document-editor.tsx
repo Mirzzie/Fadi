@@ -81,7 +81,7 @@ export function DocumentEditor({
   }
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-7rem)] max-w-3xl flex-col gap-3">
+    <div className="mx-auto flex h-[calc(100vh-9rem)] w-full max-w-4xl flex-col gap-3">
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">

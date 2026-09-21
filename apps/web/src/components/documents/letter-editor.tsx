@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { AiTellCheck } from "@/components/documents/ai-tell-check";
+import { ImproveBox } from "@/components/documents/improve-box";
 import { DocAdvisor } from "@/components/documents/doc-advisor";
 import { DocTemplatePicker } from "@/components/documents/doc-template-picker";
 import { LetterPreview } from "@/components/documents/letter-preview";
@@ -44,12 +45,15 @@ export function LetterEditor({
   initialTitle,
   initialContent,
   initialVersion,
+  hasJob = false,
 }: {
   id: string;
   kind: ProseKind;
   initialTitle: string;
   initialContent: string;
   initialVersion: number;
+  /** Whether this letter belongs to a posting — Fadi tailors to it when asked to change things. */
+  hasJob?: boolean;
 }) {
   const fields = LETTER_FIELDS[kind];
   const [title, setTitle] = useState(initialTitle);
@@ -96,7 +100,7 @@ export function LetterEditor({
   }
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-7rem)] max-w-6xl flex-col gap-3">
+    <div className="flex h-[calc(100vh-9rem)] w-full flex-col gap-3">
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -166,6 +170,24 @@ export function LetterEditor({
       {/* Recruiter-backed length guidance + honest reads-human check (body prose) */}
       <DocAdvisor kind={kind as DocKind} text={data.body} />
       <AiTellCheck text={data.body} />
+
+      {/* Ask for a change and get the change — applied here, autosaved as a new version. */}
+      <ImproveBox
+        documentId={id}
+        hasJob={hasJob}
+        currentContent={() => serializeLetter(data)}
+        onApply={(content) => {
+          dirty.current = true;
+          markDirty();
+          setData(parseLetter(content, kind));
+        }}
+        quick={[
+          hasJob ? "Tailor it to this posting" : "Make it specific to the role",
+          "Shorter — cut it by a third",
+          "Open with something concrete, not a stock line",
+          "Plainer language, fewer adjectives",
+        ]}
+      />
 
       <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-2">
         {/* Live preview */}

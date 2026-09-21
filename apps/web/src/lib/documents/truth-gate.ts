@@ -253,6 +253,22 @@ function seniorityInflation(generated: string, corpus: string): TruthFinding[] {
 }
 
 // Generic words that must never be flagged as a "skill from the JD".
+/**
+ * Everyday words that carry no claim. Separate from STOP (which is about job-advert filler) so
+ * each list keeps its own reason for existing.
+ */
+const COMMON_PROSE = new Set([
+  "while", "also", "each", "over", "regular", "real", "every", "other", "their", "there",
+  "where", "which", "these", "those", "would", "could", "should", "about", "after", "before",
+  "between", "during", "through", "under", "again", "further", "being", "been", "into", "more",
+  "most", "some", "such", "than", "then", "them", "they", "when", "what", "will", "with",
+  "well", "make", "made", "take", "taken", "given", "based", "along", "across", "around",
+  "provide", "provided", "ensure", "ensuring", "support", "supporting", "deliver", "delivered",
+  "building", "focused", "including", "first", "second", "third", "years", "year", "month",
+  "months", "week", "weeks", "today", "always", "often", "never", "part", "full", "high",
+  "level", "levels", "area", "areas", "range", "number", "value", "values", "people", "person",
+]);
+
 const STOP = new Set([
   "the",
   "and",
@@ -325,7 +341,16 @@ const STOP = new Set([
   "when",
 ]);
 
-const tokenize = (s: string) => s.toLowerCase().match(/[a-z][a-z0-9+#.]{3,}/g) ?? [];
+/**
+ * Words, keeping the dots INSIDE a term ("node.js", "asp.net") and dropping the one that ends a
+ * sentence. Without the trim, a term that closed a sentence in the posting ("… with Kubernetes.")
+ * was the token "kubernetes." and never matched the same word in the draft — so the check quietly
+ * missed exactly the borrowed terms it exists to catch.
+ */
+const tokenize = (s: string) =>
+  (s.toLowerCase().match(/[a-z][a-z0-9+#.]{3,}/g) ?? [])
+    .map((t) => t.replace(/\.+$/, ""))
+    .filter((t) => t.length >= 4);
 
 /** Terms present in BOTH the draft and the JD but ABSENT from the record → JD contamination. */
 function jdOnlyTerms(
@@ -340,6 +365,12 @@ function jdOnlyTerms(
   const flagged = new Set<string>();
   for (const t of new Set(tokenize(generated))) {
     if (STOP.has(t) || flagged.has(t)) continue;
+    // ORDINARY ENGLISH IS NOT A CLAIM. The list flagged "while", "also", "each", "over",
+    // "regular" and "real" as terms the person had to justify (seen on a real EY cover letter,
+    // 20 Sep): twelve warnings, none of them about anything. A reader who is told to justify
+    // "also" stops reading the ones that matter. A term worth checking is a word a person could
+    // be accused of borrowing — a skill, a tool, a domain — not connective tissue.
+    if (t.length <= 4 || COMMON_PROSE.has(t)) continue;
     if (!jdSet.has(t) || corpusSet.has(t)) continue; // must be from the JD and NOT in the record
     flagged.add(t);
     out.push({
