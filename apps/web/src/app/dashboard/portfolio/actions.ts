@@ -29,7 +29,9 @@ const SECTION_KIND: Record<string, EvidenceKind> = {
   project: "project",
   experience: "experience",
   education: "education",
-  certification: "achievement",
+  // A credential is a credential. Mapping it to "achievement" merged two different things the
+  // portfolio has always shown separately.
+  certification: "certification",
   skill: "skill",
   custom: "skill",
 };

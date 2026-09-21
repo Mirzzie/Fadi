@@ -1,117 +1,149 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { Layers, Loader2, Undo2 } from "lucide-react";
-
+import { Layers, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   findSameEvidence,
+  discardPendingEvidence,
+  keepEvidenceSeparate,
   mergeEvidence,
   type SameThingPair,
 } from "@/app/dashboard/evidence/actions";
 
-/**
- * "THESE LOOK LIKE THE SAME THING."
- *
- * The pool is the source every other surface projects from — the résumé, the
- * portfolio, the prompt block Fadi reasons with — so one reality stored twice becomes
- * a duplicate everywhere at once. This is the only place it can honestly be fixed.
- *
- * MERGING IS NOT DELETING, and the copy says so plainly, because the fear it has to
- * answer is "will I lose the version I wrote for that application?" The absorbed
- * record keeps its wording as an alternative phrasing of the surviving fact, and the
- * merge is reversible. Nothing here acts without a click.
- */
 export function SameThingPanel({ onChanged }: { onChanged: () => void }) {
   const [pairs, setPairs] = useState<SameThingPair[] | null>(null);
-  const [done, setDone] = useState<Set<string>>(new Set());
-  const [pending, startTransition] = useTransition();
-
-  const load = () => {
-    findSameEvidence().then((res) => setPairs(res.ok ? res.pairs : []));
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const load = async () => {
+    try {
+      const result = await findSameEvidence();
+      if (!result.ok) throw new Error("Review unavailable");
+      setPairs(result.pairs);
+    } catch {
+      setError("Could not load pending matches. Please reload.");
+    }
   };
-  useEffect(load, []);
+  useEffect(() => {
+    let active = true;
+    void findSameEvidence().then(result => {
+      if (!active) return;
+      if (result.ok) setPairs(result.pairs);
+      else setError("Could not load pending matches. Please reload.");
+    }).catch(() => {
+      if (active) setError("Could not load pending matches. Please reload.");
+    });
+    return () => { active = false; };
+  }, []);
 
-  if (!pairs || pairs.length === 0) return null;
-  const open = pairs.filter((p) => !done.has(p.mergeId));
-  if (open.length === 0) return null;
-
-  const confident = open.filter((p) => p.confident);
-  const possible = open.filter((p) => !p.confident);
-
-  function merge(pair: SameThingPair) {
-    startTransition(async () => {
-      const res = await mergeEvidence({ keepId: pair.keepId, mergeId: pair.mergeId });
-      if (res.ok) {
-        setDone((prev) => new Set(prev).add(pair.mergeId));
+  function resolve(pair: SameThingPair, same: boolean | "discard") {
+    setError(null);
+    start(async () => {
+      try {
+        const result =
+          same === "discard"
+            ? await discardPendingEvidence({ id: pair.mergeId })
+            : same
+              ? await mergeEvidence({ keepId: pair.keepId, mergeId: pair.mergeId })
+              : await keepEvidenceSeparate({ id: pair.mergeId, otherId: pair.keepId });
+        if (!result.ok) {
+          setError("Couldn't save that decision. Please reload and try again.");
+          return;
+        }
+        await load();
         onChanged();
+      } catch {
+        setError("Couldn't save that decision. Please try again.");
       }
     });
   }
 
+  if (!pairs?.length) return error ? <p role="alert">{error}</p> : null;
   return (
-    <div className="mb-6 rounded-xl border border-warning/30 bg-warning/5 p-4">
-      <div className="flex items-center gap-2">
-        <Layers className="size-4 text-warning" aria-hidden="true" />
-        <h3 className="text-sm font-semibold">Same thing, written twice</h3>
-        <span className="rounded-full bg-warning/20 px-2 py-0.5 text-[10px] text-warning">
-          {open.length}
-        </span>
-      </div>
-      <p className="mt-1.5 text-xs text-muted-foreground">
-        Tailoring your history for a different role produces new wording, not new experience. Merging
-        keeps <span className="text-foreground">both versions</span> — the one you merge becomes an
-        alternative phrasing of the same fact, and it stops counting as separate work everywhere else.
+    <section className="rounded-xl border border-warning/30 bg-warning/5 p-4">
+      <h2 className="flex items-center gap-2 text-sm font-semibold">
+        <Layers className="size-4" aria-hidden="true" /> Review possible matches{" "}
+        <span className="text-muted-foreground">{pairs.length}</span>
+      </h2>
+      <p className="mt-2 text-xs text-muted-foreground">
+        Similar wording can describe different work. Check the organisation, dates and details
+        before joining records. Pending imports stay out of evidence-based prompts and portfolio
+        sync until you decide.
       </p>
-
-      <div className="mt-3 space-y-2">
-        {[...confident, ...possible].map((p) => (
-          <div key={`${p.keepId}-${p.mergeId}`} className="rounded-lg border border-border bg-background/40 p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span
-                className={`rounded-full border px-2 py-0.5 text-[10px] ${
-                  p.confident
-                    ? "border-warning/40 bg-warning/10 text-warning"
-                    : "border-border bg-muted/40 text-muted-foreground"
-                }`}
+      {error ? (
+        <p role="alert" className="mt-2 text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+      <div className="mt-3 space-y-3">
+        {pairs.map((pair) => (
+          <article
+            key={`${pair.keepId}:${pair.mergeId}`}
+            className="rounded-lg border border-border bg-background p-3"
+          >
+            <p className="text-xs text-muted-foreground">
+              {pair.pendingReview
+                ? "Imported wording · awaiting your decision"
+                : "Existing records · possible match"}
+            </p>
+            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+              <div>
+                <p className="text-xs text-muted-foreground">Existing record</p>
+                <p className="text-sm font-medium">{pair.keepTitle}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{pair.keepContext}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Compare with</p>
+                <p className="text-sm font-medium">{pair.mergeTitle}</p>
+                <p className="mt-1 text-xs text-muted-foreground">{pair.mergeContext}</p>
+              </div>
+            </div>
+            <details className="mt-2 text-xs">
+              <summary className="cursor-pointer">Compare descriptions</summary>
+              <div className="mt-2 grid gap-3 whitespace-pre-wrap sm:grid-cols-2">
+                <p>{pair.keepDetail || "No description"}</p>
+                <p>{pair.mergeDetail || "No description"}</p>
+              </div>
+              <p className="mt-2 text-muted-foreground">
+                Suggested because: {pair.reasons.join("; ")}
+              </p>
+            </details>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={pending || pair.canMerge === false}
+                onClick={() => resolve(pair, true)}
               >
-                {p.confident ? "Same thing" : "Possibly the same"}
-              </span>
-              <span className="text-[11px] text-muted-foreground">{p.reasons.join("; ")}</span>
-            </div>
-
-            <div className="mt-2 grid gap-1.5 text-sm sm:grid-cols-[1fr_auto_1fr] sm:items-center">
-              <span className="truncate">
-                <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Keep</span>{" "}
-                <span className="font-medium">{p.keepTitle}</span>
-              </span>
-              <span className="text-muted-foreground">←</span>
-              <span className="truncate text-muted-foreground">
-                <span className="text-[10px] uppercase tracking-wide">Fold in</span> {p.mergeTitle}
-              </span>
-            </div>
-
-            <div className="mt-2.5 flex justify-end gap-2">
-              <Button size="sm" variant="outline" disabled={pending} onClick={() => merge(p)}>
-                {pending ? <Loader2 className="size-4 animate-spin" /> : <Layers className="size-4" />}
-                Merge as one
+                {pending ? <Loader2 className="size-3 animate-spin" aria-hidden="true" /> : null}
+                Same work · keep existing facts
               </Button>
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => setDone((prev) => new Set(prev).add(p.mergeId))}
+                disabled={pending}
+                onClick={() => resolve(pair, false)}
               >
-                They&apos;re different
+                {pair.canMerge === false ? "Keep as separate work" : "They're different"}
               </Button>
+              {pair.pendingReview ? (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={pending}
+                  onClick={() => resolve(pair, "discard")}
+                >
+                  Discard this import
+                </Button>
+              ) : null}
             </div>
-          </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Joining keeps both descriptions. It does not change the existing employer or dates, or
+              rewrite saved documents.
+            </p>
+          </article>
         ))}
       </div>
-
-      <p className="mt-2.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <Undo2 className="size-3" aria-hidden="true" />
-        Every merge can be undone — nothing you wrote is deleted.
-      </p>
-    </div>
+    </section>
   );
 }

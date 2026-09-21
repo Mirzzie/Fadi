@@ -9,6 +9,7 @@ import { revalidatePath } from "next/cache";
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
+import { preserveCareerSource } from "@/lib/career/sources";
 import { publish } from "@/lib/events/bus";
 import { extractEvidencePool, normKind, toEvidenceView, type EvidenceView } from "@/lib/evidence/pool";
 
@@ -37,13 +38,21 @@ export async function saveResumeTextAction(
 
   const db = getDatabase();
   const activeTrack = await createCareerProfilesRepository(db).getActiveForUser(user.id);
+  // KEEP WHAT ARRIVED. The résumé row is overwritten per direction, so the previous text used to
+  // vanish — and with it any chance of telling a later import's new work from its rewording.
+  // Identical text reuses its version, so re-saving does not manufacture history.
+  await preserveCareerSource(user.id, {
+    sourceKind: "resume",
+    sourceKey: activeTrack?.id ?? "no-direction",
+    content: resumeText,
+  });
   await createResumesRepository(db).upsertLatestForTrack(user.id, activeTrack?.id ?? null, resumeText);
   revalidatePath(PATH);
   return { ok: true };
 }
 
 export async function buildEvidencePool(): Promise<
-  { ok: true; items: EvidenceView[] } | { ok: false; message: string }
+  { ok: true; items: EvidenceView[]; pendingReview: number } | { ok: false; message: string }
 > {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
@@ -51,7 +60,7 @@ export async function buildEvidencePool(): Promise<
   if (!res.ok) return { ok: false, message: res.message };
   await publish("evidence.changed", { userId: user.id, reason: "extracted" });
   revalidatePath(PATH);
-  return { ok: true, items: res.items };
+  return { ok: true, items: res.items, pendingReview: res.pendingReview };
 }
 
 export async function saveEvidence(input: {
@@ -115,6 +124,12 @@ export type SameThingPair = {
   mergeTitle: string;
   confident: boolean;
   reasons: string[];
+  keepContext?: string;
+  mergeContext?: string;
+  keepDetail?: string;
+  mergeDetail?: string;
+  pendingReview?: boolean;
+  canMerge?: boolean;
 };
 
 /**
@@ -129,7 +144,8 @@ export async function findSameEvidence(): Promise<{ ok: boolean; pairs: SameThin
   if (!user) return { ok: false, pairs: [] };
 
   const repo = createEvidenceRepository(getDatabase());
-  const items = await repo.listForUser(user.id);
+  const all = await repo.listAllForUser(user.id);
+  const items = all.filter(i => i.isCanonical && i.reviewStatus === "accepted");
   const { findSameThings } = await import("@/lib/identity/resolve");
 
   const byId = new Map(items.map((i) => [i.id, i]));
@@ -138,9 +154,11 @@ export async function findSameEvidence(): Promise<{ ok: boolean; pairs: SameThin
     kind: i.kind,
     title: i.title,
     organization: i.organization,
+    attribution: i.attribution,
+    metrics: i.metrics,
     period: i.period,
     detail: i.detail,
-    tags: [...(i.tags ?? []), ...(i.marketTags ?? [])],
+    tags: i.tags ?? [],
   }));
 
   // MEANING, for the case the anchors cannot see: two records that share no proper
@@ -168,7 +186,12 @@ export async function findSameEvidence(): Promise<{ ok: boolean; pairs: SameThin
     // No embeddings provider — the deterministic signals still stand on their own.
   }
 
-  const matches = findSameThings(inputs, similarity);
+  const matches = findSameThings(inputs, similarity).filter(m => {
+    const a = byId.get(m.a)!;
+    const b = byId.get(m.b)!;
+    return !(a.distinctFrom ?? []).includes(b.factId ?? b.id) &&
+      !(b.distinctFrom ?? []).includes(a.factId ?? a.id);
+  });
 
   const pairs = matches.map((m) => {
     const a = byId.get(m.a);
@@ -185,10 +208,26 @@ export async function findSameEvidence(): Promise<{ ok: boolean; pairs: SameThin
       mergeTitle: merge!.title,
       confident: m.verdict === "same",
       reasons: m.reasons,
+      keepContext: [keep!.kind, keep!.organization, keep!.period].filter(Boolean).join(" · "),
+      mergeContext: [merge!.kind, merge!.organization, merge!.period].filter(Boolean).join(" · "),
+      keepDetail: keep!.detail,
+      mergeDetail: merge!.detail,
     };
   });
 
-  return { ok: true, pairs };
+  const reviews: SameThingPair[] = all.filter(i => i.reviewStatus === "pending").map(candidate => {
+    const previous = all.find(i => i.id === candidate.reviewTargetId);
+    const target = items.find(i => (i.factId ?? i.id) === (previous?.factId ?? previous?.id));
+    return {
+      keepId: target?.id ?? candidate.id, keepTitle: target?.title ?? "Previous record unavailable",
+      mergeId: candidate.id, mergeTitle: candidate.title, confident: false,
+      reasons: candidate.reviewReasons ?? [], pendingReview: true, canMerge: Boolean(target),
+      keepContext: target ? [target.kind, target.organization, target.period].filter(Boolean).join(" · ") : "",
+      mergeContext: [candidate.kind, candidate.organization, candidate.period].filter(Boolean).join(" · "),
+      keepDetail: target?.detail ?? "", mergeDetail: candidate.detail,
+    };
+  });
+  return { ok: true, pairs: [...reviews, ...pairs] };
 }
 
 /**
@@ -204,9 +243,35 @@ export async function mergeEvidence(input: {
 }): Promise<{ ok: boolean }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false };
-  await createEvidenceRepository(getDatabase()).mergeInto(user.id, input.keepId, input.mergeId);
-  revalidatePath("/dashboard/evidence");
-  return { ok: true };
+  try {
+    await createEvidenceRepository(getDatabase()).mergeInto(user.id, input.keepId, input.mergeId);
+    await publish("evidence.changed", { userId: user.id, reason: "updated", evidenceItemId: input.keepId });
+    revalidatePath("/dashboard/evidence");
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
+/** Persist an explicit distinct-work decision, accepting a pending candidate separately. */
+export async function keepEvidenceSeparate(input: { id: string; otherId: string }): Promise<{ ok: boolean }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false };
+  try {
+    await createEvidenceRepository(getDatabase()).keepSeparate(user.id, input.id, input.otherId);
+    await publish("evidence.changed", { userId: user.id, reason: "updated", evidenceItemId: input.id });
+    revalidatePath(PATH);
+    return { ok: true };
+  } catch { return { ok: false }; }
+}
+
+/** A pending import is removable without exposing accepted records to a stale action. */
+export async function discardPendingEvidence(input: { id: string }): Promise<{ ok: boolean }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false };
+  const ok = await createEvidenceRepository(getDatabase()).discardPending(user.id, input.id);
+  revalidatePath(PATH);
+  return { ok };
 }
 
 /** Undo: the record becomes its own fact again. */
@@ -294,16 +359,15 @@ export async function promoteRendering(input: { id: string }): Promise<{ ok: boo
 
   const repo = createEvidenceRepository(getDatabase());
   const item = await repo.getForUser(user.id, input.id);
-  if (!item) return { ok: false };
-
-  const fact = item.factId ?? item.id;
-  const all = await repo.listAllForUser(user.id);
-  for (const row of all.filter((r) => (r.factId ?? r.id) === fact)) {
-    const shouldBeCanonical = row.id === input.id;
-    if (row.isCanonical !== shouldBeCanonical) {
-      await repo.update(user.id, row.id, { isCanonical: shouldBeCanonical, factId: fact });
-    }
-  }
+  if (!item || item.reviewStatus !== "accepted") return { ok: false };
+  const leader = await repo.getCanonicalForFact(user.id, item.factId ?? item.id);
+  if (!leader) return { ok: false };
+  // A wording switch cannot silently switch employer, dates or claimed results.
+  const norm = (v: string | null) => (v ?? "").trim().toLowerCase();
+  if (["organization", "period", "metrics", "attribution"].some(key =>
+    norm(item[key as "organization"]) !== norm(leader[key as "organization"])
+  )) return { ok: false };
+  await repo.mergeInto(user.id, item.id, leader.id);
   revalidatePath("/dashboard/evidence");
   return { ok: true };
 }

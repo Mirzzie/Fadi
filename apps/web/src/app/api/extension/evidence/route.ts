@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { createEvidenceRepository } from "@careeros/database";
 import { z } from "zod";
 
 import { getExtensionUser } from "@/lib/extension/auth";
-import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
 
 // Evidence-clip: the extension sends a win/achievement the user selected on any page (a
@@ -51,14 +49,14 @@ export async function POST(req: Request) {
     // Through the gate, like every other door. Capturing the same win twice from two
     // pages is the extension's most likely failure mode, not its rarest.
     const { admitEvidence } = await import("@/lib/identity/admit");
-    await admitEvidence(user.id, {
+    const admitted = await admitEvidence(user.id, {
       kind: "achievement",
       title: parsed.data.title,
       detail: parsed.data.detail,
       origin: "extension",
     });
     logger.info("extension.evidence", { userId: user.id });
-    return withCors(NextResponse.json({ ok: true }), origin);
+    return withCors(NextResponse.json({ ok: true, reviewStatus: admitted.row.reviewStatus, reviewUrl: admitted.row.reviewStatus === "pending" ? "/dashboard/evidence" : null }), origin);
   } catch (error) {
     logger.error("extension.evidence_failed", {
       userId: user.id,

@@ -26,6 +26,8 @@ export function EvidencePool({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [reviewVersion, setReviewVersion] = useState(0);
+  const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | "new" | null>(null);
 
   function build() {
@@ -33,7 +35,11 @@ export function EvidencePool({
     startTransition(async () => {
       const r = await buildEvidencePool();
       if (!r.ok) setError(r.message);
-      else router.refresh();
+      else {
+        setNotice(`${r.items.length} new records saved. ${r.pendingReview} possible matches need review below.`);
+        setReviewVersion(v => v + 1);
+        router.refresh();
+      }
     });
   }
 
@@ -76,6 +82,7 @@ export function EvidencePool({
           Add an item
         </Button>
       </div>
+      {notice ? <p role="status" className="text-sm text-muted-foreground">{notice}</p> : null}
       {error ? (
         <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm">{error}</p>
       ) : null}
@@ -83,17 +90,16 @@ export function EvidencePool({
       {/* Duplicates are caught HERE because the pool is what every other surface
           projects from — one reality stored twice becomes a duplicate in the résumé,
           the portfolio and Fadi's prompt block simultaneously. */}
-      <SameThingPanel onChanged={() => router.refresh()} />
+      <SameThingPanel key={reviewVersion} onChanged={() => router.refresh()} />
 
       {editing === "new" ? (
-        <EvidenceEditor onClose={() => setEditing(null)} onSaved={() => { setEditing(null); router.refresh(); }} />
+        <EvidenceEditor onClose={() => setEditing(null)} onSaved={() => { setEditing(null); setReviewVersion(v => v + 1); router.refresh(); }} />
       ) : null}
 
       {ranked.length === 0 && editing !== "new" ? (
         <div className="space-y-4">
           <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-            No evidence yet. Build it from your real history, or add an item by hand. Fadi only uses
-            your real experience — it never invents.
+            No evidence yet. Build it from your real history, or add an item by hand. Review imported details before using them in career documents.
           </p>
           {/* Capture history HERE rather than sending the user to Profile and back —
               building the pool needs a CV, and that round-trip was the one real
@@ -113,7 +119,7 @@ export function EvidencePool({
                 key={r.item.id}
                 item={r.item}
                 onClose={() => setEditing(null)}
-                onSaved={() => { setEditing(null); router.refresh(); }}
+                onSaved={() => { setEditing(null); setReviewVersion(v => v + 1); router.refresh(); }}
               />
             ) : (
               <EvidenceCard

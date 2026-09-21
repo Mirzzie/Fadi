@@ -93,12 +93,12 @@ describe("the rewritten-project case lexical matching missed", () => {
     expect(m.reasons.join(" ")).toMatch(/distinctive terms/);
   });
 
-  it("promotes it to a confident match once meaning agrees", () => {
+  it("asks for review even when embedding meaning agrees", () => {
     const idf = rarityIndex(pool);
     const m = compareIdentity(pool[0], pool[1], idf, 0.93);
 
-    expect(m.verdict).toBe("same");
-    expect(m.reasons).toContain("describe the same thing in different words");
+    expect(m.verdict).toBe("maybe");
+    expect(m.reasons).toContain("similar meaning; identity still needs confirmation");
   });
 
   it("keeps genuinely different work apart", () => {
@@ -110,12 +110,12 @@ describe("the rewritten-project case lexical matching missed", () => {
 });
 
 describe("artefacts are the strongest signal", () => {
-  it("treats two records pointing at one file as the same thing", () => {
+  it("asks about two records pointing at one file", () => {
     const a = item({ id: "a", title: "Home lab write-up", imageUrl: "https://cdn.x/abc.jpg" });
     const b = item({ id: "b", title: "Detection lab", imageUrl: "https://cdn.x/abc.jpg" });
     const m = compareIdentity(a, b, rarityIndex([a, b]));
 
-    expect(m.verdict).toBe("same");
+    expect(m.verdict).toBe("maybe");
     expect(m.reasons[0]).toContain("same file or link");
   });
 
@@ -123,7 +123,7 @@ describe("artefacts are the strongest signal", () => {
     const a = item({ id: "a", title: "Repo", url: "https://www.github.com/me/lab/" });
     const b = item({ id: "b", title: "The lab", url: "http://github.com/me/lab" });
 
-    expect(compareIdentity(a, b, rarityIndex([a, b])).verdict).toBe("same");
+    expect(compareIdentity(a, b, rarityIndex([a, b])).verdict).toBe("maybe");
   });
 });
 

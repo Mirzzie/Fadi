@@ -22,8 +22,89 @@ export function createEvidenceRepository(db: DbOrTx) {
       return db
         .select()
         .from(evidenceItems)
-        .where(and(eq(evidenceItems.userId, userId), eq(evidenceItems.isCanonical, true)))
+        .where(
+          and(
+            eq(evidenceItems.userId, userId),
+            eq(evidenceItems.isCanonical, true),
+            eq(evidenceItems.reviewStatus, "accepted")
+          )
+        )
         .orderBy(desc(evidenceItems.updatedAt));
+    },
+
+    async getCanonicalForFact(userId: string, factId: string): Promise<EvidenceItem | null> {
+      const [row] = await db
+        .select()
+        .from(evidenceItems)
+        .where(
+          and(
+            eq(evidenceItems.userId, userId),
+            eq(evidenceItems.isCanonical, true),
+            eq(evidenceItems.reviewStatus, "accepted"),
+            or(eq(evidenceItems.factId, factId), eq(evidenceItems.id, factId))
+          )
+        )
+        .limit(1);
+      return row ?? null;
+    },
+
+    /** Resolve a review without losing the candidate or forgetting the user's answer. */
+    async keepSeparate(userId: string, id: string, otherId: string): Promise<void> {
+      await db.transaction(async (tx) => {
+        await tx.execute(sql`select id from users where id = ${userId} for update`);
+        const rows = await tx
+          .select()
+          .from(evidenceItems)
+          .where(and(eq(evidenceItems.userId, userId), inArray(evidenceItems.id, [id, otherId])));
+        const item = rows.find((r) => r.id === id);
+        const other = rows.find((r) => r.id === otherId);
+        if (!item) throw new Error("Evidence item unavailable.");
+        if (!other || id === otherId) {
+          if (item.reviewStatus !== "pending") throw new Error("No review to resolve.");
+          await tx
+            .update(evidenceItems)
+            .set({
+              reviewStatus: "accepted",
+              reviewTargetId: null,
+              reviewReasons: [],
+              updatedAt: new Date(),
+            })
+            .where(and(eq(evidenceItems.userId, userId), eq(evidenceItems.id, id)));
+          return;
+        }
+        for (const [row, counterpart] of [
+          [item, other],
+          [other, item],
+        ]) {
+          await tx
+            .update(evidenceItems)
+            .set({
+              ...(row.id === id
+                ? { reviewStatus: "accepted", reviewTargetId: null, reviewReasons: [] }
+                : {}),
+              distinctFrom: [
+                ...new Set([...(row.distinctFrom ?? []), counterpart.factId ?? counterpart.id]),
+              ],
+              updatedAt: new Date(),
+            })
+            .where(and(eq(evidenceItems.userId, userId), eq(evidenceItems.id, row.id)));
+        }
+      });
+    },
+
+    /** Remove only an unresolved import; a stale button cannot delete accepted work. */
+    async discardPending(userId: string, id: string): Promise<boolean> {
+      const removed = await db
+        .delete(evidenceItems)
+        .where(
+          and(
+            eq(evidenceItems.userId, userId),
+            eq(evidenceItems.id, id),
+            eq(evidenceItems.reviewStatus, "pending")
+          )
+        )
+        .returning({ id: evidenceItems.id });
+      return removed.length === 1;
     },
 
     /** Every row including alternative wordings — for the merge UI and for export. */
@@ -44,8 +125,8 @@ export function createEvidenceRepository(db: DbOrTx) {
           and(
             eq(evidenceItems.userId, userId),
             eq(evidenceItems.factId, factId),
-            eq(evidenceItems.isCanonical, false),
-          ),
+            eq(evidenceItems.isCanonical, false)
+          )
         )
         .orderBy(desc(evidenceItems.updatedAt));
     },
@@ -82,18 +163,23 @@ export function createEvidenceRepository(db: DbOrTx) {
     async mergeInto(userId: string, canonicalId: string, absorbedId: string): Promise<void> {
       if (canonicalId === absorbedId) return;
       await db.transaction(async (tx) => {
+        await tx.execute(sql`select id from users where id = ${userId} for update`);
         const rows = await tx
           .select()
           .from(evidenceItems)
           .where(
             and(
               eq(evidenceItems.userId, userId),
-              inArray(evidenceItems.id, [canonicalId, absorbedId]),
-            ),
+              inArray(evidenceItems.id, [canonicalId, absorbedId])
+            )
           );
         const canonical = rows.find((r) => r.id === canonicalId);
         const absorbed = rows.find((r) => r.id === absorbedId);
-        if (!canonical || !absorbed) return;
+        if (!canonical || !absorbed) throw new Error("Evidence item unavailable.");
+        if (canonical.kind !== absorbed.kind)
+          throw new Error("Different kinds of evidence cannot be merged.");
+        if (canonical.reviewStatus !== "accepted")
+          throw new Error("Choose an accepted record to keep.");
 
         const factId = canonical.factId ?? canonical.id;
         const absorbedFact = absorbed.factId ?? absorbed.id;
@@ -102,15 +188,26 @@ export function createEvidenceRepository(db: DbOrTx) {
         // demoting by fact is what erased the keeper when both already shared a fact.
         await tx
           .update(evidenceItems)
-          .set({ factId, isCanonical: false, updatedAt: new Date() })
+          .set({
+            factId,
+            isCanonical: false,
+            reviewStatus: "accepted",
+            reviewTargetId: null,
+            reviewReasons: [],
+            updatedAt: new Date(),
+          })
           .where(
             and(
               eq(evidenceItems.userId, userId),
               ne(evidenceItems.id, canonicalId),
               // The absorbed row by id — because its own fact_id may still be NULL —
               // and anything already merged into it.
-              or(eq(evidenceItems.id, absorbedId), eq(evidenceItems.factId, absorbedFact)),
-            ),
+              or(
+                eq(evidenceItems.id, absorbedId),
+                eq(evidenceItems.factId, absorbedFact),
+                eq(evidenceItems.factId, factId)
+              )
+            )
           );
 
         await tx
@@ -151,15 +248,18 @@ export function createEvidenceRepository(db: DbOrTx) {
 
     async create(
       userId: string,
-      input: Omit<NewEvidenceItem, "id" | "userId" | "createdAt" | "updatedAt">,
+      input: Omit<NewEvidenceItem, "userId" | "createdAt" | "updatedAt">
     ): Promise<EvidenceItem> {
-      const [created] = await db.insert(evidenceItems).values({ ...input, userId }).returning();
+      const [created] = await db
+        .insert(evidenceItems)
+        .values({ ...input, userId })
+        .returning();
       return created;
     },
 
     async createMany(
       userId: string,
-      rows: Array<Omit<NewEvidenceItem, "id" | "userId" | "createdAt" | "updatedAt">>,
+      rows: Array<Omit<NewEvidenceItem, "id" | "userId" | "createdAt" | "updatedAt">>
     ): Promise<EvidenceItem[]> {
       if (rows.length === 0) return [];
       return db
@@ -187,8 +287,13 @@ export function createEvidenceRepository(db: DbOrTx) {
           | "factId"
           | "isCanonical"
           | "renderingFor"
+          | "attribution"
+          | "reviewStatus"
+          | "reviewTargetId"
+          | "reviewReasons"
+          | "distinctFrom"
         >
-      >,
+      >
     ): Promise<EvidenceItem | null> {
       const [updated] = await db
         .update(evidenceItems)
@@ -199,7 +304,9 @@ export function createEvidenceRepository(db: DbOrTx) {
     },
 
     async delete(userId: string, id: string): Promise<void> {
-      await db.delete(evidenceItems).where(and(eq(evidenceItems.id, id), eq(evidenceItems.userId, userId)));
+      await db
+        .delete(evidenceItems)
+        .where(and(eq(evidenceItems.id, id), eq(evidenceItems.userId, userId)));
     },
 
     async count(userId: string): Promise<number> {
