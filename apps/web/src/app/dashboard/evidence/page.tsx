@@ -1,3 +1,4 @@
+import { CareerSelectionPanel } from "@/components/evidence/career-selection-panel";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
@@ -21,6 +22,7 @@ export default async function EvidencePage() {
 
   return (
     <AppShell>
+      <CareerSelectionPanel />
       <EvidencePool track={track} ranked={ranked} />
     </AppShell>
   );

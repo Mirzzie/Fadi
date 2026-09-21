@@ -15,7 +15,7 @@ import { ExternalLink } from "lucide-react";
 
 import { ApplicationOutcomePanel } from "@/components/workspace/application-outcome-panel";
 import { FitGatePanel } from "@/components/workspace/fit-gate-panel";
-import { LeadEvidencePanel } from "@/components/workspace/lead-evidence-panel";
+import { CareerSelectionPanel } from "@/components/evidence/career-selection-panel";
 import { ApplicationQualityPanel } from "@/components/workspace/application-quality-panel";
 import { CvReviewPanel } from "@/components/workspace/cv-review-panel";
 import { InterviewPrepPanel } from "@/components/workspace/interview-prep-panel";
@@ -162,7 +162,11 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
             title="What should lead here?"
             hint="Which of your evidence goes first for this role"
           >
-            <LeadEvidencePanel jobTitle={job.title} jobDescription={job.description ?? undefined} />
+            <CareerSelectionPanel
+              directionId={applications[0]?.careerProfileId ?? track?.id}
+              applicationId={applications[0]?.id}
+              jobId={job.id}
+            />
           </WorkspaceSection>
           <WorkspaceSection
             icon="quality"
@@ -194,6 +198,7 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
             hint="Likely questions + STAR answers from your real experience"
           >
             <InterviewPrepPanel
+              applicationId={applications[0]?.id}
               jobId={job.id}
               jobTitle={job.title}
               jobCompany={job.company}

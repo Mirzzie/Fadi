@@ -1755,3 +1755,24 @@ export const careerRecordVersions = pgTable(
 );
 
 export type CareerRecordVersion = typeof careerRecordVersions.$inferSelect;
+
+/** Scope is direction:<id> or application:<id>; repository checks ownership before writes. */
+export const careerSelections = pgTable("career_selections", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  scope: text("scope").notNull(),
+  factId: uuid("fact_id").notNull(),
+  mode: text("mode").notNull().default("auto"),
+  keepWording: boolean("keep_wording").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  ...timestamps,
+}, table => [uniqueIndex("career_selection_scope_fact").on(table.userId, table.scope, table.factId)]);
+
+/** Immutable generation input, including selected facts, scope, preferences and job text. */
+export const careerContextSnapshots = pgTable("career_context_snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  fingerprint: text("fingerprint").notNull(),
+  payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+}, table => [index("career_context_snapshots_user").on(table.userId)]);

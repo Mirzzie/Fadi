@@ -1,5 +1,6 @@
 "use server";
 
+import { z } from "zod";
 import { createApplicationsRepository } from "@careeros/database";
 import { revalidatePath } from "next/cache";
 
@@ -193,7 +194,7 @@ export async function scoreApplicationDraft(input: {
         experienceLevel: ctx?.experienceLevel ?? undefined,
         careerGoals: ctx?.careerGoals ?? undefined,
       },
-      user.id,
+      user.id
     );
 
     return { ok: true, result };
@@ -203,7 +204,10 @@ export async function scoreApplicationDraft(input: {
       jobId: input.jobId,
       error: error instanceof Error ? error.message : "unknown",
     });
-    return { ok: false, message: "Something went wrong scoring this application. Please try again." };
+    return {
+      ok: false,
+      message: "Something went wrong scoring this application. Please try again.",
+    };
   }
 }
 
@@ -222,7 +226,11 @@ async function resolveResumeForJob(userId: string, jobId: string) {
 }
 
 /** The document text the user would actually send for this job, per kind. */
-async function resolveDocForJob(userId: string, jobId: string, kind: ReviewableKind): Promise<string> {
+async function resolveDocForJob(
+  userId: string,
+  jobId: string,
+  kind: ReviewableKind
+): Promise<string> {
   if (kind === "resume") {
     const { resumeText } = await resolveResumeForJob(userId, jobId);
     return resumeText;
@@ -230,7 +238,9 @@ async function resolveDocForJob(userId: string, jobId: string, kind: ReviewableK
   const jobDocs = await createDocumentsRepository(getDatabase()).listForJob(userId, jobId);
   const doc = jobDocs.find((d) => d.kind === kind);
   if (!doc) return "";
-  return isProseKind(doc.kind) ? letterToPlainText(parseLetter(doc.content, doc.kind)).trim() : doc.content.trim();
+  return isProseKind(doc.kind)
+    ? letterToPlainText(parseLetter(doc.content, doc.kind)).trim()
+    : doc.content.trim();
 }
 
 /**
@@ -254,7 +264,8 @@ export async function reviewDocForJob(input: {
       return {
         ok: false,
         reason: "no_provider",
-        message: "Connect an AI provider in Settings → AI provider and I'll review your documents like a recruiter.",
+        message:
+          "Connect an AI provider in Settings → AI provider and I'll review your documents like a recruiter.",
       };
     }
 
@@ -282,7 +293,11 @@ export async function reviewDocForJob(input: {
       jobId: input.jobId,
       error: error instanceof Error ? error.message : "unknown",
     });
-    return { ok: false, reason: "error", message: "Something went wrong reviewing this document. Please try again." };
+    return {
+      ok: false,
+      reason: "error",
+      message: "Something went wrong reviewing this document. Please try again.",
+    };
   }
 }
 
@@ -318,12 +333,20 @@ export async function applyReviewFixes(input: {
         jobId: input.jobId,
         guidance: reviewToGuidance(input.review),
       },
-      generate,
+      generate
     );
 
     revalidatePath(workspacePath(input.jobId));
-    logger.info("applications.review_fixes_applied", { userId: user.id, jobId: input.jobId, kind: input.kind });
-    return { ok: true, message: "Redrafted with the fixes — review it in the editor before sending.", docId: doc.id };
+    logger.info("applications.review_fixes_applied", {
+      userId: user.id,
+      jobId: input.jobId,
+      kind: input.kind,
+    });
+    return {
+      ok: true,
+      message: "Redrafted with the fixes — review it in the editor before sending.",
+      docId: doc.id,
+    };
   } catch (error) {
     if (error instanceof NoHistoryError) return { ok: false, message: error.message };
     // Not a failure — their allowance simply reset window. Say so plainly.
@@ -333,7 +356,10 @@ export async function applyReviewFixes(input: {
       jobId: input.jobId,
       error: error instanceof Error ? error.message : "unknown",
     });
-    return { ok: false, message: "Couldn't redraft just now. Check your AI provider and try again." };
+    return {
+      ok: false,
+      message: "Couldn't redraft just now. Check your AI provider and try again.",
+    };
   }
 }
 
@@ -353,17 +379,33 @@ export async function getCompanyBrief(input: {
  * for this role and drafts answers from the user's REAL LinkedIn/career evidence.
  */
 export async function prepareInterview(input: {
+  applicationId?: string;
+  jobId?: string;
   jobTitle: string;
   company: string;
   jobDescription: string;
 }): Promise<PrepResult> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, reason: "error", message: "Please sign in again." };
-  return prepareInterviewForJob(user.id, {
-    jobDescription: input.jobDescription,
-    jobTitle: input.jobTitle,
-    company: input.company,
-  });
+  if (
+    [input.applicationId, input.jobId].some((id) => id && !z.string().uuid().safeParse(id).success)
+  )
+    return { ok: false, reason: "error", message: "Unknown application or job." };
+  try {
+    return await prepareInterviewForJob(user.id, {
+      applicationId: input.applicationId,
+      jobId: input.jobId,
+      jobDescription: input.jobDescription,
+      jobTitle: input.jobTitle,
+      company: input.company,
+    });
+  } catch {
+    return {
+      ok: false,
+      reason: "error",
+      message: "Could not load this application’s career records. Please reopen the workspace.",
+    };
+  }
 }
 
 /** Log a rejection against a real, sent application and open the autopsy. */
@@ -388,7 +430,14 @@ export async function submitRejectionAutopsy(input: {
   applicationId: string;
   reflection: { stage?: string; feedback?: string; lesson?: string; nextAction?: string };
 }): Promise<
-  | { ok: true; message: string; momentum: number; delta: number; band: string; insight: RejectionInsight }
+  | {
+      ok: true;
+      message: string;
+      momentum: number;
+      delta: number;
+      band: string;
+      insight: RejectionInsight;
+    }
   | { ok: false; message: string }
 > {
   const user = await getCurrentAuthUser();

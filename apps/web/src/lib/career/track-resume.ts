@@ -1,18 +1,14 @@
 import "server-only";
 
-import {
-  createLinkedInProfilesRepository,
-  createProfilesRepository,
-  createResumesRepository,
-  type CareerProfile,
-} from "@careeros/database";
+import { createResumesRepository, type CareerProfile } from "@careeros/database";
 
 import { getDatabase } from "@/lib/database/client";
 import { getUserDocGenerate } from "@/lib/ai/user-generate";
-import { composeCareerEvidence } from "@/lib/career/evidence";
+import { buildCareerContext } from "@/lib/career/context";
+import { resumeFromCareerRecords } from "@/lib/career/resume-from-records";
 import { pivotFraming } from "@/lib/career/pivot";
 import { resumeToPlainText } from "@/lib/documents/resume";
-import { resumeGenerationSchema, toResumeData } from "@/lib/documents/resume-schema";
+import { resumeGenerationSchema } from "@/lib/documents/resume-schema";
 import { HUMANIZE_CORE, HUMANIZE_RESUME } from "@/lib/documents/humanize";
 import { logger } from "@/lib/observability/logger";
 
@@ -31,54 +27,53 @@ export async function draftTrackBaseResume(userId: string, track: CareerProfile)
   try {
     const generate = await getUserDocGenerate(userId);
     if (!generate) {
-      logger.info("tracks.base_resume.skipped", { userId, trackId: track.id, reason: "no_provider" });
+      logger.info("tracks.base_resume.skipped", {
+        userId,
+        trackId: track.id,
+        reason: "no_provider",
+      });
       return false;
     }
 
     const db = getDatabase();
-    const [profile, sharedResume, linkedin] = await Promise.all([
-      createProfilesRepository(db).getByUserId(userId),
-      // The new track has no resume yet — this resolves the shared/legacy base.
-      createResumesRepository(db).getLatestForTrack(userId, track.id),
-      createLinkedInProfilesRepository(db).getLatestForUser(userId),
-    ]);
-
-    const evidence = composeCareerEvidence({
-      resumeText: sharedResume?.parsedText ?? sharedResume?.rawText,
-      linkedInText: linkedin?.rawText ?? linkedin?.profileUrl,
-    });
-    if (evidence.historySource === "none") {
-      logger.info("tracks.base_resume.skipped", { userId, trackId: track.id, reason: "no_history" });
+    const context = await buildCareerContext(userId, { directionId: track.id });
+    if (!context.payload.records.length) {
+      logger.info("tracks.base_resume.skipped", {
+        userId,
+        trackId: track.id,
+        reason: "no_selected_records",
+      });
       return false;
     }
 
-    // Direction-specific ADDITIONS: the evidence pool (projects, certs, activities)
-    // ranked for THIS direction — so a SOC lab project or an IT-support cert lands
-    // in the direction whose base resume it strengthens.
-    const topEvidence = await import("@/lib/evidence/pool").then((m) => m.topEvidenceForPrompt(userId));
-
-    const system = `You are Fadi, an expert resume writer. From the candidate's REAL career history below, produce the BASE resume for their "${track.targetRole}" direction${track.domain ? ` (${track.domain})` : ""} — the tailored starting point every application in this direction builds on.
+    const direction = context.payload.direction!;
+    const system = `You are Fadi, an expert resume writer. From the candidate's REAL career history below, produce the BASE resume for their "${direction.role}" direction${direction.domain ? ` (${direction.domain})` : ""} — the tailored starting point every application in this direction builds on.
 - Keep their real roles, companies, dates, education and projects exactly.
 - Rewrite the summary and bullets to position them for this direction, using its vocabulary where genuinely accurate.
 CRITICAL: use ONLY real experience, education, skills and projects from the provided material. Never invent employers, dates, degrees, or achievements. If a section is thin, keep it short rather than fabricating.
 
-${pivotFraming({ targetRole: track.targetRole, domain: track.domain, intent: track.intent, careerGoal: track.careerGoal })}
+${pivotFraming({ targetRole: direction.role, domain: direction.domain, intent: direction.intent, careerGoal: direction.goal })}
 
 ${HUMANIZE_CORE}
 
 ${HUMANIZE_RESUME}`;
 
-    const userPrompt = topEvidence ? `${evidence.block}\n\n${topEvidence}` : evidence.block;
-    const gen = await generate.structured(system, userPrompt, resumeGenerationSchema, "track_base_resume");
+    const userPrompt = context.block;
+    const gen = await generate.structured(
+      system,
+      userPrompt,
+      resumeGenerationSchema,
+      "track_base_resume"
+    );
     const text = resumeToPlainText(
-      toResumeData(gen, {
-        name: profile?.fullName ?? "",
-        headline: track.targetRole ?? "",
-        email: profile?.email ?? "",
+      resumeFromCareerRecords(context.payload.records, gen, {
+        name: context.payload.person.name,
+        headline: direction.role ?? "",
+        email: context.payload.person.email,
         phone: "",
-        location: track.location ?? "",
-        links: linkedin?.profileUrl ?? "",
-      }),
+        location: direction.location ?? "",
+        links: "",
+      })
     ).trim();
     if (!text) {
       logger.warn("tracks.base_resume.empty", { userId, trackId: track.id });

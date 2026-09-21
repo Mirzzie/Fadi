@@ -32,7 +32,13 @@ export const FIT_DIMENSIONS: Array<{ id: FitDimensionId; label: string; weight: 
   { id: "legitimacy", label: "Posting legitimacy", weight: 0.1 },
 ];
 
-export type FitDimension = { id: FitDimensionId; label: string; weight: number; score: number; note: string };
+export type FitDimension = {
+  id: FitDimensionId;
+  label: string;
+  weight: number;
+  score: number;
+  note: string;
+};
 
 /**
  * ELIGIBILITY IS NOT A SCORE.
@@ -94,7 +100,12 @@ const APPLY_BAR = 3.8;
 /** The gates. Everything else is relevance, and relevance is ranked only after these. */
 export const ELIGIBILITY_IDS: EligibilityId[] = ["logistics", "legitimacy"];
 /** The four that describe how well the work matches — the only ones that get averaged. */
-export const RELEVANCE_IDS: FitDimensionId[] = ["roleMatch", "seniorityFit", "domainFit", "trajectory"];
+export const RELEVANCE_IDS: FitDimensionId[] = [
+  "roleMatch",
+  "seniorityFit",
+  "domainFit",
+  "trajectory",
+];
 
 /**
  * A 0–5 dimension score becomes a gate state.
@@ -118,7 +129,7 @@ const ELIGIBILITY_LABEL: Record<EligibilityId, string> = {
 
 export function eligibilityChecks(
   scores: Partial<Record<FitDimensionId, number>>,
-  notes: Partial<Record<EligibilityId, string>> = {},
+  notes: Partial<Record<EligibilityId, string>> = {}
 ): EligibilityCheck[] {
   return ELIGIBILITY_IDS.map((id) => {
     const state = eligibilityFrom(scores[id]);
@@ -166,7 +177,7 @@ export function relevanceScore(scores: Partial<Record<FitDimensionId, number>>):
  */
 export function gatedVerdict(
   checks: EligibilityCheck[],
-  relevance: number,
+  relevance: number
 ): { verdict: FitVerdict; blocking: EligibilityCheck[] } {
   const failed = checks.filter((c) => c.state === "fail");
   if (failed.length > 0) return { verdict: "blocked", blocking: failed };
@@ -258,7 +269,7 @@ export type FitResult =
 
 export async function evaluateFit(
   userId: string,
-  input: { jobDescription: string; jobTitle?: string; company?: string },
+  input: { jobDescription: string; jobTitle?: string; company?: string }
 ): Promise<FitResult> {
   const jd = (input.jobDescription ?? "").trim();
   if (!jd) {
@@ -270,10 +281,10 @@ export async function evaluateFit(
     };
   }
 
-  const [{ getCareerReportContext }, { composeCareerEvidence }, { getUserDocGenerate }] =
+  const [{ getCareerReportContext }, { approvedCareerEvidence }, { getUserDocGenerate }] =
     await Promise.all([
       import("@/lib/career-report/data"),
-      import("@/lib/career/evidence"),
+      import("@/lib/career/context"),
       import("@/lib/ai/user-generate"),
     ]);
 
@@ -282,17 +293,13 @@ export async function evaluateFit(
     return {
       ok: false,
       reason: "no_provider",
-      message: "Connect an AI provider in Settings and I'll run an honest fit check before you apply.",
+      message:
+        "Connect an AI provider in Settings and I'll run an honest fit check before you apply.",
     };
   }
 
   const ctx = await getCareerReportContext(userId);
-  const evidence = composeCareerEvidence({
-    resumeText: ctx?.resumeText,
-    linkedInText: ctx?.linkedInProfileText,
-  });
-
-  const topEvidence = await import("@/lib/evidence/pool").then((m) => m.topEvidenceForPrompt(userId));
+  const evidence = await approvedCareerEvidence(userId, { directionId: ctx?.careerProfileId });
   const user = [
     `Candidate's goal/target role: ${ctx?.targetRole ?? "not specified"}`,
     `Field/industry: ${ctx?.domain ?? "not specified"}`,
@@ -300,7 +307,6 @@ export async function evaluateFit(
     `Location preference: ${ctx?.locationPreference ?? "not specified"}`,
     "",
     evidence.block,
-    topEvidence ? `\n${topEvidence}` : "",
     "",
     `JOB — ${input.jobTitle ?? "(title n/a)"}${input.company ? ` at ${input.company}` : ""}:`,
     jd.slice(0, 6000),
@@ -347,6 +353,10 @@ export async function evaluateFit(
       },
     };
   } catch {
-    return { ok: false, reason: "error", message: "I couldn't run the fit check just now — please try again." };
+    return {
+      ok: false,
+      reason: "error",
+      message: "I couldn't run the fit check just now — please try again.",
+    };
   }
 }

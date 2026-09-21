@@ -9,7 +9,9 @@ import { Button } from "@/components/ui/button";
 import { prepareInterview } from "@/app/dashboard/applications/actions";
 import type { PrepQuestion } from "@/lib/interview/jd-prep";
 
-const STAR_ROWS: Array<[keyof Pick<PrepQuestion, "situation" | "task" | "action" | "result">, string]> = [
+const STAR_ROWS: Array<
+  [keyof Pick<PrepQuestion, "situation" | "task" | "action" | "result">, string]
+> = [
   ["situation", "Situation"],
   ["task", "Task"],
   ["action", "Action"],
@@ -18,11 +20,13 @@ const STAR_ROWS: Array<[keyof Pick<PrepQuestion, "situation" | "task" | "action"
 
 export function InterviewPrepPanel({
   jobId,
+  applicationId,
   jobTitle,
   jobCompany,
   jobDescription,
 }: {
   jobId?: string;
+  applicationId?: string;
   jobTitle: string;
   jobCompany: string;
   jobDescription?: string;
@@ -36,6 +40,8 @@ export function InterviewPrepPanel({
     setError(null);
     startTransition(async () => {
       const res = await prepareInterview({
+        jobId,
+        applicationId,
         jobTitle,
         company: jobCompany,
         jobDescription: jobDescription ?? "",
@@ -58,12 +64,22 @@ export function InterviewPrepPanel({
         <div className="flex items-center gap-2">
           {jobId ? (
             // Practise out loud against THIS posting — same job, same description, spoken answers.
-            <Button size="sm" variant="outline" nativeButton={false} render={<Link href={`/dashboard/interview?jobId=${jobId}`} />}>
+            <Button
+              size="sm"
+              variant="outline"
+              nativeButton={false}
+              render={<Link href={`/dashboard/interview?jobId=${jobId}`} />}
+            >
               <Mic className="size-3.5" aria-hidden="true" />
               Practise out loud
             </Button>
           ) : null}
-          <Button size="sm" variant={questions ? "outline" : "default"} onClick={run} disabled={pending || !hasJd}>
+          <Button
+            size="sm"
+            variant={questions ? "outline" : "default"}
+            onClick={run}
+            disabled={pending || !hasJd}
+          >
             <Sparkles className="size-3.5" aria-hidden="true" />
             {pending ? "Prepping…" : questions ? "Re-prep" : "Prep me"}
           </Button>
@@ -77,14 +93,17 @@ export function InterviewPrepPanel({
         </p>
       ) : !questions && !error ? (
         <p className="mt-2 text-sm text-muted-foreground">
-          I&apos;ll infer the behavioral questions for <span className="text-foreground">{jobTitle}</span>{" "}
-          and answer each in STAR form from your real experience. The more you&apos;ve added to your
-          LinkedIn (achievements, projects), the sharper this gets.
+          I&apos;ll infer the behavioral questions for{" "}
+          <span className="text-foreground">{jobTitle}</span> and answer each in STAR form from your
+          real experience. The more you&apos;ve added to your LinkedIn (achievements, projects), the
+          sharper this gets.
         </p>
       ) : null}
 
       {error ? (
-        <p className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm">{error}</p>
+        <p className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm">
+          {error}
+        </p>
       ) : null}
 
       {questions ? (
@@ -94,13 +113,16 @@ export function InterviewPrepPanel({
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm font-medium">{q.question}</p>
                 {q.competency ? (
-                  <Badge variant="secondary" className="text-[0.6rem]">{q.competency}</Badge>
+                  <Badge variant="secondary" className="text-[0.6rem]">
+                    {q.competency}
+                  </Badge>
                 ) : null}
               </div>
 
               {q.needsRealExample ? (
                 <p className="mt-1.5 rounded border-l-2 border-amber-500/50 bg-amber-500/10 py-1 pl-2 text-xs text-amber-200/90">
-                  No real example on file for this yet — prepare one from your experience; Fadi won&apos;t invent it.
+                  No real example on file for this yet — prepare one from your experience; Fadi
+                  won&apos;t invent it.
                 </p>
               ) : null}
 
@@ -114,7 +136,9 @@ export function InterviewPrepPanel({
               </dl>
 
               {q.basedOn ? (
-                <p className="mt-1.5 text-xs text-muted-foreground">From your story: &ldquo;{q.basedOn}&rdquo;</p>
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                  From your story: &ldquo;{q.basedOn}&rdquo;
+                </p>
               ) : null}
             </li>
           ))}
@@ -123,8 +147,9 @@ export function InterviewPrepPanel({
 
       {questions ? (
         <p className="mt-3 text-xs text-muted-foreground">
-          Deliver these in your own words — they&apos;re your real stories, shaped to this role. Save the
-          strong ones to your <span className="text-foreground">story bank</span> to reuse everywhere.
+          Deliver these in your own words — they&apos;re your real stories, shaped to this role.
+          Save the strong ones to your <span className="text-foreground">story bank</span> to reuse
+          everywhere.
         </p>
       ) : null}
     </div>

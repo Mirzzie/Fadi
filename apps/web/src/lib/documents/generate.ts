@@ -1,12 +1,6 @@
 import "server-only";
 
-import {
-  createCareerProfilesRepository,
-  createDocumentsRepository,
-  createLinkedInProfilesRepository,
-  createProfilesRepository,
-  createResumesRepository,
-} from "@careeros/database";
+import { createDocumentsRepository } from "@careeros/database";
 
 import { getDatabase } from "@/lib/database/client";
 import {
@@ -15,7 +9,8 @@ import {
   HUMANIZE_RESUME,
   stripAiTells,
 } from "@/lib/documents/humanize";
-import { composeCareerEvidence, isResumeJustLinkedInCopy } from "@/lib/career/evidence";
+import { buildCareerContext } from "@/lib/career/context";
+import { resumeFromCareerRecords } from "@/lib/career/resume-from-records";
 import { truthCheck, type TruthFinding } from "@/lib/documents/truth-gate";
 import { pivotFraming } from "@/lib/career/pivot";
 
@@ -24,14 +19,14 @@ import { pivotFraming } from "@/lib/career/pivot";
 export class NoHistoryError extends Error {
   constructor() {
     super(
-      "I don't have your career history yet, and drafting without it would just be generic filler. Paste your LinkedIn history (or your resume) in Profile first — then everything I write is grounded in you."
+      "No selected career records are ready. Add and review your history in Evidence, then choose what to include in this direction or application."
     );
     this.name = "NoHistoryError";
   }
 }
 import { isProseKind, letterFromText, serializeLetter } from "@/lib/documents/letter";
 import { serializeResume, type ResumeData } from "@/lib/documents/resume";
-import { resumeGenerationSchema, toResumeData } from "@/lib/documents/resume-schema";
+import { resumeGenerationSchema } from "@/lib/documents/resume-schema";
 import type { DocKind } from "@/lib/jobs/application-types";
 
 export type { DocKind };
@@ -53,24 +48,9 @@ export type GeneratedDoc = {
   id: string;
   kind: string;
   title: string;
-  /**
-   * Set when the document was drafted WITHOUT the evidence pool contributing anything
-   * — i.e. from résumé/LinkedIn prose alone. Honest-degradation signal, not an error.
-   *
-   * WHY (docs/DATA_FLOW_AUDIT.md, F3): the pool is empty for every user in the live
-   * database, so `topEvidenceForPrompt` returns "" and five features quietly fall back
-   * to raw text. The fallback is correct; the SILENCE is not. A user whose entire
-   * strategy is "compensate for thin experience with real projects" was never told
-   * that none of those projects were reaching their CV. Principle 5: a signal the user
-   * can act on must actually reach them.
-   */
+  /** Scope and coverage notice; accepted records are not independent verification. */
   evidenceNotice?: string;
-  /**
-   * Deterministic truth-gate findings for THIS draft, checked against the candidate's real
-   * record (résumé + LinkedIn + evidence). "block" = a metric with no backing (reads as
-   * invented) — the UI should stop export until resolved; "warn" = JD-only skill terms or
-   * seniority inflation to confirm. This is the doctrine made architectural, not just a prompt.
-   */
+  /** Heuristic findings, not a comprehensive factual verification. */
   truthFindings?: TruthFinding[];
 };
 
@@ -88,81 +68,39 @@ export async function generateCareerDocument(
     jobDescription?: string | null;
     jobId?: string | null;
     applicationId?: string | null;
+    directionId?: string | null;
     /** Red-pen review fixes to incorporate (the review→redraft loop). */
     guidance?: string | null;
   },
   generate: DocGenerate
 ): Promise<GeneratedDoc> {
   const db = getDatabase();
-  const careerProfile = await createCareerProfilesRepository(db).getActiveForUser(userId);
-  const resumesRepo = createResumesRepository(db);
-  const [profile, trackResume, linkedin] = await Promise.all([
-    createProfilesRepository(db).getByUserId(userId),
-    // Tailor from THIS direction's resume (falls back to the shared one).
-    resumesRepo.getLatestForTrack(userId, careerProfile?.id ?? null),
-    createLinkedInProfilesRepository(db).getLatestForUser(userId),
-  ]);
-
-  // Real failure mode (seen in the wild): a track's resume slot holds a COPY of
-  // the LinkedIn paste instead of an actual CV — generation then has no real
-  // resume voice/structure to preserve and invents wording wholesale (AI slop).
-  // Detect the copy and fall back to the shared base resume (the real CV).
-  let resume = trackResume;
-  const linkedInText = linkedin?.rawText ?? linkedin?.profileUrl;
-  if (
-    careerProfile &&
-    resume?.careerProfileId &&
-    isResumeJustLinkedInCopy(resume.parsedText ?? resume.rawText, linkedInText)
-  ) {
-    const shared = await resumesRepo.getLatestForTrack(userId, null);
-    if (shared && !isResumeJustLinkedInCopy(shared.parsedText ?? shared.rawText, linkedInText)) {
-      resume = shared;
+  // Capture once BEFORE the model call. Direction changes or evidence edits during
+  // generation cannot silently change this document's inputs or its truth-check corpus.
+  const context = await buildCareerContext(
+    userId,
+    {
+      directionId: opts.directionId,
+      applicationId: opts.applicationId,
+      jobId: opts.jobId,
+    },
+    {
+      persist: true,
+      target: { title: opts.jobTitle, company: opts.company, description: opts.jobDescription },
     }
-  }
-
-  const role = opts.jobTitle?.trim() || careerProfile?.targetRole || "the target role";
-  const company = opts.company?.trim() ?? "";
-  // LinkedIn (when provided) is the full record / source of truth; the resume is a
-  // role-tailored excerpt. composeCareerEvidence enforces that hierarchy + labels.
-  const evidence = composeCareerEvidence({
-    resumeText: resume?.parsedText ?? resume?.rawText,
-    linkedInText,
-  });
-
-  // No history at all → refuse honestly. Generating a "resume" from nothing but a
-  // role name is guaranteed generic slop, and slop is worse than a clear ask.
-  if (evidence.historySource === "none") {
-    throw new NoHistoryError();
-  }
-
-  // The shared evidence pool, ranked for the ACTIVE track — so the same history
-  // produces a differently-framed document per direction (the multi-track payoff).
-  const topEvidence = await import("@/lib/evidence/pool").then((m) =>
-    m.topEvidenceForPrompt(userId)
   );
-
-  // Degrade honestly, out loud. An empty pool is the normal case today, and falling
-  // back to résumé prose is the right behaviour — but doing it silently means the user
-  // never learns that their projects are missing from their own CV (F3).
-  const evidenceNotice = topEvidence
-    ? undefined
-    : "Drafted from your résumé/LinkedIn text only — your Evidence pool is empty, so none of your projects, labs or certs were used. Add them in Evidence and re-draft: that's usually the difference for thin-experience applications.";
-
-  const jobDescription = (opts.jobDescription ?? "").slice(0, 5000).trim();
-  // The candidate's REAL record — everything the truth gate is allowed to treat as backed.
-  const truthCorpus = [
-    evidence.block,
-    topEvidence,
-    resume?.parsedText ?? resume?.rawText,
-    linkedInText,
-  ]
-    .filter(Boolean)
-    .join("\n");
+  const { payload } = context;
+  if (!payload.records.length) throw new NoHistoryError();
+  const role = payload.target.title || "the target role";
+  const company = payload.target.company;
+  const jobDescription = payload.target.description.slice(0, 5000).trim();
+  const truthCorpus = context.block;
+  const evidenceNotice = `Drafted from ${payload.records.length} selected career records. Review the wording before use; accepted records and automated checks do not establish every claim.`;
   const candidateContext = [
-    `Candidate: ${profile?.fullName ?? "the candidate"}`,
+    `Candidate: ${payload.person.name || "the candidate"}`,
     `Target role: ${role}${company ? ` at ${company}` : ""}`,
-    `Location: ${careerProfile?.location ?? "not specified"}`,
-    `Career goal: ${careerProfile?.careerGoal ?? "not specified"}`,
+    `Location: ${payload.direction?.location ?? "not specified"}`,
+    `Career goal: ${payload.direction?.goal ?? "not specified"}`,
     jobDescription
       ? `\nTARGET JOB DESCRIPTION (tailor specifically to this — mirror its language and address its requirements with the candidate's REAL experience):\n${jobDescription}`
       : "",
@@ -170,14 +108,13 @@ export async function generateCareerDocument(
     // Direction-aware framing: same shared history, framed for THIS direction —
     // adjacent-field experience adopted, transferable skills named with evidence.
     pivotFraming({
-      targetRole: careerProfile?.targetRole ?? null,
-      domain: careerProfile?.domain ?? null,
-      intent: careerProfile?.intent ?? null,
-      careerGoal: careerProfile?.careerGoal ?? null,
+      targetRole: payload.direction?.role ?? null,
+      domain: payload.direction?.domain ?? null,
+      intent: payload.direction?.intent ?? null,
+      careerGoal: payload.direction?.goal ?? null,
     }),
     "",
-    evidence.block,
-    topEvidence ? `\n${topEvidence}` : "",
+    context.block,
     opts.guidance?.trim()
       ? `\nRED-PEN REVIEW OF THE PREVIOUS DRAFT — incorporate every fix below that is grounded in the candidate's REAL experience (keep any [ADD REAL NUMBER] placeholders literally; never invent the number):\n${opts.guidance.trim().slice(0, 4000)}`
       : "",
@@ -187,17 +124,23 @@ export async function generateCareerDocument(
   const titleSuffix = [role, company].filter(Boolean).join(" · ");
   // Tag the document with the active career track so each path owns its documents.
   const link = {
-    careerProfileId: careerProfile?.id ?? null,
-    jobId: opts.jobId ?? null,
-    applicationId: opts.applicationId ?? null,
+    careerProfileId: payload.directionId,
+    jobId: payload.jobId,
+    applicationId: payload.applicationId,
   };
   const jobContext = { jobTitle: role, company };
+  const metadata = {
+    careerContextSnapshotId: context.snapshotId,
+    careerContextFingerprint: context.fingerprint,
+    contextSchemaVersion: 1,
+    provenance: payload.provenance,
+  };
 
   if (opts.kind === "resume") {
     // EXTRACTIVE-FIRST: the anti-slop architecture. The candidate's own wording is
     // the product — AI text that reads as AI comes from REWRITING; selection and
     // reordering of their real sentences can't sound like a bot.
-    const system = `You are Fadi, tailoring the candidate's BASE resume to the target role${jobDescription ? " and its job description" : ""}. EXTRACTIVE-FIRST — their own wording IS the product:
+    const system = `You are Fadi, tailoring the candidate's selected career records to the target role${jobDescription ? " and its job description" : ""}. EXTRACTIVE-FIRST — their own wording IS the product:
 - PRESERVE their sentences. Select, reorder, and trim from the base material; do NOT paraphrase bullets that already read well. Most bullets should appear verbatim or near-verbatim from the base.
 - You MAY: reorder experiences and bullets by relevance to this role; drop bullets irrelevant to it; tighten a bullet by cutting filler words; surface a JD term ONLY where the underlying experience is already in the base material.
 - You MAY write genuinely NEW text only for: the summary (≤45 words, grounded in the base) and the ordering/grouping of the skills list.
@@ -215,20 +158,21 @@ ${HUMANIZE_RESUME}`;
       "resume"
     );
     const personal: ResumeData["personal"] = {
-      name: profile?.fullName ?? "",
+      name: payload.person.name,
       headline: role,
-      email: profile?.email ?? "",
+      email: payload.person.email,
       phone: "",
-      location: careerProfile?.location ?? "",
-      links: linkedin?.profileUrl ?? "",
+      location: payload.direction?.location ?? "",
+      links: "",
     };
-    const content = serializeResume(toResumeData(gen, personal));
+    const content = serializeResume(resumeFromCareerRecords(payload.records, gen, personal));
     const doc = await docsRepo.createForUser(userId, {
       ...link,
       kind: "resume",
       title: `Resume — ${titleSuffix}`,
       content,
       jobContext,
+      metadata,
     });
     return {
       id: doc.id,
@@ -260,6 +204,7 @@ ${HUMANIZE_PROSE}`;
     title: `${label.replace(/\b\w/, (c) => c.toUpperCase())} — ${titleSuffix}`,
     content,
     jobContext,
+    metadata,
   });
   return {
     id: doc.id,

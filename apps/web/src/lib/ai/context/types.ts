@@ -11,6 +11,7 @@ export interface FadiUserContext {
   };
 
   evidence: {
+    approvedBlock?: string;
     resumeText: string | null;
     linkedInText: string | null;
     hasResume: boolean;

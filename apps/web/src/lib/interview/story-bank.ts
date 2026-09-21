@@ -32,7 +32,7 @@ const STORY_SCHEMA = z.object({
         action: z.string(),
         result: z.string(),
         reflection: z.string(),
-      }),
+      })
     )
     .max(8),
 });
@@ -56,30 +56,24 @@ export type ExtractResult =
  */
 export async function generateStoriesFromEvidence(userId: string): Promise<ExtractResult> {
   const [
-    { getCareerReportContext },
-    { composeCareerEvidence },
+    { approvedCareerEvidence },
     { getUserDocGenerate },
     { createInterviewStoriesRepository },
     { getDatabase },
   ] = await Promise.all([
-    import("@/lib/career-report/data"),
-    import("@/lib/career/evidence"),
+    import("@/lib/career/context"),
     import("@/lib/ai/user-generate"),
     import("@careeros/database"),
     import("@/lib/database/client"),
   ]);
 
-  const context = await getCareerReportContext(userId);
-  const evidence = composeCareerEvidence({
-    resumeText: context?.resumeText,
-    linkedInText: context?.linkedInProfileText,
-  });
+  const evidence = await approvedCareerEvidence(userId);
   if (evidence.historySource === "none") {
     return {
       ok: false,
       reason: "no_evidence",
       message:
-        "I don't have your career history yet. Paste your LinkedIn or upload a resume first, and I'll mine your real experience into interview stories.",
+        "I don't have your career history yet. Add and review your records in Evidence first, and I'll mine your real experience into interview stories.",
     };
   }
 
@@ -88,7 +82,8 @@ export async function generateStoriesFromEvidence(userId: string): Promise<Extra
     return {
       ok: false,
       reason: "no_provider",
-      message: "Connect an AI provider in Settings and I'll draft your story bank from your experience.",
+      message:
+        "Connect an AI provider in Settings and I'll draft your story bank from your experience.",
     };
   }
 
@@ -98,10 +93,14 @@ export async function generateStoriesFromEvidence(userId: string): Promise<Extra
       EXTRACTION_SYSTEM,
       buildExtractionContext(evidence.block),
       STORY_SCHEMA,
-      "interview_stories",
+      "interview_stories"
     );
   } catch {
-    return { ok: false, reason: "empty", message: "I couldn't draft stories just now — please try again." };
+    return {
+      ok: false,
+      reason: "empty",
+      message: "I couldn't draft stories just now — please try again.",
+    };
   }
 
   const clean = (parsed.stories ?? []).filter((s) => s.title.trim() && s.action.trim());
@@ -110,7 +109,7 @@ export async function generateStoriesFromEvidence(userId: string): Promise<Extra
       ok: false,
       reason: "empty",
       message:
-        "There wasn't enough concrete detail in your history for a real story yet. Add more specifics to your LinkedIn/resume and try again.",
+        "There wasn't enough concrete detail in your history for a real story yet. Add more specifics to your Evidence records and try again.",
     };
   }
 
@@ -126,7 +125,7 @@ export async function generateStoriesFromEvidence(userId: string): Promise<Extra
       result: s.result.trim(),
       reflection: s.reflection.trim(),
       origin: "ai",
-    })),
+    }))
   );
   return { ok: true, stories: created.map(toStoryView) };
 }
@@ -159,10 +158,11 @@ export type StoryFromAnswerResult =
  */
 export async function storyFromMockAnswer(
   userId: string,
-  input: { question: string; answer: string; role?: string | null; competency?: string | null },
+  input: { question: string; answer: string; role?: string | null; competency?: string | null }
 ): Promise<StoryFromAnswerResult> {
   const answer = input.answer?.trim() ?? "";
-  if (!answer) return { ok: false, reason: "empty_answer", message: "There's no answer to save yet." };
+  if (!answer)
+    return { ok: false, reason: "empty_answer", message: "There's no answer to save yet." };
 
   const [{ getUserDocGenerate }, { createInterviewStoriesRepository }, { getDatabase }] =
     await Promise.all([
@@ -191,15 +191,25 @@ export async function storyFromMockAnswer(
 
   let s: z.infer<typeof ONE_STORY_SCHEMA>;
   try {
-    s = await generate.structured(ANSWER_TO_STORY_SYSTEM, user, ONE_STORY_SCHEMA, "interview_story_from_answer");
+    s = await generate.structured(
+      ANSWER_TO_STORY_SYSTEM,
+      user,
+      ONE_STORY_SCHEMA,
+      "interview_story_from_answer"
+    );
   } catch {
-    return { ok: false, reason: "empty", message: "I couldn't shape that into a story just now — please try again." };
+    return {
+      ok: false,
+      reason: "empty",
+      message: "I couldn't shape that into a story just now — please try again.",
+    };
   }
   if (!s.title.trim() || !s.action.trim()) {
     return {
       ok: false,
       reason: "empty",
-      message: "That answer didn't have enough to form a story yet. Add more specifics and re-answer.",
+      message:
+        "That answer didn't have enough to form a story yet. Add more specifics and re-answer.",
     };
   }
 
@@ -228,7 +238,7 @@ export async function listStories(userId: string): Promise<StoryView[]> {
 /** Answer a behavioral question with the best-matching real story (no fabrication). */
 export async function answerBehavioral(
   userId: string,
-  question: string,
+  question: string
 ): Promise<{ ok: boolean; answer?: string; storyTitle?: string; message?: string }> {
   const stories = await listStories(userId);
   const story = pickBestStory(stories, question);
