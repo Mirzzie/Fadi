@@ -8,13 +8,17 @@ import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
 import { getUserDocGenerate } from "@/lib/ai/user-generate";
 import { loadCandidateCorpus } from "@/lib/documents/corpus";
-import { HUMANIZE_CORE, HUMANIZE_PROSE, HUMANIZE_RESUME } from "@/lib/documents/humanize";
 import { resolveLocaleNorm } from "@/lib/documents/locale-norms";
-import { parseResume, serializeResume } from "@/lib/documents/resume";
-import { resumeImportSchema, toResumeData } from "@/lib/documents/resume-schema";
 import { truthCheck, type TruthFinding } from "@/lib/documents/truth-gate";
 import { figuresAskedButNotWritten } from "@/lib/documents/improve-figures";
-import { inventedNote, restoreDropped, restoredNote } from "@/lib/documents/revision-guard";
+import { backedRecords, NO_BACKED_RECORDS } from "@/lib/documents/backed-records";
+import { rewriteProse, rewriteResume } from "@/lib/documents/rewrite";
+import {
+  addedNote,
+  inventedNote,
+  removedNote,
+  restoredNote,
+} from "@/lib/documents/revision-guard";
 import { logger } from "@/lib/observability/logger";
 
 /**
@@ -84,9 +88,23 @@ export async function improveDocumentAction(input: {
     .filter(Boolean)
     .join("\n\n");
 
+  // What their record supports, so a rewrite can work in their own project without the guard
+  // mistaking it for an invention (S2-R2). Their whole accepted record, not this document's
+  // selection: asking to add something is exactly how a record enters a document.
+  let backed = NO_BACKED_RECORDS;
+  try {
+    const { buildCareerContext } = await import("@/lib/career/context");
+    backed = backedRecords((await buildCareerContext(user.id, { all: true })).payload.records);
+  } catch {
+    // Unreadable record: the guard falls back to allowing nothing new, which is the safe side.
+  }
+
   const rewrite = (extra: string) =>
     doc.kind === "resume"
-      ? rewriteResume(generate, input.currentContent, ground + extra)
+      ? rewriteResume(generate, input.currentContent, ground + extra, {
+          instruction: ask.data,
+          backed,
+        })
       : rewriteProse(generate, input.currentContent, ground + extra, doc.kind);
 
   const newFigures = (text: string) =>
@@ -150,6 +168,8 @@ export async function improveDocumentAction(input: {
         declined.length > 0
           ? `Fadi did not add ${declined.join(" or ")} — your record doesn't show ${declined.length === 1 ? "it" : "them"}. Record the evidence first and ask again.`
           : "",
+        addedNote(revision.added),
+        removedNote(revision.removed),
         restoredNote(revision.restored),
         inventedNote(revision.invented),
       ]
@@ -173,83 +193,3 @@ export async function improveDocumentAction(input: {
 }
 
 /** A résumé is structured: the model edits the structure, so sections and order survive. */
-async function rewriteResume(
-  generate: { structured: <T>(system: string, user: string, schema: z.ZodType<T>, name: string) => Promise<T> },
-  current: string,
-  ground: string
-): Promise<{ content: string; restored: string[]; invented: string[] }> {
-  const data = parseResume(current);
-  const system = `You revise ONE résumé to a person's instruction. Return the whole résumé, revised.
-${HUMANIZE_CORE}
-${HUMANIZE_RESUME}
-Rules that override the instruction:
-- Every claim must be supported by their record. Do not add employers, dates, tools, certifications or numbers that are not in it.
-- Keep their own wording where it already works; rewrite what the instruction targets.
-- Bullets: concrete action, the thing itself, and the outcome where the record gives one. No invented metrics.
-- Keep every section they have unless the instruction says to remove it.`;
-
-  const revised = await generate.structured(
-    system,
-    `${ground}\n\nTHE RÉSUMÉ NOW (JSON):\n${JSON.stringify(
-      {
-        personal: data.personal,
-        summary: data.summary,
-        experiences: data.experiences.map((e: { bullets: string }) => ({
-          ...e,
-          bullets: e.bullets.split("\n").filter(Boolean),
-        })),
-        education: data.education,
-        skills: data.skills,
-        projects: data.projects,
-      },
-      null,
-      1
-    ).slice(0, 12000)}`,
-    resumeImportSchema,
-    "resume_revision"
-  );
-
-  // NOTHING IS DELETED BY A REWRITE. A model that omits an employer returns a perfectly valid
-  // résumé, so this is checked structurally rather than asked for in the prompt.
-  const experiences = restoreDropped(
-    data.experiences.map((e) => ({ ...e, bullets: e.bullets.split("\n").filter(Boolean) })),
-    revised.experiences,
-    ["company", "title"]
-  );
-  const education = restoreDropped(data.education, revised.education, ["school", "degree"]);
-  const projects = restoreDropped(data.projects, revised.projects, ["title"]);
-
-  // Rebuild through the same path an import uses, then keep the section order the person chose.
-  const next = toResumeData(
-    {
-      summary: revised.summary,
-      experiences: experiences.entries,
-      education: education.entries,
-      skills: revised.skills,
-      projects: projects.entries,
-    },
-    revised.personal
-  );
-  return {
-    content: serializeResume({ ...next, order: data.order }),
-    restored: [...experiences.restored, ...education.restored, ...projects.restored],
-    invented: [...experiences.invented, ...education.invented, ...projects.invented],
-  };
-}
-
-/** A letter or email is prose: the model returns the text, and nothing else. */
-async function rewriteProse(
-  generate: { text: (system: string, user: string) => Promise<string> },
-  current: string,
-  ground: string,
-  kind: string
-): Promise<{ content: string; restored: string[]; invented: string[] }> {
-  const system = `You revise ONE ${kind.replace(/_/g, " ")} to a person's instruction. Return ONLY the revised text — no preamble, no explanation, no markdown fences.
-${HUMANIZE_CORE}
-${HUMANIZE_PROSE}
-Rules that override the instruction:
-- Every claim must be supported by their record. Never add an employer, a number or an achievement that is not in it.
-- Keep their voice. Revise what the instruction targets and leave the rest alone.`;
-  const out = await generate.text(system, `${ground}\n\nTHE DOCUMENT NOW:\n${current.slice(0, 9000)}`);
-  return { content: out.replace(/^```[a-z]*\n?|\n?```$/g, "").trim(), restored: [], invented: [] };
-}
