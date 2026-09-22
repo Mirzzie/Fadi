@@ -26,7 +26,8 @@ export type CapturedContext = {
 export function capturedContextOf(metadata: unknown): CapturedContext | null {
   if (!metadata || typeof metadata !== "object") return null;
   const m = metadata as Record<string, unknown>;
-  const snapshotId = typeof m.careerContextSnapshotId === "string" ? m.careerContextSnapshotId : null;
+  const snapshotId =
+    typeof m.careerContextSnapshotId === "string" ? m.careerContextSnapshotId : null;
   const fingerprint =
     typeof m.careerContextFingerprint === "string" ? m.careerContextFingerprint : null;
   if (!snapshotId && !fingerprint) return null;
@@ -42,6 +43,12 @@ export type ContextRecord = {
   title?: string | null;
   organization?: string | null;
   detail?: string | null;
+  period?: string | null;
+  kind?: string | null;
+  metrics?: string | null;
+  attribution?: string | null;
+  tags?: string[];
+  marketTags?: string[];
 };
 
 export type RecordChanges = {
@@ -87,7 +94,24 @@ export function whatChanged(before: ContextRecord[], after: ContextRecord[]): Re
       added.push(name(record));
       continue;
     }
-    if (words(previous.detail) !== words(record.detail)) reworded.push(name(record));
+    const fields = [
+      "title",
+      "organization",
+      "detail",
+      "period",
+      "kind",
+      "metrics",
+      "attribution",
+    ] as const;
+    const changed = fields.some((field) => words(previous[field]) !== words(record[field]));
+    const tags = (values?: string[]) => JSON.stringify([...new Set(values ?? [])].sort());
+    if (
+      changed ||
+      tags(previous.tags) !== tags(record.tags) ||
+      tags(previous.marketTags) !== tags(record.marketTags)
+    ) {
+      reworded.push(name(record));
+    }
   }
 
   const removed: string[] = [];
@@ -116,11 +140,13 @@ function list(names: string[]): string {
 export function freshnessNote(changes: RecordChanges): string {
   const parts: string[] = [];
   if (changes.added.length) parts.push(`you've added ${list(changes.added)}`);
-  if (changes.reworded.length) parts.push(`you reworded ${list(changes.reworded)}`);
+  if (changes.reworded.length) parts.push(`you updated ${list(changes.reworded)}`);
   if (changes.removed.length) parts.push(`${list(changes.removed)} is no longer selected`);
   if (parts.length === 0) return "Your record has changed since this was written.";
   const joined =
-    parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+    parts.length === 1
+      ? parts[0]
+      : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
   return `Your record has changed since this was written — ${joined}.`;
 }
 

@@ -64,17 +64,29 @@ export function ProfileForm({
     <div className="space-y-4">
       <div className="rounded-xl border bg-card p-6 space-y-4">
         <Field label="Full name">
-          <input value={form.fullName} onChange={(e) => set("fullName", e.target.value)} className={inputCls} />
+          <input
+            value={form.fullName}
+            onChange={(e) => set("fullName", e.target.value)}
+            className={inputCls}
+          />
         </Field>
         <Field label="Email">
           <input value={email} disabled className={cn(inputCls, "opacity-60")} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Target role">
-            <input value={form.targetRole} onChange={(e) => set("targetRole", e.target.value)} className={inputCls} />
+            <input
+              value={form.targetRole}
+              onChange={(e) => set("targetRole", e.target.value)}
+              className={inputCls}
+            />
           </Field>
           <Field label="Location preference">
-            <input value={form.location} onChange={(e) => set("location", e.target.value)} className={inputCls} />
+            <input
+              value={form.location}
+              onChange={(e) => set("location", e.target.value)}
+              className={inputCls}
+            />
           </Field>
         </div>
         <Field label="Experience level">
@@ -108,13 +120,16 @@ export function ProfileForm({
             className={inputCls}
           />
         </Field>
-        <Field label="Career history — LinkedIn (your source of truth)">
+        <Field label="Imported career history — LinkedIn">
           <p className="-mt-0.5 text-xs text-muted-foreground">
-            The full, role-agnostic record Fadi grounds everything in. We can&apos;t pull it from
-            LinkedIn automatically — paste your About + experience, or upload your LinkedIn
-            &ldquo;Save to PDF&rdquo; export. Your resumes can be tailored per role; this stays complete.
+            Paste your About and experience, or upload a LinkedIn PDF export. This is source
+            material: after saving, use Evidence to review the records extracted from it. New
+            documents use your selected evidence, not this text directly.
           </p>
-          <CvUpload label="Upload LinkedIn PDF export" onExtracted={(text) => set("linkedInText", text)} />
+          <CvUpload
+            label="Upload LinkedIn PDF export"
+            onExtracted={(text) => set("linkedInText", text)}
+          />
           <textarea
             value={form.linkedInText}
             onChange={(e) => set("linkedInText", e.target.value)}
@@ -123,13 +138,18 @@ export function ProfileForm({
             className={cn(inputCls, "h-auto py-2")}
           />
         </Field>
-        <Field label={directionLabel ? `Base resume — your “${directionLabel}” direction` : "Base resume / CV"}>
+        <Field
+          label={
+            directionLabel
+              ? `Imported resume — your “${directionLabel}” direction`
+              : "Imported resume / CV"
+          }
+        >
           <p className="-mt-0.5 text-xs text-muted-foreground">
-            Each direction keeps its own base resume — every job document Fadi tailors in{" "}
-            {directionLabel ? `“${directionLabel}”` : "this direction"} starts from THIS text (your
-            words are preserved, not rewritten). Add direction-specific projects or certifications
-            here as you earn them. Your LinkedIn above stays the shared career history. Don&apos;t
-            paste the same LinkedIn text here — it needs to be an actual resume.
+            Keep a CV from Fadi or another tool here for this direction. After saving, add its
+            records through Evidence and review any conflicts. Choose Auto, Include or Exclude
+            there, and use &ldquo;Keep my description&rdquo; for wording you want preserved in a new
+            résumé. Saving an imported CV does not overwrite your approved career records.
           </p>
           <CvUpload onExtracted={(text) => set("resumeText", text)} />
           <textarea
@@ -147,7 +167,7 @@ export function ProfileForm({
               "flex items-start gap-2 rounded-lg border p-3 text-sm",
               status.ok
                 ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                : "border-amber-500/30 bg-amber-500/10 text-amber-200",
+                : "border-amber-500/30 bg-amber-500/10 text-amber-200"
             )}
           >
             {status.ok ? (
@@ -169,22 +189,24 @@ export function ProfileForm({
       <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 space-y-6">
         {/* 1. Start over — wipe data, keep the login. */}
         <div>
-          <h3 className="text-sm font-semibold text-destructive">Delete my data &amp; start over</h3>
+          <h3 className="text-sm font-semibold text-destructive">
+            Delete my data &amp; start over
+          </h3>
           {/* THE LIST HAS TO BE COMPLETE. It named profile, reports, evidence,
               applications, momentum and AI settings — and omitted the portfolio, which
               this also erases: every item, the site, the handle, the custom wording and
               the GitHub connection. An irreversible action described incompletely is
               worse than one described bluntly. */}
           <p className="mt-1 text-sm text-muted-foreground">
-            Permanently removes your profile, reports, evidence, applications, momentum, AI
-            settings <strong>and your entire portfolio</strong> — every item, your public page
-            and its handle, your custom wording, and the GitHub connection. Then it signs you
-            out. <strong>Your login stays</strong>, so you can sign back in and start fresh.
-            This can&apos;t be undone.
+            Permanently removes your profile, reports, evidence, applications, momentum, AI settings{" "}
+            <strong>and your entire portfolio</strong> — every item, your public page and its
+            handle, your custom wording, and the GitHub connection. Then it signs you out.{" "}
+            <strong>Your login stays</strong>, so you can sign back in and start fresh. This
+            can&apos;t be undone.
           </p>
           <p className="mt-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
-            Your published site on GitHub Pages keeps serving — Fadi just stops knowing about
-            it. Uploaded images stay on Cloudinary, but the links to them live here and go with
+            Your published site on GitHub Pages keeps serving — Fadi just stops knowing about it.
+            Uploaded images stay on Cloudinary, but the links to them live here and go with
             everything else. <strong>Export your portfolio first</strong> (Portfolio → Export) if
             there is anything in it you would miss.
           </p>
@@ -201,7 +223,12 @@ export function ProfileForm({
                   )}
                   Yes, delete my data
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => setConfirming(null)} disabled={pending}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirming(null)}
+                  disabled={pending}
+                >
                   Cancel
                 </Button>
               </div>
@@ -242,7 +269,12 @@ export function ProfileForm({
                 )}
                 Yes, close my account
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setConfirming(null)} disabled={pending}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setConfirming(null)}
+                disabled={pending}
+              >
                 Cancel
               </Button>
             </div>

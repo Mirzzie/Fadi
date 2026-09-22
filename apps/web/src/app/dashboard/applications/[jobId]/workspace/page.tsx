@@ -155,19 +155,11 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
               jobDescription={job.description ?? undefined}
             />
           </WorkspaceSection>
-          {/* Sits between go/no-go and ready-to-send on purpose: once you've decided
-              to apply, the next real decision is what leads — not another score. */}
-          <WorkspaceSection
-            icon="lead"
-            title="What should lead here?"
-            hint="Which of your evidence goes first for this role"
-          >
-            <CareerSelectionPanel
-              directionId={applications[0]?.careerProfileId ?? track?.id}
-              applicationId={applications[0]?.id}
-              jobId={job.id}
-            />
-          </WorkspaceSection>
+          <CareerSelectionPanel
+            directionId={applications[0]?.careerProfileId ?? track?.id}
+            applicationId={applications[0]?.id}
+            jobId={job.id}
+          />
           <WorkspaceSection
             icon="quality"
             title="Is it ready to send?"

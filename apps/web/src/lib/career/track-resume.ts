@@ -12,16 +12,9 @@ import { resumeGenerationSchema } from "@/lib/documents/resume-schema";
 import { HUMANIZE_CORE, HUMANIZE_RESUME } from "@/lib/documents/humanize";
 import { logger } from "@/lib/observability/logger";
 
-/**
- * Draft a new direction's BASE resume from the shared source of truth — the
- * architecture the user asked for: constant data (career history, education)
- * lives once; each direction gets its own customized resume, auto-created on
- * direction creation and editable afterwards (Profile → resume, per direction).
- *
- * Best-effort by design: no provider or no history → skip quietly (the direction
- * falls back to the shared resume until one exists). Never fabricates — the
- * pivot framing adopts adjacent-field experience and names transferable skills
- * only where the evidence shows them.
+/** Draft a direction-specific reference CV from selected accepted records.
+ * New application documents independently capture their own selected records.
+ * Without records or a provider, skip this optional draft.
  */
 export async function draftTrackBaseResume(userId: string, track: CareerProfile): Promise<boolean> {
   try {
@@ -47,7 +40,7 @@ export async function draftTrackBaseResume(userId: string, track: CareerProfile)
     }
 
     const direction = context.payload.direction!;
-    const system = `You are Fadi, an expert resume writer. From the candidate's REAL career history below, produce the BASE resume for their "${direction.role}" direction${direction.domain ? ` (${direction.domain})` : ""} — the tailored starting point every application in this direction builds on.
+    const system = `You are Fadi, an expert resume writer. From the candidate's REAL career history below, produce the BASE resume for their "${direction.role}" direction${direction.domain ? ` (${direction.domain})` : ""} — a reference draft for this direction.
 - Keep their real roles, companies, dates, education and projects exactly.
 - Rewrite the summary and bullets to position them for this direction, using its vocabulary where genuinely accurate.
 CRITICAL: use ONLY real experience, education, skills and projects from the provided material. Never invent employers, dates, degrees, or achievements. If a section is thin, keep it short rather than fabricating.

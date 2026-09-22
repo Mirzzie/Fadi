@@ -57,13 +57,17 @@ describe("whatChanged", () => {
   });
 
   it("ignores whitespace, which is not a change anybody made", () => {
-    const changes = whatChanged([rec()], [rec({ detail: "  Supported Windows and Linux\n users. " })]);
+    const changes = whatChanged(
+      [rec()],
+      [rec({ detail: "  Supported Windows and Linux\n users. " })]
+    );
     expect(nothingChanged(changes)).toBe(true);
   });
 
   it("notices a record that is no longer selected", () => {
-    expect(whatChanged([rec(), rec({ factId: "fact-2", title: "SOC Home Lab" })], [rec()]).removed)
-      .toEqual(["SOC Home Lab (Crozaint Technologies)"]);
+    expect(
+      whatChanged([rec(), rec({ factId: "fact-2", title: "SOC Home Lab" })], [rec()]).removed
+    ).toEqual(["SOC Home Lab (Crozaint Technologies)"]);
   });
 
   it("falls back to title and organisation when a record has no fact id", () => {
@@ -79,20 +83,22 @@ describe("whatChanged", () => {
 describe("what the person is told", () => {
   it("names the change rather than demanding a regeneration", () => {
     const note = freshnessNote({ added: ["SOC Home Lab"], removed: [], reworded: [] });
-    expect(note).toBe("Your record has changed since this was written — you've added SOC Home Lab.");
+    expect(note).toBe(
+      "Your record has changed since this was written — you've added SOC Home Lab."
+    );
     expect(note).not.toMatch(/regenerat|rewrite now/i);
   });
 
   it("reads as one sentence when several things changed", () => {
-    expect(
-      freshnessNote({ added: ["A"], reworded: ["B"], removed: ["C"] })
-    ).toBe("Your record has changed since this was written — you've added A, you reworded B and C is no longer selected.");
+    expect(freshnessNote({ added: ["A"], reworded: ["B"], removed: ["C"] })).toBe(
+      "Your record has changed since this was written — you've added A, you updated B and C is no longer selected."
+    );
   });
 
   it("counts the rest instead of listing everything", () => {
-    expect(freshnessNote({ added: ["A", "B", "C", "D", "E"], removed: [], reworded: [] })).toContain(
-      "A, B, C and 2 more"
-    );
+    expect(
+      freshnessNote({ added: ["A", "B", "C", "D", "E"], removed: [], reworded: [] })
+    ).toContain("A, B, C and 2 more");
   });
 
   it("offers an instruction the guarded rewrite can take", () => {
@@ -103,5 +109,40 @@ describe("what the person is told", () => {
       "Use my current wording for A job"
     );
     expect(freshnessAsk({ added: [], removed: [], reworded: [] })).toBeNull();
+  });
+});
+
+describe("factual corrections under an unchanged fact identity", () => {
+  const record = {
+    factId: "employment-1",
+    title: "Support engineer",
+    organization: "Former wording",
+    detail: "Resolved incidents",
+    period: "2024",
+    metrics: "30 tickets",
+    kind: "experience",
+    attribution: "employment",
+    tags: ["Linux"],
+    marketTags: ["IT support"],
+  };
+  it.each([
+    { organization: "Correct employer" },
+    { title: "Correct title" },
+    { period: "2025" },
+    { metrics: "20 tickets" },
+    { kind: "project" },
+    { attribution: "personal" },
+    { tags: ["Windows"] },
+    { marketTags: ["Desktop support"] },
+  ])("does not call an unchanged description fresh after %j", (correction) => {
+    expect(whatChanged([record], [{ ...record, ...correction }]).reworded).toHaveLength(1);
+  });
+  it("does not warn for tag order alone", () => {
+    expect(
+      whatChanged(
+        [{ ...record, tags: ["Linux", "Windows"] }],
+        [{ ...record, tags: ["Windows", "Linux"] }]
+      ).reworded
+    ).toHaveLength(0);
   });
 });

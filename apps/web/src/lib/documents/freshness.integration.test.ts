@@ -31,11 +31,12 @@ suite("a document knows when it has fallen behind", () => {
     const { Pool } = await import("pg");
     pool = new Pool({ connectionString: URL });
     const email = `freshness-${Date.now()}@example.test`;
-    userId = (await pool.query(`insert into users (email) values ($1) returning id`, [email])).rows[0].id;
-    await pool.query(`insert into profiles (user_id, full_name, email) values ($1,'Freshness Check',$2)`, [
-      userId,
-      email,
-    ]);
+    userId = (await pool.query(`insert into users (email) values ($1) returning id`, [email]))
+      .rows[0].id;
+    await pool.query(
+      `insert into profiles (user_id, full_name, email) values ($1,'Freshness Check',$2)`,
+      [userId, email]
+    );
     directionId = (
       await pool.query(
         `insert into career_profiles (user_id, target_role, career_goal, imported_from, analysis_status, intent, is_active)
@@ -121,6 +122,30 @@ suite("a document knows when it has fallen behind", () => {
     if (fresh.state !== "stale") return;
     expect(fresh.changes.reworded).toContain("Ticket triage");
     expect(fresh.changes.added).not.toContain("Ticket triage");
+  });
+
+  it("flags an employer/date correction even when the description stays identical", async () => {
+    const { buildCareerContext } = await import("@/lib/career/context");
+    const { documentFreshness } = await import("./freshness.server");
+    const factId = await addEvidence("Employment correction", "Resolved support incidents.");
+    const context = await buildCareerContext(userId, { directionId }, { persist: true });
+    await pool.query(
+      "update evidence_items set organization = 'Correct employer', period = '2025' where id = $1",
+      [factId]
+    );
+    const fresh = await documentFreshness(userId, {
+      metadata: {
+        careerContextSnapshotId: context.snapshotId,
+        careerContextFingerprint: context.fingerprint,
+        contextSchemaVersion: 1,
+      },
+      careerProfileId: directionId,
+      applicationId: null,
+      jobId: null,
+    });
+    expect(fresh.state).toBe("stale");
+    if (fresh.state === "stale")
+      expect(fresh.changes.reworded).toContain("Employment correction (Correct employer)");
   });
 
   it("claims nothing about a document Fadi never generated", async () => {

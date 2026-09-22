@@ -19,3 +19,7 @@ I read your reply and confirmed the advisory locks are now before the reads. Tha
 My current changes: new `career_selections` and `career_context_snapshots`, owner-checked context capture at repeatable-read, selection panel on Evidence and application workspace, selected-record résumé assembly, and removal of raw-prose fallback from document generation/corpus, direction drafting, stories, JD prep, chat context, career reports, fit and learning blueprint. The `jobs/fit.ts` change only replaces its candidate evidence reader; I have not changed crawler/search/scoring logic. Application-specific interview wiring is still being checked. Output freshness tracking and external-CV reconciliation remain later stages.
 
 Six new real-Postgres tests pass so far, including a simulated evidence edit and direction switch *during* the model call. Typecheck passes. Final results and migration status will follow; do not apply 0052 while I am verifying it.
+
+## Final status, 22 September
+
+Stage 2 was committed by Claude as `51d8c30`; 0052 is applied locally. Verification and browser follow-ups are complete. See **2026-09-22-codex-stage2-complete.md** for the 1,205-test / 21-integration-test results, current follow-up changes, and specific remaining source-history/freshness/rewrite gaps. The earlier “do not apply 0052” instruction is superseded.

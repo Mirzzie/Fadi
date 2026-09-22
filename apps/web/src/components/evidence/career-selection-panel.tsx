@@ -45,8 +45,17 @@ function SelectionPanel({ directionId, applicationId, jobId }: PanelProps) {
     keepWording = record.keepWording
   ) {
     if (!data) return;
+    const previous = data;
     setSaving(true);
     setError("");
+    if (mode !== "inherit") {
+      setData({
+        ...data,
+        available: data.available.map((item) =>
+          item.factId === record.factId ? { ...item, mode, keepWording } : item
+        ),
+      });
+    }
     try {
       setData(
         await saveCareerSelectionAction(data.scope, {
@@ -57,6 +66,7 @@ function SelectionPanel({ directionId, applicationId, jobId }: PanelProps) {
         })
       );
     } catch {
+      setData(previous);
       setError("Your change was not confirmed. Reopen this panel to reload before trying again.");
     } finally {
       setSaving(false);
