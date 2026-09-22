@@ -13,20 +13,9 @@ import {
   nothingChanged,
   whatChanged,
   type ContextRecord,
-  type RecordChanges,
+  type DocumentFreshness,
 } from "@/lib/documents/freshness";
 import { logger } from "@/lib/observability/logger";
-
-/**
- * Is this document still written from the person's current record?
- *
- * Answered by comparing what generation captured with what the same scope holds now — see
- * lib/documents/freshness.ts for why this is a comparison rather than a guess.
- */
-export type DocumentFreshness =
-  | { state: "unknown" }
-  | { state: "current" }
-  | { state: "stale"; note: string; ask: string | null; changes: RecordChanges };
 
 type DocumentLike = {
   metadata: Record<string, unknown>;

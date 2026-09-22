@@ -4,6 +4,11 @@ import type { DbOrTx } from "../client";
 import { evidenceItems, portfolioItems, type EvidenceItem, type NewEvidenceItem } from "../schema";
 
 import { recordCanonicalState, recordFactState } from "./fact-history";
+import {
+  forgetSelections,
+  reconcileSelections,
+  type SelectionReconcile,
+} from "./selection-lifecycle";
 
 /**
  * The shared evidence pool — the user's real experience stored once, independent
@@ -175,9 +180,13 @@ export function createEvidenceRepository(db: DbOrTx) {
      * the absorbed row by id, and by doing the whole thing in one transaction so a
      * failure between the two writes cannot leave the invariant broken.
      */
-    async mergeInto(userId: string, canonicalId: string, absorbedId: string): Promise<void> {
-      if (canonicalId === absorbedId) return;
-      await db.transaction(async (tx) => {
+    async mergeInto(
+      userId: string,
+      canonicalId: string,
+      absorbedId: string
+    ): Promise<SelectionReconcile> {
+      if (canonicalId === absorbedId) return { cleared: [], moved: [] };
+      return db.transaction(async (tx) => {
         await tx.execute(sql`select id from users where id = ${userId} for update`);
         const rows = await tx
           .select()
@@ -237,6 +246,10 @@ export function createEvidenceRepository(db: DbOrTx) {
         if (absorbedFact !== factId) {
           await recordFactState(tx, userId, absorbed, "retracted");
         }
+
+        // The person's Include/Exclude choices were made about two records; one of those records
+        // no longer exists as an identity (S2-R5).
+        return reconcileSelections(tx, userId, factId, absorbedFact);
       });
     },
 
@@ -370,7 +383,17 @@ export function createEvidenceRepository(db: DbOrTx) {
         if (!removed) return;
         // Deleting the last row of a fact ends its history with what it last said; deleting one
         // wording of a fact that still has a leader records the fact as it now stands.
-        await recordCanonicalState(tx, userId, removed.factId ?? removed.id, removed);
+        const factId = removed.factId ?? removed.id;
+        await recordCanonicalState(tx, userId, factId, removed);
+
+        // A choice about a record that no longer exists is an orphan. If another wording still
+        // leads the fact, the choice still means something and stays.
+        const [survivor] = await tx
+          .select({ id: evidenceItems.id })
+          .from(evidenceItems)
+          .where(and(eq(evidenceItems.userId, userId), eq(evidenceItems.factId, factId)))
+          .limit(1);
+        if (!survivor) await forgetSelections(tx, userId, factId);
       });
     },
 

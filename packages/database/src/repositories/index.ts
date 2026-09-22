@@ -3,6 +3,7 @@ export * from "./agent-runs.repository";
 export * from "./applications.repository";
 export * from "./career-core.repository";
 export * from "./fact-history";
+export * from "./selection-lifecycle";
 export * from "./career-profiles.repository";
 export * from "./career-reports.repository";
 export * from "./documents.repository";

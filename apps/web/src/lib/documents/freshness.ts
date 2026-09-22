@@ -161,3 +161,16 @@ export function freshnessAsk(changes: RecordChanges): string | null {
   if (changes.removed.length) return `Drop ${list(changes.removed)}`;
   return null;
 }
+
+/**
+ * Is this document still written from the person's current record?
+ *
+ * SCOPE, deliberately narrow (Codex's S2-R4): career records only. The captured fingerprint also
+ * covers the job posting, the direction and contact details, so a fingerprint difference alone is
+ * not reported — what the person is told about is their own material changing. `unknown` means
+ * exactly that: a document Fadi did not generate is not proven current, it is unexamined.
+ */
+export type DocumentFreshness =
+  | { state: "unknown" }
+  | { state: "current" }
+  | { state: "stale"; note: string; ask: string | null; changes: RecordChanges };

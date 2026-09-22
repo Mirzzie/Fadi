@@ -252,14 +252,27 @@ export async function findSameEvidence(): Promise<{ ok: boolean; pairs: SameThin
 export async function mergeEvidence(input: {
   keepId: string;
   mergeId: string;
-}): Promise<{ ok: boolean }> {
+}): Promise<{ ok: boolean; message?: string }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false };
   try {
-    await createEvidenceRepository(getDatabase()).mergeInto(user.id, input.keepId, input.mergeId);
+    const selections = await createEvidenceRepository(getDatabase()).mergeInto(
+      user.id,
+      input.keepId,
+      input.mergeId
+    );
     await publish("evidence.changed", { userId: user.id, reason: "updated", evidenceItemId: input.keepId });
     revalidatePath("/dashboard/evidence");
-    return { ok: true };
+    // SAY IT IF A DECISION WAS UNDONE. The two records had different Include/Exclude choices, so
+    // neither is a decision about the one record that now exists — it is back to Auto, and the
+    // person needs to know rather than discovering it in a document later.
+    return {
+      ok: true,
+      message:
+        selections.cleared.length > 0
+          ? "Joined. They had different include/exclude choices, so that record is back to Auto — choose again when you need to."
+          : undefined,
+    };
   } catch {
     return { ok: false };
   }

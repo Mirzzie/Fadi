@@ -14,6 +14,7 @@ import {
 export function SameThingPanel({ onChanged }: { onChanged: () => void }) {
   const [pairs, setPairs] = useState<SameThingPair[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const load = async () => {
     try {
@@ -50,6 +51,9 @@ export function SameThingPanel({ onChanged }: { onChanged: () => void }) {
           setError("Couldn't save that decision. Please reload and try again.");
           return;
         }
+        // A join can undo an include/exclude choice the person made about one of the two records.
+        // They are told here rather than finding out through a document later.
+        setNotice("message" in result && typeof result.message === "string" ? result.message : null);
         await load();
         onChanged();
       } catch {
@@ -70,6 +74,11 @@ export function SameThingPanel({ onChanged }: { onChanged: () => void }) {
         before joining records. Pending imports stay out of evidence-based prompts and portfolio
         sync until you decide.
       </p>
+      {notice ? (
+        <p role="status" className="mt-2 text-sm text-muted-foreground">
+          {notice}
+        </p>
+      ) : null}
       {error ? (
         <p role="alert" className="mt-2 text-sm text-destructive">
           {error}

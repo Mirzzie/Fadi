@@ -83,7 +83,7 @@ export default async function DocumentEditorPage({ params }: { params: Promise<{
             notes: standard.notes,
           }}
         />
-        <FreshnessNote freshness={freshness} />
+        <FreshnessNote documentId={doc.id} freshness={freshness} />
         <TruthReport findings={truthFindings} />
 
         {doc.kind === "resume" ? (
