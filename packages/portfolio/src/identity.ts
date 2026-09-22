@@ -208,7 +208,7 @@ export function rareOverlap(
  * of the shorter title present in the longer one, and at least two words in common so a single
  * generic word ("pipeline", "engineer") cannot pair two unrelated records.
  */
-function titlesName(a: IdentityInput, b: IdentityInput): boolean {
+export function titlesName(a: IdentityInput, b: IdentityInput): boolean {
   const ta = new Set(tokens(a.title ?? ""));
   const tb = new Set(tokens(b.title ?? ""));
   if (ta.size === 0 || tb.size === 0) return false;

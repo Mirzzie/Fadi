@@ -374,6 +374,20 @@ export async function syncFromEvidence(): Promise<Result<{ added: number; nearMa
   // WORK ALREADY ON THE SITE IS NOT NEW WORK — IT IS THE SAME WORK, WITH THE PROOF ATTACHED.
   // The decision lives in lib/portfolio/sync-plan.ts, tested against the owner's real titles.
   const { planEvidenceSync } = await import("@/lib/portfolio/sync-plan");
+  // Project records never create an entry (they need an artefact a record cannot carry) — but
+  // where the person has already built that entry with their screenshots, the two are the same
+  // work and should be linked, so the entry becomes the proof for the record.
+  const linkOnly = evidence
+    .filter((e) => e.kind === "project" || e.kind === "achievement")
+    .map((e) => ({
+      evidenceItemId: e.id,
+      section: "project",
+      title: e.title,
+      subtitle: e.organization,
+      dateRange: e.period,
+      description: e.detail,
+    }));
+
   const plan = planEvidenceSync(seeded, existing.map((x) => ({
     id: x.id,
     evidenceItemId: x.evidenceItemId,

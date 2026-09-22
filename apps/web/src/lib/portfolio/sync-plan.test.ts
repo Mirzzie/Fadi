@@ -146,3 +146,94 @@ describe("planEvidenceSync", () => {
     expect(plan).toMatchObject({ create: [], link: [], alreadyShown: 0 });
   });
 });
+
+/**
+ * PROJECTS: LINK, NEVER CREATE.
+ *
+ * The owner's site carries seven project entries, every one with a screenshot, and their CV
+ * carries seven project records — and not one pair was connected, because projects are excluded
+ * from seeding and therefore from linking too. Their ask: the record and the entry that shows it
+ * should be the same thing, with the entry's images as the proof, and no second copy of anything.
+ */
+describe("project records", () => {
+  const gallery: ExistingEntry[] = [
+    {
+      id: "p-wordpress",
+      evidenceItemId: null,
+      section: "project",
+      title: "WordPress on AWS + Ansible",
+      subtitle: "Cloud Automation",
+      dateRange: "2025",
+      description: "A hardened WordPress stack on AWS EC2, provisioned with Ansible playbooks.",
+    },
+    {
+      id: "p-ad",
+      evidenceItemId: null,
+      section: "project",
+      title: "Active Directory & Hybrid IT Network Simulation",
+      subtitle: null,
+      dateRange: null,
+      description: "A corporate Active Directory environment on VMware.",
+    },
+  ];
+  const record = (title: string, description = "") => ({
+    evidenceItemId: `ev-${title.slice(0, 6).toLowerCase().replace(/\W/g, "")}`,
+    section: "project",
+    title,
+    subtitle: null,
+    dateRange: null,
+    description,
+  });
+
+  it("links the record to the entry that already shows it — same work, different words", () => {
+    const plan = planEvidenceSync([], gallery, {
+      have: new Set(),
+      linkOnly: [record("Automated WordPress Deployment on AWS")],
+    });
+    expect(plan.create).toEqual([]);
+    expect(plan.link.map((l) => l.itemId)).toEqual(["p-wordpress"]);
+  });
+
+  it("links an identical title without hesitation", () => {
+    const plan = planEvidenceSync([], gallery, {
+      have: new Set(),
+      linkOnly: [record("Active Directory & Hybrid IT Network Simulation")],
+    });
+    expect(plan.link.map((l) => l.itemId)).toEqual(["p-ad"]);
+  });
+
+  it("does NOT link two projects that share one generic word", () => {
+    const plan = planEvidenceSync([], gallery, {
+      have: new Set(),
+      linkOnly: [record("CI/CD Pipeline for Node.js Application on AWS")],
+    });
+    expect(plan.link).toEqual([]);
+  });
+
+  it("never creates a project entry, even with nothing to link to", () => {
+    const plan = planEvidenceSync([], [], {
+      have: new Set(),
+      linkOnly: [record("WhatsApp Forensic Investigation and Evidence Extraction")],
+    });
+    expect(plan).toMatchObject({ create: [], link: [] });
+  });
+
+  it("does not attach a project record to a job", () => {
+    const jobs: ExistingEntry[] = [
+      {
+        id: "e-job",
+        evidenceItemId: null,
+        section: "experience",
+        title: "Active Directory & Hybrid IT Network Simulation",
+        subtitle: "Somewhere",
+        dateRange: "2025",
+        description: "",
+      },
+    ];
+    const plan = planEvidenceSync([], jobs, {
+      have: new Set(),
+      linkOnly: [record("Active Directory & Hybrid IT Network Simulation")],
+    });
+    expect(plan.link).toEqual([]);
+  });
+});
