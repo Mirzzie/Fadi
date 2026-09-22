@@ -95,6 +95,8 @@ export async function loadPortfolio(): Promise<
     /** Proof from Evidence not on the portfolio yet — so the CMS can proactively ask
      *  the user to pull it in (detect → propose → approve; never auto-mutate). */
     pendingProof: number;
+    /** Project work in their record with no artefact yet — named, never published as an entry. */
+    awaitingArtefact: string[];
     /** The other direction: live items the record has moved PAST — see lib/portfolio/freshness.ts. */
     drift: { withdrawn: { id: string; title: string }[]; reworded: { id: string; title: string }[] };
   }>
@@ -139,6 +141,17 @@ export async function loadPortfolio(): Promise<
     );
   }).length;
 
+  // PROJECT WORK THAT IS WAITING ON PROOF, not missing from the site by mistake. A project entry
+  // is a claim with an artefact attached, and an evidence record cannot carry one — so these are
+  // named here rather than published as entries with nothing to show.
+  const shownTitles = items.map((i) => i.title.toLowerCase().trim());
+  const awaitingArtefact = evidence
+    .filter((e) => e.kind === "project" || e.kind === "achievement")
+    .filter((e) => !have.has(e.id))
+    .filter((e) => !dismissed.has(e.factId ?? e.id))
+    .filter((e) => !shownTitles.includes(e.title.toLowerCase().trim()))
+    .map((e) => e.title);
+
   // What is LIVE but no longer matches the record. Read-only: a public page is the owner's, and
   // a projection that has drifted is a decision to put to them, never a silent unpublish.
   const drift = portfolioFreshness(
@@ -160,6 +173,7 @@ export async function loadPortfolio(): Promise<
     isPublished: site.isPublished,
     items: items.map(toItemView),
     pendingProof,
+    awaitingArtefact,
     drift,
   };
 }

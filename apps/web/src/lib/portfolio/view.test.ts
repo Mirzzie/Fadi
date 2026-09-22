@@ -139,13 +139,12 @@ describe("fromExportItem — defensive parsing of untrusted JSON", () => {
 });
 
 describe("seedItemsFromEvidence — the evidence→portfolio projection", () => {
-  it("maps evidence kinds to portfolio sections, folding achievement into project", () => {
+  it("seeds the sections nobody expects a screenshot of", () => {
     const kinds: Array<[EvidenceItem["kind"], string]> = [
       ["experience", "experience"],
-      ["project", "project"],
-      ["achievement", "project"], // achievements surface as projects
-      ["skill", "skill"],
       ["education", "education"],
+      ["certification" as EvidenceItem["kind"], "certification"],
+      ["skill", "skill"],
     ];
     for (const [kind, section] of kinds) {
       const [seeded] = seedItemsFromEvidence([evidenceItem({ kind })]);
@@ -153,15 +152,27 @@ describe("seedItemsFromEvidence — the evidence→portfolio projection", () => 
     }
   });
 
-  it("routes an unknown kind to 'custom' rather than dropping it", () => {
-    const [seeded] = seedItemsFromEvidence([
-      evidenceItem({ kind: "wildcard" as EvidenceItem["kind"] }),
-    ]);
-    expect(seeded.section).toBe("custom");
+  /**
+   * A PROJECT IS A CLAIM WITH PROOF. An evidence record has no url, no image, no gallery —
+   * nothing an artefact could live in — so a project seeded from one is an entry with nothing to
+   * show. The owner ended up with five of those standing beside the real entries they had built
+   * with screenshots, and was then asked to clean it up by hand.
+   */
+  it("does NOT seed project work — it has no artefact to show", () => {
+    expect(seedItemsFromEvidence([evidenceItem({ kind: "project" })])).toEqual([]);
+    expect(seedItemsFromEvidence([evidenceItem({ kind: "achievement" })])).toEqual([]);
+  });
+
+  it("drops an unknown kind rather than inventing a section for it", () => {
+    // It used to land in "Custom Section" — which is where the owner found their AWS
+    // certification, because certification was missing from the map entirely.
+    expect(
+      seedItemsFromEvidence([evidenceItem({ kind: "wildcard" as EvidenceItem["kind"] })])
+    ).toEqual([]);
   });
 
   it("derives narrative fields from real evidence, never inventing", () => {
-    const [seeded] = seedItemsFromEvidence([evidenceItem()]);
+    const [seeded] = seedItemsFromEvidence([evidenceItem({ kind: "experience" })]);
     expect(seeded).toMatchObject({
       evidenceItemId: "e-1",
       title: "Vulnerability lab",
@@ -175,7 +186,7 @@ describe("seedItemsFromEvidence — the evidence→portfolio projection", () => 
 
   it("turns an empty detail into null and absent metrics into no bullets", () => {
     const [seeded] = seedItemsFromEvidence([
-      evidenceItem({ detail: "", metrics: null, tags: [] }),
+      evidenceItem({ kind: "experience", detail: "", metrics: null, tags: [] }),
     ]);
     expect(seeded.description).toBeNull();
     expect(seeded.bullets).toEqual([]);
@@ -184,9 +195,9 @@ describe("seedItemsFromEvidence — the evidence→portfolio projection", () => 
 
   it("assigns stable increasing sort order (10, 20, 30…)", () => {
     const seeded = seedItemsFromEvidence([
-      evidenceItem({ id: "a" }),
-      evidenceItem({ id: "b" }),
-      evidenceItem({ id: "c" }),
+      evidenceItem({ id: "a", kind: "experience" }),
+      evidenceItem({ id: "b", kind: "experience" }),
+      evidenceItem({ id: "c", kind: "experience" }),
     ]);
     expect(seeded.map((s) => s.sortOrder)).toEqual([10, 20, 30]);
   });

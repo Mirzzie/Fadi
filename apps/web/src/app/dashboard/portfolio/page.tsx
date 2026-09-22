@@ -25,6 +25,7 @@ export default async function PortfolioPage() {
         isPublished={data.isPublished}
         items={data.items}
         pendingProof={data.pendingProof}
+        awaitingArtefact={data.awaitingArtefact}
         drift={data.drift}
       />
     </AppShell>

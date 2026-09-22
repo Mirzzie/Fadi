@@ -66,6 +66,7 @@ export function PortfolioManager({
   isPublished,
   items,
   pendingProof,
+  awaitingArtefact = [],
   drift = { withdrawn: [], reworded: [] },
 }: {
   site: PortfolioSiteView;
@@ -75,6 +76,8 @@ export function PortfolioManager({
   /** Count of Evidence proof not yet on the portfolio — drives the proactive
    *  "pull it in" nudge (detect → propose → approve; never auto-mutate). */
   pendingProof: number;
+  /** Project work in their record that has no artefact yet — named, never auto-published. */
+  awaitingArtefact?: string[];
   /** Live items the record has moved past: withdrawn evidence, or wording since corrected. */
   drift?: { withdrawn: { id: string; title: string }[]; reworded: { id: string; title: string }[] };
 }) {
@@ -422,6 +425,18 @@ export function PortfolioManager({
               — {unproven.slice(0, 4).map((i) => i.title).join(", ")}
               {unproven.length > 4 ? `, +${unproven.length - 4} more` : ""}. They show as an honest
               gap rather than padded prose. A screenshot, diagram, repo or write-up fixes each one.
+            </p>
+          )}
+          {awaitingArtefact.length > 0 && (
+            <p className="text-xs text-muted-foreground">
+              <span className="text-foreground">
+                {awaitingArtefact.length} project{awaitingArtefact.length === 1 ? "" : "s"} in your
+                record {awaitingArtefact.length === 1 ? "is" : "are"} waiting for proof
+              </span>{" "}
+              — {awaitingArtefact.slice(0, 4).join(", ")}
+              {awaitingArtefact.length > 4 ? `, +${awaitingArtefact.length - 4} more` : ""}. A
+              project here is a claim with something to show, so Fadi will not publish these as
+              empty entries. Add one with a screenshot or repo link and it goes up.
             </p>
           )}
           {unbacked.length > 0 && (
