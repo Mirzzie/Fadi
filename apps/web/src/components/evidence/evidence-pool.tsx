@@ -14,7 +14,16 @@ import { SameThingPanel } from "./same-thing-panel";
 import { HistoryCapture } from "@/components/evidence/history-capture";
 import type { EvidenceView, RankedEvidence } from "@/lib/evidence/pool";
 
-const KINDS = ["experience", "project", "achievement", "skill", "education"] as const;
+// Certification became a first-class kind when imports started classifying it; leaving it out
+// here meant an imported certificate worked and a hand-added one could not be classified at all.
+const KINDS = [
+  "experience",
+  "project",
+  "achievement",
+  "skill",
+  "education",
+  "certification",
+] as const;
 
 export function EvidencePool({
   track,

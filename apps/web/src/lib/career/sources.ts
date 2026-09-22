@@ -64,19 +64,25 @@ export async function preserveThenReplace<T>(
   replace: (tx: DbOrTx) => Promise<T>
 ): Promise<T> {
   const content = input.content.trim();
-  return getDatabase().transaction(async (tx) => {
+  // Logged AFTER the commit, never inside it: a later failure rolls the version back, and a
+  // success-shaped log line for a row that no longer exists is how an audit trail starts lying.
+  let preserved: { version: number; reused: boolean } | null = null;
+  const result = await getDatabase().transaction(async (tx) => {
     if (content) {
       const { version, reused } = await createCareerCoreRepository(tx as never).preserveSource(
         userId,
         { ...input, content }
       );
-      logger.info("career.source_preserved", {
-        userId,
-        sourceKind: input.sourceKind,
-        version: version.version,
-        reused,
-      });
+      preserved = { version: version.version, reused };
     }
     return replace(tx);
   });
+  if (preserved) {
+    logger.info("career.source_preserved", {
+      userId,
+      sourceKind: input.sourceKind,
+      ...(preserved as { version: number; reused: boolean }),
+    });
+  }
+  return result;
 }

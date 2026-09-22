@@ -95,6 +95,17 @@ export function PortfolioManager({
   // What the user told Sync to stop bringing back. A decision they cannot reverse is
   // a trap, so it is listed and undoable rather than buried in a jsonb column.
   const [dismissed, setDismissed] = useState<{ factId: string; title: string }[]>([]);
+  // A restore offer with nothing to restore from is a guaranteed dead-end click (Codex). Asked
+  // only when the CMS is empty, which is the one time the offer matters.
+  const [publishedRepo, setPublishedRepo] = useState<string | null>(null);
+  useEffect(() => {
+    if (items.length > 0) return;
+    void import("@/app/dashboard/portfolio/github-actions").then(({ getGithubConnection }) =>
+      getGithubConnection().then((c) =>
+        setPublishedRepo(c.connected && c.repo && c.lastPublishedAt ? c.repo : null)
+      )
+    );
+  }, [items.length]);
   useEffect(() => {
     void listDismissed().then((r) => setDismissed(r.ok ? r.dismissed : []));
   }, [items]);
@@ -557,9 +568,11 @@ export function PortfolioManager({
           published site means the data was wiped and the repo still has it — which is exactly
           when this is worth a click, and exactly when nobody wants to hunt for an export file.
           With no published site, the action says so instead of the button being hidden. */}
-      {items.length === 0 && (
+      {items.length === 0 && publishedRepo && (
         <div className="mb-6 rounded-xl border border-border bg-muted/20 p-4">
-          <p className="text-sm font-medium">Published this portfolio before?</p>
+          <p className="text-sm font-medium">
+            Restore from <span className="text-foreground">{publishedRepo}</span>?
+          </p>
           {/* SAY WHAT IT RESTORES. The backup is built from the PUBLISHED view, so it carries
               published, confirmed entries and their media links — not drafts, hidden items, your
               site settings or evidence links. Calling that "everything" was false (C15-04). */}
