@@ -174,13 +174,18 @@ export function PortfolioManager({
         setError(r.message);
         return;
       }
+      // SAY WHAT HAPPENED TO THEIR PAGE. "Held back N" left the owner to work out what that
+      // meant and what to do about it; linking is the whole point, so it is named.
+      const linkedPart =
+        r.nearMatches > 0
+          ? `Connected ${r.nearMatches} to ${r.nearMatches === 1 ? "the entry" : "entries"} already on your site — your wording and screenshots are untouched.`
+          : "";
       setNotice(
         r.added > 0
-          ? `Added ${r.added} item${r.added === 1 ? "" : "s"} from your evidence.` +
-            (r.nearMatches > 0
-              ? ` Held back ${r.nearMatches} that already look like work on your site — Fadi will ask about ${r.nearMatches === 1 ? "it" : "them"} rather than adding a second copy.`
-              : "")
-          : "You're all synced — no new evidence to add.",
+          ? [`Added ${r.added} item${r.added === 1 ? "" : "s"} from your evidence.`, linkedPart]
+              .filter(Boolean)
+              .join(" ")
+          : linkedPart || "You're all synced — no new evidence to add.",
       );
       router.refresh();
     });

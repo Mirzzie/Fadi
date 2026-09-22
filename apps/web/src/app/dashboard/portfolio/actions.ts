@@ -113,12 +113,31 @@ export async function loadPortfolio(): Promise<
     ((site.theme as { dismissedFacts?: unknown })?.dismissedFacts as string[] | undefined) ?? [],
   );
   const factOfEvidence = new Map(evidence.map((e) => [e.id, e.factId ?? e.id]));
-  const pendingProof = seedItemsFromEvidence(evidence).filter(
-    (r) =>
-      !have.has(r.evidenceItemId) &&
-      !dismissed.has(factOfEvidence.get(r.evidenceItemId) ?? r.evidenceItemId) &&
-      !items.some((x) => isSameEntry(r, x)),
-  ).length;
+  // The count must be what Sync would actually ADD, or the nudge outlives the work: records whose
+  // entry is already on the site (worded differently, with the person's own screenshots) are not
+  // missing proof — they are the same proof, and sync links them rather than copying them.
+  const { findSameThings } = await import("@/lib/identity/resolve");
+  const asIdentity = (
+    x: { section: string; title: string; subtitle: string | null; dateRange: string | null; description: string | null; bullets?: string[] | null },
+    id: string
+  ) => ({
+    id,
+    kind: x.section,
+    title: x.title,
+    organization: x.subtitle,
+    period: x.dateRange,
+    detail: [x.description, ...(x.bullets ?? [])].filter(Boolean).join(" "),
+  });
+  const itemIdentities = items.map((x) => asIdentity(x, x.id));
+  const pendingProof = seedItemsFromEvidence(evidence).filter((r, idx) => {
+    if (have.has(r.evidenceItemId)) return false;
+    if (dismissed.has(factOfEvidence.get(r.evidenceItemId) ?? r.evidenceItemId)) return false;
+    if (items.some((x) => isSameEntry(r, x))) return false;
+    const me = asIdentity(r, `seed-${idx}`);
+    return !findSameThings([me, ...itemIdentities], undefined, { requireAnchor: false }).some(
+      (m) => m.a === me.id || m.b === me.id
+    );
+  }).length;
 
   // What is LIVE but no longer matches the record. Read-only: a public page is the owner's, and
   // a projection that has drifted is a decision to put to them, never a silent unpublish.
@@ -316,59 +335,40 @@ export async function syncFromEvidence(): Promise<Result<{ added: number; nearMa
   );
   const factOfEvidence = new Map(evidence.map((e) => [e.id, e.factId ?? e.id]));
 
-  // IDENTITY, NOT WORDING. `isSameEntry` is lexical and section-scoped, so a project
-  // rewritten for a different application read as a brand-new one. This asks whether
-  // it is the same real thing (see lib/identity/resolve).
-  const { findSameThings } = await import("@/lib/identity/resolve");
-  const asInput = (x: {
-    id?: string;
-    section: string;
-    title: string;
-    subtitle: string | null;
-    dateRange: string | null;
-    description: string | null;
-    bullets?: string[] | null;
-  }, id: string) => ({
-    id,
-    kind: x.section,
+  // WORK ALREADY ON THE SITE IS NOT NEW WORK — IT IS THE SAME WORK, WITH THE PROOF ATTACHED.
+  // The decision lives in lib/portfolio/sync-plan.ts, tested against the owner's real titles.
+  const { planEvidenceSync } = await import("@/lib/portfolio/sync-plan");
+  const plan = planEvidenceSync(seeded, existing.map((x) => ({
+    id: x.id,
+    evidenceItemId: x.evidenceItemId,
+    section: x.section,
     title: x.title,
-    organization: x.subtitle,
-    period: x.dateRange,
-    detail: [x.description, ...(x.bullets ?? [])].filter(Boolean).join(" "),
+    subtitle: x.subtitle,
+    dateRange: x.dateRange,
+    description: x.description,
+    bullets: x.bullets,
+  })), {
+    have,
+    dismissed,
+    factOf: (id) => factOfEvidence.get(id) ?? id,
+    sameEntry: (candidate, entry) => isSameEntry(candidate, entry),
   });
-  const existingInputs = existing.map((x) => asInput(x, x.id));
 
-  // A "MAYBE" DOES NOT BECOME A SECOND ITEM.
-  //
-  // This is where the user's six duplicates actually landed: the resolver ran, scored
-  // every one of them "maybe" rather than "same", and the old rule added on a maybe.
-  // Detection after the fact was never the answer — by then two copies of one project
-  // are already on a public site and in every document generated from it.
-  //
-  // Not creating an item here loses nothing: the evidence row still exists, still holds
-  // its wording, and the background pass reports the near-match so the owner can add it
-  // deliberately if the two really are different work. Skipping is a click to undo;
-  // publishing a duplicate is not.
-  let nearMatches = 0;
+  // Repair the links first: an entry the person built keeps its images and wording and gains the
+  // evidence id it lost, which is what stops every future sync proposing it again.
+  for (const link of plan.link) {
+    await repo.linkToEvidence(user.id, link.itemId, link.evidenceItemId);
+  }
+  const kept = plan.create;
+  const linked = plan.alreadyShown;
 
-  const kept = seeded.filter((r, idx) => {
-    if (have.has(r.evidenceItemId)) return false;
-    if (dismissed.has(factOfEvidence.get(r.evidenceItemId) ?? r.evidenceItemId)) return false;
-    if (existing.some((x) => isSameEntry(r, x))) return false;
-    // Only a CONFIDENT match suppresses a new item — a "maybe" is still added, because
-    // silently withholding real work is worse than a duplicate the user can merge.
-    const me = asInput(r, `seed-${idx}`);
-    const mine = findSameThings([me, ...existingInputs]).filter(
-      (m) => m.a === me.id || m.b === me.id,
-    );
-    if (mine.some((m) => m.verdict === "same")) return false;
-    if (mine.some((m) => m.verdict === "maybe")) {
-      nearMatches += 1;
-      return false;
+  if (kept.length === 0) {
+    if (plan.link.length > 0) {
+      await publish("portfolio.changed", { userId: user.id, siteId: site.id, reason: "synced" });
+      revalidatePath(PATH);
     }
-    return true;
-  });
-  if (kept.length === 0) return { ok: true, added: 0, nearMatches };
+    return { ok: true, added: 0, nearMatches: linked };
+  }
 
   const maxSort = existing.reduce((m, i) => Math.max(m, i.sortOrder), 0);
   const rows = kept.map((r, i) => ({
@@ -385,7 +385,7 @@ export async function syncFromEvidence(): Promise<Result<{ added: number; nearMa
   const created = await repo.createItems(user.id, rows);
   await publish("portfolio.changed", { userId: user.id, siteId: site.id, reason: "synced" });
   revalidatePath(PATH);
-  return { ok: true, added: created.length, nearMatches };
+  return { ok: true, added: created.length, nearMatches: linked };
 }
 
 /**

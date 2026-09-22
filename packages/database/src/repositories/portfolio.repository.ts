@@ -130,6 +130,26 @@ export function createPortfolioRepository(db: Database) {
         .returning();
     },
 
+    /**
+     * ATTACH AN ENTRY TO THE RECORD IT ALREADY SHOWS.
+     *
+     * Only the link. Not a content change, and deliberately NOT a confirmation: repairing a
+     * connection the owner never broke must not mark their entry as reviewed, and must not touch
+     * the wording, the images or the publish state that make it theirs.
+     */
+    async linkToEvidence(
+      userId: string,
+      id: string,
+      evidenceItemId: string
+    ): Promise<PortfolioItem | null> {
+      const [updated] = await db
+        .update(portfolioItems)
+        .set({ evidenceItemId, updatedAt: new Date() })
+        .where(and(eq(portfolioItems.id, id), eq(portfolioItems.userId, userId)))
+        .returning();
+      return updated ?? null;
+    },
+
     async updateItem(
       userId: string,
       id: string,
