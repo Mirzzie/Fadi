@@ -199,6 +199,25 @@ export function rareOverlap(
   };
 }
 
+
+/**
+ * Do these two records NAME the same thing?
+ *
+ * Exact titles rarely survive a rewrite ("CI/CD Pipeline for Node.js Application on AWS" becomes
+ * "Node.js CI/CD pipeline on AWS"), so identity is read from the words of the title itself: most
+ * of the shorter title present in the longer one, and at least two words in common so a single
+ * generic word ("pipeline", "engineer") cannot pair two unrelated records.
+ */
+function titlesName(a: IdentityInput, b: IdentityInput): boolean {
+  const ta = new Set(tokens(a.title ?? ""));
+  const tb = new Set(tokens(b.title ?? ""));
+  if (ta.size === 0 || tb.size === 0) return false;
+  let shared = 0;
+  for (const t of ta) if (tb.has(t)) shared += 1;
+  if (shared < 2) return false;
+  return shared / Math.min(ta.size, tb.size) >= 0.6;
+}
+
 /** Normalised artefact identity — the same repo written two ways is one artefact. */
 function artefacts(item: IdentityInput): Set<string> {
   const raw = [item.url, item.imageUrl, ...(item.gallery ?? [])].filter(Boolean) as string[];
@@ -243,11 +262,24 @@ function overlap<T>(a: Set<T>, b: Set<T>): number {
  * fetched so this stays pure and testable, and so the whole thing still works with no
  * embeddings provider configured — the lexical anchors alone catch the common cases.
  */
+export type IdentityOptions = {
+  /**
+   * Must something NAME the same work before a pair is raised at all?
+   *
+   * True (the default) wherever a pair costs the person an answer: it holds an import out of
+   * their record until they decide. False where a false pair costs nothing — reconciling a
+   * résumé against a portfolio, where the only effect of a wrong match is that Fadi stays quiet
+   * about work it thinks is already shown.
+   */
+  requireAnchor?: boolean;
+};
+
 export function compareIdentity(
   a: IdentityInput,
   b: IdentityInput,
   idf: Map<string, number>,
-  similarity?: number
+  similarity?: number,
+  options: IdentityOptions = {}
 ): IdentityMatch {
   const reasons: string[] = [];
   let score = 0;
@@ -278,9 +310,13 @@ export function compareIdentity(
   // A matching title is a reason to ask even in a two-record corpus. It is
   // never sufficient to merge, particularly when employer or dates differ.
   const sameTitle = Boolean(normalText(a.title) && normalText(a.title) === normalText(b.title));
+  const nearTitle = sameTitle || titlesName(a, b);
   if (sameTitle) {
     score += 0.55;
     reasons.push("same title with different recorded fields");
+  } else if (nearTitle) {
+    score += 0.4;
+    reasons.push("nearly the same title");
   }
 
   // A record with almost no words cannot be identified by its words. Requiring a
@@ -350,16 +386,33 @@ export function compareIdentity(
     }
   }
 
-  // A thin record needs an anchor a rewrite cannot fake — a shared artefact, or the
-  // same place at the same time. Shared words alone are not enough to identify it.
-  const anchored = sameTitle || sharedArtefact > 0 || (sameOrg && sharedYear);
-  if (tooThin && !anchored) {
+  /**
+   * AN ANCHOR, OR NO QUESTION.
+   *
+   * Shared vocabulary cannot identify a record, however much of it there is. Measured on the
+   * owner's real CV (22 Sep 2026): "DevSecOps Pipeline & Security Monitoring", "Automated
+   * WordPress Deployment on AWS" and "CI/CD Pipeline for Node.js Application on AWS" are three
+   * different projects, and Fadi held two of them for review against the first — because
+   * personal projects carry no employer and no dates, so the decision fell entirely to words
+   * like "aws", "pipeline" and "deployment", which every cloud project shares. The person was
+   * asked to adjudicate a question that had no reason to exist.
+   *
+   * An anchor is something that names the same THING rather than the same field: nearly the same
+   * title, the same artefact, or the same place at the same time. Words and embeddings can only
+   * strengthen an anchored candidate now; they can no longer create one. A duplicate that shares
+   * no anchor slips through as a second record, which is visible and deletable — unlike a
+   * question nobody can answer.
+   */
+  const anchored = nearTitle || sharedArtefact > 0 || (sameOrg && sharedYear);
+  if (!anchored && (options.requireAnchor ?? true)) {
     return {
       a: a.id,
       b: b.id,
       score: 0,
       verdict: "different",
-      reasons: ["too little detail to identify"],
+      reasons: [
+        tooThin ? "too little detail to identify" : "nothing anchors these to the same work",
+      ],
     };
   }
 
@@ -378,13 +431,20 @@ export function compareIdentity(
  */
 export function findSameThings(
   items: IdentityInput[],
-  similarityOf?: (a: string, b: string) => number | undefined
+  similarityOf?: (a: string, b: string) => number | undefined,
+  options: IdentityOptions = {}
 ): IdentityMatch[] {
   const idf = rarityIndex(items);
   const out: IdentityMatch[] = [];
   for (let i = 0; i < items.length; i++) {
     for (let j = i + 1; j < items.length; j++) {
-      const m = compareIdentity(items[i], items[j], idf, similarityOf?.(items[i].id, items[j].id));
+      const m = compareIdentity(
+        items[i],
+        items[j],
+        idf,
+        similarityOf?.(items[i].id, items[j].id),
+        options
+      );
       if (m.verdict !== "different") out.push(m);
     }
   }

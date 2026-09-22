@@ -40,7 +40,14 @@ export function EvidencePool({
       const r = await buildEvidencePool();
       if (!r.ok) setError(r.message);
       else {
-        setNotice(`${r.items.length} new records saved. ${r.pendingReview} possible matches need review below.`);
+        // TWO NUMBERS THAT MEANT DIFFERENT THINGS read as one that disagreed with itself: this
+        // counted imports held for a decision, while the panel below counts every pair it
+        // raises, including ones between records already accepted. Say which is which.
+        setNotice(
+          r.pendingReview > 0
+            ? `${r.items.length} new records saved. ${r.pendingReview} ${r.pendingReview === 1 ? "import is" : "imports are"} waiting on your decision below.`
+            : `${r.items.length} new records saved.`
+        );
         setReviewVersion(v => v + 1);
         router.refresh();
       }

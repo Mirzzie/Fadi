@@ -109,7 +109,10 @@ export function reconcile(
   for (const r of resumeItems) {
     let best: { p: IdentityInput; verdict: Verdict; reasons: string[]; rank: number } | null = null;
     for (const p of portfolioItems) {
-      const m = compareIdentity(r, p, idf);
+      // Loose on purpose: this asks "is this résumé line already on the site?", and a wrong
+      // yes only keeps Fadi quiet. It never holds a record or demands an answer, so it does not
+      // need the anchor the evidence review requires.
+      const m = compareIdentity(r, p, idf, undefined, { requireAnchor: false });
       const rank = m.verdict === "same" ? 2 : m.verdict === "maybe" ? 1 : 0;
       if (rank === 0) continue;
       if (!best || rank > best.rank) best = { p, verdict: m.verdict, reasons: m.reasons, rank };
