@@ -40,6 +40,7 @@ import {
   updateSiteSettings,
   listDismissed,
   undismissFact,
+  type EvidenceProjectOption,
 } from "@/app/dashboard/portfolio/actions";
 import {
   findAllDuplicates,
@@ -66,7 +67,7 @@ export function PortfolioManager({
   isPublished,
   items,
   pendingProof,
-  awaitingArtefact = [],
+  evidenceProjects,
   drift = { withdrawn: [], reworded: [] },
 }: {
   site: PortfolioSiteView;
@@ -76,8 +77,7 @@ export function PortfolioManager({
   /** Count of Evidence proof not yet on the portfolio — drives the proactive
    *  "pull it in" nudge (detect → propose → approve; never auto-mutate). */
   pendingProof: number;
-  /** Project work in their record that has no artefact yet — named, never auto-published. */
-  awaitingArtefact?: string[];
+  evidenceProjects: EvidenceProjectOption[];
   /** Live items the record has moved past: withdrawn evidence, or wording since corrected. */
   drift?: { withdrawn: { id: string; title: string }[]; reworded: { id: string; title: string }[] };
 }) {
@@ -116,7 +116,7 @@ export function PortfolioManager({
   const unbacked = useMemo(() => unbackedSkills(items), [items]);
   const unproven = useMemo(
     () => items.filter((i) => i.section === "project" && !hasArtifact(i)),
-    [items],
+    [items]
   );
   const [dragId, setDragId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -125,7 +125,11 @@ export function PortfolioManager({
   // pass (contradictions / timeline / anomalies) is on demand. The AI verdict is keyed to the
   // exact content it ran against, so a later edit invalidates it — derived, no effect needed.
   const [checking, setChecking] = useState(false);
-  const [ai, setAi] = useState<{ key: string; findings: IntegrityFinding[]; note: string | null } | null>(null);
+  const [ai, setAi] = useState<{
+    key: string;
+    findings: IntegrityFinding[];
+    note: string | null;
+  } | null>(null);
   // findAllDuplicates, not findDuplicates: the section-scoped pass alone cannot see
   // a job that was also written up as a project, which is where every real duplicate
   // in this portfolio was hiding.
@@ -133,7 +137,7 @@ export function PortfolioManager({
   const titleById = useMemo(() => new Map(items.map((i) => [i.id, i.title])), [items]);
   const itemsKey = useMemo(
     () => items.map((i) => `${i.id}:${i.title}:${i.subtitle ?? ""}:${i.dateRange ?? ""}`).join("|"),
-    [items],
+    [items]
   );
   const aiValid = ai && ai.key === itemsKey ? ai : null;
   const allFindings = [...dupFindings, ...(aiValid?.findings ?? [])];
@@ -217,7 +221,7 @@ export function PortfolioManager({
           ? [`Added ${r.added} item${r.added === 1 ? "" : "s"} from your evidence.`, linkedPart]
               .filter(Boolean)
               .join(" ")
-          : linkedPart || "You're all synced — no new evidence to add.",
+          : linkedPart || "You're all synced — no new evidence to add."
       );
       router.refresh();
     });
@@ -267,18 +271,25 @@ export function PortfolioManager({
     run(async () => {
       const r = await saveItem({
         id: form.id,
+        evidenceItemId: form.evidenceItemId,
         section: form.section,
         title: form.title,
         subtitle: form.subtitle,
         location: form.location,
         dateRange: form.dateRange,
         description: form.description,
-        bullets: form.bulletsText.split("\n").map((b) => b.trim()).filter(Boolean),
+        bullets: form.bulletsText
+          .split("\n")
+          .map((b) => b.trim())
+          .filter(Boolean),
         roles: form.roles,
         tag: form.tag,
         url: form.url,
         imageUrl: form.imageUrl,
-        gallery: form.galleryText.split("\n").map((g) => g.trim()).filter(Boolean),
+        gallery: form.galleryText
+          .split("\n")
+          .map((g) => g.trim())
+          .filter(Boolean),
       });
       if (r.ok) setEditing(null);
       return r;
@@ -307,7 +318,9 @@ export function PortfolioManager({
       <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-xs uppercase tracking-[0.3em] text-primary">Portfolio CMS</p>
-          <h1 className="mt-1 font-heading text-3xl font-semibold tracking-tight md:text-4xl">Manage content</h1>
+          <h1 className="mt-1 font-heading text-3xl font-semibold tracking-tight md:text-4xl">
+            Manage content
+          </h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Add, edit, and remove anything on your portfolio. Changes appear live.
           </p>
@@ -339,7 +352,12 @@ export function PortfolioManager({
             Who&apos;s looking
           </Button>
           {/* One direction, one claim — the antidote to a site that spans four. */}
-          <Button size="sm" variant="outline" onClick={() => setFocusOpen(true)} disabled={items.length === 0}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setFocusOpen(true)}
+            disabled={items.length === 0}
+          >
             <Crosshair className="size-4" aria-hidden="true" />
             Focus
           </Button>
@@ -351,10 +369,20 @@ export function PortfolioManager({
               <Sparkles className="size-4" /> Sync evidence
             </Button>
           )}
-          <Button size="sm" variant="outline" onClick={doExport} disabled={pending || items.length === 0}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={doExport}
+            disabled={pending || items.length === 0}
+          >
             <Download className="size-4" /> Export
           </Button>
-          <Button size="sm" variant="outline" onClick={() => fileRef.current?.click()} disabled={pending}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => fileRef.current?.click()}
+            disabled={pending}
+          >
             <Upload className="size-4" /> Import
           </Button>
           <input
@@ -399,8 +427,8 @@ export function PortfolioManager({
             </span>
             <div>
               <p className="text-sm font-medium">
-                {pendingProof} {pendingProof === 1 ? "piece" : "pieces"} of proof aren&apos;t on your
-                portfolio yet
+                {pendingProof} {pendingProof === 1 ? "piece" : "pieces"} of proof aren&apos;t on
+                your portfolio yet
               </p>
               <p className="text-xs text-muted-foreground">
                 Fadi found {pendingProof === 1 ? "it" : "them"} in your Evidence. Pull{" "}
@@ -416,9 +444,7 @@ export function PortfolioManager({
 
       {dismissed.length > 0 && (
         <div className="mb-6 rounded-2xl border border-border bg-muted/20 p-4">
-          <p className="text-sm font-medium">
-            Not shown, by your choice ({dismissed.length})
-          </p>
+          <p className="text-sm font-medium">Not shown, by your choice ({dismissed.length})</p>
           <p className="mt-1 text-xs text-muted-foreground">
             Sync will not bring these back — including if the same work turns up again worded
             differently.
@@ -445,29 +471,29 @@ export function PortfolioManager({
         </div>
       )}
 
+      {/* The "Projects and proof" panel lived here and was removed on the owner's instruction.
+          Their proof already exists: images in Cloudinary and repository links on the CMS
+          entries. A panel that says "Needs proof" next to work that HAS proof, and asks them to
+          Connect or Save to Evidence by hand, is a chore list generated by a missing link —
+          not a missing screenshot. Sync connects those records automatically and copies the
+          media onto the fact; anything genuinely absent is named in "What your public page is
+          missing" below, as one sentence. */}
+
       {(unproven.length > 0 || unbacked.length > 0) && (
         <div className="mb-6 space-y-2 rounded-2xl border border-warning/30 bg-warning/5 p-4">
           <p className="text-sm font-medium">What your public page is missing</p>
           {unproven.length > 0 && (
             <p className="text-xs text-muted-foreground">
-              <span className="text-foreground">{unproven.length} project{unproven.length === 1 ? " has" : "s have"} no artefact</span>{" "}
-              — {unproven.slice(0, 4).map((i) => i.title).join(", ")}
+              <span className="text-foreground">
+                {unproven.length} project{unproven.length === 1 ? " has" : "s have"} no artefact
+              </span>{" "}
+              —{" "}
+              {unproven
+                .slice(0, 4)
+                .map((i) => i.title)
+                .join(", ")}
               {unproven.length > 4 ? `, +${unproven.length - 4} more` : ""}. They show as an honest
               gap rather than padded prose. A screenshot, diagram, repo or write-up fixes each one.
-            </p>
-          )}
-          {awaitingArtefact.length > 0 && (
-            <p className="text-xs text-muted-foreground">
-              <span className="text-foreground">
-                {awaitingArtefact.length} project{awaitingArtefact.length === 1 ? "" : "s"} in your
-                record {awaitingArtefact.length === 1 ? "is" : "are"} waiting for proof
-              </span>{" "}
-              — {awaitingArtefact.slice(0, 4).join(", ")}
-              {awaitingArtefact.length > 4 ? `, +${awaitingArtefact.length - 4} more` : ""}. They
-              are in your Evidence and your CV, but a project on this page is a claim with
-              something to show — so Fadi will not publish them as empty entries. Use{" "}
-              <span className="text-foreground">Add project</span> below, paste the write-up and
-              attach a screenshot or repo link.
             </p>
           )}
           {unbacked.length > 0 && (
@@ -519,20 +545,21 @@ export function PortfolioManager({
             <p className="mt-1.5 text-xs text-muted-foreground">
               Fadi collected {waiting.length === 1 ? "this" : "these"} automatically, so
               {waiting.length === 1 ? " it is" : " they are"} not on your public site yet. Your live
-              site only ever shows what you have looked at — which is what lets the rest of Fadi keep
-              changing without putting it at risk.
+              site only ever shows what you have looked at — which is what lets the rest of Fadi
+              keep changing without putting it at risk.
             </p>
             <p className="mt-2 text-xs">
-              {waiting.slice(0, 6).map((i) => i.title).join(" · ")}
+              {waiting
+                .slice(0, 6)
+                .map((i) => i.title)
+                .join(" · ")}
               {waiting.length > 6 ? ` +${waiting.length - 6} more` : ""}
             </p>
             <div className="mt-3 flex justify-end">
               <Button
                 size="sm"
                 disabled={pending}
-                onClick={() =>
-                  run(() => confirmPortfolioItems({ ids: waiting.map((i) => i.id) }))
-                }
+                onClick={() => run(() => confirmPortfolioItems({ ids: waiting.map((i) => i.id) }))}
               >
                 <ShieldCheck className="size-4" aria-hidden="true" />
                 Put {waiting.length === 1 ? "it" : "them"} on my site
@@ -548,7 +575,7 @@ export function PortfolioManager({
             run(() =>
               mode === "delete"
                 ? deleteItem({ id: dropId })
-                : setItemPublished({ id: dropId, published: false }),
+                : setItemPublished({ id: dropId, published: false })
             )
           }
           onResolveAll={({ dropIds }) =>
@@ -612,7 +639,11 @@ export function PortfolioManager({
                 Seed it from your Fadi evidence — projects, experience, skills.
               </p>
               <Button size="sm" onClick={seed} disabled={pending} className="mt-3">
-                {pending ? <Loader2 className="size-4 animate-spin" /> : <Sparkles className="size-4" />}
+                {pending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Sparkles className="size-4" />
+                )}
                 Seed from evidence
               </Button>
             </li>
@@ -623,7 +654,12 @@ export function PortfolioManager({
               <p className="mt-1 text-xs text-muted-foreground">
                 Choose a template in Settings — Noir &amp; Gold, Aurora, or Minimal.
               </p>
-              <Button size="sm" variant="outline" onClick={() => setSettingsOpen(true)} className="mt-3">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setSettingsOpen(true)}
+                className="mt-3"
+              >
                 <Settings className="size-4" /> Choose template
               </Button>
             </li>
@@ -634,7 +670,13 @@ export function PortfolioManager({
               <p className="mt-1 text-xs text-muted-foreground">
                 Go live at your handle — or export it to host on your own domain.
               </p>
-              <Button size="sm" variant="outline" onClick={togglePublishSite} disabled={pending} className="mt-3">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={togglePublishSite}
+                disabled={pending}
+                className="mt-3"
+              >
                 <Eye className="size-4" /> Publish site
               </Button>
             </li>
@@ -710,7 +752,11 @@ export function PortfolioManager({
               onDrop={() => onDropOn(item.id)}
               onEdit={() => setEditing(toForm(item))}
               onDelete={() => {
-                if (confirm(`Delete “${item.title}”?`)) run(() => deleteItem({ id: item.id }));
+                const connected = Boolean(item.evidenceItemId);
+                const question = connected
+                  ? `Remove “${item.title}” from this portfolio? Its fact and proof stay in Evidence, and it will stay under Not shown until you undo that choice.`
+                  : `Delete “${item.title}”? Proof-bearing projects must be saved to Evidence first.`;
+                if (confirm(question)) run(() => deleteItem({ id: item.id }));
               }}
               onTogglePublish={() =>
                 run(() => setItemPublished({ id: item.id, published: !item.isPublished }))
@@ -723,6 +769,7 @@ export function PortfolioManager({
       {editing && (
         <ItemEditor
           initial={editing}
+          evidenceProjects={evidenceProjects}
           pending={pending}
           onSave={saveEditing}
           onClose={() => setEditing(null)}

@@ -37,6 +37,7 @@ export const RESUME_KEYS = [
 
 export type ItemForm = {
   id?: string;
+  evidenceItemId?: string;
   section: string;
   title: string;
   subtitle: string;
@@ -71,6 +72,7 @@ export function emptyForm(section = "project"): ItemForm {
 export function toForm(item: PortfolioItemView): ItemForm {
   return {
     id: item.id,
+    evidenceItemId: item.evidenceItemId ?? undefined,
     section: item.section,
     title: item.title,
     subtitle: item.subtitle ?? "",

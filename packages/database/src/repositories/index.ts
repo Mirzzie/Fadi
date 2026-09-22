@@ -8,6 +8,7 @@ export * from "./career-profiles.repository";
 export * from "./career-reports.repository";
 export * from "./documents.repository";
 export * from "./evidence.repository";
+export * from "./evidence-artifacts.repository";
 export * from "./github-connections.repository";
 export * from "./interview-stories.repository";
 export * from "./jobs.repository";

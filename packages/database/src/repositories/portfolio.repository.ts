@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
-import type { Database } from "../client";
+import type { DbOrTx } from "../client";
 import {
   portfolioItems,
   portfolioSites,
@@ -16,7 +16,7 @@ import {
  * explicitly public `getPublishedByHandle`, which the Content API uses to serve
  * a live site and returns ONLY published data.
  */
-export function createPortfolioRepository(db: Database) {
+export function createPortfolioRepository(db: DbOrTx) {
   return {
     /* ------------------------------- sites ------------------------------- */
 
@@ -48,7 +48,7 @@ export function createPortfolioRepository(db: Database) {
 
     async createSite(
       userId: string,
-      input: Omit<NewPortfolioSite, "id" | "userId" | "createdAt" | "updatedAt">,
+      input: Omit<NewPortfolioSite, "id" | "userId" | "createdAt" | "updatedAt">
     ): Promise<PortfolioSite> {
       const [created] = await db
         .insert(portfolioSites)
@@ -73,7 +73,7 @@ export function createPortfolioRepository(db: Database) {
           | "isPublished"
           | "careerProfileId"
         >
-      >,
+      >
     ): Promise<PortfolioSite | null> {
       const [updated] = await db
         .update(portfolioSites)
@@ -110,7 +110,7 @@ export function createPortfolioRepository(db: Database) {
 
     async createItem(
       userId: string,
-      input: Omit<NewPortfolioItem, "id" | "userId" | "createdAt" | "updatedAt">,
+      input: Omit<NewPortfolioItem, "id" | "userId" | "createdAt" | "updatedAt">
     ): Promise<PortfolioItem> {
       const [created] = await db
         .insert(portfolioItems)
@@ -121,12 +121,15 @@ export function createPortfolioRepository(db: Database) {
 
     async createItems(
       userId: string,
-      rows: Array<Omit<NewPortfolioItem, "id" | "userId" | "createdAt" | "updatedAt">>,
+      rows: Array<Omit<NewPortfolioItem, "id" | "userId" | "createdAt" | "updatedAt">>
     ): Promise<PortfolioItem[]> {
       if (rows.length === 0) return [];
       return db
         .insert(portfolioItems)
         .values(rows.map((r) => ({ ...r, userId })))
+        // Sync can run in two tabs. The database's one-projection-per-fact constraint is the
+        // arbiter; the later insert becomes an idempotent no-op instead of an error page.
+        .onConflictDoNothing()
         .returning();
     },
 
@@ -181,7 +184,7 @@ export function createPortfolioRepository(db: Database) {
           | "isPublished"
           | "confirmedAt"
         >
-      >,
+      >
     ): Promise<PortfolioItem | null> {
       // EDITING IS CONFIRMING. The owner had the row open and changed it, so there is
       // nothing further to ask — requiring a second, separate confirmation for work
@@ -226,7 +229,7 @@ export function createPortfolioRepository(db: Database) {
     async replaceItems(
       userId: string,
       siteId: string,
-      rows: Array<Omit<NewPortfolioItem, "id" | "userId" | "createdAt" | "updatedAt">>,
+      rows: Array<Omit<NewPortfolioItem, "id" | "userId" | "createdAt" | "updatedAt">>
     ): Promise<PortfolioItem[]> {
       return db.transaction(async (tx) => {
         await tx
@@ -257,7 +260,7 @@ export function createPortfolioRepository(db: Database) {
 
     /** Public read for the renderer: a PUBLISHED site + only its PUBLISHED items. */
     async getPublishedByHandle(
-      handle: string,
+      handle: string
     ): Promise<{ site: PortfolioSite; items: PortfolioItem[] } | null> {
       const [site] = await db
         .select()
@@ -276,8 +279,8 @@ export function createPortfolioRepository(db: Database) {
           and(
             eq(portfolioItems.siteId, site.id),
             eq(portfolioItems.isPublished, true),
-            isNotNull(portfolioItems.confirmedAt),
-          ),
+            isNotNull(portfolioItems.confirmedAt)
+          )
         )
         .orderBy(asc(portfolioItems.section), asc(portfolioItems.sortOrder));
 

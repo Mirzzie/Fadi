@@ -1,6 +1,10 @@
 "use server";
 
-import { createEvidenceRepository, createPortfolioRepository } from "@careeros/database";
+import {
+  createEvidenceArtifactsRepository,
+  createEvidenceRepository,
+  createPortfolioRepository,
+} from "@careeros/database";
 import { revalidatePath } from "next/cache";
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
@@ -49,6 +53,21 @@ const SECTIONS = [
 
 type Result<T> = ({ ok: true } & T) | { ok: false; message: string };
 
+export type EvidenceProjectOption = {
+  id: string;
+  factId: string;
+  title: string;
+  organization: string | null;
+  period: string | null;
+  detail: string;
+  hasProof: boolean;
+  isDismissed: boolean;
+  proofUrl: string | null;
+  proofCover: string | null;
+  proofGallery: string[];
+  linkedItemId: string | null;
+};
+
 function slugify(input: string): string {
   return (
     input
@@ -95,10 +114,13 @@ export async function loadPortfolio(): Promise<
     /** Proof from Evidence not on the portfolio yet — so the CMS can proactively ask
      *  the user to pull it in (detect → propose → approve; never auto-mutate). */
     pendingProof: number;
-    /** Project work in their record with no artefact yet — named, never published as an entry. */
-    awaitingArtefact: string[];
+    /** One compact reconciliation list for Add proof / Connect / Save to Evidence. */
+    evidenceProjects: EvidenceProjectOption[];
     /** The other direction: live items the record has moved PAST — see lib/portfolio/freshness.ts. */
-    drift: { withdrawn: { id: string; title: string }[]; reworded: { id: string; title: string }[] };
+    drift: {
+      withdrawn: { id: string; title: string }[];
+      reworded: { id: string; title: string }[];
+    };
   }>
 > {
   const user = await getCurrentAuthUser();
@@ -111,8 +133,10 @@ export async function loadPortfolio(): Promise<
   // dismissal memory, or the CMS would keep offering to re-add work the user removed.
   const have = new Set(items.map((i) => i.evidenceItemId).filter(Boolean) as string[]);
   const evidence = await createEvidenceRepository(getDatabase()).listForUser(user.id);
+  const artifacts = await createEvidenceArtifactsRepository(getDatabase()).listForUser(user.id);
+  const factsWithProof = new Set(artifacts.map((a) => a.factId));
   const dismissed = new Set(
-    ((site.theme as { dismissedFacts?: unknown })?.dismissedFacts as string[] | undefined) ?? [],
+    ((site.theme as { dismissedFacts?: unknown })?.dismissedFacts as string[] | undefined) ?? []
   );
   const factOfEvidence = new Map(evidence.map((e) => [e.id, e.factId ?? e.id]));
   // The count must be what Sync would actually ADD, or the nudge outlives the work: records whose
@@ -120,7 +144,14 @@ export async function loadPortfolio(): Promise<
   // missing proof — they are the same proof, and sync links them rather than copying them.
   const { findSameThings } = await import("@/lib/identity/resolve");
   const asIdentity = (
-    x: { section: string; title: string; subtitle: string | null; dateRange: string | null; description: string | null; bullets?: string[] | null },
+    x: {
+      section: string;
+      title: string;
+      subtitle: string | null;
+      dateRange: string | null;
+      description: string | null;
+      bullets?: string[] | null;
+    },
     id: string
   ) => ({
     id,
@@ -143,36 +174,36 @@ export async function loadPortfolio(): Promise<
     );
   }).length;
 
-  // PROJECT WORK THAT IS WAITING ON PROOF, not missing from the site by mistake. A project entry
-  // is a claim with an artefact attached, and an evidence record cannot carry one — so these are
-  // named here rather than published as entries with nothing to show.
-  // Measured on the owner's page: "Automated WordPress Deployment on AWS" was listed as waiting
-  // for proof while their entry "WordPress on AWS + Ansible" — the same project, with the
-  // screenshot — sat below it. Same work, named twice, which is the redundancy this whole pass
-  // is about. The check is the one sync uses, so the two panels cannot disagree.
-  const awaitingArtefact = evidence
+  const linkedItemByEvidence = new Map(
+    items
+      .filter((item) => item.evidenceItemId)
+      .map((item) => [item.evidenceItemId as string, item.id])
+  );
+  const evidenceProjects = evidence
     .filter((e) => e.kind === "project" || e.kind === "achievement")
-    .filter((e) => !have.has(e.id))
-    .filter((e) => !dismissed.has(e.factId ?? e.id))
-    .filter((e, index) => {
-      const me = asIdentity(
-        {
-          section: "project",
-          title: e.title,
-          subtitle: e.organization,
-          dateRange: e.period,
-          description: e.detail,
-        },
-        `waiting-${index}`
+    .map((e) => {
+      const factId = e.factId ?? e.id;
+      const proof = artifacts.filter((artifact) => artifact.factId === factId);
+      const visual = proof.filter(
+        (artifact) => artifact.kind === "image" || artifact.kind === "video"
       );
-      // An advisory can be generous: naming a project that is arguably already shown is a
-      // sentence, not a mutation. This stays loose on purpose, and says "waiting for proof"
-      // rather than asserting the work is missing.
-      return !findSameThings([me, ...itemIdentities], undefined, { requireAnchor: false }).some(
-        (m) => m.a === me.id || m.b === me.id
-      );
-    })
-    .map((e) => e.title);
+      return {
+        id: e.id,
+        factId,
+        title: e.title,
+        organization: e.organization,
+        period: e.period,
+        detail: e.detail,
+        hasProof: factsWithProof.has(factId),
+        isDismissed: dismissed.has(factId),
+        proofUrl:
+          proof.find((artifact) => artifact.kind !== "image" && artifact.kind !== "video")?.url ??
+          null,
+        proofCover: visual[0]?.url ?? null,
+        proofGallery: visual.slice(1).map((artifact) => artifact.url),
+        linkedItemId: linkedItemByEvidence.get(e.id) ?? null,
+      };
+    });
 
   // What is LIVE but no longer matches the record. Read-only: a public page is the owner's, and
   // a projection that has drifted is a decision to put to them, never a silent unpublish.
@@ -195,7 +226,7 @@ export async function loadPortfolio(): Promise<
     isPublished: site.isPublished,
     items: items.map(toItemView),
     pendingProof,
-    awaitingArtefact,
+    evidenceProjects,
     drift,
   };
 }
@@ -238,7 +269,7 @@ export async function updateSiteSettings(input: {
       ? {
           ...(site.theme ?? {}),
           labels: Object.fromEntries(
-            Object.entries(input.labels).filter(([, v]) => typeof v === "string" && v.trim()),
+            Object.entries(input.labels).filter(([, v]) => typeof v === "string" && v.trim())
           ),
         }
       : site.theme,
@@ -357,7 +388,38 @@ export async function syncFromEvidence(): Promise<Result<{ added: number; nearMa
   // on the CONTENT (section + org + years + title) — the same credential worded differently
   // ("MSc" vs "M.Sc.", "BCA, Computer Science" vs "Bachelor of Computer Application (BCA)")
   // no longer sneaks back in as a duplicate.
-  const seeded = seedItemsFromEvidence(evidence);
+  const artifactRows = await createEvidenceArtifactsRepository(getDatabase()).listForUser(user.id);
+  const artifactsByFact = new Map<string, typeof artifactRows>();
+  for (const artifact of artifactRows) {
+    const rows = artifactsByFact.get(artifact.factId) ?? [];
+    rows.push(artifact);
+    artifactsByFact.set(artifact.factId, rows);
+  }
+  const seededProjects = evidence
+    .filter((e) => e.kind === "project" || e.kind === "achievement")
+    .flatMap((e, index) => {
+      const proof = artifactsByFact.get(e.factId ?? e.id) ?? [];
+      if (proof.length === 0) return [];
+      const visual = proof.filter((a) => a.kind === "image" || a.kind === "video");
+      const source = proof.find((a) => a.kind !== "image" && a.kind !== "video");
+      return [
+        {
+          evidenceItemId: e.id,
+          section: "project",
+          title: e.title,
+          subtitle: e.organization,
+          dateRange: e.period,
+          description: e.detail || null,
+          bullets: e.metrics ? [e.metrics] : [],
+          tag: e.tags?.[0] ?? null,
+          sortOrder: (index + 1) * 10,
+          url: source?.url ?? null,
+          imageUrl: visual[0]?.url ?? null,
+          gallery: visual.slice(1).map((a) => a.url),
+        },
+      ];
+    });
+  const seeded = [...seedItemsFromEvidence(evidence), ...seededProjects];
 
   // WHAT THE USER ALREADY DECIDED AGAINST.
   //
@@ -367,7 +429,7 @@ export async function syncFromEvidence(): Promise<Result<{ added: number; nearMa
   // had just cleaned. A dismissal is a decision, so it is remembered. It is keyed on
   // the FACT, not the row, so the same reality re-worded stays dismissed too.
   const dismissed = new Set(
-    ((site.theme as { dismissedFacts?: unknown })?.dismissedFacts as string[] | undefined) ?? [],
+    ((site.theme as { dismissedFacts?: unknown })?.dismissedFacts as string[] | undefined) ?? []
   );
   const factOfEvidence = new Map(evidence.map((e) => [e.id, e.factId ?? e.id]));
 
@@ -379,6 +441,7 @@ export async function syncFromEvidence(): Promise<Result<{ added: number; nearMa
   // work and should be linked, so the entry becomes the proof for the record.
   const linkOnly = evidence
     .filter((e) => e.kind === "project" || e.kind === "achievement")
+    .filter((e) => !artifactsByFact.has(e.factId ?? e.id))
     .map((e) => ({
       evidenceItemId: e.id,
       section: "project",
@@ -388,26 +451,41 @@ export async function syncFromEvidence(): Promise<Result<{ added: number; nearMa
       description: e.detail,
     }));
 
-  const plan = planEvidenceSync(seeded, existing.map((x) => ({
-    id: x.id,
-    evidenceItemId: x.evidenceItemId,
-    section: x.section,
-    title: x.title,
-    subtitle: x.subtitle,
-    dateRange: x.dateRange,
-    description: x.description,
-    bullets: x.bullets,
-  })), {
-    have,
-    dismissed,
-    factOf: (id) => factOfEvidence.get(id) ?? id,
-    sameEntry: (candidate, entry) => isSameEntry(candidate, entry),
-  });
+  const plan = planEvidenceSync(
+    seeded,
+    existing.map((x) => ({
+      id: x.id,
+      evidenceItemId: x.evidenceItemId,
+      section: x.section,
+      title: x.title,
+      subtitle: x.subtitle,
+      dateRange: x.dateRange,
+      description: x.description,
+      bullets: x.bullets,
+    })),
+    {
+      have,
+      linkOnly,
+      dismissed,
+      factOf: (id) => factOfEvidence.get(id) ?? id,
+      sameEntry: (candidate, entry) => isSameEntry(candidate, entry),
+    }
+  );
 
   // Repair the links first: an entry the person built keeps its images and wording and gains the
   // evidence id it lost, which is what stops every future sync proposing it again.
   for (const link of plan.link) {
-    await repo.linkToEvidence(user.id, link.itemId, link.evidenceItemId);
+    const linkedRow = await repo.linkToEvidence(user.id, link.itemId, link.evidenceItemId);
+    if (linkedRow) {
+      const record = evidence.find((e) => e.id === link.evidenceItemId);
+      if (record) {
+        await createEvidenceArtifactsRepository(getDatabase()).addForFact(
+          user.id,
+          record.factId ?? record.id,
+          proofFromPortfolio(linkedRow)
+        );
+      }
+    }
   }
   const kept = plan.create;
   const linked = plan.alreadyShown;
@@ -421,17 +499,24 @@ export async function syncFromEvidence(): Promise<Result<{ added: number; nearMa
   }
 
   const maxSort = existing.reduce((m, i) => Math.max(m, i.sortOrder), 0);
-  const rows = kept.map((r, i) => ({
-    ...r,
-    siteId: site.id,
-    roles: [] as string[],
-    url: null,
-    imageUrl: null,
-    gallery: [] as string[],
-    isPublished: true,
-    sortOrder: maxSort + (i + 1) * 10,
-    confirmedAt: null, // automatic — waits for a look before it goes public
-  }));
+  const rows = kept.map((r, i) => {
+    const media = r as typeof r & {
+      url?: string | null;
+      imageUrl?: string | null;
+      gallery?: string[];
+    };
+    return {
+      ...r,
+      siteId: site.id,
+      roles: [] as string[],
+      url: media.url ?? null,
+      imageUrl: media.imageUrl ?? null,
+      gallery: media.gallery ?? [],
+      isPublished: true,
+      sortOrder: maxSort + (i + 1) * 10,
+      confirmedAt: null, // automatic — waits for a look before it goes public
+    };
+  });
   const created = await repo.createItems(user.id, rows);
   await publish("portfolio.changed", { userId: user.id, siteId: site.id, reason: "synced" });
   revalidatePath(PATH);
@@ -468,8 +553,58 @@ function safeLinkUrl(raw?: string | null): string | null {
   return v; // scheme-less relative path
 }
 
+function proofKind(url: string): "image" | "video" | "link" {
+  if (/(\.mp4|\.webm|\.mov)(\?|$)|\/video\/upload\//i.test(url)) return "video";
+  if (/(\.png|\.jpe?g|\.gif|\.webp|\.svg)(\?|$)|\/image\/upload\//i.test(url)) return "image";
+  return "link";
+}
+
+function proofFromPortfolio(item: {
+  id: string;
+  imageUrl: string | null;
+  gallery: string[];
+  url: string | null;
+}) {
+  const rows: Array<{
+    kind: "image" | "video" | "link";
+    url: string;
+    label: string;
+    sortOrder: number;
+    sourcePortfolioItemId: string;
+  }> = [];
+  if (item.imageUrl) {
+    rows.push({
+      kind: proofKind(item.imageUrl),
+      url: item.imageUrl,
+      label: "Cover",
+      sortOrder: 0,
+      sourcePortfolioItemId: item.id,
+    });
+  }
+  item.gallery.forEach((url, index) => {
+    rows.push({
+      kind: proofKind(url),
+      url,
+      label: "Gallery",
+      sortOrder: index + 1,
+      sourcePortfolioItemId: item.id,
+    });
+  });
+  if (item.url) {
+    rows.push({
+      kind: "link",
+      url: item.url,
+      label: "Source",
+      sortOrder: 1000,
+      sourcePortfolioItemId: item.id,
+    });
+  }
+  return rows;
+}
+
 export async function saveItem(input: {
   id?: string;
+  evidenceItemId?: string;
   section: string;
   title: string;
   subtitle?: string;
@@ -487,7 +622,8 @@ export async function saveItem(input: {
   if (!user) return { ok: false, message: "Please sign in again." };
   if (!input.title.trim()) return { ok: false, message: "Give it a title." };
 
-  const repo = createPortfolioRepository(getDatabase());
+  const db = getDatabase();
+  const repo = createPortfolioRepository(db);
   const site = await ensureSite(user.id, user.email);
   const section = (SECTIONS as readonly string[]).includes(input.section)
     ? input.section
@@ -508,29 +644,155 @@ export async function saveItem(input: {
     gallery: input.gallery.map((g) => safeLinkUrl(g)).filter((g): g is string => Boolean(g)),
   };
 
+  const before = input.id ? await repo.getItemForUser(user.id, input.id) : null;
+  if (input.id && !before) return { ok: false, message: "I can't find that item." };
+  if (
+    before?.evidenceItemId &&
+    input.evidenceItemId &&
+    before.evidenceItemId !== input.evidenceItemId
+  ) {
+    return { ok: false, message: "Disconnect this project before choosing a different record." };
+  }
+  const evidenceItemId = input.evidenceItemId ?? before?.evidenceItemId ?? null;
+  const evidence = evidenceItemId
+    ? await createEvidenceRepository(db).getForUser(user.id, evidenceItemId)
+    : null;
+  if (
+    evidenceItemId &&
+    (!evidence ||
+      !evidence.isCanonical ||
+      evidence.reviewStatus !== "accepted" ||
+      !["project", "achievement"].includes(evidence.kind) ||
+      section !== "project")
+  ) {
+    return { ok: false, message: "Choose an accepted project from your Evidence." };
+  }
+  if (
+    section === "project" &&
+    evidenceItemId &&
+    !fields.imageUrl &&
+    fields.gallery.length === 0 &&
+    !fields.url
+  ) {
+    return {
+      ok: false,
+      message: "Add a screenshot, video, repository or write-up before connecting this project.",
+    };
+  }
+
   let row;
-  if (input.id) {
-    row = await repo.updateItem(user.id, input.id, fields);
-  } else {
-    // Append to the end of its section. (Creating everything at sort_order 0 made
-    // new items tie, so their order was arbitrary and drag-reorder looked broken.)
-    const siblings = await repo.listItemsForUser(user.id, site.id);
-    const maxSort = siblings
-      .filter((i) => i.section === section)
-      .reduce((m, i) => Math.max(m, i.sortOrder), 0);
-    row = await repo.createItem(user.id, {
-      ...fields,
-      siteId: site.id,
-      sortOrder: maxSort + 10,
-      isPublished: true,
-      // The owner typed this. Confirmation is what "a person has looked at it" means,
-      // and they were looking at it while they wrote it.
-      confirmedAt: new Date(),
+  try {
+    row = await db.transaction(async (tx) => {
+      const txRepo = createPortfolioRepository(tx);
+      let saved;
+      if (input.id) {
+        saved = await txRepo.updateItem(user.id, input.id, fields);
+        if (saved && evidenceItemId && !saved.evidenceItemId) {
+          saved = await txRepo.linkToEvidence(user.id, saved.id, evidenceItemId);
+        }
+      } else {
+        const siblings = await txRepo.listItemsForUser(user.id, site.id);
+        const maxSort = siblings
+          .filter((i) => i.section === section)
+          .reduce((m, i) => Math.max(m, i.sortOrder), 0);
+        saved = await txRepo.createItem(user.id, {
+          ...fields,
+          evidenceItemId,
+          siteId: site.id,
+          sortOrder: maxSort + 10,
+          isPublished: true,
+          confirmedAt: new Date(),
+        });
+      }
+      if (!saved) return null;
+      if (evidence) {
+        await createEvidenceArtifactsRepository(tx).addForFact(
+          user.id,
+          evidence.factId ?? evidence.id,
+          proofFromPortfolio(saved)
+        );
+      }
+      return saved;
     });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (/portfolio_items_site_evidence_unique|duplicate key/i.test(message)) {
+      return {
+        ok: false,
+        message: "That Evidence project is already connected to this portfolio.",
+      };
+    }
+    return { ok: false, message: "Couldn't save that project. Your existing item is unchanged." };
   }
   if (!row) return { ok: false, message: "I can't find that item." };
   revalidatePath(PATH);
   return { ok: true, item: toItemView(row) };
+}
+
+/** Promote a real CMS-only project into Evidence, then connect its existing proof-bearing entry. */
+export async function savePortfolioProjectToEvidence(input: {
+  id: string;
+}): Promise<Result<{ evidenceItemId: string }>> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  const db = getDatabase();
+  const item = await createPortfolioRepository(db).getItemForUser(user.id, input.id);
+  if (!item || item.section !== "project") {
+    return { ok: false, message: "That portfolio project is unavailable." };
+  }
+  if (item.evidenceItemId) return { ok: true, evidenceItemId: item.evidenceItemId };
+  if (!item.imageUrl && item.gallery.length === 0 && !item.url) {
+    return { ok: false, message: "Add proof before saving this project to Evidence." };
+  }
+
+  const { admitEvidence } = await import("@/lib/identity/admit");
+  const admitted = await admitEvidence(user.id, {
+    kind: "project",
+    title: item.title,
+    organization: item.subtitle,
+    period: item.dateRange,
+    detail: [item.description, ...item.bullets].filter(Boolean).join("\n"),
+    metrics: null,
+    tags: [item.tag, ...item.roles].filter((x): x is string => Boolean(x)),
+    origin: "manual",
+    attribution: "personal",
+  });
+  if (admitted.row.reviewStatus !== "accepted") {
+    return {
+      ok: false,
+      message:
+        "Fadi found a possible existing project. Resolve that one question in Evidence, then connect it here.",
+    };
+  }
+
+  const linked = await db.transaction(async (tx) => {
+    const row = await createPortfolioRepository(tx).linkToEvidence(
+      user.id,
+      item.id,
+      admitted.row.id
+    );
+    if (!row) return null;
+    await createEvidenceArtifactsRepository(tx).addForFact(
+      user.id,
+      admitted.row.factId ?? admitted.row.id,
+      proofFromPortfolio(row)
+    );
+    return row;
+  });
+  if (!linked) {
+    return {
+      ok: false,
+      message: "That project was connected in another tab. Refresh and check it.",
+    };
+  }
+  await publish("evidence.changed", {
+    userId: user.id,
+    reason: "created",
+    evidenceItemId: admitted.row.id,
+  });
+  revalidatePath(PATH);
+  revalidatePath("/dashboard/evidence");
+  return { ok: true, evidenceItemId: admitted.row.id };
 }
 
 /**
@@ -604,9 +866,9 @@ export async function setItemPublished(input: {
   return { ok: true };
 }
 
-export async function deleteItem(input: { id: string }): Promise<{ ok: boolean }> {
+export async function deleteItem(input: { id: string }): Promise<Result<{ removed: boolean }>> {
   const user = await getCurrentAuthUser();
-  if (!user) return { ok: false };
+  if (!user) return { ok: false, message: "Please sign in again." };
 
   const db = getDatabase();
   const repo = createPortfolioRepository(db);
@@ -614,23 +876,38 @@ export async function deleteItem(input: { id: string }): Promise<{ ok: boolean }
   // Remember the decision BEFORE the row goes, or Sync will simply put it back.
   // Keyed on the fact, so the same reality re-worded stays dismissed as well.
   const item = await repo.getItemForUser(user.id, input.id);
-  if (item?.evidenceItemId) {
+  if (!item) return { ok: false, message: "That portfolio item is unavailable." };
+  if (!item.evidenceItemId && (item.imageUrl || item.gallery.length > 0 || item.url)) {
+    return {
+      ok: false,
+      message: "Save this proof-bearing project to Evidence before removing it.",
+    };
+  }
+  if (item.evidenceItemId) {
     const site = await ensureSite(user.id, user.email);
     const evidence = await createEvidenceRepository(db).listAllForUser(user.id);
-    const fact =
-      evidence.find((e) => e.id === item.evidenceItemId)?.factId ?? item.evidenceItemId;
+    const record = evidence.find((e) => e.id === item.evidenceItemId);
+    const fact = record?.factId ?? item.evidenceItemId;
     const theme = (site.theme ?? {}) as Record<string, unknown>;
     const prev = Array.isArray(theme.dismissedFacts) ? (theme.dismissedFacts as string[]) : [];
-    if (!prev.includes(fact)) {
-      await repo.updateSite(user.id, site.id, {
-        theme: { ...theme, dismissedFacts: [...prev, fact] },
-      });
-    }
+    await db.transaction(async (tx) => {
+      await createEvidenceArtifactsRepository(tx).addForFact(
+        user.id,
+        fact,
+        proofFromPortfolio(item),
+      );
+      if (!prev.includes(fact)) {
+        await createPortfolioRepository(tx).updateSite(user.id, site.id, {
+          theme: { ...theme, dismissedFacts: [...prev, fact] },
+        });
+      }
+      await createPortfolioRepository(tx).deleteItem(user.id, input.id);
+    });
+  } else {
+    await repo.deleteItem(user.id, input.id);
   }
-
-  await repo.deleteItem(user.id, input.id);
   revalidatePath(PATH);
-  return { ok: true };
+  return { ok: true, removed: true };
 }
 
 /** Export all items in the portfolio's interchange format (round-trips with the standalone CMS). */
@@ -730,9 +1007,7 @@ export type FocusPlan = {
  * Preview first: this returns the plan and writes nothing. `applyPortfolioFocus`
  * commits it. Detect → propose → approve, like the rest of the CMS.
  */
-export async function planPortfolioFocus(input: {
-  direction: string;
-}): Promise<Result<FocusPlan>> {
+export async function planPortfolioFocus(input: { direction: string }): Promise<Result<FocusPlan>> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
 
@@ -789,7 +1064,8 @@ export async function planPortfolioFocus(input: {
 
   const verdictOf = new Map<string, { verdict: FocusPlanItem["verdict"]; reason: string }>();
   for (const p of decision.lead) verdictOf.set(p.item.id, { verdict: "lead", reason: p.reason });
-  for (const p of decision.holdBack) verdictOf.set(p.item.id, { verdict: "hide", reason: p.reason });
+  for (const p of decision.holdBack)
+    verdictOf.set(p.item.id, { verdict: "hide", reason: p.reason });
   for (const p of [...decision.support, ...decision.untranslated])
     verdictOf.set(p.item.id, { verdict: "keep", reason: p.reason });
 
@@ -895,15 +1171,21 @@ export async function loadPortfolioStats(input: { days?: number } = {}): Promise
   if (!user) return { ok: false, message: "Please sign in again." };
 
   const site = await ensureSite(user.id, user.email);
-  const { portfolioStats, portfolioFeedback, portfolioTimeline } = await import(
-    "@/lib/portfolio/analytics"
-  );
+  const { portfolioStats, portfolioFeedback, portfolioTimeline } =
+    await import("@/lib/portfolio/analytics");
   const [stats, feedback, timeline] = await Promise.all([
     portfolioStats(user.id, site.id, input.days ?? 30),
     portfolioFeedback(user.id, site.id),
     portfolioTimeline(user.id, site.id, input.days ?? 30),
   ]);
-  return { ok: true, stats, feedback, timeline, handle: site.handle, isPublished: site.isPublished };
+  return {
+    ok: true,
+    stats,
+    feedback,
+    timeline,
+    handle: site.handle,
+    isPublished: site.isPublished,
+  };
 }
 
 /**
@@ -922,7 +1204,10 @@ export async function clearPortfolioTestEvents(): Promise<Result<{ removed: numb
   const site = await ensureSite(user.id, user.email);
   const { createProductEventsRepository } = await import("@careeros/database");
   const { getDatabase } = await import("@/lib/database/client");
-  const removed = await createProductEventsRepository(getDatabase()).purgeExcluded(user.id, site.id);
+  const removed = await createProductEventsRepository(getDatabase()).purgeExcluded(
+    user.id,
+    site.id
+  );
   return { ok: true, removed };
 }
 
@@ -940,9 +1225,8 @@ export async function syncPortfolioAudience(): Promise<
   if (!user) return { ok: false, message: "Please sign in again." };
 
   const site = await ensureSite(user.id, user.email);
-  const { syncCollectorEvents, syncCollectorFeedback } = await import(
-    "@/lib/portfolio/collector-sync"
-  );
+  const { syncCollectorEvents, syncCollectorFeedback } =
+    await import("@/lib/portfolio/collector-sync");
   const args = { userId: user.id, siteId: site.id, handle: site.handle };
   const res = await syncCollectorEvents(args);
   if (!res.ok) return { ok: false, message: res.message };
@@ -1017,9 +1301,9 @@ export async function undismissFact(input: { factId: string }): Promise<{ ok: bo
  * until this runs. That is what lets the rest of the platform stay under construction
  * without the one part strangers read being at risk.
  */
-export async function confirmPortfolioItems(input: { ids: string[] }): Promise<
-  Result<{ confirmed: number }>
-> {
+export async function confirmPortfolioItems(input: {
+  ids: string[];
+}): Promise<Result<{ confirmed: number }>> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
 

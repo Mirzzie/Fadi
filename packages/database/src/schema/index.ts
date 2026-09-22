@@ -1587,6 +1587,38 @@ export const portfolioItems = pgTable(
     index("portfolio_items_site_id_idx").on(table.siteId),
     index("portfolio_items_site_section_idx").on(table.siteId, table.section),
     index("portfolio_items_evidence_item_idx").on(table.evidenceItemId),
+    uniqueIndex("portfolio_items_site_evidence_unique")
+      .on(table.siteId, table.evidenceItemId)
+      .where(sql`${table.evidenceItemId} is not null`),
+  ]
+);
+
+/**
+ * Proof belongs to the career fact. A portfolio is one presentation of a fact. It may choose a
+ * cover, order and wording, but deleting that presentation must not erase the only record of the
+ * screenshots, recording, repository or write-up that proves the work.
+ */
+export const evidenceArtifacts = pgTable(
+  "evidence_artifacts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    factId: uuid("fact_id").notNull(),
+    /** image | video | repository | writeup | link | document */
+    kind: text("kind").notNull(),
+    url: text("url").notNull(),
+    label: text("label"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    sourcePortfolioItemId: uuid("source_portfolio_item_id").references(() => portfolioItems.id, {
+      onDelete: "set null",
+    }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("evidence_artifacts_fact_url_unique").on(table.userId, table.factId, table.url),
+    index("evidence_artifacts_fact_idx").on(table.userId, table.factId),
   ]
 );
 
@@ -1665,9 +1697,10 @@ export type PortfolioSite = typeof portfolioSites.$inferSelect;
 export type NewPortfolioSite = typeof portfolioSites.$inferInsert;
 export type PortfolioItem = typeof portfolioItems.$inferSelect;
 export type NewPortfolioItem = typeof portfolioItems.$inferInsert;
+export type EvidenceArtifact = typeof evidenceArtifacts.$inferSelect;
+export type NewEvidenceArtifact = typeof evidenceArtifacts.$inferInsert;
 export type GithubConnection = typeof githubConnections.$inferSelect;
 export type NewGithubConnection = typeof githubConnections.$inferInsert;
-
 
 /* ────────────────────────────────────────────────────────────────────────────
  * MY CAREER: the facts, and where they came from.
@@ -1781,22 +1814,36 @@ export const careerRecordVersions = pgTable(
 export type CareerRecordVersion = typeof careerRecordVersions.$inferSelect;
 
 /** Scope is direction:<id> or application:<id>; repository checks ownership before writes. */
-export const careerSelections = pgTable("career_selections", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  scope: text("scope").notNull(),
-  factId: uuid("fact_id").notNull(),
-  mode: text("mode").notNull().default("auto"),
-  keepWording: boolean("keep_wording").notNull().default(false),
-  sortOrder: integer("sort_order").notNull().default(0),
-  ...timestamps,
-}, table => [uniqueIndex("career_selection_scope_fact").on(table.userId, table.scope, table.factId)]);
+export const careerSelections = pgTable(
+  "career_selections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    scope: text("scope").notNull(),
+    factId: uuid("fact_id").notNull(),
+    mode: text("mode").notNull().default("auto"),
+    keepWording: boolean("keep_wording").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("career_selection_scope_fact").on(table.userId, table.scope, table.factId),
+  ]
+);
 
 /** Immutable generation input, including selected facts, scope, preferences and job text. */
-export const careerContextSnapshots = pgTable("career_context_snapshots", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  fingerprint: text("fingerprint").notNull(),
-  payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-}, table => [index("career_context_snapshots_user").on(table.userId)]);
+export const careerContextSnapshots = pgTable(
+  "career_context_snapshots",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    fingerprint: text("fingerprint").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [index("career_context_snapshots_user").on(table.userId)]
+);
