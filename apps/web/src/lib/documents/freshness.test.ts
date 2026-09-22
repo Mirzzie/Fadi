@@ -17,6 +17,17 @@ const rec = (over: Partial<Parameters<typeof whatChanged>[0][number]> = {}) => (
 });
 
 describe("capturedContextOf", () => {
+  it("keeps what the person acknowledged apart from what the document was written from", () => {
+    // Codex C15-06: replacing the generation fingerprint on "keep this version" made every later
+    // reader call the document current, which nothing had checked.
+    const captured = capturedContextOf({
+      careerContextSnapshotId: "snap-1",
+      careerContextFingerprint: "written-from",
+      acknowledgedFingerprint: "seen-and-kept",
+    });
+    expect(captured).toMatchObject({ fingerprint: "written-from", acknowledged: "seen-and-kept" });
+  });
+
   it("reads what generation recorded", () => {
     expect(
       capturedContextOf({
@@ -24,7 +35,7 @@ describe("capturedContextOf", () => {
         careerContextFingerprint: "abc",
         contextSchemaVersion: 1,
       })
-    ).toEqual({ snapshotId: "snap-1", fingerprint: "abc", schemaVersion: 1 });
+    ).toEqual({ snapshotId: "snap-1", fingerprint: "abc", acknowledged: null, schemaVersion: 1 });
   });
 
   it("is null for a document Fadi never generated — imported, pasted, hand-written", () => {

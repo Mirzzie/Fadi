@@ -41,6 +41,12 @@ export async function documentFreshness(
     if (captured.fingerprint && captured.fingerprint === current.fingerprint) {
       return { state: "current" };
     }
+    // The person saw this exact state of their record and chose to keep the document. That is a
+    // dismissal, not an update — the document is not claimed to be current, the notice simply
+    // does not repeat itself until the record moves again (Codex C15-06).
+    if (captured.acknowledged && captured.acknowledged === current.fingerprint) {
+      return { state: "kept" };
+    }
 
     // The fingerprint covers the job text and the direction too, so a changed fingerprint is not
     // by itself a changed RECORD. Only the person's own material is worth interrupting them for.

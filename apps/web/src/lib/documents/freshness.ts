@@ -19,6 +19,12 @@
 export type CapturedContext = {
   snapshotId: string | null;
   fingerprint: string | null;
+  /**
+   * The state of the record the person last looked at and chose to keep the document against.
+   * Separate from `fingerprint` on purpose: one says what the document was WRITTEN from, the
+   * other says what they have SEEN. Conflating them turned a dismissal into a false "current".
+   */
+  acknowledged: string | null;
   schemaVersion: number | null;
 };
 
@@ -26,6 +32,8 @@ export type CapturedContext = {
 export function capturedContextOf(metadata: unknown): CapturedContext | null {
   if (!metadata || typeof metadata !== "object") return null;
   const m = metadata as Record<string, unknown>;
+  const acknowledged =
+    typeof m.acknowledgedFingerprint === "string" ? m.acknowledgedFingerprint : null;
   const snapshotId =
     typeof m.careerContextSnapshotId === "string" ? m.careerContextSnapshotId : null;
   const fingerprint =
@@ -34,6 +42,7 @@ export function capturedContextOf(metadata: unknown): CapturedContext | null {
   return {
     snapshotId,
     fingerprint,
+    acknowledged,
     schemaVersion: typeof m.contextSchemaVersion === "number" ? m.contextSchemaVersion : null,
   };
 }
@@ -173,4 +182,6 @@ export function freshnessAsk(changes: RecordChanges): string | null {
 export type DocumentFreshness =
   | { state: "unknown" }
   | { state: "current" }
+  /** The record moved, the person saw it and chose to keep this version as it is. */
+  | { state: "kept" }
   | { state: "stale"; note: string; ask: string | null; changes: RecordChanges };

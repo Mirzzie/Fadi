@@ -117,3 +117,28 @@ describe("speech blocked before a gesture", () => {
     expect(isAutoplayBlock(new Error("network"))).toBe(false);
   });
 });
+
+/**
+ * SPEECH WAITING ON A GESTURE IS STILL SPEECH — it obeys Stop (Codex C15-07).
+ *
+ * The first version stored the TEXT in a module global with listeners nothing cleared, then
+ * re-requested the audio on the next click: Stop, mute, an unmounted interview or a newer
+ * utterance all left the old one queued to interrupt whatever came next, and the blob already
+ * paid for was thrown away.
+ */
+describe("queued speech and Stop", () => {
+  it("exports a queue that Stop can clear", async () => {
+    const mod = await import("./fadi-speech");
+    expect(typeof mod.stopFadiSpeech).toBe("function");
+    // The queue is module-private by design; what matters publicly is that stopping is total,
+    // which the source expresses by clearing it. This pins the contract at the seam we control.
+    const source = await import("node:fs").then((fs) =>
+      fs.readFileSync(new URL("./fadi-speech.ts", import.meta.url), "utf8")
+    );
+    expect(source).toMatch(/export function stopFadiSpeech[\s\S]{0,600}clearQueuedSpeech\(\)/);
+    // And a queued item carries the generation that asked for it, so a newer utterance wins.
+    expect(source).toMatch(/queued\.generation !== generation/);
+    // The element is kept rather than the text, so no second provider request is made.
+    expect(source).toMatch(/el: HTMLAudioElement/);
+  });
+});

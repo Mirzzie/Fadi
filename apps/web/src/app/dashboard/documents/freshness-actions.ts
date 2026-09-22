@@ -11,7 +11,7 @@ import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
 
 /**
- * "I'VE DEALT WITH THAT" — set by the person, never inferred.
+ * "KEEP THIS VERSION" — a dismissal, recorded as one.
  *
  * Codex's S2-R4: after acting on a freshness notice the document still carried the snapshot it
  * was generated from, so the notice stayed up and the person had no way to end it. The obvious
@@ -19,9 +19,14 @@ import { logger } from "@/lib/observability/logger";
  * document reflects the current record because somebody edited a phone number. It would also
  * erase the notice for a change they never actually worked in.
  *
- * So the baseline moves only when the person says it should. This captures the record as it
- * stands now and records it as what this document answers to. It is their claim, and it is the
- * one claim they are entitled to make about their own document.
+ * The first version REPLACED the generation fingerprint, so every later reader reported the
+ * document as current — a dismissal silently became a claim that the document contains changes
+ * nothing had checked (Codex C15-06).
+ *
+ * Now the generation baseline stays exactly where it was, and the acknowledgement is recorded
+ * beside it: this person saw this state of their record and chose to keep the document as is. The
+ * notice stops for that state and returns the moment the record moves again. Nothing claims the
+ * document was updated, because nothing updated it.
  */
 export async function markDocumentCurrentAction(input: {
   documentId: string;
@@ -49,12 +54,10 @@ export async function markDocumentCurrentAction(input: {
     const result = await repo.updateForUser(user.id, doc.id, doc.version, {
       metadata: {
         ...doc.metadata,
-        careerContextSnapshotId: context.snapshotId,
-        careerContextFingerprint: context.fingerprint,
-        contextSchemaVersion: 1,
-        // Marked by the person, not generated — so a later reader can tell the difference
-        // between "written from this" and "checked against this".
-        baselineMarkedAt: new Date().toISOString(),
+        // The generation baseline is NOT touched: this document is still written from whatever
+        // it was written from, and saying otherwise would be a claim nobody verified.
+        acknowledgedFingerprint: context.fingerprint,
+        acknowledgedAt: new Date().toISOString(),
       },
     });
     if (result.status === "conflict") {

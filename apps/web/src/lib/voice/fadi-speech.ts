@@ -30,9 +30,21 @@ export function isAutoplayBlock(error: unknown): boolean {
   );
 }
 
-/** An utterance the browser refused to play before a gesture, waiting for one. */
-let queuedByAutoplay: { text: string; at: number } | null = null;
-let listeningForGesture = false;
+/**
+ * Audio the browser refused to play before a gesture.
+ *
+ * It holds the ELEMENT, not the text: retrying by calling speakFadi again threw away a blob we
+ * had already generated and paid a second provider request for it (Codex C15-07). It also carries
+ * the generation that asked for it, so Stop, mute, a new utterance or an unmounted interview
+ * cancel it instead of leaving it to surprise the person on their next click.
+ */
+let queuedByAutoplay: {
+  at: number;
+  generation: number;
+  el: HTMLAudioElement;
+  release: () => void;
+} | null = null;
+let gestureListener: (() => void) | null = null;
 
 /**
  * Hold a blocked utterance until the person touches the page.
@@ -42,25 +54,54 @@ let listeningForGesture = false;
  */
 const GESTURE_WINDOW_MS = 60_000;
 
-function waitForGesture(text: string): void {
-  queuedByAutoplay = { text, at: Date.now() };
+/** Forget anything waiting on a gesture, and free what it was holding. */
+function clearQueuedSpeech(): void {
+  if (gestureListener && typeof window !== "undefined") {
+    window.removeEventListener("pointerdown", gestureListener);
+    window.removeEventListener("keydown", gestureListener);
+  }
+  gestureListener = null;
+  const queued = queuedByAutoplay;
+  queuedByAutoplay = null;
+  if (!queued) return;
+  queued.el.pause();
+  queued.release();
+}
+
+function waitForGesture(el: HTMLAudioElement, release: () => void, ownGeneration: number): void {
+  clearQueuedSpeech();
+  queuedByAutoplay = { at: Date.now(), generation: ownGeneration, el, release };
   if (!warnedAutoplay) {
     warnedAutoplay = true;
     console.info(
       "[Fadi] The browser holds audio until you interact with the page — Fadi will speak on your next click."
     );
   }
-  if (listeningForGesture || typeof window === "undefined") return;
-  listeningForGesture = true;
+  if (typeof window === "undefined") return;
   const go = () => {
-    window.removeEventListener("pointerdown", go);
-    window.removeEventListener("keydown", go);
-    listeningForGesture = false;
     const queued = queuedByAutoplay;
+    if (gestureListener) {
+      window.removeEventListener("pointerdown", gestureListener);
+      window.removeEventListener("keydown", gestureListener);
+    }
+    gestureListener = null;
     queuedByAutoplay = null;
-    if (!queued || Date.now() - queued.at > GESTURE_WINDOW_MS) return;
-    void speakFadi(queued.text);
+    if (!queued) return;
+    // Stale in any of three ways: superseded, stopped, or simply too old to still be what the
+    // person expects to hear.
+    if (queued.generation !== generation || Date.now() - queued.at > GESTURE_WINDOW_MS) {
+      queued.el.pause();
+      queued.release();
+      return;
+    }
+    audioEl = queued.el;
+    releaseAudio = queued.release;
+    void queued.el.play().catch(() => {
+      queued.release();
+      if (audioEl === queued.el) audioEl = null;
+    });
   };
+  gestureListener = go;
   window.addEventListener("pointerdown", go);
   window.addEventListener("keydown", go);
 }
@@ -103,6 +144,8 @@ export function stopFadiSpeech(): void {
   }
   releaseAudio?.();
   releaseAudio = null;
+  // Stop means stop: speech waiting on a gesture is cancelled too, not saved for the next click.
+  clearQueuedSpeech();
   if (typeof window !== "undefined" && "speechSynthesis" in window) {
     window.speechSynthesis.cancel();
   }
@@ -214,15 +257,16 @@ export async function speakFadi(text: string): Promise<void> {
           // gesture, so a briefing that speaks on mount can never be heard on a fresh load. The
           // old code fell through to the browser voice and — on a machine with none — blamed the
           // absent Linux speech engine for a policy decision the browser had just made.
-          release();
-          if (ownGeneration !== generation) return;
+          if (ownGeneration !== generation) {
+            release();
+            return;
+          }
+          if (!isAutoplayBlock(error)) release();
           if (isAutoplayBlock(error)) {
-            // The person already asked for Fadi's voice (the preference is on, which is why this
-            // was speaking at all). The browser is not refusing the voice, only refusing it
-            // BEFORE a gesture — so it waits for their next click or keypress instead of being
-            // lost, and instead of the old behaviour: falling through to a browser voice that
-            // does not exist on Linux and blaming the missing speech engine.
-            waitForGesture(clean);
+            // The person already asked for Fadi's voice. The browser is not refusing the voice,
+            // only refusing it BEFORE a gesture — so the audio we already generated waits for
+            // their next click, rather than being thrown away and re-requested.
+            waitForGesture(el, release, ownGeneration);
             emit(false);
             return;
           }

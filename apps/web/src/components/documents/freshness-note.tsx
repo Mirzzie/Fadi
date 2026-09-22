@@ -65,7 +65,9 @@ export function FreshnessNote({
         {pending ? (
           <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
         ) : (
-          "It's up to date"
+          // NOT "it's up to date": nothing has checked whether this document contains the change.
+          // It records that they saw it and kept this version (Codex C15-06).
+          "Keep this version"
         )}
       </button>
     </div>
