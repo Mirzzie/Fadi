@@ -2,7 +2,6 @@
 
 import {
   BriefcaseBusiness,
-  Compass,
   Globe,
   GraduationCap,
   KanbanSquare,
@@ -30,8 +29,9 @@ export type DockApp = { href: string; label: string; icon: LucideIcon; group: Do
 export const DOCK_APPS: DockApp[] = [
   // Start
   { href: "/dashboard", label: "Home", icon: LayoutDashboard, group: "start" },
-  // Orient — where to aim, and what the world is doing
-  { href: "/dashboard/niche-finder", label: "Niche Finder", icon: Compass, group: "orient" },
+  // Orient — Niche Finder is NOT a standing destination. It answers one question ("which path?"),
+  // so it is offered where that question comes up: the direction switcher and the setup guidance.
+  // A permanent icon for a once-or-twice tool is furniture.
   // You — who you are + what you send
   { href: "/dashboard/evidence", label: "Evidence", icon: Layers, group: "you" },
   { href: "/dashboard/portfolio", label: "Portfolio", icon: Globe, group: "you" },
