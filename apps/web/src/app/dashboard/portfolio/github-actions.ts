@@ -7,6 +7,7 @@ import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
 import { buildPortfolioSite, pagesBasePath } from "@/lib/portfolio/build-export";
 import { buildPagesDeployWorkflow, GitHubClient, GitHubError, pagesUrl } from "@/lib/portfolio/github";
+import { MAX_RESTORE_BYTES, readRestorePayload } from "@/lib/portfolio/restore-payload";
 import { toExportItem, toPortfolioView } from "@careeros/portfolio";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 import { decryptSecret, encryptSecret } from "@/lib/security/crypto";
@@ -427,16 +428,17 @@ export async function checkPublishedSite(): Promise<
 }
 
 /**
- * RESTORE THE CMS FROM THE SITE YOU ALREADY PUBLISHED.
+ * RESTORE THE PUBLISHED ITEMS FROM YOUR REPO.
  *
- * "Delete my data" removes the portfolio and warns the owner to export first, or lose the links
- * to every uploaded image. That is a rule to remember at the one moment nobody is thinking about
- * backups — and their site was already a copy, published to their own repo, just not in a form
- * anything could read back (measured: /portfolio.json answered 404 on the live site).
+ * Deliberately narrower than it first read (Codex C15-04). The backup is built from the PUBLISHED
+ * view — published, confirmed items only — so it cannot restore drafts, hidden entries, site
+ * title/headline/theme/resume links, evidence links or confirmation state. Calling that "the
+ * whole CMS" was false, and a public page cannot be made to carry private drafts safely.
  *
- * Every publish now ships `fadi-portfolio.json` — exactly the file Export produces and Import
- * consumes — beside the page. This reads it back. Nothing is guessed: if the published site does
- * not carry the file (published before this existed), it says so rather than half-restoring.
+ * The file is read through the authenticated GitHub Contents API using the stored owner and repo,
+ * not by fetching the Pages URL: a plain fetch follows redirects a user could influence, which
+ * turns reading our own file into an authenticated request-forgery surface. It is then validated
+ * against a strict schema with byte, row, string and link caps before anything is written.
  */
 export async function restoreFromPublishedSite(input: {
   mode: "merge" | "replace";
@@ -445,35 +447,45 @@ export async function restoreFromPublishedSite(input: {
   if (!user) return { ok: false, message: "Please sign in again." };
 
   const row = await createGithubConnectionsRepository(getDatabase()).getByUserId(user.id);
-  const base = row?.pagesUrl?.trim();
-  if (!base) {
+  if (!row?.tokenCiphertext || !row.githubLogin || !row.repo) {
     return {
       ok: false,
       message: "No published site to restore from — connect GitHub and publish once first.",
     };
   }
 
-  const url = `${base.replace(/\/+$/, "")}/fadi-portfolio.json`;
-  let payload: unknown;
+  const { decryptSecret } = await import("@/lib/security/crypto");
+  const token = decryptSecret(row.tokenCiphertext);
+  if (!token) return { ok: false, message: "Reconnect GitHub — the stored token can't be read." };
+
+  let raw: string | null;
   try {
-    const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(20_000) });
-    if (res.status === 404) {
-      return {
-        ok: false,
-        message:
-          "Your published site doesn't carry a backup file yet — publish once more and it will, from then on.",
-      };
-    }
-    if (!res.ok) return { ok: false, message: `Couldn't read your published site (${res.status}).` };
-    payload = await res.json();
-  } catch (error) {
-    logger.warn("portfolio.restore_fetch_failed", {
-      userId: user.id,
-      error: error instanceof Error ? error.message.slice(0, 120) : "unknown",
+    const gh = clientFor(token);
+    raw = await gh.readFile({
+      owner: row.githubLogin,
+      repo: row.repo,
+      path: "public/fadi-portfolio.json",
+      maxBytes: MAX_RESTORE_BYTES,
     });
-    return { ok: false, message: "Couldn't reach your published site just now. Try again." };
+  } catch (error) {
+    logger.warn("portfolio.restore_read_failed", {
+      userId: user.id,
+      error: error instanceof Error ? error.message.slice(0, 160) : "unknown",
+    });
+    return { ok: false, message: "Couldn't read the backup from your repository just now." };
   }
 
+  if (raw === null) {
+    return {
+      ok: false,
+      message:
+        "Your repository doesn't carry a backup file yet — publish once more and it will, from then on.",
+    };
+  }
+
+  const parsed = readRestorePayload(raw);
+  if (!parsed.ok) return { ok: false, message: parsed.message };
+
   const { importPortfolio } = await import("./actions");
-  return importPortfolio({ payload: payload as never, mode: input.mode });
+  return importPortfolio({ payload: parsed.payload as never, mode: input.mode });
 }

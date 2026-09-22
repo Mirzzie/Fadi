@@ -179,7 +179,7 @@ export function PortfolioManager({
         return;
       }
       setNotice(
-        `Restored ${r.imported} item${r.imported === 1 ? "" : "s"} from your published site.` +
+        `Restored ${r.imported} published item${r.imported === 1 ? "" : "s"} from your repository.` +
           (r.heldBack > 0 ? ` ${r.heldBack} looked like work already here and were left out.` : "")
       );
       router.refresh();
@@ -560,13 +560,16 @@ export function PortfolioManager({
       {items.length === 0 && (
         <div className="mb-6 rounded-xl border border-border bg-muted/20 p-4">
           <p className="text-sm font-medium">Published this portfolio before?</p>
+          {/* SAY WHAT IT RESTORES. The backup is built from the PUBLISHED view, so it carries
+              published, confirmed entries and their media links — not drafts, hidden items, your
+              site settings or evidence links. Calling that "everything" was false (C15-04). */}
           <p className="mt-1 text-xs text-muted-foreground">
-            Your site&apos;s repo carries a copy of everything, including the links to your
-            screenshots. Fadi can read it back.
+            Your repository carries the entries that were live when you last published, with their
+            screenshot links. Drafts, hidden entries and your site settings are not in it.
           </p>
           <Button size="sm" variant="outline" className="mt-3" onClick={restore} disabled={pending}>
             {pending ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-            Restore from my published site
+            Restore published items
           </Button>
         </div>
       )}

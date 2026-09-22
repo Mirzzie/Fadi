@@ -181,9 +181,10 @@ export function ProfileForm({
           <p className="mt-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
             Your published site on GitHub Pages keeps serving — Fadi just stops knowing about it.
             Uploaded images stay on Cloudinary. If you have published since this was added, your
-            repo carries <code>fadi-portfolio.json</code> and Portfolio → Import → &ldquo;Restore
-            from my published site&rdquo; brings the whole CMS back, images and all. If you have
-            not, <strong>publish once</strong> (or Portfolio → Export) before deleting.
+            repo carries <code>fadi-portfolio.json</code>, and Portfolio can restore the entries
+            that were <strong>live at that publish</strong> — not drafts, hidden entries or your
+            site settings. For everything else, <strong>Export first</strong> (Portfolio →
+            Export).
           </p>
           {confirming === "data" ? (
             <div className="mt-3 space-y-3">

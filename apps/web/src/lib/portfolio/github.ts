@@ -342,6 +342,37 @@ export class GitHubClient {
   }
 
   /**
+   * Read one file from the repo through the authenticated API.
+   *
+   * Not a plain fetch of the Pages URL: that follows redirects a user could control, which makes
+   * an authenticated request-forgery surface out of what should be a read of our own file
+   * (Codex C15-04). This goes to api.github.com with the stored token and the stored owner/repo.
+   */
+  async readFile(args: {
+    owner: string;
+    repo: string;
+    path: string;
+    maxBytes?: number;
+  }): Promise<string | null> {
+    const { status, data } = await this.request(
+      "GET",
+      `/repos/${args.owner}/${args.repo}/contents/${args.path}`
+    );
+    if (status === 404) return null;
+    if (status !== 200 || !data || typeof data !== "object") {
+      this.fail(status, data, `Could not read ${args.path}.`);
+    }
+    const body = data as { content?: unknown; encoding?: unknown; size?: unknown };
+    const size = typeof body.size === "number" ? body.size : 0;
+    const cap = args.maxBytes ?? 2_000_000;
+    if (size > cap) {
+      throw new GitHubError(413, `${args.path} is ${size} bytes — too large to read back.`);
+    }
+    if (typeof body.content !== "string" || body.encoding !== "base64") return null;
+    return Buffer.from(body.content, "base64").toString("utf8");
+  }
+
+  /**
    * Create or update a file. GitHub's PUT /contents is an upsert but REQUIRES the current
    * blob sha when the path already exists, so we look it up first. Idempotent: publishing
    * twice updates in place instead of erroring.
