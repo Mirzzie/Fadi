@@ -6,7 +6,7 @@ import { ResumeButton } from "./resume-button";
 import { FeedbackForm } from "./feedback-form";
 import { SkillFilter } from "./skill-filter";
 import {
-  caseSkills,
+  caseSkillSlugs,
   hasArtifact,
   pickLead,
   rankCases,
@@ -87,6 +87,9 @@ export function WorkTemplate({
   const lead = pickLead(items);
   const rest = cases.filter((c) => c.id !== lead?.id);
   const skills = skillIndex(items);
+  // The labels the owner lists, so a case can answer to a skill it names and not only to its tag
+  // — the index and the filter have to agree or a chip filters to nothing.
+  const skillLabels = items.filter((i) => i.section === "skill").map((i) => i.title);
   const experience = items.filter((i) => i.section === "experience");
   // Education and certifications are NOT the same class of thing. Rendering a degree
   // in the same list as a one-afternoon job simulation flattens the difference and
@@ -187,7 +190,7 @@ export function WorkTemplate({
             <h2 className="mb-6 font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--pf-ink-3)]">
               {L.featured}
             </h2>
-            <Lead item={lead} href={itemHref(lead.id)} labels={L} />
+            <Lead item={lead} href={itemHref(lead.id)} labels={L} skillLabels={skillLabels} />
           </section>
         ) : null}
 
@@ -210,7 +213,7 @@ export function WorkTemplate({
         {rest.length > 0 ? (
           <section className="grid gap-4 py-10">
             {rest.map((c) => (
-              <Case key={c.id} item={c} href={itemHref(c.id)} labels={L} />
+              <Case key={c.id} item={c} href={itemHref(c.id)} labels={L} skillLabels={skillLabels} />
             ))}
           </section>
         ) : null}
@@ -403,7 +406,17 @@ export function WorkTemplate({
   );
 }
 
-function Lead({ item, href, labels }: { item: PortfolioItemView; href: string; labels: PageLabels }) {
+function Lead({
+  item,
+  href,
+  labels,
+  skillLabels,
+}: {
+  item: PortfolioItemView;
+  href: string;
+  labels: PageLabels;
+  skillLabels: string[];
+}) {
   const { figures } = splitBullets(item.bullets ?? []);
   const leadMedia = [item.imageUrl, ...(item.gallery ?? [])].filter((m): m is string => !!m);
   return (
@@ -411,7 +424,7 @@ function Lead({ item, href, labels }: { item: PortfolioItemView; href: string; l
       data-case
       data-portfolio-item
       data-roles={item.roles.join(" ")}
-      data-skills={caseSkills(item).map(slugify).join(" ")}
+      data-skills={caseSkillSlugs(item, skillLabels).join(" ")}
       className="grid items-start gap-8 py-2 md:grid-cols-[1.05fr_.95fr] md:gap-10"
     >
       <div>
@@ -445,7 +458,17 @@ function Lead({ item, href, labels }: { item: PortfolioItemView; href: string; l
   );
 }
 
-function Case({ item, href, labels }: { item: PortfolioItemView; href: string; labels: PageLabels }) {
+function Case({
+  item,
+  href,
+  labels,
+  skillLabels,
+}: {
+  item: PortfolioItemView;
+  href: string;
+  labels: PageLabels;
+  skillLabels: string[];
+}) {
   const { figures, notes } = splitBullets(item.bullets ?? []);
   const proven = hasArtifact(item);
   // Only career work is held to the evidence standard. A hobby or a side interest
@@ -459,7 +482,7 @@ function Case({ item, href, labels }: { item: PortfolioItemView; href: string; l
       data-case
       data-portfolio-item
       data-roles={item.roles.join(" ")}
-      data-skills={caseSkills(item).map(slugify).join(" ")}
+      data-skills={caseSkillSlugs(item, skillLabels).join(" ")}
       className={`grid overflow-hidden rounded-xl border bg-[var(--pf-surface)] ${
         media.length > 0 ? "md:grid-cols-[300px_1fr]" : ""
       } ${proven ? "border-[var(--pf-line)]" : "border-dashed border-[var(--pf-line)]"}`}

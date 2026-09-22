@@ -122,6 +122,29 @@ export function caseSkills(item: PortfolioItemView): string[] {
  * Skill-section items are included ONLY when the owner's work already mentions them;
  * a skill nothing backs is exactly the assertion this page exists to avoid making.
  */
+
+/** Everything a visitor can read on a case, as one searchable string. */
+function caseText(item: PortfolioItemView): string {
+  return [item.title, item.subtitle, item.description, ...(item.bullets ?? []), item.tag]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+/**
+ * Does this case name that skill?
+ *
+ * Whole words only, so "SOC" does not match "society" and "Go" does not match "going". A
+ * multi-word skill must appear as the phrase — "Server Administration" is not backed by a case
+ * that happens to contain "server" and, elsewhere, "administration".
+ */
+export function mentionsSkill(item: PortfolioItemView, skill: string): boolean {
+  const needle = skill.trim().toLowerCase();
+  if (needle.length < 2) return false;
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, "i").test(caseText(item));
+}
+
 export function skillIndex(items: PortfolioItemView[]): SkillEntry[] {
   const counts = new Map<string, { label: string; count: number }>();
 
@@ -135,12 +158,31 @@ export function skillIndex(items: PortfolioItemView[]): SkillEntry[] {
     }
   }
 
-  // A named skill the owner listed separately gets the nicer label when the work
-  // already backs it — "Ansible" rather than whatever casing a tag happened to use.
+  /**
+   * A SKILL THE WORK NAMES IS BACKED BY THAT WORK.
+   *
+   * Backing used to come only from a case's single `tag` (plus its personas). Measured on the
+   * owner's real site: sixteen listed skills, zero backed, because their tags read "IaC",
+   * "Homelab", "Blue Team" while their skills read "Ansible", "AWS Cloud", "Terraform" — two
+   * vocabularies kept by hand. Worse, a case has ONE tag, so seven projects could never back
+   * sixteen skills however diligently anyone tagged. The page told them to "tag the work that
+   * proves each one", which was not a thing they could do.
+   *
+   * So a case also backs a skill it NAMES — in its title, description or bullets. That is the
+   * same standard the filter promises a visitor: click the skill, read the work that says it.
+   * Nothing here invents a claim; it only notices one the owner already wrote.
+   */
   for (const item of items.filter((i) => i.section === "skill")) {
     const slug = slugify(item.title);
     const found = counts.get(slug);
-    if (found) found.label = item.title;
+    if (found) {
+      // A named skill the owner listed separately gets the nicer label when the work already
+      // backs it — "Ansible" rather than whatever casing a tag happened to use.
+      found.label = item.title;
+      continue;
+    }
+    const named = items.filter((c) => isCase(c) && mentionsSkill(c, item.title)).length;
+    if (named > 0) counts.set(slug, { label: item.title, count: named });
   }
 
   return [...counts.entries()]
@@ -203,4 +245,19 @@ export function labelsFor(theme: Record<string, unknown> | null | undefined): Pa
     out[k] = typeof v === "string" && v.trim() ? v.trim() : DEFAULT_LABELS[k];
   }
   return out;
+}
+
+/**
+ * Every skill slug this case answers to — its own tags, plus the listed skills it names.
+ *
+ * The filter and the index MUST agree. Counting a skill as backed because a case mentions it,
+ * while the case's `data-skills` still carried only its tag, would have produced a skill chip
+ * that filters to nothing — worse than hiding it.
+ */
+export function caseSkillSlugs(item: PortfolioItemView, skillLabels: string[]): string[] {
+  const slugs = new Set(caseSkills(item).map(slugify).filter(Boolean));
+  for (const label of skillLabels) {
+    if (mentionsSkill(item, label)) slugs.add(slugify(label));
+  }
+  return [...slugs].filter(Boolean);
 }

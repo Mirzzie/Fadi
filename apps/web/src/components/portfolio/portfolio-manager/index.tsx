@@ -463,18 +463,28 @@ export function PortfolioManager({
                 record {awaitingArtefact.length === 1 ? "is" : "are"} waiting for proof
               </span>{" "}
               — {awaitingArtefact.slice(0, 4).join(", ")}
-              {awaitingArtefact.length > 4 ? `, +${awaitingArtefact.length - 4} more` : ""}. A
-              project here is a claim with something to show, so Fadi will not publish these as
-              empty entries. Add one with a screenshot or repo link and it goes up.
+              {awaitingArtefact.length > 4 ? `, +${awaitingArtefact.length - 4} more` : ""}. They
+              are in your Evidence and your CV, but a project on this page is a claim with
+              something to show — so Fadi will not publish them as empty entries. Use{" "}
+              <span className="text-foreground">Add project</span> below, paste the write-up and
+              attach a screenshot or repo link.
             </p>
           )}
           {unbacked.length > 0 && (
+            /* SAY WHAT A VISITOR SEES, AND WHAT IS ACTUALLY POSSIBLE. The old wording said "tag
+               the work that proves each one" — but a case carries ONE tag, so seven projects
+               could never back sixteen skills, and the owner reasonably asked what it meant. */
             <p className="text-xs text-muted-foreground">
-              <span className="text-foreground">{unbacked.length} skill{unbacked.length === 1 ? " is" : "s are"} unbacked</span>{" "}
+              <span className="text-foreground">
+                {unbacked.length} skill{unbacked.length === 1 ? "" : "s"} on your list{" "}
+                {unbacked.length === 1 ? "has" : "have"} no work here that shows{" "}
+                {unbacked.length === 1 ? "it" : "them"}
+              </span>{" "}
               — {unbacked.slice(0, 6).join(", ")}
-              {unbacked.length > 6 ? `, +${unbacked.length - 6} more` : ""}. These are hidden from
-              visitors on purpose: a skill no work demonstrates is a claim. Tag the work that proves
-              each one and it appears in the filter.
+              {unbacked.length > 6 ? `, +${unbacked.length - 6} more` : ""}. Visitors don&apos;t see
+              these, because a skill nothing demonstrates is just a claim. A project whose write-up
+              names the skill backs it automatically — so either add work that shows it, mention it
+              in a project you already have, or drop it from the list.
             </p>
           )}
         </div>
