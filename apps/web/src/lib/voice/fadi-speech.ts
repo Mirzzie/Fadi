@@ -21,6 +21,8 @@ const listeners = new Set<Listener>();
 let cloudTtsDown = false;
 // Warn exactly once when the platform has no speech voice at all (common on Linux).
 let warnedNoVoices = false;
+/** The provider's own explanation for refusing the premium voice, when it gave one. */
+let cloudTtsReason: string | null = null;
 
 function emit(next: boolean) {
   if (next === speaking) return;
@@ -92,12 +94,16 @@ function browserFallback(text: string, ownGeneration: number) {
   if (voice) {
     utterance.voice = voice;
   } else if (!warnedNoVoices && window.speechSynthesis.getVoices().length === 0) {
-    // No system voice at all — the browser will make no sound. Say why, once.
+    // No system voice at all — the browser will make no sound. Say why, once, and lead with the
+    // provider's reason when there is one: "install espeak" is useless advice to someone whose
+    // cloud voice is one click from working.
     warnedNoVoices = true;
     console.warn(
-      "[Fadi] No system text-to-speech voice is available, so Fadi can't speak aloud. " +
-        "On Linux, install a speech engine (e.g. `sudo pacman -S speech-dispatcher espeak-ng`) " +
-        "and restart the browser — or switch on the upcoming local Kokoro voice."
+      cloudTtsReason
+        ? `[Fadi] Fadi can't speak aloud. The premium voice was refused — ${cloudTtsReason} — and this machine has no system voice as a fallback (on Linux: \`sudo pacman -S speech-dispatcher espeak-ng\`, then restart the browser).`
+        : "[Fadi] No system text-to-speech voice is available, so Fadi can't speak aloud. " +
+            "On Linux, install a speech engine (e.g. `sudo pacman -S speech-dispatcher espeak-ng`) " +
+            "and restart the browser — or run a local Kokoro voice (FADI_TTS_LOCAL_BASE)."
     );
   }
   utterance.rate = 1.0;
@@ -161,8 +167,16 @@ export async function speakFadi(text: string): Promise<void> {
         return;
       }
       // A hard non-OK (e.g. 503: no/expired TTS key) means the cloud voice is
-      // unavailable this session — don't retry it every time.
+      // unavailable this session — don't retry it every time. Keep WHY: the provider's own
+      // message is the only thing that tells the person what to do about it, and it used to be
+      // thrown away in favour of advice about installing a Linux speech engine.
       cloudTtsDown = true;
+      cloudTtsReason = await res
+        .json()
+        .then((body: { reason?: string; provider?: string }) =>
+          body?.reason ? `${body.provider ? `${body.provider}: ` : ""}${body.reason}` : null
+        )
+        .catch(() => null);
     } catch {
       if (ownGeneration !== generation) return;
       releaseAudio?.();

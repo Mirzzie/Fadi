@@ -3,9 +3,9 @@ import { logger } from "@/lib/observability/logger";
 import { consumeAiSpendLimit } from "@/lib/security/ai-spend";
 import { synthesizeFadiSpeech } from "@/lib/voice/tts";
 
-/** Fadi's premium voice — neural TTS from the user's Groq/OpenAI key. Returns
- *  audio, or 503 when no capable key is set (the client falls back to the browser
- *  voice, so Fadi always speaks). */
+/** Fadi's premium voice — neural TTS from the user's Groq/OpenAI key. Returns audio, or a 503
+ *  carrying the provider's OWN reason (the client falls back to the browser voice and can say
+ *  what actually went wrong instead of guessing). */
 export async function POST(req: Request) {
   const user = await getCurrentAuthUser();
   if (!user) return new Response("Unauthorized", { status: 401 });
@@ -35,10 +35,31 @@ export async function POST(req: Request) {
 
   try {
     const out = await synthesizeFadiSpeech(user.id, text);
-    if (!out) return new Response("No TTS provider", { status: 503 });
-    return new Response(out.audio, {
-      headers: { "Content-Type": out.contentType, "Cache-Control": "no-store" },
-    });
+    if (out && "audio" in out) {
+      return new Response(out.audio, {
+        headers: { "Content-Type": out.contentType, "Cache-Control": "no-store" },
+      });
+    }
+
+    // SAY WHAT THE PROVIDER SAID. A generic 503 sent the owner to install a Linux speech engine
+    // when their cloud voice was one terms-acceptance click from working.
+    const failures = out?.failures ?? [];
+    if (failures.length > 0) {
+      logger.warn("fadi.speak.unavailable", {
+        userId: user.id,
+        attempts: failures.map((f) => `${f.provider} ${f.status}: ${f.reason}`).join(" | "),
+      });
+    }
+    return Response.json(
+      {
+        error: "no_voice",
+        reason:
+          failures[0]?.reason ??
+          "No text-to-speech provider is configured. Add an OpenAI or Groq key in Settings → AI.",
+        provider: failures[0]?.provider ?? null,
+      },
+      { status: 503 }
+    );
   } catch (err) {
     logger.error("fadi.speak.failed", {
       userId: user.id,
