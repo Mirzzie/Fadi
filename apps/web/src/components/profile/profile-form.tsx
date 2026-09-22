@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { CheckCircle2, Loader2, Trash2, UserX, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { CvUpload } from "@/components/profile/cv-upload";
+import Link from "next/link";
 import { FadiGuardianCallout } from "@/components/workspace/fadi-guardian-callout";
 import { evaluateDeleteAllData } from "@/lib/guardian/guardian";
 import { cn } from "@/lib/utils";
@@ -20,12 +20,10 @@ const EXPERIENCE_LEVELS = ["entry", "mid", "senior", "lead", "principal"];
 export function ProfileForm({
   email,
   initial,
-  directionLabel,
 }: {
   email: string;
   initial: UpdateProfileInput;
   /** The active direction's name — the resume below belongs to IT. */
-  directionLabel?: string | null;
 }) {
   const [form, setForm] = useState<UpdateProfileInput>(initial);
   const [pending, startTransition] = useTransition();
@@ -120,46 +118,18 @@ export function ProfileForm({
             className={inputCls}
           />
         </Field>
-        <Field label="Imported career history — LinkedIn">
-          <p className="-mt-0.5 text-xs text-muted-foreground">
-            Paste your About and experience, or upload a LinkedIn PDF export. This is source
-            material: after saving, use Evidence to review the records extracted from it. New
-            documents use your selected evidence, not this text directly.
-          </p>
-          <CvUpload
-            label="Upload LinkedIn PDF export"
-            onExtracted={(text) => set("linkedInText", text)}
-          />
-          <textarea
-            value={form.linkedInText}
-            onChange={(e) => set("linkedInText", e.target.value)}
-            rows={6}
-            placeholder="Paste your LinkedIn About + experience here, or upload the PDF above."
-            className={cn(inputCls, "h-auto py-2")}
-          />
-        </Field>
-        <Field
-          label={
-            directionLabel
-              ? `Imported resume — your “${directionLabel}” direction`
-              : "Imported resume / CV"
-          }
-        >
-          <p className="-mt-0.5 text-xs text-muted-foreground">
-            Keep a CV from Fadi or another tool here for this direction. After saving, add its
-            records through Evidence and review any conflicts. Choose Auto, Include or Exclude
-            there, and use &ldquo;Keep my description&rdquo; for wording you want preserved in a new
-            résumé. Saving an imported CV does not overwrite your approved career records.
-          </p>
-          <CvUpload onExtracted={(text) => set("resumeText", text)} />
-          <textarea
-            value={form.resumeText}
-            onChange={(e) => set("resumeText", e.target.value)}
-            rows={8}
-            placeholder="Upload your CV above, or paste the text here."
-            className={cn(inputCls, "h-auto py-2 font-mono text-xs")}
-          />
-        </Field>
+        {/* THE CV LIVES IN ONE PLACE. Two boxes here stored text that did nothing until the
+            person pressed a button on another screen — which is how a saved CV and an empty
+            record existed side by side. Intake is Evidence; this page is who you are and how to
+            reach you. */}
+        <p className="rounded-lg border border-dashed border-border/70 p-3 text-xs text-muted-foreground">
+          Your CV and career history live in{" "}
+          <Link href="/dashboard/evidence" className="text-foreground underline underline-offset-2">
+            Evidence
+          </Link>
+          . Drop it there once and Fadi reads it into records you can check — documents, your
+          portfolio and interview prep all draw on those.
+        </p>
 
         {status ? (
           <div

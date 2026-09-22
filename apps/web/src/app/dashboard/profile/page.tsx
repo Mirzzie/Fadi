@@ -13,7 +13,6 @@ import {
   createCareerProfilesRepository,
   createLinkedInProfilesRepository,
   createProfilesRepository,
-  createResumesRepository,
 } from "@careeros/database";
 
 export const metadata: Metadata = { title: "Profile" };
@@ -24,13 +23,11 @@ export default async function ProfilePage() {
   if (!user) redirect("/auth/sign-in");
 
   const db = getDatabase();
-  // Active direction first, so the form shows THIS direction's resume (LinkedIn
-  // history stays shared across directions).
+  // The CV is no longer edited here — intake is Evidence — so the résumé row is not loaded.
   const careerProfile = await createCareerProfilesRepository(db).getActiveForUser(user.id);
-  const [profile, linkedIn, resume] = await Promise.all([
+  const [profile, linkedIn] = await Promise.all([
     createProfilesRepository(db).getByUserId(user.id),
     createLinkedInProfilesRepository(db).getLatestForUser(user.id),
-    createResumesRepository(db).getLatestForTrack(user.id, careerProfile?.id ?? null),
   ]);
   // Gate on the profile we already loaded — no second profiles round-trip.
   if (onboardingStatusOf(profile) !== "completed") redirect("/onboarding");
@@ -64,7 +61,6 @@ export default async function ProfilePage() {
 
         <ProfileForm
           email={user.email ?? ""}
-          directionLabel={careerProfile?.label ?? careerProfile?.targetRole ?? null}
           initial={{
             fullName: profile?.fullName ?? "",
             targetRole: careerProfile?.targetRole ?? "",
@@ -72,8 +68,6 @@ export default async function ProfilePage() {
             experienceLevel: careerProfile?.experienceLevel ?? "",
             careerGoal: careerProfile?.careerGoal ?? "",
             linkedInUrl: linkedIn?.profileUrl ?? "",
-            linkedInText: linkedIn?.rawText ?? "",
-            resumeText: resume?.parsedText ?? resume?.rawText ?? "",
           }}
         />
 

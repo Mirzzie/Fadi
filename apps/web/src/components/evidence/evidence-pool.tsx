@@ -19,9 +19,12 @@ const KINDS = ["experience", "project", "achievement", "skill", "education"] as 
 export function EvidencePool({
   track,
   ranked,
+  hasStoredHistory = false,
 }: {
   track: { role: string; domain: string | null } | null;
   ranked: RankedEvidence[];
+  /** A CV or LinkedIn text is already on file — so the screen can say what is missing. */
+  hasStoredHistory?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -29,6 +32,7 @@ export function EvidencePool({
   const [reviewVersion, setReviewVersion] = useState(0);
   const [notice, setNotice] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | "new" | null>(null);
+  const [capturing, setCapturing] = useState(false);
 
   function build() {
     setError(null);
@@ -72,16 +76,32 @@ export function EvidencePool({
         </p>
       </header>
 
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" onClick={build} disabled={pending}>
-          <Wand2 className="size-4" aria-hidden="true" />
-          {ranked.length > 0 ? "Add more from my history" : "Build from my history"}
-        </Button>
-        <Button size="sm" variant="outline" onClick={() => setEditing("new")} disabled={pending}>
-          <Plus className="size-4" aria-hidden="true" />
-          Add an item
-        </Button>
-      </div>
+      {/* ONE DOOR. There used to be two verbs here — "Build from my history" (which read a CV
+          saved on another screen) and "Add an item" — plus a third upload box below, and a CV
+          could sit saved with nothing built from it. Adding history IS the same box either way,
+          so the buttons open it rather than doing a different thing. */}
+      {ranked.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={() => setCapturing((v) => !v)} disabled={pending}>
+            <Wand2 className="size-4" aria-hidden="true" />
+            Add more history
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setEditing("new")} disabled={pending}>
+            <Plus className="size-4" aria-hidden="true" />
+            Add one by hand
+          </Button>
+        </div>
+      ) : null}
+      {capturing && ranked.length > 0 ? (
+        <HistoryCapture
+          title="Add more of your history"
+          onSaved={() => {
+            setCapturing(false);
+            setError(null);
+            build();
+          }}
+        />
+      ) : null}
       {notice ? <p role="status" className="text-sm text-muted-foreground">{notice}</p> : null}
       {error ? (
         <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm">{error}</p>
@@ -97,19 +117,38 @@ export function EvidencePool({
       ) : null}
 
       {ranked.length === 0 && editing !== "new" ? (
-        <div className="space-y-4">
-          <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-            No evidence yet. Build it from your real history, or add an item by hand. Review imported details before using them in career documents.
-          </p>
-          {/* Capture history HERE rather than sending the user to Profile and back —
-              building the pool needs a CV, and that round-trip was the one real
-              navigation deflection in this flow. */}
-          <HistoryCapture
-            onSaved={() => {
-              setError(null);
-              build();
-            }}
-          />
+        <div className="space-y-3">
+          {hasStoredHistory ? (
+            /* A CV saved with nothing built from it was the commonest broken state: the text was
+               on file, the record was empty, and every other screen quietly had nothing to work
+               with. Say that plainly, and make the fix one button. */
+            <div className="rounded-lg border border-border/70 bg-muted/20 p-4">
+              <p className="text-sm font-medium">Your CV is saved — Fadi hasn&apos;t read it yet.</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Reading it turns it into records you can check and correct. Everything else —
+                documents, your portfolio, interview prep — works from those records, not from the
+                CV text.
+              </p>
+              <Button size="sm" className="mt-3" onClick={build} disabled={pending}>
+                <Wand2 className="size-4" aria-hidden="true" />
+                {pending ? "Reading your CV…" : "Read it and build my record"}
+              </Button>
+            </div>
+          ) : (
+            <HistoryCapture
+              onSaved={() => {
+                setError(null);
+                build();
+              }}
+            />
+          )}
+          <button
+            type="button"
+            onClick={() => setEditing("new")}
+            className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+          >
+            Or add one item by hand
+          </button>
         </div>
       ) : (
         <ul className="space-y-3">

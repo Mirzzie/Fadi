@@ -72,8 +72,9 @@ export type UpdateProfileInput = {
   experienceLevel: string;
   careerGoal: string;
   linkedInUrl: string;
-  linkedInText: string;
-  resumeText: string;
+  /** Legacy: Profile no longer carries imported text — intake is Evidence. */
+  linkedInText?: string;
+  resumeText?: string;
 };
 
 export async function updateProfileAction(input: UpdateProfileInput): Promise<Result> {
@@ -107,7 +108,7 @@ export async function updateProfileAction(input: UpdateProfileInput): Promise<Re
     // them editable here too. Only touch them when the user provided something,
     // so saving the basic fields never wipes an existing import.
     const linkedInUrl = input.linkedInUrl.trim();
-    const linkedInText = input.linkedInText.trim();
+    const linkedInText = (input.linkedInText ?? "").trim();
     if (linkedInUrl || linkedInText) {
       // Keep the pasted history before it replaces what is stored — see lib/career/sources.ts.
       // Preserved and replaced together: a failed history write must not cost the person the
@@ -123,7 +124,7 @@ export async function updateProfileAction(input: UpdateProfileInput): Promise<Re
       );
     }
 
-    const resumeText = input.resumeText.trim();
+    const resumeText = (input.resumeText ?? "").trim();
     if (resumeText) {
       await preserveThenReplace(
         user.id,
