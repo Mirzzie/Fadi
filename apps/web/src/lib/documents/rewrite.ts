@@ -4,7 +4,7 @@ import { HUMANIZE_CORE, HUMANIZE_PROSE, HUMANIZE_RESUME } from "@/lib/documents/
 import { parseResume, serializeResume } from "@/lib/documents/resume";
 import { resumeImportSchema, toResumeData } from "@/lib/documents/resume-schema";
 import type { BackedRecords } from "@/lib/documents/backed-records";
-import { explicitRemovals, restoreDropped } from "@/lib/documents/revision-guard";
+import { restoreDropped } from "@/lib/documents/revision-guard";
 
 /**
  * THE REWRITE ITSELF, kept out of the server-action file.
@@ -64,17 +64,17 @@ Rules that override the instruction:
     ...e,
     bullets: e.bullets.split("\n").filter(Boolean),
   }));
+  // Nothing the instruction says can delete a role, a qualification or a project: a bullet-level
+  // request ("cut one bullet from the IT Support Consultant job") must not license removing the
+  // job (Codex C15-02). Deleting an entry stays a deliberate act in the editor.
   const experiences = restoreDropped(currentExperiences, revised.experiences, ["company", "title"], {
     backed: scope.backed.experiences,
-    removable: explicitRemovals(scope.instruction, currentExperiences, ["company", "title"]),
   });
   const education = restoreDropped(data.education, revised.education, ["school", "degree"], {
     backed: scope.backed.education,
-    removable: explicitRemovals(scope.instruction, data.education, ["school", "degree"]),
   });
   const projects = restoreDropped(data.projects, revised.projects, ["title"], {
     backed: scope.backed.projects,
-    removable: explicitRemovals(scope.instruction, data.projects, ["title"]),
   });
 
   const next = toResumeData(

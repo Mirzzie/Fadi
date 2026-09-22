@@ -75,16 +75,27 @@ export function planEvidenceSync<T extends SyncCandidate>(
     if (options.have.has(candidate.evidenceItemId)) return;
     if (dismissed.has(factOf(candidate.evidenceItemId))) return;
 
+    /**
+     * WRITING A FOREIGN KEY NEEDS PROOF, NOT A HUNCH. (Codex C15-03.)
+     *
+     * The first version linked on the best `findSameThings` result with `requireAnchor: false`,
+     * where 0.55 can come from nothing but shared vocabulary — Codex reproduced two different
+     * jobs scoring exactly that on "Windows, systems, networks, cloud". A wrong link is not the
+     * cheap error I called it: it writes provenance that is false and then hides the record from
+     * every future sync, permanently.
+     *
+     * So a link needs deterministic identity: the CMS's own section-scoped lexical match
+     * (section + organisation + years + title), or an exact-fields verdict from the resolver.
+     * A weaker resemblance decides nothing here — the record is simply left to the person.
+     */
     const lexical = options.sameEntry
       ? existing.find((entry) => options.sameEntry!(candidate, entry))
       : undefined;
     const me = identity(candidate, `candidate-${index}`);
-    // Loose on purpose: the costs are not symmetric. A wrong match means one record is not copied
-    // onto a public page and can still be added by hand; a missed match publishes their work twice.
-    const best = findSameThings([me, ...entries], undefined, { requireAnchor: false })
-      .filter((m) => m.a === me.id || m.b === me.id)
+    const exact = findSameThings([me, ...entries])
+      .filter((m) => (m.a === me.id || m.b === me.id) && m.verdict === "same")
       .sort((a, b) => b.score - a.score)[0];
-    const matchedId = lexical?.id ?? (best ? (best.a === me.id ? best.b : best.a) : null);
+    const matchedId = lexical?.id ?? (exact ? (exact.a === me.id ? exact.b : exact.a) : null);
 
     if (!matchedId) {
       create.push(candidate);

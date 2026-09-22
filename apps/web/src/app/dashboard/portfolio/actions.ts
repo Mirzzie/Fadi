@@ -136,8 +136,10 @@ export async function loadPortfolio(): Promise<
     if (dismissed.has(factOfEvidence.get(r.evidenceItemId) ?? r.evidenceItemId)) return false;
     if (items.some((x) => isSameEntry(r, x))) return false;
     const me = asIdentity(r, `seed-${idx}`);
-    return !findSameThings([me, ...itemIdentities], undefined, { requireAnchor: false }).some(
-      (m) => m.a === me.id || m.b === me.id
+    // Same proof standard as the link itself (C15-03): a resemblance must not quietly remove a
+    // record from the count of work that is genuinely not on the site.
+    return !findSameThings([me, ...itemIdentities]).some(
+      (m) => (m.a === me.id || m.b === me.id) && m.verdict === "same"
     );
   }).length;
 
@@ -163,6 +165,9 @@ export async function loadPortfolio(): Promise<
         },
         `waiting-${index}`
       );
+      // An advisory can be generous: naming a project that is arguably already shown is a
+      // sentence, not a mutation. This stays loose on purpose, and says "waiting for proof"
+      // rather than asserting the work is missing.
       return !findSameThings([me, ...itemIdentities], undefined, { requireAnchor: false }).some(
         (m) => m.a === me.id || m.b === me.id
       );

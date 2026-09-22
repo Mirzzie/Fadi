@@ -65,8 +65,6 @@ function sameEntry(a: Entry, b: Entry, keys: readonly string[]): boolean {
 export type GuardScope = {
   /** Entries the person's own record supports — a rewrite may introduce these. */
   backed?: Entry[];
-  /** Identities the instruction explicitly asked to remove. */
-  removable?: string[];
 };
 
 /**
@@ -99,18 +97,14 @@ export function restoreDropped<T extends Entry>(
     return false;
   });
 
-  const removable = new Set((scope.removable ?? []).map((id) => id.toLowerCase()));
   const restored: string[] = [];
+  // Kept in the shape for callers and notes; a rewrite can no longer remove a structured entry,
+  // so this is always empty (see explicitRemovals below).
   const removed: string[] = [];
   const merged = [...kept];
   before.forEach((entry, index) => {
     if (kept.some((surviving) => sameEntry(entry, surviving, keys))) return;
     const id = identityOf(entry, keys) || "an entry without a title";
-    if (removable.has(id.toLowerCase())) {
-      // They asked for this one to go, by name. Removing it is the instruction, not a loss.
-      removed.push(id);
-      return;
-    }
     restored.push(id);
     // Back where it was, as far as the shortened list allows.
     merged.splice(Math.min(index, merged.length), 0, entry);
@@ -135,35 +129,24 @@ export function restoredNote(restored: string[]): string {
 }
 
 /**
- * Which entries did the instruction explicitly ask to remove?
+ * A SENTENCE IS NOT AUTHORITY TO DELETE A JOB.
  *
- * Free text, so this is deliberately narrow: a removal verb AND the entry named. "Drop the
- * Deloitte role" removes that role; "make it shorter", "cut the fluff" and "trim the bullets"
- * remove nothing, because shortening prose is not deleting history. Anything this does not
- * recognise falls back to the safe behaviour — the entry is restored.
+ * This used to read a removal verb plus the employer's name as permission to drop the whole
+ * structured entry. Codex reproduced what that licenses (C15-02):
+ *
+ *   "Remove Linux from the Spark Technomedia role"     → the entire role could be deleted
+ *   "Cut one bullet from the IT Support Consultant job" → the entire job could be deleted
+ *
+ * Both are bullet-level edits. If the model dropped the role while carrying them out, the guard
+ * accepted the omission — which is the exact failure the guard was built after: a rewrite
+ * silently removing an employer from someone's real history.
+ *
+ * So no free text removes a role, a project or a qualification any more. Deleting an entry is
+ * something the person does in the editor, where it is visible and reversible. The function is
+ * kept as a documented refusal rather than deleted, so nobody wires this back up by accident.
  */
-const REMOVAL = /\b(drop|remove|delete|cut|take\s+out|get\s+rid\s+of|leave\s+out|omit)\b/i;
-
-export function explicitRemovals<T extends Entry>(
-  instruction: string,
-  before: T[],
-  keys: readonly string[]
-): string[] {
-  if (!REMOVAL.test(instruction)) return [];
-  const asked = instruction.toLowerCase();
-  const out: string[] = [];
-  for (const entry of before) {
-    const id = identityOf(entry, keys);
-    if (!id) continue;
-    // Each part on its own — "Deloitte · Analyst" is never typed that way, but "the Deloitte
-    // job" and "the analyst role" both name it.
-    const named = keys
-      .map((key) => String(entry[key] ?? "").trim().toLowerCase())
-      .filter((part) => part.length > 3)
-      .some((part) => asked.includes(part));
-    if (named) out.push(id);
-  }
-  return out;
+export function explicitRemovals(): string[] {
+  return [];
 }
 
 /** What to say when the rewrite worked in something from their record. */

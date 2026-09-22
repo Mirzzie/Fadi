@@ -101,7 +101,10 @@ describe("rewriteResume", () => {
     expect(result.invented).toEqual(["kubernetes platform at google"]);
   });
 
-  it("S2-R2: removes the job they asked to drop by name", async () => {
+  it("C15-02: asking to drop a job in prose does NOT remove it", async () => {
+    // Codex reproduced what the old rule licensed: "Cut one bullet from the IT Support Consultant
+    // job" gave the model authority to delete the whole role — the very failure this guard exists
+    // for. Removing an entry stays something the person does in the editor.
     const result = await rewriteResume(
       model({ ...baseRevision, experiences: [] }),
       currentResume(),
@@ -109,9 +112,9 @@ describe("rewriteResume", () => {
       { instruction: "Drop the Crozaint Technologies job", backed: NO_BACKED_RECORDS }
     );
 
-    expect(parseResume(result.content).experiences).toHaveLength(0);
-    expect(result.removed).toEqual(["crozaint technologies · it support specialist"]);
-    expect(result.restored).toEqual([]);
+    expect(parseResume(result.content).experiences).toHaveLength(1);
+    expect(result.restored).toEqual(["crozaint technologies · it support specialist"]);
+    expect(result.removed).toEqual([]);
   });
 
   it("still restores a job dropped without being asked for", async () => {

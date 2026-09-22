@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import type { Database } from "../client";
 import {
@@ -142,10 +142,19 @@ export function createPortfolioRepository(db: Database) {
       id: string,
       evidenceItemId: string
     ): Promise<PortfolioItem | null> {
+      // COMPARE-AND-SET. Two tabs can both read a null link; an unconditional write let the
+      // second overwrite the first, which the comment above claimed could not happen (Codex
+      // C15-03). Only an entry that still has no link is attached.
       const [updated] = await db
         .update(portfolioItems)
         .set({ evidenceItemId, updatedAt: new Date() })
-        .where(and(eq(portfolioItems.id, id), eq(portfolioItems.userId, userId)))
+        .where(
+          and(
+            eq(portfolioItems.id, id),
+            eq(portfolioItems.userId, userId),
+            isNull(portfolioItems.evidenceItemId)
+          )
+        )
         .returning();
       return updated ?? null;
     },

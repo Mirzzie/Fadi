@@ -104,28 +104,39 @@ export async function updateProfileAction(input: UpdateProfileInput): Promise<Re
     // stale sync window (synonyms were cleared in the repo when it changed).
     await invalidateJobSync(input.targetRole.trim());
 
-    // LinkedIn URL + context and resume text are the richest AI inputs — keep
-    // them editable here too. Only touch them when the user provided something,
-    // so saving the basic fields never wipes an existing import.
+    /**
+     * OMITTED IS NOT EMPTY. (Codex C15-01 — a live data-loss path I introduced.)
+     *
+     * Profile stopped carrying the imported LinkedIn text when intake moved to Evidence, but it
+     * still submits the LinkedIn URL. The old branch read the absent text as "", wrote
+     * rawText: null over the stored history, and skipped preservation because the content was
+     * empty — losing exactly what S2-R1 exists to protect, on an ordinary Save.
+     *
+     * A field the form does not send is a field the person is not editing.
+     */
     const linkedInUrl = input.linkedInUrl.trim();
+    const linkedInEdited = typeof input.linkedInText === "string";
     const linkedInText = (input.linkedInText ?? "").trim();
-    if (linkedInUrl || linkedInText) {
+    if (linkedInUrl || linkedInEdited) {
+      const existing = linkedInEdited
+        ? null
+        : await createLinkedInProfilesRepository(db).getLatestForUser(user.id);
+      const rawText = linkedInEdited ? linkedInText || null : (existing?.rawText ?? null);
       // Keep the pasted history before it replaces what is stored — see lib/career/sources.ts.
-      // Preserved and replaced together: a failed history write must not cost the person the
-      // text it was meant to keep (see lib/career/sources.ts).
       await preserveThenReplace(
         user.id,
-        { sourceKind: "linkedin", sourceKey: "self", content: linkedInText },
+        { sourceKind: "linkedin", sourceKey: "self", content: rawText ?? "" },
         (tx) =>
           createLinkedInProfilesRepository(tx).upsertLatestForUser(user.id, {
             profileUrl: linkedInUrl || null,
-            rawText: linkedInText || null,
+            rawText,
           })
       );
     }
 
+    // Same rule for the résumé: only a field the form actually sent is an edit.
     const resumeText = (input.resumeText ?? "").trim();
-    if (resumeText) {
+    if (typeof input.resumeText === "string" && resumeText) {
       await preserveThenReplace(
         user.id,
         { sourceKind: "resume", sourceKey: activeTrack?.id ?? "no-direction", content: resumeText },
