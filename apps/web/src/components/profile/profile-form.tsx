@@ -174,11 +174,16 @@ export function ProfileForm({
             <strong>Your login stays</strong>, so you can sign back in and start fresh. This
             can&apos;t be undone.
           </p>
+          {/* WHAT IS ACTUALLY RECOVERABLE. This used to hand the owner a rule to remember at the
+              one moment nobody thinks about backups. Their site is published to their own repo,
+              and every publish now ships fadi-portfolio.json beside the page — the same file
+              Import reads — so the repo IS the copy. */}
           <p className="mt-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
             Your published site on GitHub Pages keeps serving — Fadi just stops knowing about it.
-            Uploaded images stay on Cloudinary, but the links to them live here and go with
-            everything else. <strong>Export your portfolio first</strong> (Portfolio → Export) if
-            there is anything in it you would miss.
+            Uploaded images stay on Cloudinary. If you have published since this was added, your
+            repo carries <code>fadi-portfolio.json</code> and Portfolio → Import → &ldquo;Restore
+            from my published site&rdquo; brings the whole CMS back, images and all. If you have
+            not, <strong>publish once</strong> (or Portfolio → Export) before deleting.
           </p>
           {confirming === "data" ? (
             <div className="mt-3 space-y-3">

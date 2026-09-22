@@ -7,7 +7,7 @@ import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
 import { buildPortfolioSite, pagesBasePath } from "@/lib/portfolio/build-export";
 import { buildPagesDeployWorkflow, GitHubClient, GitHubError, pagesUrl } from "@/lib/portfolio/github";
-import { toPortfolioView } from "@careeros/portfolio";
+import { toExportItem, toPortfolioView } from "@careeros/portfolio";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 import { decryptSecret, encryptSecret } from "@/lib/security/crypto";
 
@@ -208,7 +208,16 @@ export async function publishToGithub(input: {
     // the assets are base-path-aware for this repo's Pages URL.
     let siteFiles;
     try {
-      siteFiles = await buildPortfolioSite({ view, basePath: pagesBasePath(login, repoName) });
+      siteFiles = await buildPortfolioSite({
+        view,
+        basePath: pagesBasePath(login, repoName),
+        // The same payload Export produces and Import consumes — see build-export.ts.
+        backup: {
+          version: 1,
+          exported_at: new Date().toISOString(),
+          items: published.items.map(toExportItem),
+        },
+      });
     } catch (e) {
       logger.error("github.export_build_failed", {
         userId: user.id,
@@ -415,4 +424,56 @@ export async function checkPublishedSite(): Promise<
   } catch {
     return { ok: true, data: { url, state: "unknown", message: `Couldn't reach ${url} from here.` } };
   }
+}
+
+/**
+ * RESTORE THE CMS FROM THE SITE YOU ALREADY PUBLISHED.
+ *
+ * "Delete my data" removes the portfolio and warns the owner to export first, or lose the links
+ * to every uploaded image. That is a rule to remember at the one moment nobody is thinking about
+ * backups — and their site was already a copy, published to their own repo, just not in a form
+ * anything could read back (measured: /portfolio.json answered 404 on the live site).
+ *
+ * Every publish now ships `fadi-portfolio.json` — exactly the file Export produces and Import
+ * consumes — beside the page. This reads it back. Nothing is guessed: if the published site does
+ * not carry the file (published before this existed), it says so rather than half-restoring.
+ */
+export async function restoreFromPublishedSite(input: {
+  mode: "merge" | "replace";
+}): Promise<{ ok: true; imported: number; heldBack: number } | { ok: false; message: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  const row = await createGithubConnectionsRepository(getDatabase()).getByUserId(user.id);
+  const base = row?.pagesUrl?.trim();
+  if (!base) {
+    return {
+      ok: false,
+      message: "No published site to restore from — connect GitHub and publish once first.",
+    };
+  }
+
+  const url = `${base.replace(/\/+$/, "")}/fadi-portfolio.json`;
+  let payload: unknown;
+  try {
+    const res = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(20_000) });
+    if (res.status === 404) {
+      return {
+        ok: false,
+        message:
+          "Your published site doesn't carry a backup file yet — publish once more and it will, from then on.",
+      };
+    }
+    if (!res.ok) return { ok: false, message: `Couldn't read your published site (${res.status}).` };
+    payload = await res.json();
+  } catch (error) {
+    logger.warn("portfolio.restore_fetch_failed", {
+      userId: user.id,
+      error: error instanceof Error ? error.message.slice(0, 120) : "unknown",
+    });
+    return { ok: false, message: "Couldn't reach your published site just now. Try again." };
+  }
+
+  const { importPortfolio } = await import("./actions");
+  return importPortfolio({ payload: payload as never, mode: input.mode });
 }

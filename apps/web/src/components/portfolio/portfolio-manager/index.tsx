@@ -168,6 +168,24 @@ export function PortfolioManager({
   function seed() {
     run(() => seedFromEvidence());
   }
+  function restore() {
+    setError(null);
+    setNotice(null);
+    startTransition(async () => {
+      const { restoreFromPublishedSite } = await import("@/app/dashboard/portfolio/github-actions");
+      const r = await restoreFromPublishedSite({ mode: "replace" });
+      if (!r.ok) {
+        setError(r.message);
+        return;
+      }
+      setNotice(
+        `Restored ${r.imported} item${r.imported === 1 ? "" : "s"} from your published site.` +
+          (r.heldBack > 0 ? ` ${r.heldBack} looked like work already here and were left out.` : "")
+      );
+      router.refresh();
+    });
+  }
+
   function sync() {
     setError(null);
     setNotice(null);
@@ -533,6 +551,24 @@ export function PortfolioManager({
           titleOf={(id) => titleById.get(id)}
           onRunAi={runAiCheck}
         />
+      )}
+
+      {/* RESTORE APPEARS WHERE IT IS THE OBVIOUS ACTION, and nowhere else. An empty CMS beside a
+          published site means the data was wiped and the repo still has it — which is exactly
+          when this is worth a click, and exactly when nobody wants to hunt for an export file.
+          With no published site, the action says so instead of the button being hidden. */}
+      {items.length === 0 && (
+        <div className="mb-6 rounded-xl border border-border bg-muted/20 p-4">
+          <p className="text-sm font-medium">Published this portfolio before?</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Your site&apos;s repo carries a copy of everything, including the links to your
+            screenshots. Fadi can read it back.
+          </p>
+          <Button size="sm" variant="outline" className="mt-3" onClick={restore} disabled={pending}>
+            {pending ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+            Restore from my published site
+          </Button>
+        </div>
       )}
 
       {items.length === 0 && (

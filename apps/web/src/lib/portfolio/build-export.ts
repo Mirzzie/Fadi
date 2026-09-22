@@ -1,7 +1,7 @@
 import "server-only";
 
 import { execFile } from "node:child_process";
-import { readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { extname, join, resolve } from "node:path";
 import { promisify } from "node:util";
 
@@ -45,12 +45,31 @@ let buildLock: Promise<unknown> = Promise.resolve();
 export async function buildPortfolioSite(args: {
   view: PortfolioView;
   basePath: string;
+  /**
+   * THE PUBLISHED SITE CARRIES ITS OWN BACKUP.
+   *
+   * Delete-my-data wipes the portfolio, and the warning told the owner to export first or lose
+   * the links to their Cloudinary images — a rule they had to remember, at the one moment they
+   * are least likely to. Their site was already published to a repo, but as built HTML: the data
+   * existed nowhere machine-readable (verified: /portfolio.json answered 404).
+   *
+   * Every publish now writes the import file beside the page, so the repo IS the copy and
+   * restoring is reading a URL rather than hoping a download happened months ago.
+   */
+  backup?: unknown;
 }): Promise<ExportedFile[]> {
   const run = buildLock.then(async () => {
     const dir = exportAppDir();
 
     // Bake the user's published data in — the export reads this JSON at build time.
     writeFileSync(join(dir, "src", "data", "portfolio.json"), JSON.stringify(args.view));
+
+    // …and ship the import file itself, so the published repo can restore the CMS.
+    if (args.backup) {
+      // The export app has no public/ of its own — Next copies whatever is there into out/.
+      mkdirSync(join(dir, "public"), { recursive: true });
+      writeFileSync(join(dir, "public", "fadi-portfolio.json"), JSON.stringify(args.backup));
+    }
 
     // On Windows npx is `npx.cmd`; execFile doesn't go through a shell, so the bare "npx"
     // would throw ENOENT. Use the platform-correct binary name.
