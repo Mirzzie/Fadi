@@ -31,3 +31,24 @@ describe("readableAiError", () => {
     expect(readableAiError(undefined)).toContain("couldn't run");
   });
 });
+
+/**
+ * A FAILED CHECK MUST NOT READ AS A CLEAN ONE.
+ *
+ * The owner's panel said "Fadi found no contradictions, timeline errors, or duplicates" with
+ * "Fadi's AI answered in a shape Fadi couldn't read" directly beneath it. Two sentences, one
+ * claiming a result and one admitting there wasn't one.
+ */
+describe("what the panel is allowed to claim", () => {
+  it("has a distinct line for 'the AI check did not complete'", async () => {
+    const source = await import("node:fs").then((fs) =>
+      fs.readFileSync(
+        new URL("../../components/portfolio/portfolio-manager/integrity-panel.tsx", import.meta.url),
+        "utf8"
+      )
+    );
+    // The clean claim is gated on there being no error note.
+    expect(source).toMatch(/aiNote\s*\?[\s\S]{0,200}did not complete/);
+    expect(source).toMatch(/:\s*aiRan[\s\S]{0,120}found no contradictions/);
+  });
+});

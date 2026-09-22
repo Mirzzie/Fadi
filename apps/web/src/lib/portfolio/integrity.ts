@@ -64,13 +64,35 @@ export async function checkPortfolioIntegrityAI(
     bullets: it.bullets,
   }));
 
-  try {
-    const raw = await gen.structured(
+  /**
+   * ONE RETRY, ON LESS.
+   *
+   * The owner hit "answered in a shape Fadi couldn't read" on a 29-item portfolio while the same
+   * check passed on a smaller one. Reasoning models spend completion tokens before they answer,
+   * so a long payload can truncate the JSON mid-object — which is a size problem wearing a
+   * schema problem's clothes. If the first pass cannot be read, ask again over fewer entries
+   * rather than reporting a failure to someone who cannot act on it.
+   */
+  const ask = (limit: number) =>
+    gen.structured(
       SYSTEM,
-      `Portfolio entries (JSON):\n${JSON.stringify(payload).slice(0, 14_000)}`,
+      `Portfolio entries (JSON):\n${JSON.stringify(payload.slice(0, limit)).slice(0, 14_000)}`,
       schema,
       "portfolio_integrity",
     );
+
+  try {
+    let raw: Awaited<ReturnType<typeof ask>>;
+    try {
+      raw = await ask(payload.length);
+    } catch (first) {
+      logger.info("portfolio.integrity_ai_retry", {
+        userId,
+        items: payload.length,
+        error: first instanceof Error ? first.message.slice(0, 120) : "unknown",
+      });
+      raw = await ask(Math.max(8, Math.ceil(payload.length / 2)));
+    }
     const ids = new Set(items.map((i) => i.id));
     const findings: IntegrityFinding[] = (raw.findings ?? [])
       .filter((f) => f.title?.trim() && f.detail?.trim())

@@ -102,9 +102,14 @@ export function IntegrityPanel({
 
       {clean ? (
         <p className="mt-2 text-xs text-muted-foreground">
-          {aiRan
-            ? "Fadi found no contradictions, timeline errors, or duplicates."
-            : "No duplicates found. Run Fadi AI for a deeper check of contradictions and timeline logic."}
+          {/* A FAILED CHECK IS NOT A CLEAN ONE. The owner saw "Fadi found no contradictions"
+              sitting directly above "Fadi's AI answered in a shape Fadi couldn't read" — the
+              panel asserting a result and admitting it had none, in the same breath. */}
+          {aiNote
+            ? "The deterministic duplicate check found nothing. The deeper AI check did not complete — see below."
+            : aiRan
+              ? "Fadi found no contradictions, timeline errors, or duplicates."
+              : "No duplicates found. Run Fadi AI for a deeper check of contradictions and timeline logic."}
         </p>
       ) : (
         <ul className="mt-3 space-y-2">
