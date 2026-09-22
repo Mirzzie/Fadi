@@ -9,7 +9,8 @@ import { revalidatePath } from "next/cache";
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
-import { preserveCareerSource } from "@/lib/career/sources";
+import { preserveThenReplace } from "@/lib/career/sources";
+import { logger } from "@/lib/observability/logger";
 import { publish } from "@/lib/events/bus";
 import { extractEvidencePool, normKind, toEvidenceView, type EvidenceView } from "@/lib/evidence/pool";
 
@@ -41,12 +42,23 @@ export async function saveResumeTextAction(
   // KEEP WHAT ARRIVED. The résumé row is overwritten per direction, so the previous text used to
   // vanish — and with it any chance of telling a later import's new work from its rewording.
   // Identical text reuses its version, so re-saving does not manufacture history.
-  await preserveCareerSource(user.id, {
-    sourceKind: "resume",
-    sourceKey: activeTrack?.id ?? "no-direction",
-    content: resumeText,
-  });
-  await createResumesRepository(db).upsertLatestForTrack(user.id, activeTrack?.id ?? null, resumeText);
+  try {
+    await preserveThenReplace(
+      user.id,
+      { sourceKind: "resume", sourceKey: activeTrack?.id ?? "no-direction", content: resumeText },
+      (tx) =>
+        createResumesRepository(tx).upsertLatestForTrack(user.id, activeTrack?.id ?? null, resumeText)
+    );
+  } catch (error) {
+    logger.error("evidence.resume_save_failed", {
+      userId: user.id,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return {
+      ok: false,
+      message: "Couldn't save that — your previous CV text is untouched. Try again.",
+    };
+  }
   revalidatePath(PATH);
   return { ok: true };
 }

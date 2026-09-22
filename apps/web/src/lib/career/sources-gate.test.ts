@@ -27,6 +27,15 @@ import { describe, expect, it } from "vitest";
  */
 const GENERATED = ["src/lib/career/track-resume.ts"];
 
+/**
+ * Both ways of keeping a source count here.
+ *
+ * `preserveCareerSource` is for doors that ADD; `preserveThenReplace` is for doors that overwrite
+ * stored text, where preservation and replacement are one transaction (Codex's S2-R1: catching
+ * the failure and overwriting anyway is how the previous text disappears with nothing kept).
+ */
+const PRESERVES = "preserve(CareerSource|ThenReplace)\\(";
+
 /** Files that store imported career text, each of which must preserve a version of it. */
 const DOORS = [
   "src/app/onboarding/actions.ts",
@@ -55,19 +64,19 @@ describe("every imported source is kept before it can be overwritten", () => {
     const writers = grep(
       "create(Resumes|LinkedInProfiles)Repository\\([^)]*\\)[\\s\\S]{0,40}\\.(createForUser|upsertLatest(ForTrack|ForUser))\\(|resumesRepository\\.createForUser\\(|linkedInProfilesRepository\\.createForUser\\("
     );
-    const preserving = new Set([...grep("preserveCareerSource\\("), ...GENERATED]);
+    const preserving = new Set([...grep(PRESERVES), ...GENERATED]);
     expect(writers.filter((file) => !preserving.has(file))).toEqual([]);
   });
 
   it("has no file-import path that reads a document and keeps no version of it", () => {
     const importers = grep("extractDocumentText\\(|parseJsonResume\\(");
-    const preserving = new Set(grep("preserveCareerSource\\("));
+    const preserving = new Set(grep(PRESERVES));
     expect(importers.filter((file) => !preserving.has(file) && !file.includes("/lib/documents/")))
       .toEqual([]);
   });
 
   it("names the doors it knows about, so a new one is noticed", () => {
-    const preserving = grep("preserveCareerSource\\(").filter((f) => !f.includes("lib/career/sources.ts"));
+    const preserving = grep(PRESERVES).filter((f) => !f.includes("lib/career/sources.ts"));
     expect(preserving.sort()).toEqual([...DOORS].sort());
   });
 });

@@ -12,7 +12,7 @@ import { revalidatePath } from "next/cache";
 import { signOutAction } from "@/app/auth/actions";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
-import { preserveCareerSource } from "@/lib/career/sources";
+import { preserveThenReplace } from "@/lib/career/sources";
 import { invalidateJobSync } from "@/lib/jobs/sync";
 import { detectDocType, extractDocumentText } from "@/lib/documents/extract-text";
 import { logger } from "@/lib/observability/logger";
@@ -110,30 +110,25 @@ export async function updateProfileAction(input: UpdateProfileInput): Promise<Re
     const linkedInText = input.linkedInText.trim();
     if (linkedInUrl || linkedInText) {
       // Keep the pasted history before it replaces what is stored — see lib/career/sources.ts.
-      if (linkedInText) {
-        await preserveCareerSource(user.id, {
-          sourceKind: "linkedin",
-          sourceKey: "self",
-          content: linkedInText,
-        });
-      }
-      await createLinkedInProfilesRepository(db).upsertLatestForUser(user.id, {
-        profileUrl: linkedInUrl || null,
-        rawText: linkedInText || null,
-      });
+      // Preserved and replaced together: a failed history write must not cost the person the
+      // text it was meant to keep (see lib/career/sources.ts).
+      await preserveThenReplace(
+        user.id,
+        { sourceKind: "linkedin", sourceKey: "self", content: linkedInText },
+        (tx) =>
+          createLinkedInProfilesRepository(tx).upsertLatestForUser(user.id, {
+            profileUrl: linkedInUrl || null,
+            rawText: linkedInText || null,
+          })
+      );
     }
 
     const resumeText = input.resumeText.trim();
     if (resumeText) {
-      await preserveCareerSource(user.id, {
-        sourceKind: "resume",
-        sourceKey: activeTrack?.id ?? "no-direction",
-        content: resumeText,
-      });
-      await createResumesRepository(db).upsertLatestForTrack(
+      await preserveThenReplace(
         user.id,
-        activeTrack?.id ?? null,
-        resumeText
+        { sourceKind: "resume", sourceKey: activeTrack?.id ?? "no-direction", content: resumeText },
+        (tx) => createResumesRepository(tx).upsertLatestForTrack(user.id, activeTrack?.id ?? null, resumeText)
       );
     }
 
