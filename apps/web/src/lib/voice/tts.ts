@@ -112,7 +112,7 @@ export async function synthesizeFadiSpeech(
       });
       if (!res.ok) {
         failures.push({
-          provider: spec.base.includes("groq") ? "Groq" : spec.base.includes("openai") ? "OpenAI" : "local",
+          provider: nameOf(spec),
           status: res.status,
           reason: readReason(await res.text().catch(() => "")),
         });
@@ -120,16 +120,23 @@ export async function synthesizeFadiSpeech(
       }
       const audio = await res.arrayBuffer();
       if (audio.byteLength > 0) return { audio, contentType: spec.contentType };
-      failures.push({ provider: spec.model, status: 200, reason: "returned no audio" });
+      failures.push({ provider: nameOf(spec), status: 200, reason: "returned no audio" });
     } catch (error) {
       failures.push({
-        provider: spec.model,
+        provider: nameOf(spec),
         status: 0,
         reason: error instanceof Error ? error.message : "could not be reached",
       });
     }
   }
   return failures.length > 0 ? { failures } : null;
+}
+
+/** What to call this backend when explaining why it did not speak. */
+function nameOf(spec: TtsSpec): string {
+  if (spec.base.includes("groq")) return "Groq";
+  if (spec.base.includes("openai")) return "OpenAI";
+  return `local TTS (${spec.base})`;
 }
 
 /** The provider's message, not its JSON envelope. */

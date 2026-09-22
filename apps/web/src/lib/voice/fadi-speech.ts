@@ -21,6 +21,49 @@ const listeners = new Set<Listener>();
 let cloudTtsDown = false;
 // Warn exactly once when the platform has no speech voice at all (common on Linux).
 let warnedNoVoices = false;
+let warnedAutoplay = false;
+/** Did the browser refuse to play BEFORE a gesture, rather than fail to play at all? */
+export function isAutoplayBlock(error: unknown): boolean {
+  return (
+    error instanceof DOMException &&
+    (error.name === "NotAllowedError" || error.name === "AbortError")
+  );
+}
+
+/** An utterance the browser refused to play before a gesture, waiting for one. */
+let queuedByAutoplay: { text: string; at: number } | null = null;
+let listeningForGesture = false;
+
+/**
+ * Hold a blocked utterance until the person touches the page.
+ *
+ * One page load, one retry, and only while it is still current: a briefing that arrives on load
+ * should be read when they engage, not thirty minutes later over something else.
+ */
+const GESTURE_WINDOW_MS = 60_000;
+
+function waitForGesture(text: string): void {
+  queuedByAutoplay = { text, at: Date.now() };
+  if (!warnedAutoplay) {
+    warnedAutoplay = true;
+    console.info(
+      "[Fadi] The browser holds audio until you interact with the page — Fadi will speak on your next click."
+    );
+  }
+  if (listeningForGesture || typeof window === "undefined") return;
+  listeningForGesture = true;
+  const go = () => {
+    window.removeEventListener("pointerdown", go);
+    window.removeEventListener("keydown", go);
+    listeningForGesture = false;
+    const queued = queuedByAutoplay;
+    queuedByAutoplay = null;
+    if (!queued || Date.now() - queued.at > GESTURE_WINDOW_MS) return;
+    void speakFadi(queued.text);
+  };
+  window.addEventListener("pointerdown", go);
+  window.addEventListener("keydown", go);
+}
 /** The provider's own explanation for refusing the premium voice, when it gave one. */
 let cloudTtsReason: string | null = null;
 
@@ -163,8 +206,28 @@ export async function speakFadi(text: string): Promise<void> {
         };
         el.onended = done;
         el.onerror = done;
-        await el.play(); // may reject if autoplay isn't unlocked → fall through
-        return;
+        try {
+          await el.play();
+          return;
+        } catch (error) {
+          // AUTOPLAY, NOT A MISSING VOICE. Chromium refuses sound until the page has had a
+          // gesture, so a briefing that speaks on mount can never be heard on a fresh load. The
+          // old code fell through to the browser voice and — on a machine with none — blamed the
+          // absent Linux speech engine for a policy decision the browser had just made.
+          release();
+          if (ownGeneration !== generation) return;
+          if (isAutoplayBlock(error)) {
+            // The person already asked for Fadi's voice (the preference is on, which is why this
+            // was speaking at all). The browser is not refusing the voice, only refusing it
+            // BEFORE a gesture — so it waits for their next click or keypress instead of being
+            // lost, and instead of the old behaviour: falling through to a browser voice that
+            // does not exist on Linux and blaming the missing speech engine.
+            waitForGesture(clean);
+            emit(false);
+            return;
+          }
+          throw error;
+        }
       }
       // A hard non-OK (e.g. 503: no/expired TTS key) means the cloud voice is
       // unavailable this session — don't retry it every time. Keep WHY: the provider's own

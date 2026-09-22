@@ -99,3 +99,21 @@ describe("speech interruption owns pending generation as well as playback", () =
     expect(speech.isFadiSpeaking()).toBe(true);
   });
 });
+
+/**
+ * AUTOPLAY IS NOT A MISSING VOICE.
+ *
+ * Measured on the owner's machine after the premium voice started working: the briefing speaks on
+ * mount, Chromium refuses audio before a gesture, and the old code fell through to a browser
+ * voice that does not exist on Linux — then blamed the absent speech engine. The person saw a
+ * console warning telling them to install espeak for a problem the browser had just created.
+ */
+describe("speech blocked before a gesture", () => {
+  it("is told apart from having no voice at all", async () => {
+    const { isAutoplayBlock } = await import("./fadi-speech");
+    expect(isAutoplayBlock(new DOMException("play() failed", "NotAllowedError"))).toBe(true);
+    expect(isAutoplayBlock(new DOMException("aborted", "AbortError"))).toBe(true);
+    expect(isAutoplayBlock(new DOMException("boom", "NotSupportedError"))).toBe(false);
+    expect(isAutoplayBlock(new Error("network"))).toBe(false);
+  });
+});

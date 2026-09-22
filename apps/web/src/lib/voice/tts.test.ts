@@ -77,3 +77,33 @@ describe("synthesizeFadiSpeech", () => {
     }
   });
 });
+
+describe("which failure the person is shown", () => {
+  it("prefers the backend that answered over one that could not be reached", async () => {
+    // Measured: FADI_TTS_LOCAL_BASE points at a Kokoro server that is not running, so it fails
+    // first with "fetch failed" — which would have masked Groq's actual, actionable message.
+    mocks.configs.mockResolvedValue([{ id: "groq", apiKey: "gsk-test" }]);
+    process.env.FADI_TTS_LOCAL_BASE = "http://localhost:8880/v1";
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValueOnce(new Error("fetch failed"))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: { message: "requires terms acceptance" } }), {
+          status: 400,
+        })
+      );
+    try {
+      const { synthesizeFadiSpeech } = await import("./tts");
+      const out = await synthesizeFadiSpeech("user-1", "Hello.");
+      if (!out || !("failures" in out)) throw new Error("expected failures");
+      expect(out.failures).toHaveLength(2);
+      expect(out.failures[0].status).toBe(0); // the unreachable local server
+      const told = out.failures.find((f) => f.status > 0);
+      expect(told?.provider).toBe("Groq");
+      expect(told?.reason).toContain("terms acceptance");
+    } finally {
+      fetchSpy.mockRestore();
+      delete process.env.FADI_TTS_LOCAL_BASE;
+    }
+  });
+});

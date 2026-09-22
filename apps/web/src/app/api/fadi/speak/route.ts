@@ -50,13 +50,18 @@ export async function POST(req: Request) {
         attempts: failures.map((f) => `${f.provider} ${f.status}: ${f.reason}`).join(" | "),
       });
     }
+    // THE INFORMATIVE FAILURE, NOT THE FIRST ONE. A local Kokoro server that is configured but
+    // not running fails before anything else is tried, and "fetch failed" would have masked the
+    // provider that actually answered and said what to do about it.
+    const told = failures.find((f) => f.status > 0) ?? failures[0];
     return Response.json(
       {
         error: "no_voice",
         reason:
-          failures[0]?.reason ??
+          told?.reason ??
           "No text-to-speech provider is configured. Add an OpenAI or Groq key in Settings → AI.",
-        provider: failures[0]?.provider ?? null,
+        provider: told?.provider ?? null,
+        attempts: failures.length,
       },
       { status: 503 }
     );
