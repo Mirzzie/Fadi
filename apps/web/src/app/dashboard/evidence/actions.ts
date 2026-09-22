@@ -2,6 +2,7 @@
 
 import {
   createCareerProfilesRepository,
+  createEvidenceArtifactsRepository,
   createEvidenceRepository,
   createResumesRepository,
 } from "@careeros/database";
@@ -84,6 +85,7 @@ export async function saveEvidence(input: {
   detail?: string;
   metrics?: string;
   tags: string[];
+  artifactUrls?: string[];
 }): Promise<{ ok: true; item: EvidenceView } | { ok: false; message: string }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
@@ -107,6 +109,28 @@ export async function saveEvidence(input: {
     ? await repo.update(user.id, input.id, fields)
     : (await admitEvidence(user.id, { ...fields, origin: "manual" })).row;
   if (!row) return { ok: false, message: "I can't find that item." };
+
+  const artifactUrls = [...new Set((input.artifactUrls ?? [])
+    .map((url) => url.trim())
+    .filter((url) => /^https?:\/\//i.test(url))
+  )].slice(0, 20);
+  if (artifactUrls.length > 0 && row.isCanonical && row.reviewStatus === "accepted") {
+    await createEvidenceArtifactsRepository(getDatabase()).addForFact(
+      user.id,
+      row.factId ?? row.id,
+      artifactUrls.map((url, index) => ({
+        kind: /(\.mp4|\.webm|\.mov)(\?|$)|\/video\/upload\//i.test(url)
+          ? "video"
+          : /(\.png|\.jpe?g|\.gif|\.webp|\.svg)(\?|$)|\/image\/upload\//i.test(url)
+            ? "image"
+            : "link",
+        url,
+        label: "Media",
+        sortOrder: index,
+        sourcePortfolioItemId: null,
+      }))
+    );
+  }
   await publish("evidence.changed", {
     userId: user.id,
     reason: input.id ? "updated" : "created",
@@ -114,6 +138,18 @@ export async function saveEvidence(input: {
   });
   revalidatePath(PATH);
   return { ok: true, item: toEvidenceView(row) };
+}
+
+export async function removeEvidenceArtifact(input: {
+  id: string;
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  const removed = await createEvidenceArtifactsRepository(getDatabase()).remove(user.id, input.id);
+  if (!removed) return { ok: false, message: "That media item is unavailable." };
+  await publish("evidence.changed", { userId: user.id, reason: "updated" });
+  revalidatePath(PATH);
+  return { ok: true };
 }
 
 export async function deleteEvidence(input: { id: string }): Promise<{ ok: boolean }> {

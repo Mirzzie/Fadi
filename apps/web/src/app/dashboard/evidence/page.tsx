@@ -5,6 +5,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { EvidencePool } from "@/components/evidence/evidence-pool";
 import {
   createCareerProfilesRepository,
+  createEvidenceArtifactsRepository,
   createLinkedInProfilesRepository,
   createResumesRepository,
 } from "@careeros/database";
@@ -30,17 +31,31 @@ export default async function EvidencePage() {
   // question in that state, so it asks the database rather than showing a generic empty box.
   const db = getDatabase();
   const activeTrack = await createCareerProfilesRepository(db).getActiveForUser(user.id);
-  const [resume, linkedIn] = await Promise.all([
+  const [resume, linkedIn, artifacts] = await Promise.all([
     createResumesRepository(db).getLatestForTrack(user.id, activeTrack?.id ?? null),
     createLinkedInProfilesRepository(db).getLatestForUser(user.id),
+    createEvidenceArtifactsRepository(db).listForUser(user.id),
   ]);
+  const rankedWithArtifacts = ranked.map((entry) => ({
+    ...entry,
+    item: {
+      ...entry.item,
+      artifacts: artifacts
+        .filter((artifact) => artifact.factId === (entry.item.factId ?? entry.item.id))
+        .map(({ id, kind, url, label }) => ({ id, kind, url, label })),
+    },
+  }));
   const hasStoredHistory = Boolean(
     (resume?.parsedText ?? resume?.rawText ?? "").trim() || (linkedIn?.rawText ?? "").trim()
   );
 
   return (
     <AppShell>
-      <EvidencePool track={track} ranked={ranked} hasStoredHistory={hasStoredHistory} />
+      <EvidencePool
+        track={track}
+        ranked={rankedWithArtifacts}
+        hasStoredHistory={hasStoredHistory}
+      />
     </AppShell>
   );
 }

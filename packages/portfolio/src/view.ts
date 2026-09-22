@@ -159,23 +159,10 @@ export function toPortfolioView(site: PortfolioSite, items: PortfolioItem[]): Po
   return { site: toSiteView(site), items: items.map(toItemView) };
 }
 
-/**
- * WHICH RECORDS BELONG ON A PUBLIC PAGE, AND WHERE.
- *
- * A portfolio PROJECT is a claim with proof attached — a screenshot, a diagram, a repo, a
- * write-up. An evidence record carries none of those: the table has no url, no image, nothing an
- * artefact could live in. So a project seeded from evidence is, by construction, an entry with
- * nothing to show — and the owner ended up with five of them standing beside the real ones they
- * had built, screenshots and all.
- *
- * Experience, education, certifications and skills are different: nobody expects a screenshot of
- * a job, and those sections read as a record, not as a showcase. Those seed.
- *
- * Projects do not. A record that describes project work stays in Evidence (where the résumé and
- * interview prep already use it) and is named on the portfolio page as work without an artefact
- * yet — which is a sentence, not a duplicate entry.
- */
+/** One career record, projected into the section that presents that kind of fact. */
 const EVIDENCE_SECTION: Record<string, string> = {
+  project: "project",
+  achievement: "achievement",
   experience: "experience",
   education: "education",
   certification: "certification",

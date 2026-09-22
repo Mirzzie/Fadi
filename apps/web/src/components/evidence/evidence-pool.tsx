@@ -2,17 +2,18 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Layers, Pencil, Plus, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { ExternalLink, ImagePlus, Layers, Loader2, Pencil, Plus, Sparkles, Trash2, Wand2, X } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { buildEvidencePool, deleteEvidence, saveEvidence } from "@/app/dashboard/evidence/actions";
+import { buildEvidencePool, deleteEvidence, removeEvidenceArtifact, saveEvidence } from "@/app/dashboard/evidence/actions";
 import { RenderingsPanel } from "./renderings-panel";
 import { SameThingPanel } from "./same-thing-panel";
 import { HistoryCapture } from "@/components/evidence/history-capture";
 import type { EvidenceView, RankedEvidence } from "@/lib/evidence/pool";
+import { mediaUploadConfigured, uploadPortfolioMedia } from "@/lib/portfolio/upload";
 
 // Certification became a first-class kind when imports started classifying it; leaving it out
 // here meant an imported certificate worked and a hand-added one could not be classified at all.
@@ -66,6 +67,14 @@ export function EvidencePool({
   function remove(id: string) {
     startTransition(async () => {
       await deleteEvidence({ id });
+      router.refresh();
+    });
+  }
+
+  function removeArtifact(id: string) {
+    startTransition(async () => {
+      const result = await removeEvidenceArtifact({ id });
+      if (!result.ok) setError(result.message);
       router.refresh();
     });
   }
@@ -184,6 +193,7 @@ export function EvidencePool({
                 trackRole={track?.role ?? ""}
                 onEdit={() => setEditing(r.item.id)}
                 onRemove={() => remove(r.item.id)}
+                onRemoveArtifact={removeArtifact}
               />
             ),
           )}
@@ -199,12 +209,14 @@ function EvidenceCard({
   trackRole,
   onEdit,
   onRemove,
+  onRemoveArtifact,
 }: {
   ranked: RankedEvidence;
   hasTrack: boolean;
   trackRole: string;
   onEdit: () => void;
   onRemove: () => void;
+  onRemoveArtifact: (id: string) => void;
 }) {
   const { item, score, matched } = ranked;
   return (
@@ -234,6 +246,21 @@ function EvidenceCard({
 
       {item.detail ? <p className="mt-2 text-sm text-foreground/90">{item.detail}</p> : null}
       {item.metrics ? <p className="mt-1 text-sm text-primary">{item.metrics}</p> : null}
+
+      {(item.artifacts ?? []).length > 0 ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {(item.artifacts ?? []).map((artifact) => (
+            <span key={artifact.id} className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs">
+              <a href={artifact.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
+                {artifact.label || artifact.kind}<ExternalLink className="size-3" aria-hidden="true" />
+              </a>
+              <button type="button" onClick={() => onRemoveArtifact(artifact.id)} className="text-muted-foreground hover:text-destructive" aria-label={"Remove " + (artifact.label || artifact.kind)}>
+                <X className="size-3" aria-hidden="true" />
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
 
       {item.tags.length > 0 ? (
         <div className="mt-2 flex flex-wrap gap-1">
@@ -274,6 +301,7 @@ function EvidenceEditor({
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [form, setForm] = useState({
     kind: String(item?.kind ?? "experience"),
     title: item?.title ?? "",
@@ -282,6 +310,7 @@ function EvidenceEditor({
     detail: item?.detail ?? "",
     metrics: item?.metrics ?? "",
     tags: (item?.tags ?? []).join(", "),
+    artifactUrls: (item?.artifacts ?? []).map((artifact) => artifact.url).join("\n"),
   });
 
   function submit() {
@@ -296,10 +325,27 @@ function EvidenceEditor({
         detail: form.detail,
         metrics: form.metrics,
         tags: form.tags.split(",").map((t) => t.trim()).filter(Boolean),
+        artifactUrls: form.artifactUrls.split("\n").map((url) => url.trim()).filter(Boolean),
       });
       if (!res.ok) return setError(res.message);
       onSaved();
     });
+  }
+
+  async function uploadMedia(event: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (files.length === 0) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const urls = await Promise.all(files.map((file) => uploadPortfolioMedia(file)));
+      setForm((current) => ({ ...current, artifactUrls: [current.artifactUrls, ...urls].filter(Boolean).join("\n") }));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Upload failed.");
+    } finally {
+      setUploading(false);
+    }
   }
 
   return (
@@ -325,9 +371,20 @@ function EvidenceEditor({
       <Field label="Tags (skills/domains, comma-separated — these power per-track relevance)">
         <Input value={form.tags} onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))} placeholder="e.g. patient care, triage, leadership" />
       </Field>
+      <Field label="Media or source links (optional, one URL per line)">
+        <Textarea rows={2} value={form.artifactUrls} onChange={(e) => setForm((f) => ({ ...f, artifactUrls: e.target.value }))} placeholder="Repository, write-up, screenshot or video URL" />
+      </Field>
+      {mediaUploadConfigured() ? (
+        <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-input px-3 py-2 text-xs hover:bg-muted">
+          {uploading ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
+          {uploading ? "Uploading…" : "Upload images or video"}
+          <input type="file" accept="image/*,video/*" multiple className="sr-only" onChange={uploadMedia} disabled={uploading} />
+        </label>
+      ) : null}
+      <p className="text-xs text-muted-foreground">Media strengthens a public project but is never required. It stays attached to this Evidence record when the portfolio changes.</p>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <div className="flex gap-2">
-        <Button size="sm" onClick={submit} disabled={pending || !form.title.trim()}>Save</Button>
+        <Button size="sm" onClick={submit} disabled={pending || uploading || !form.title.trim()}>Save</Button>
         <Button size="sm" variant="ghost" onClick={onClose} disabled={pending}>Cancel</Button>
       </div>
     </div>

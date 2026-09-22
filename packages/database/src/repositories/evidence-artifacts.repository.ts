@@ -50,7 +50,15 @@ export function createEvidenceArtifactsRepository(db: DbOrTx) {
         .orderBy(asc(evidenceArtifacts.factId), asc(evidenceArtifacts.sortOrder));
     },
 
-    /** Copy proof from a presentation into the durable fact-owned store. */
+    async remove(userId: string, id: string): Promise<boolean> {
+      const rows = await db
+        .delete(evidenceArtifacts)
+        .where(and(eq(evidenceArtifacts.userId, userId), eq(evidenceArtifacts.id, id)))
+        .returning({ id: evidenceArtifacts.id });
+      return rows.length > 0;
+    },
+
+    /** Copy optional media or links from any intake into the durable fact-owned store. */
     async addForFact(
       userId: string,
       factId: string,

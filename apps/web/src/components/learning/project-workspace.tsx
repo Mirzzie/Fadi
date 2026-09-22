@@ -622,7 +622,6 @@ function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => Prom
 function FinishPanel({ runId, stepsKey }: { runId: string; stepsKey: string }) {
   const [view, setView] = useState<FinishView | null>(null);
   const [summary, setSummary] = useState("");
-  const [skipped, setSkipped] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [busy, start] = useTransition();
 
@@ -665,21 +664,6 @@ function FinishPanel({ runId, stepsKey }: { runId: string; stepsKey: string }) {
         <div className="mt-4">
           <PostComposer runId={runId} />
         </div>
-      </section>
-    );
-  }
-
-  if (skipped) {
-    return (
-      <section className="rounded-2xl border border-border bg-card p-5">
-        <p className="font-semibold">Project complete.</p>
-        <button
-          type="button"
-          onClick={() => setSkipped(false)}
-          className="mt-1 text-sm text-muted-foreground hover:text-foreground hover:underline"
-        >
-          Save it as evidence after all
-        </button>
       </section>
     );
   }
@@ -733,9 +717,6 @@ function FinishPanel({ runId, stepsKey }: { runId: string; stepsKey: string }) {
         >
           {busy ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Check aria-hidden="true" />}
           Save as evidence
-        </Button>
-        <Button variant="ghost" disabled={busy} onClick={() => setSkipped(true)}>
-          Finish without evidence
         </Button>
       </div>
       {note ? <p className="mt-2 text-xs text-destructive">{note}</p> : null}

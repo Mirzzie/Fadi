@@ -139,8 +139,10 @@ describe("fromExportItem — defensive parsing of untrusted JSON", () => {
 });
 
 describe("seedItemsFromEvidence — the evidence→portfolio projection", () => {
-  it("seeds the sections nobody expects a screenshot of", () => {
+  it("seeds every supported record into its appropriate section", () => {
     const kinds: Array<[EvidenceItem["kind"], string]> = [
+      ["project", "project"],
+      ["achievement", "achievement"],
       ["experience", "experience"],
       ["education", "education"],
       ["certification" as EvidenceItem["kind"], "certification"],
@@ -150,17 +152,6 @@ describe("seedItemsFromEvidence — the evidence→portfolio projection", () => 
       const [seeded] = seedItemsFromEvidence([evidenceItem({ kind })]);
       expect(seeded.section).toBe(section);
     }
-  });
-
-  /**
-   * A PROJECT IS A CLAIM WITH PROOF. An evidence record has no url, no image, no gallery —
-   * nothing an artefact could live in — so a project seeded from one is an entry with nothing to
-   * show. The owner ended up with five of those standing beside the real entries they had built
-   * with screenshots, and was then asked to clean it up by hand.
-   */
-  it("does NOT seed project work — it has no artefact to show", () => {
-    expect(seedItemsFromEvidence([evidenceItem({ kind: "project" })])).toEqual([]);
-    expect(seedItemsFromEvidence([evidenceItem({ kind: "achievement" })])).toEqual([]);
   });
 
   it("drops an unknown kind rather than inventing a section for it", () => {

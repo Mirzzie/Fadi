@@ -32,6 +32,7 @@ const PATH = "/dashboard/portfolio";
 /** Portfolio sections → evidence kinds, so one decision engine serves both. */
 const SECTION_KIND: Record<string, EvidenceKind> = {
   project: "project",
+  achievement: "achievement",
   experience: "experience",
   education: "education",
   // A credential is a credential. Mapping it to "achievement" merged two different things the
@@ -43,6 +44,7 @@ const SECTION_KIND: Record<string, EvidenceKind> = {
 
 const SECTIONS = [
   "project",
+  "achievement",
   "experience",
   "education",
   "certification",
@@ -56,6 +58,7 @@ type Result<T> = ({ ok: true } & T) | { ok: false; message: string };
 export type EvidenceProjectOption = {
   id: string;
   factId: string;
+  kind: "project" | "achievement";
   title: string;
   organization: string | null;
   period: string | null;
@@ -111,10 +114,9 @@ export async function loadPortfolio(): Promise<
     handle: string;
     isPublished: boolean;
     items: PortfolioItemView[];
-    /** Proof from Evidence not on the portfolio yet — so the CMS can proactively ask
-     *  the user to pull it in (detect → propose → approve; never auto-mutate). */
-    pendingProof: number;
-    /** One compact reconciliation list for Add proof / Connect / Save to Evidence. */
+    /** Accepted Evidence records not yet represented on the portfolio. */
+    pendingItems: number;
+    /** Project records and any optional media already attached to them. */
     evidenceProjects: EvidenceProjectOption[];
     /** The other direction: live items the record has moved PAST — see lib/portfolio/freshness.ts. */
     drift: {
@@ -139,40 +141,29 @@ export async function loadPortfolio(): Promise<
     ((site.theme as { dismissedFacts?: unknown })?.dismissedFacts as string[] | undefined) ?? []
   );
   const factOfEvidence = new Map(evidence.map((e) => [e.id, e.factId ?? e.id]));
-  // The count must be what Sync would actually ADD, or the nudge outlives the work: records whose
-  // entry is already on the site (worded differently, with the person's own screenshots) are not
-  // missing proof — they are the same proof, and sync links them rather than copying them.
-  const { findSameThings } = await import("@/lib/identity/resolve");
-  const asIdentity = (
-    x: {
-      section: string;
-      title: string;
-      subtitle: string | null;
-      dateRange: string | null;
-      description: string | null;
-      bullets?: string[] | null;
-    },
-    id: string
-  ) => ({
-    id,
-    kind: x.section,
-    title: x.title,
-    organization: x.subtitle,
-    period: x.dateRange,
-    detail: [x.description, ...(x.bullets ?? [])].filter(Boolean).join(" "),
-  });
-  const itemIdentities = items.map((x) => asIdentity(x, x.id));
-  const pendingProof = seedItemsFromEvidence(evidence).filter((r, idx) => {
-    if (have.has(r.evidenceItemId)) return false;
-    if (dismissed.has(factOfEvidence.get(r.evidenceItemId) ?? r.evidenceItemId)) return false;
-    if (items.some((x) => isSameEntry(r, x))) return false;
-    const me = asIdentity(r, `seed-${idx}`);
-    // Same proof standard as the link itself (C15-03): a resemblance must not quietly remove a
-    // record from the count of work that is genuinely not on the site.
-    return !findSameThings([me, ...itemIdentities]).some(
-      (m) => (m.a === me.id || m.b === me.id) && m.verdict === "same"
-    );
-  }).length;
+  // Count through the same planner Sync uses. A count-only reimplementation had already drifted
+  // once and offered work the write path would only link.
+  const { planEvidenceSync } = await import("@/lib/portfolio/sync-plan");
+  const pendingPlan = planEvidenceSync(
+    seedItemsFromEvidence(evidence),
+    items.map((item) => ({
+      id: item.id,
+      evidenceItemId: item.evidenceItemId,
+      section: item.section,
+      title: item.title,
+      subtitle: item.subtitle,
+      dateRange: item.dateRange,
+      description: item.description,
+      bullets: item.bullets,
+    })),
+    {
+      have,
+      dismissed,
+      factOf: (id) => factOfEvidence.get(id) ?? id,
+      sameEntry: (candidate, entry) => isSameEntry(candidate, entry),
+    }
+  );
+  const pendingItems = pendingPlan.create.length;
 
   const linkedItemByEvidence = new Map(
     items
@@ -190,6 +181,7 @@ export async function loadPortfolio(): Promise<
       return {
         id: e.id,
         factId,
+        kind: e.kind as "project" | "achievement",
         title: e.title,
         organization: e.organization,
         period: e.period,
@@ -225,7 +217,7 @@ export async function loadPortfolio(): Promise<
     handle: site.handle,
     isPublished: site.isPublished,
     items: items.map(toItemView),
-    pendingProof,
+    pendingItems,
     evidenceProjects,
     drift,
   };
@@ -395,31 +387,18 @@ export async function syncFromEvidence(): Promise<Result<{ added: number; nearMa
     rows.push(artifact);
     artifactsByFact.set(artifact.factId, rows);
   }
-  const seededProjects = evidence
-    .filter((e) => e.kind === "project" || e.kind === "achievement")
-    .flatMap((e, index) => {
-      const proof = artifactsByFact.get(e.factId ?? e.id) ?? [];
-      if (proof.length === 0) return [];
-      const visual = proof.filter((a) => a.kind === "image" || a.kind === "video");
-      const source = proof.find((a) => a.kind !== "image" && a.kind !== "video");
-      return [
-        {
-          evidenceItemId: e.id,
-          section: "project",
-          title: e.title,
-          subtitle: e.organization,
-          dateRange: e.period,
-          description: e.detail || null,
-          bullets: e.metrics ? [e.metrics] : [],
-          tag: e.tags?.[0] ?? null,
-          sortOrder: (index + 1) * 10,
-          url: source?.url ?? null,
-          imageUrl: visual[0]?.url ?? null,
-          gallery: visual.slice(1).map((a) => a.url),
-        },
-      ];
-    });
-  const seeded = [...seedItemsFromEvidence(evidence), ...seededProjects];
+  const seeded = seedItemsFromEvidence(evidence).map((record) => {
+    const factId = evidence.find((item) => item.id === record.evidenceItemId)?.factId;
+    const media = artifactsByFact.get(factId ?? record.evidenceItemId) ?? [];
+    const visual = media.filter((item) => item.kind === "image" || item.kind === "video");
+    const source = media.find((item) => item.kind !== "image" && item.kind !== "video");
+    return {
+      ...record,
+      url: source?.url ?? null,
+      imageUrl: visual[0]?.url ?? null,
+      gallery: visual.slice(1).map((item) => item.url),
+    };
+  });
 
   // WHAT THE USER ALREADY DECIDED AGAINST.
   //
@@ -433,23 +412,9 @@ export async function syncFromEvidence(): Promise<Result<{ added: number; nearMa
   );
   const factOfEvidence = new Map(evidence.map((e) => [e.id, e.factId ?? e.id]));
 
-  // WORK ALREADY ON THE SITE IS NOT NEW WORK — IT IS THE SAME WORK, WITH THE PROOF ATTACHED.
-  // The decision lives in lib/portfolio/sync-plan.ts, tested against the owner's real titles.
+  // Work already on the site is linked to its record. Work that is genuinely new is created
+  // whether or not it has media; screenshots and links are optional fields on that projection.
   const { planEvidenceSync } = await import("@/lib/portfolio/sync-plan");
-  // Project records never create an entry (they need an artefact a record cannot carry) — but
-  // where the person has already built that entry with their screenshots, the two are the same
-  // work and should be linked, so the entry becomes the proof for the record.
-  const linkOnly = evidence
-    .filter((e) => e.kind === "project" || e.kind === "achievement")
-    .filter((e) => !artifactsByFact.has(e.factId ?? e.id))
-    .map((e) => ({
-      evidenceItemId: e.id,
-      section: "project",
-      title: e.title,
-      subtitle: e.organization,
-      dateRange: e.period,
-      description: e.detail,
-    }));
 
   const plan = planEvidenceSync(
     seeded,
@@ -465,7 +430,6 @@ export async function syncFromEvidence(): Promise<Result<{ added: number; nearMa
     })),
     {
       have,
-      linkOnly,
       dismissed,
       factOf: (id) => factOfEvidence.get(id) ?? id,
       sameEntry: (candidate, entry) => isSameEntry(candidate, entry),
@@ -657,27 +621,16 @@ export async function saveItem(input: {
   const evidence = evidenceItemId
     ? await createEvidenceRepository(db).getForUser(user.id, evidenceItemId)
     : null;
+  const expectedSection = evidence?.kind === "achievement" ? "achievement" : "project";
   if (
     evidenceItemId &&
     (!evidence ||
       !evidence.isCanonical ||
       evidence.reviewStatus !== "accepted" ||
       !["project", "achievement"].includes(evidence.kind) ||
-      section !== "project")
+      section !== expectedSection)
   ) {
-    return { ok: false, message: "Choose an accepted project from your Evidence." };
-  }
-  if (
-    section === "project" &&
-    evidenceItemId &&
-    !fields.imageUrl &&
-    fields.gallery.length === 0 &&
-    !fields.url
-  ) {
-    return {
-      ok: false,
-      message: "Add a screenshot, video, repository or write-up before connecting this project.",
-    };
+    return { ok: false, message: "Choose a matching accepted record from your Evidence." };
   }
 
   let row;
@@ -741,10 +694,6 @@ export async function savePortfolioProjectToEvidence(input: {
     return { ok: false, message: "That portfolio project is unavailable." };
   }
   if (item.evidenceItemId) return { ok: true, evidenceItemId: item.evidenceItemId };
-  if (!item.imageUrl && item.gallery.length === 0 && !item.url) {
-    return { ok: false, message: "Add proof before saving this project to Evidence." };
-  }
-
   const { admitEvidence } = await import("@/lib/identity/admit");
   const admitted = await admitEvidence(user.id, {
     kind: "project",
@@ -894,7 +843,7 @@ export async function deleteItem(input: { id: string }): Promise<Result<{ remove
       await createEvidenceArtifactsRepository(tx).addForFact(
         user.id,
         fact,
-        proofFromPortfolio(item),
+        proofFromPortfolio(item)
       );
       if (!prev.includes(fact)) {
         await createPortfolioRepository(tx).updateSite(user.id, site.id, {

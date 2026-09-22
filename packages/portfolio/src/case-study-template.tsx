@@ -130,18 +130,7 @@ export function CaseStudyTemplate({
               </p>
             ) : null}
           </section>
-        ) : (
-          // The same honesty as the index: an empty case says so.
-          <section className="mt-10 rounded-lg border border-dashed border-[var(--pf-gap)]/50 bg-[var(--pf-gap-soft)] p-4">
-            <span className="mb-1 block font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--pf-gap)]">
-              No artefact yet
-            </span>
-            <p className="m-0 text-[14px] text-[var(--pf-ink-2)]">
-              This case has nothing to show yet — a screenshot, a diagram or a repo would make it
-              evidence rather than a description.
-            </p>
-          </section>
-        )}
+        ) : null}
 
         <footer className="mt-14 border-t border-[var(--pf-line)] pt-6 text-[13px] text-[var(--pf-ink-3)]">
           <Link href={backHref} className="transition-colors hover:text-[var(--pf-ink)]">

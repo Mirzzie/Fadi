@@ -627,15 +627,24 @@ export async function completeStepAction(input: {
   if (!user) return { ok: false };
   const artifact = input.artifact?.trim() || null;
   const { createProjectRunsRepository } = await import("@careeros/database");
-  const updated = await createProjectRunsRepository(getDatabase()).setStepStatus(
-    user.id,
-    input.stepId,
-    {
-      status: "done",
-      artifact,
-      completion: completionFor(artifact),
+  const runs = createProjectRunsRepository(getDatabase());
+  const updated = await runs.setStepStatus(user.id, input.stepId, {
+    status: "done",
+    artifact,
+    completion: completionFor(artifact),
+  });
+
+  // The last completed step closes the loop immediately. saveEvidenceOnce locks the run and makes
+  // this idempotent across retries or two tabs; the summary is derived only from recorded results.
+  if (updated) {
+    const project = await runs.getWithSteps(user.id, updated.runId);
+    if (project?.run.status === "done" && !project.run.evidenceItemId) {
+      const { completionReview } = await import("@/lib/learning/project-review");
+      const { saveProjectEvidenceAction } = await import("./project-finish-actions");
+      const summary = completionReview(project.run.title, project.steps).summary;
+      await saveProjectEvidenceAction({ runId: project.run.id, summary });
     }
-  );
+  }
   return { ok: Boolean(updated) };
 }
 

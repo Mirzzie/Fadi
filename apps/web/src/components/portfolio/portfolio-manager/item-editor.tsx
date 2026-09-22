@@ -116,7 +116,7 @@ export function ItemEditor({
       }
     >
       <div className="space-y-4">
-        {form.section === "project" && (
+        {(form.section === "project" || form.section === "achievement") && (
           <div className="space-y-1.5">
             <Label>Evidence project</Label>
             <select
@@ -126,22 +126,24 @@ export function ItemEditor({
               className="h-8 w-full rounded-lg border border-border bg-background px-2.5 text-sm disabled:opacity-70"
             >
               <option value="">Portfolio only</option>
-              {evidenceProjects.filter((project) => !project.isDismissed).map((project) => (
-                <option
-                  key={project.id}
-                  value={project.id}
-                  disabled={Boolean(project.linkedItemId && project.linkedItemId !== initial.id)}
-                >
-                  {project.title}
-                  {project.linkedItemId && project.linkedItemId !== initial.id
-                    ? " · already connected"
-                    : ""}
-                </option>
-              ))}
+              {evidenceProjects
+                .filter((project) => !project.isDismissed && project.kind === form.section)
+                .map((project) => (
+                  <option
+                    key={project.id}
+                    value={project.id}
+                    disabled={Boolean(project.linkedItemId && project.linkedItemId !== initial.id)}
+                  >
+                    {project.title}
+                    {project.linkedItemId && project.linkedItemId !== initial.id
+                      ? " · already connected"
+                      : ""}
+                  </option>
+                ))}
             </select>
             <p className="text-xs text-muted-foreground">
-              Connect this entry to the real project in Evidence. Its images and links become
-              durable proof for that fact.
+              Connect this entry to its single record in Evidence. Media and links stay with that
+              record and remain optional.
             </p>
           </div>
         )}

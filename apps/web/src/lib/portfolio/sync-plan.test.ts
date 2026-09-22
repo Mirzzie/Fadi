@@ -186,36 +186,31 @@ describe("project records", () => {
   });
 
   it("links the record to the entry that already shows it — same work, different words", () => {
-    const plan = planEvidenceSync([], gallery, {
+    const plan = planEvidenceSync([record("Automated WordPress Deployment on AWS")], gallery, {
       have: new Set(),
-      linkOnly: [record("Automated WordPress Deployment on AWS")],
     });
     expect(plan.create).toEqual([]);
     expect(plan.link.map((l) => l.itemId)).toEqual(["p-wordpress"]);
   });
 
   it("links an identical title without hesitation", () => {
-    const plan = planEvidenceSync([], gallery, {
+    const plan = planEvidenceSync([record("Active Directory & Hybrid IT Network Simulation")], gallery, {
       have: new Set(),
-      linkOnly: [record("Active Directory & Hybrid IT Network Simulation")],
     });
     expect(plan.link.map((l) => l.itemId)).toEqual(["p-ad"]);
   });
 
-  it("does NOT link two projects that share one generic word", () => {
-    const plan = planEvidenceSync([], gallery, {
-      have: new Set(),
-      linkOnly: [record("CI/CD Pipeline for Node.js Application on AWS")],
-    });
+  it("does not link two projects that share one generic word", () => {
+    const candidate = record("CI/CD Pipeline for Node.js Application on AWS");
+    const plan = planEvidenceSync([candidate], gallery, { have: new Set() });
     expect(plan.link).toEqual([]);
+    expect(plan.create).toEqual([candidate]);
   });
 
-  it("never creates a project entry, even with nothing to link to", () => {
-    const plan = planEvidenceSync([], [], {
-      have: new Set(),
-      linkOnly: [record("WhatsApp Forensic Investigation and Evidence Extraction")],
-    });
-    expect(plan).toMatchObject({ create: [], link: [] });
+  it("creates new project work even when it has no media", () => {
+    const candidate = record("WhatsApp Forensic Investigation and Evidence Extraction");
+    const plan = planEvidenceSync([candidate], [], { have: new Set() });
+    expect(plan).toMatchObject({ create: [candidate], link: [] });
   });
 
   it("does not attach a project record to a job", () => {
@@ -230,10 +225,9 @@ describe("project records", () => {
         description: "",
       },
     ];
-    const plan = planEvidenceSync([], jobs, {
-      have: new Set(),
-      linkOnly: [record("Active Directory & Hybrid IT Network Simulation")],
-    });
+    const candidate = record("Active Directory & Hybrid IT Network Simulation");
+    const plan = planEvidenceSync([candidate], jobs, { have: new Set() });
     expect(plan.link).toEqual([]);
+    expect(plan.create).toEqual([candidate]);
   });
 });

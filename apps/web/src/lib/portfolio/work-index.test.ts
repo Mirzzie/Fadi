@@ -74,10 +74,10 @@ describe("the lead case", () => {
     expect(pickLead([old, fresh])?.title).toBe("Fresh");
   });
 
-  it("is null when nothing has an artefact, rather than promoting an empty frame", () => {
+  it("can lead with a useful text-only project because media is optional", () => {
     const bare = item({ title: "Bare", description: "Words only." });
 
-    expect(pickLead([bare])).toBeNull();
+    expect(pickLead([bare])).toBe(bare);
     expect(hasArtifact(bare)).toBe(false);
   });
 

@@ -24,7 +24,7 @@ export default async function PortfolioPage() {
         handle={data.handle}
         isPublished={data.isPublished}
         items={data.items}
-        pendingProof={data.pendingProof}
+        pendingItems={data.pendingItems}
         evidenceProjects={data.evidenceProjects}
         drift={data.drift}
       />

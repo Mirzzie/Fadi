@@ -4,9 +4,8 @@ import type { PortfolioItemView } from "./view";
  * THE LOGIC BEHIND THE WORK-INDEX TEMPLATE.
  *
  * A portfolio is not a shorter résumé. A résumé lists what you *were*; a portfolio
- * shows what you *made*, with the artefact attached. So the unit here is a CASE —
- * context, what you did, the proof, the result — and everything below exists to
- * arrange cases by how well evidenced they are.
+ * explains what you made and what happened. Media and links strengthen a case, but
+ * are optional supporting material rather than an admission requirement.
  *
  * NOTHING IS HARDCODED. The owner will keep adding work for years, so the lead case
  * is chosen, never named; the skill index is derived from whatever words their own
@@ -17,7 +16,7 @@ import type { PortfolioItemView } from "./view";
  */
 
 /** Sections whose items are "work" — the things that can carry proof. */
-const CASE_SECTIONS = new Set(["project", "custom"]);
+const CASE_SECTIONS = new Set(["project", "achievement", "custom"]);
 
 export function isCase(item: PortfolioItemView): boolean {
   return CASE_SECTIONS.has(item.section);
@@ -87,14 +86,11 @@ export function rankCases(items: PortfolioItemView[]): PortfolioItemView[] {
 }
 
 /**
- * The opener. A portfolio should lead with work, not with a name — so this picks the
- * piece that can carry the top of the page, and returns null when nothing can
- * (a brand-new portfolio, or one where nothing has an artefact yet), so the template
- * can fall back rather than promoting an empty frame.
+ * The opener. Media raises a case's score, but a useful written case is still work
+ * and can lead when it is the strongest item available.
  */
 export function pickLead(items: PortfolioItemView[]): PortfolioItemView | null {
-  const lead = rankCases(items)[0];
-  return lead && hasArtifact(lead) ? lead : null;
+  return rankCases(items)[0] ?? null;
 }
 
 export type SkillEntry = { label: string; slug: string; count: number };

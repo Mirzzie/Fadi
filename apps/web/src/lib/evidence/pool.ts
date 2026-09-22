@@ -35,8 +35,16 @@ export type EvidenceKind =
   | "education"
   | "unclassified";
 
+export type EvidenceArtifactView = {
+  id: string;
+  kind: string;
+  url: string;
+  label: string | null;
+};
+
 export type EvidenceView = {
   id: string;
+  factId?: string;
   kind: EvidenceKind;
   title: string;
   organization: string | null;
@@ -48,6 +56,7 @@ export type EvidenceView = {
   /** What the market calls that same real thing ("siem", "incident triage"). */
   marketTags: string[];
   origin: string;
+  artifacts?: EvidenceArtifactView[];
 };
 
 const KINDS: EvidenceKind[] = [
@@ -92,6 +101,7 @@ export function normKind(s?: string | null): EvidenceKind {
 export function toEvidenceView(row: EvidenceItem): EvidenceView {
   return {
     id: row.id,
+    factId: row.factId ?? row.id,
     kind: normKind(row.kind),
     title: row.title,
     organization: row.organization,
@@ -101,6 +111,7 @@ export function toEvidenceView(row: EvidenceItem): EvidenceView {
     tags: Array.isArray(row.tags) ? row.tags : [],
     marketTags: Array.isArray(row.marketTags) ? row.marketTags : [],
     origin: row.origin,
+    artifacts: [],
   };
 }
 

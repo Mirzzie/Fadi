@@ -53,16 +53,6 @@ export function planEvidenceSync<T extends SyncCandidate>(
   candidates: T[],
   existing: ExistingEntry[],
   options: {
-    /**
-     * Records that may be LINKED to an entry but never create one.
-     *
-     * Project work lives here. A project entry needs an artefact the record cannot carry, so
-     * Fadi does not create it — but when the person has already built that entry, with their
-     * screenshots, the record and the entry are the same work and should say so. Linking is what
-     * makes the entry the proof for the record: deleting it is then remembered, evidence changes
-     * flag it, and nothing is ever published twice.
-     */
-    linkOnly?: SyncCandidate[];
     /** Evidence ids already attached to an entry. */
     have: Set<string>;
     /** Facts the person removed from their site on purpose. */
@@ -105,7 +95,15 @@ export function planEvidenceSync<T extends SyncCandidate>(
     const exact = findSameThings([me, ...entries])
       .filter((m) => (m.a === me.id || m.b === me.id) && m.verdict === "same")
       .sort((a, b) => b.score - a.score)[0];
-    const matchedId = lexical?.id ?? (exact ? (exact.a === me.id ? exact.b : exact.a) : null);
+    const namedWork =
+      candidate.section === "project" || candidate.section === "achievement"
+        ? existing.find(
+            (entry) =>
+              entry.section === candidate.section && titlesName(me, identity(entry, entry.id))
+          )
+        : undefined;
+    const matchedId =
+      lexical?.id ?? (exact ? (exact.a === me.id ? exact.b : exact.a) : (namedWork?.id ?? null));
 
     if (!matchedId) {
       create.push(candidate);
@@ -120,34 +118,6 @@ export function planEvidenceSync<T extends SyncCandidate>(
       link.push({ itemId: entry.id, evidenceItemId: candidate.evidenceItemId });
     }
   });
-
-  /**
-   * Link-only records: the same deterministic test, plus titles that NAME the same work.
-   *
-   * "Automated WordPress Deployment on AWS" and "WordPress on AWS + Ansible" are one project
-   * written twice; "CI/CD Pipeline for Node.js" and "DevSecOps Pipeline & Security Monitoring"
-   * share one generic word and are not. Section must match too, so a project is never attached to
-   * a job. Nothing is created here, so the worst case is a visible association on an entry the
-   * person can correct — not a duplicate on their public page.
-   */
-  for (const [index, record] of (options.linkOnly ?? []).entries()) {
-    if (options.have.has(record.evidenceItemId)) continue;
-    if (dismissed.has(factOf(record.evidenceItemId))) continue;
-
-    const me = identity(record, `link-${index}`);
-    const match = existing.find((entry) => {
-      if (entry.section !== record.section) return false;
-      if (options.sameEntry && options.sameEntry(record as T, entry)) return true;
-      return titlesName(me, identity(entry, entry.id));
-    });
-    if (!match) continue;
-
-    alreadyShown += 1;
-    if (!match.evidenceItemId && !claimed.has(match.id)) {
-      claimed.add(match.id);
-      link.push({ itemId: match.id, evidenceItemId: record.evidenceItemId });
-    }
-  }
 
   return { create, link, alreadyShown };
 }

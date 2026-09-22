@@ -4,6 +4,7 @@ import type { PortfolioItemView } from "@careeros/portfolio";
 
 export const SECTION_KEYS = [
   "project",
+  "achievement",
   "experience",
   "education",
   "certification",
@@ -14,6 +15,7 @@ export const SECTION_KEYS = [
 
 export const SECTION_META: Record<string, { label: string; description: string }> = {
   project: { label: "Projects", description: "Case studies & featured work" },
+  achievement: { label: "Achievements", description: "Awards and measurable milestones" },
   experience: { label: "Experience", description: "Jobs, internships, consulting" },
   education: { label: "Education", description: "Degrees & schooling" },
   certification: { label: "Certifications", description: "AWS, security, courses" },
