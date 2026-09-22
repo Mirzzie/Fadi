@@ -144,12 +144,29 @@ export async function loadPortfolio(): Promise<
   // PROJECT WORK THAT IS WAITING ON PROOF, not missing from the site by mistake. A project entry
   // is a claim with an artefact attached, and an evidence record cannot carry one — so these are
   // named here rather than published as entries with nothing to show.
-  const shownTitles = items.map((i) => i.title.toLowerCase().trim());
+  // Measured on the owner's page: "Automated WordPress Deployment on AWS" was listed as waiting
+  // for proof while their entry "WordPress on AWS + Ansible" — the same project, with the
+  // screenshot — sat below it. Same work, named twice, which is the redundancy this whole pass
+  // is about. The check is the one sync uses, so the two panels cannot disagree.
   const awaitingArtefact = evidence
     .filter((e) => e.kind === "project" || e.kind === "achievement")
     .filter((e) => !have.has(e.id))
     .filter((e) => !dismissed.has(e.factId ?? e.id))
-    .filter((e) => !shownTitles.includes(e.title.toLowerCase().trim()))
+    .filter((e, index) => {
+      const me = asIdentity(
+        {
+          section: "project",
+          title: e.title,
+          subtitle: e.organization,
+          dateRange: e.period,
+          description: e.detail,
+        },
+        `waiting-${index}`
+      );
+      return !findSameThings([me, ...itemIdentities], undefined, { requireAnchor: false }).some(
+        (m) => m.a === me.id || m.b === me.id
+      );
+    })
     .map((e) => e.title);
 
   // What is LIVE but no longer matches the record. Read-only: a public page is the owner's, and
@@ -932,11 +949,25 @@ export async function listDismissed(): Promise<Result<{ dismissed: Dismissal[] }
   if (ids.length === 0) return { ok: true, dismissed: [] };
 
   const evidence = await createEvidenceRepository(getDatabase()).listAllForUser(user.id);
-  const dismissed = ids.map((factId) => ({
-    factId,
-    title: evidence.find((e) => (e.factId ?? e.id) === factId)?.title ?? "A removed entry",
-  }));
-  return { ok: true, dismissed };
+  const titleOf = new Map(evidence.map((e) => [e.factId ?? e.id, e.title]));
+
+  // A DISMISSAL FOR A RECORD THAT NO LONGER EXISTS IS NOT A CHOICE, IT IS LITTER.
+  //
+  // The owner's panel showed six chips, four of them "A removed entry · undo" — dismissals whose
+  // facts went with an earlier data reset. Nothing can bring them back, so undo does nothing, and
+  // a list of unnamed rows is just something else to read past. They are dropped here, and the
+  // cleaned list is written back so the panel does not have to keep filtering them out.
+  const live = ids.filter((factId) => titleOf.has(factId));
+  if (live.length !== ids.length) {
+    await createPortfolioRepository(getDatabase()).updateSite(user.id, site.id, {
+      theme: { ...(site.theme as Record<string, unknown>), dismissedFacts: live },
+    });
+  }
+
+  return {
+    ok: true,
+    dismissed: live.map((factId) => ({ factId, title: titleOf.get(factId) ?? "A removed entry" })),
+  };
 }
 
 /**
