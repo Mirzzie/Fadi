@@ -157,6 +157,31 @@ function emit(next: boolean) {
   for (const l of listeners) l(next);
 }
 
+/**
+ * Why Fadi has no voice, when it has none.
+ *
+ * This used to go to the console, where the one person who needed it — the one listening,
+ * hearing nothing — would never look. Fadi went quiet mid-conversation and the reason (a daily
+ * cap on the premium voice, and no system voice on this machine) was three levels down in
+ * devtools. Anything that silences Fadi has to be visible on the screen it went silent on.
+ */
+let voiceProblem: string | null = null;
+const problemListeners = new Set<(problem: string | null) => void>();
+
+function setVoiceProblem(problem: string | null): void {
+  if (voiceProblem === problem) return;
+  voiceProblem = problem;
+  for (const listener of problemListeners) listener(problem);
+}
+
+export function subscribeFadiVoiceProblem(cb: (problem: string | null) => void): () => void {
+  problemListeners.add(cb);
+  cb(voiceProblem);
+  return () => {
+    problemListeners.delete(cb);
+  };
+}
+
 export function subscribeFadiSpeaking(cb: Listener): () => void {
   listeners.add(cb);
   cb(speaking);
@@ -227,6 +252,11 @@ function browserFallback(text: string, ownGeneration: number) {
     // provider's reason when there is one: "install espeak" is useless advice to someone whose
     // cloud voice is one click from working.
     warnedNoVoices = true;
+    setVoiceProblem(
+      cloudTtsReason
+        ? `Fadi has lost its voice: ${cloudTtsReason.slice(0, 200)} This machine has no system voice to fall back on either — on Linux, install speech-dispatcher and espeak-ng, then restart the browser. Fadi still hears you, and everything it says is on screen.`
+        : "This machine has no text-to-speech voice, so Fadi can't speak. It still hears you, and everything it says is on screen."
+    );
     console.warn(
       cloudTtsReason
         ? `[Fadi] Fadi can't speak aloud. The premium voice was refused — ${cloudTtsReason} — and this machine has no system voice as a fallback (on Linux: \`sudo pacman -S speech-dispatcher espeak-ng\`, then restart the browser).`

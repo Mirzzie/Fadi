@@ -73,6 +73,12 @@ export function FadiOrb() {
         ) : null}
 
         {/* What Fadi just heard and said. Already spoken — this is for whoever can see. */}
+        {voice.on && voice.voiceProblem ? (
+          <div className="max-w-[18rem] rounded-2xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200 shadow-xl backdrop-blur-xl">
+            {voice.voiceProblem}
+          </div>
+        ) : null}
+
         {voice.on && (voice.heard || voice.said) ? (
           <div className="max-w-[18rem] rounded-2xl border border-border/60 bg-popover/95 p-3 text-sm shadow-xl backdrop-blur-xl">
             {voice.heard ? <p className="text-muted-foreground">“{voice.heard}”</p> : null}

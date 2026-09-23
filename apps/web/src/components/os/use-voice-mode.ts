@@ -4,7 +4,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useGroqVoice } from "@/lib/voice/use-groq-voice";
-import { primeFadiVoice, speakFadi, stopFadiSpeech } from "@/lib/voice/fadi-speech";
+import {
+  primeFadiVoice,
+  speakFadi,
+  stopFadiSpeech,
+  subscribeFadiVoiceProblem,
+} from "@/lib/voice/fadi-speech";
 import { parseVoiceCommand, VOICE_HELP, type VoiceCommand } from "@/lib/voice/commands";
 import { speakable } from "@/lib/voice/speakable";
 import {
@@ -56,6 +61,9 @@ export function useVoiceMode() {
   // neither speaking nor done — and that is exactly when the loop reopened the microphone and
   // recorded the answer that was about to play.
   const [awaitingSpeech, setAwaitingSpeech] = useState(false);
+  // Shown, not logged: the person who cannot hear Fadi is the last person who will open devtools.
+  const [voiceProblem, setVoiceProblem] = useState<string | null>(null);
+  useEffect(() => subscribeFadiVoiceProblem(setVoiceProblem), []);
   const hasSpoken = useRef(false);
   const lastSaid = useRef("");
   const onRef = useRef(false);
@@ -242,7 +250,7 @@ export function useVoiceMode() {
     say("I'm listening. Say 'what's on today', or ask me for help.");
   }, [on, say, stop]);
 
-  return { on, busy, listening, heard, said, toggle };
+  return { on, busy, listening, heard, said, voiceProblem, toggle };
 }
 
 /** Fadi's own answer to a plain question, as text, so the loop can speak it. */
