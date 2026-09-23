@@ -11,6 +11,7 @@ import { CommandBar } from "./command-bar";
 import { FadiPresenceProvider } from "./fadi-presence";
 import { PendingActionsProvider } from "./pending-actions";
 import { SubNav } from "./sub-nav";
+import { VoiceMode } from "./voice-mode";
 
 /**
  * The chrome that wraps every authenticated screen: a top menu bar, a bottom dock
@@ -79,6 +80,9 @@ function OsShellInner({
       </main>
       <Dock />
       <CommandBar />
+      {/* Hands free: on every authenticated screen, because the session where someone cannot
+          look at the screen is not a session where they can go and find the right page first. */}
+      <VoiceMode />
       <FadiOrb />
     </div>
   );

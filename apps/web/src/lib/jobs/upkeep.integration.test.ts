@@ -91,9 +91,19 @@ suite("retiring dead postings", () => {
     const never = await posting("reed", new Date());
     await repo.setJobLiveness(checked, "live");
 
-    const queue = await repo.listForLivenessSweep(50);
+    const queue = await repo.listForLivenessSweep(500);
     const ids = queue.map((row) => row.id);
     expect(ids).toContain(never);
-    expect(ids.indexOf(never)).toBeLessThan(ids.indexOf(checked));
+
+    // The invariant, not the positions of two rows: nothing already checked may come before
+    // something never checked. Asserting on indexes broke as soon as the table had more rows
+    // than the page — the second id simply was not in it, and -1 compares as "earlier".
+    const firstChecked = queue.findIndex((row) => row.livenessCheckedAt !== null);
+    const lastNever = queue.reduce(
+      (last, row, index) => (row.livenessCheckedAt === null ? index : last),
+      -1
+    );
+    if (firstChecked !== -1 && lastNever !== -1) expect(lastNever).toBeLessThan(firstChecked);
+    if (ids.includes(checked)) expect(ids.indexOf(never)).toBeLessThan(ids.indexOf(checked));
   });
 });
