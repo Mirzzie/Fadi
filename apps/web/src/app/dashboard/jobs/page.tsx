@@ -125,6 +125,12 @@ export default async function JobsPage({
         />
         <JobControlBar
           sources={sourcesHealth.sources}
+          // What each source actually put in front of them, after matching and filtering. A
+          // source's own pull count answers "did the API reply"; this answers "did it help".
+          onBoard={jobs.reduce<Record<string, number>>((counts, job) => {
+            for (const source of job.sources) counts[source] = (counts[source] ?? 0) + 1;
+            return counts;
+          }, {})}
           lastRunAt={sourcesHealth.lastRunAt}
           activeModes={modes}
           activeTypes={types}

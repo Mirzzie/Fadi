@@ -57,8 +57,8 @@ export function JobsShell({
                 </span>
               </h2>
               <p className="text-muted-foreground">
-                Live postings from the connected sources — Google for Jobs, Adzuna, Reed, Jooble,
-                Remotive and more — matched to{" "}
+                Live postings from the sources that cover your market — company career pages,
+                the open web, Jooble, Reed and Fadi&rsquo;s own search — matched to{" "}
                 {activeRole ? (
                   <span className="text-foreground">your active direction: {activeRole}</span>
                 ) : (
@@ -229,7 +229,12 @@ function JobMeta({ job }: { job: RecommendedJob }) {
   );
 }
 
-/** Board names as a person would say them. */
+/**
+ * Board names as a person would say them.
+ *
+ * Retired sources stay in this map on purpose: postings they delivered are still in the
+ * database, and a card reading "arbeitnow" would be worse than one reading "Arbeitnow".
+ */
 function sourceNames(sources: string[]): string {
   const pretty: Record<string, string> = {
     adzuna: "Adzuna",

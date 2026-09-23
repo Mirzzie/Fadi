@@ -24,7 +24,7 @@ type Health =
 // These sources are SCRAPERS gated by a feature flag (FADI_SCRAPER_ENABLED / SCRAPERS_ENABLED)
 // — they take NO API key. Server-side scraping is largely blocked anyway; the browser
 // extension does this in the user's own session instead.
-const SCRAPER_IDS = new Set(["fadi-scraper", "linkedin-guest", "indeed-public"]);
+const SCRAPER_IDS = new Set(["fadi-scraper"]);
 
 function healthOf(s: JobSourceHealth): Health {
   if (!s.configured) return SCRAPER_IDS.has(s.id) ? "off-optin" : "needs-key";
@@ -46,23 +46,43 @@ const DOT: Record<Health, string> = {
 };
 
 const LABEL: Record<Health, string> = {
-  returning: "returning jobs",
-  "live-empty": "no jobs last pull",
-  error: "error last pull",
-  idle: "ready — not searched yet",
+  returning: "answered",
+  "live-empty": "nothing for this search",
+  error: "failed",
+  idle: "not searched yet",
   "needs-key": "needs an API key",
   "off-optin": "off · no key needed",
   "no-coverage": "doesn't cover this country",
 };
 
+/**
+ * What to say about one source, in the order a person cares about it: what it put on your
+ * board, then what it returned, then how it went.
+ *
+ * "Returning jobs" was the old line, and it was the wrong fact. A source can answer with two
+ * hundred postings and put none in front of you — Arbeitnow did exactly that for months before
+ * it was retired — and a row of green dots said everything was fine.
+ */
+function sourceLine(source: JobSourceHealth, onBoard: number, health: Health): string {
+  if (!source.configured || health === "no-coverage") return LABEL[health];
+  const parts: string[] = [];
+  if (onBoard > 0) parts.push(`${onBoard} on your board`);
+  if (source.lastRun) parts.push(`${source.lastRun.count} returned`);
+  parts.push(LABEL[health]);
+  return parts.join(" · ");
+}
+
 export function JobControlBar({
   sources,
+  onBoard = {},
   lastRunAt,
   activeModes,
   activeTypes,
   autoSearch: initialAutoSearch,
 }: {
   sources: JobSourceHealth[];
+  /** Postings from each source that actually made it onto the board, keyed by source id. */
+  onBoard?: Record<string, number>;
   lastRunAt: number | null;
   activeModes: string[];
   activeTypes: string[];
@@ -87,7 +107,12 @@ export function JobControlBar({
 
   function save() {
     startTransition(async () => {
-      await saveJobPreferences({ modes: activeModes, types: activeTypes, autoSearch, agentScope: "filters" });
+      await saveJobPreferences({
+        modes: activeModes,
+        types: activeTypes,
+        autoSearch,
+        agentScope: "filters",
+      });
       setSaved(true);
       setTimeout(() => setSaved(false), 1500);
     });
@@ -98,7 +123,10 @@ export function JobControlBar({
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-2.5">
         {/* Left — background auto-search, inline */}
         <div className="flex items-center gap-2 text-sm">
-          <label className="flex cursor-pointer items-center gap-2" title={`Runs with: ${filterSummary}. Never auto-applies.`}>
+          <label
+            className="flex cursor-pointer items-center gap-2"
+            title={`Runs with: ${filterSummary}. Never auto-applies.`}
+          >
             <input
               type="checkbox"
               checked={autoSearch}
@@ -134,12 +162,16 @@ export function JobControlBar({
           <Radio className="size-3.5 text-primary" aria-hidden="true" />
           {lastRunAt ? (
             <>
-              <span className="font-medium text-foreground">{returning}</span> of {configured} sources live
+              <span className="font-medium text-foreground">{returning}</span> of {configured}{" "}
+              sources live
             </>
           ) : (
             <>{configured} sources ready · search to check</>
           )}
-          <ChevronDown className={cn("size-3.5 transition-transform", sourcesOpen && "rotate-180")} aria-hidden="true" />
+          <ChevronDown
+            className={cn("size-3.5 transition-transform", sourcesOpen && "rotate-180")}
+            aria-hidden="true"
+          />
         </button>
       </div>
 
@@ -154,17 +186,17 @@ export function JobControlBar({
                   <span className={cn(!s.configured && "text-muted-foreground")}>{s.name}</span>
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  {s.lastRun && s.configured ? `${s.lastRun.count} last pull · ` : ""}
-                  {LABEL[h]}
+                  {sourceLine(s, onBoard[s.id] ?? 0, h)}
                 </span>
               </div>
             );
           })}
           <p className="pt-1 text-xs text-muted-foreground">
-            &ldquo;Ready&rdquo; means configured but not yet pulled this session — run a search and the counts fill
-            in. &ldquo;Returning&rdquo; means it answered with postings on the last pull (a source can be live but
-            quiet for a role/region — that&rsquo;s normal). Walled sites (LinkedIn/Indeed) aren&rsquo;t here — the
-            browser extension reads those in your own session.
+            &ldquo;On your board&rdquo; is what survived matching — the number that matters.
+            &ldquo;Returned&rdquo; is what the source sent back before filtering. A source can
+            answer with plenty and still give you nothing, which is why both are shown. Walled sites
+            (LinkedIn/Indeed) aren&rsquo;t here — the browser extension reads those in your own
+            session.
           </p>
         </div>
       ) : null}
