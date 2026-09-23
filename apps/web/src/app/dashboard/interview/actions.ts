@@ -27,14 +27,15 @@ export async function startMockInterview(input: {
   country?: string;
   seniority?: string;
   jobDescription?: string;
-  persona?: string;
+  stage?: "recruiter" | "hiring_manager" | "technical" | "behavioral";
+  durationMinutes?: 10 | 20;
 }): Promise<{ ok: true; questions: MockQuestion[] } | { ok: false; message: string }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
   return generateMockQuestions(user.id, input);
 }
 
-/** Score one practice answer (delivery + content), grounded in what they said. */
+/** Review one practice answer from its transcript, grounded in what they said. */
 export async function scoreMockAnswer(input: {
   question: string;
   answer: string;
@@ -70,8 +71,7 @@ export async function saveMockAnswerAsStory(input: {
 }
 
 export async function generateStoryBank(): Promise<
-  | { ok: true; stories: StoryView[] }
-  | { ok: false; message: string }
+  { ok: true; stories: StoryView[] } | { ok: false; message: string }
 > {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
@@ -107,7 +107,10 @@ export async function saveStory(input: {
   const repo = createInterviewStoriesRepository(getDatabase());
   const fields = {
     title: input.title.trim(),
-    competencies: input.competencies.map((c) => c.toLowerCase().trim()).filter(Boolean).slice(0, 6),
+    competencies: input.competencies
+      .map((c) => c.toLowerCase().trim())
+      .filter(Boolean)
+      .slice(0, 6),
     situation: input.situation.trim(),
     task: input.task.trim(),
     action: input.action.trim(),

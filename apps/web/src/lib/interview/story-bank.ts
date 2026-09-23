@@ -246,7 +246,9 @@ export async function answerBehavioral(
     return {
       ok: false,
       message:
-        "Your story bank is empty. Generate it from your experience first, then I can answer behavioral questions with your real stories.",
+        stories.length === 0
+          ? "Your story bank is empty. Add or generate a real story first."
+          : "I could not find a grounded story for that question. Add a real example for this competency rather than forcing an unrelated answer.",
     };
   }
   return { ok: true, answer: formatStoryAsAnswer(story), storyTitle: story.title };

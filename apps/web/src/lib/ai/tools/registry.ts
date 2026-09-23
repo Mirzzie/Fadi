@@ -1001,9 +1001,10 @@ const scoreAnswerTool: FadiTool = {
     });
     if (!res.ok) return { summary: res.message, view: "none" };
     const s = res.score;
-    const content = s.overall !== null && s.scores
-      ? `Overall ${s.overall.toFixed(1)}/5 — structure ${s.scores.structure}, specifics ${s.scores.specificity}, relevance ${s.scores.relevance}, concision ${s.scores.concision}.`
-      : "Content was not scored.";
+    const content =
+      s.overall !== null && s.scores
+        ? `Overall ${s.overall.toFixed(1)}/5 — structure ${s.scores.structure}, specifics ${s.scores.specificity}, relevance ${s.scores.relevance}, concision ${s.scores.concision}.`
+        : "Content was not scored.";
     const head = `${content} ${s.transcriptNote}`;
     const fixes = s.improvements.length ? `\nTo improve: ${s.improvements.join("; ")}.` : "";
     const stronger = s.strongerVersion

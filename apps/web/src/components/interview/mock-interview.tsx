@@ -10,7 +10,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { speakFadi, stopFadiSpeech } from "@/lib/voice/fadi-speech";
 import { useGroqVoice } from "@/lib/voice/use-groq-voice";
-import { INTERVIEWER_PERSONAS } from "@/lib/interview/personas";
 import type { AnswerScore, MockQuestion } from "@/lib/interview/mock";
 import {
   saveMockAnswerAsStory,
@@ -21,6 +20,14 @@ import {
 type SaveState = "idle" | "saving" | "saved";
 
 type Defaults = { role: string; country: string; seniority: string };
+type InterviewStage = "recruiter" | "hiring_manager" | "technical" | "behavioral";
+
+const INTERVIEW_STAGES: Array<{ value: InterviewStage; label: string }> = [
+  { value: "recruiter", label: "Recruiter screen" },
+  { value: "hiring_manager", label: "Hiring manager" },
+  { value: "technical", label: "Technical" },
+  { value: "behavioral", label: "Behavioral" },
+];
 
 /** A real posting to practise against — its title, employer and description seed the session. */
 export type PracticeJob = { title: string; company: string; description: string | null };
@@ -30,7 +37,8 @@ export function MockInterview({ defaults, job }: { defaults: Defaults; job?: Pra
   // not the profile's generic direction. Everything stays editable — this is a starting point.
   const [config, setConfig] = useState(job ? { ...defaults, role: job.title } : defaults);
   const [jd, setJd] = useState(job?.description ?? "");
-  const [persona, setPersona] = useState<string>("hiring_manager");
+  const [stage, setStage] = useState<InterviewStage>("hiring_manager");
+  const [durationMinutes, setDurationMinutes] = useState<10 | 20>(10);
   const [questions, setQuestions] = useState<MockQuestion[] | null>(null);
   const [idx, setIdx] = useState(0);
   const [answer, setAnswer] = useState("");
@@ -80,7 +88,8 @@ export function MockInterview({ defaults, job }: { defaults: Defaults; job?: Pra
     startTransition(async () => {
       const res = await startMockInterview({
         ...config,
-        persona,
+        stage,
+        durationMinutes,
         jobDescription: jd || undefined,
       });
       if (ownTurn !== turn.current) return;
@@ -155,7 +164,9 @@ export function MockInterview({ defaults, job }: { defaults: Defaults; job?: Pra
             <p className="mt-2 rounded-md bg-muted px-3 py-2 text-sm">
               Practising for <span className="font-medium">{job.title}</span> at{" "}
               <span className="font-medium">{job.company}</span>
-              {job.description ? " — questions come from this posting." : " — no description was saved, so questions follow the role."}
+              {job.description
+                ? " — questions come from this posting."
+                : " — no description was saved, so questions follow the role."}
             </p>
           ) : null}
         </div>
@@ -171,10 +182,35 @@ export function MockInterview({ defaults, job }: { defaults: Defaults; job?: Pra
             placeholder="e.g. IT Support Specialist"
           />
         </Field>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block space-y-1 text-sm">
+            <span className="text-xs text-muted-foreground">Interview stage</span>
+            <select
+              className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm text-foreground"
+              value={stage}
+              onChange={(event) => setStage(event.target.value as InterviewStage)}
+            >
+              {INTERVIEW_STAGES.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block space-y-1 text-sm">
+            <span className="text-xs text-muted-foreground">Practice length</span>
+            <select
+              className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm text-foreground"
+              value={durationMinutes}
+              onChange={(event) => setDurationMinutes(Number(event.target.value) as 10 | 20)}
+            >
+              <option value={10}>10 minutes · 4 questions</option>
+              <option value={20}>20 minutes · 7 questions</option>
+            </select>
+          </label>
+        </div>
         <details className="rounded-lg border border-border px-3 py-2">
-          <summary className="cursor-pointer text-sm text-muted-foreground">
-            Tailor the questions
-          </summary>
+          <summary className="cursor-pointer text-sm text-muted-foreground">Change context</summary>
           <div className="mt-3 space-y-3">
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="Country / region">
@@ -200,20 +236,6 @@ export function MockInterview({ defaults, job }: { defaults: Defaults; job?: Pra
                 />
               </Field>
             </div>
-            <label className="block space-y-1 text-xs text-muted-foreground">
-              <span>Interviewer style</span>
-              <select
-                className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm text-foreground"
-                value={persona}
-                onChange={(event) => setPersona(event.target.value)}
-              >
-                {INTERVIEWER_PERSONAS.map((person) => (
-                  <option key={person.id} value={person.id}>
-                    {person.label}
-                  </option>
-                ))}
-              </select>
-            </label>
             <Field label="Job description (optional)">
               <Textarea rows={3} value={jd} onChange={(event) => setJd(event.target.value)} />
             </Field>
@@ -230,7 +252,7 @@ export function MockInterview({ defaults, job }: { defaults: Defaults; job?: Pra
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         <Button size="sm" onClick={start} disabled={pending || !config.role.trim()}>
           <Wand2 className="size-4" aria-hidden="true" />
-          {pending ? "Setting up…" : "Start mock interview"}
+          {pending ? "Setting up…" : "Start practice"}
         </Button>
       </section>
     );
@@ -353,35 +375,43 @@ function ScoreCard({
   saveState: SaveState;
   onSave: () => void;
 }) {
-  const rows: Array<[string, number]> = [
-    ["Structure (STAR)", score.scores.structure],
-    ["Specificity", score.scores.specificity],
-    ["Relevance", score.scores.relevance],
-    ["Concision", score.scores.concision],
-  ];
+  const rows: Array<[string, number]> = score.scores
+    ? [
+        ["Structure (STAR)", score.scores.structure],
+        ["Specificity", score.scores.specificity],
+        ["Relevance", score.scores.relevance],
+        ["Concision", score.scores.concision],
+      ]
+    : [];
   return (
     <div className="space-y-3 rounded-md border bg-muted/30 p-3">
       <div className="flex items-center gap-3">
-        <span className="text-xl font-semibold tabular-nums">
-          {score.overall.toFixed(1)}
-          <span className="text-sm text-muted-foreground">/5</span>
-        </span>
-        <span className="text-xs text-muted-foreground">{score.deliveryNote}</span>
+        {score.overall === null ? (
+          <span className="text-sm font-medium">Transcript check only</span>
+        ) : (
+          <span className="text-xl font-semibold tabular-nums">
+            {score.overall.toFixed(1)}
+            <span className="text-sm text-muted-foreground">/5</span>
+          </span>
+        )}
+        <span className="text-xs text-muted-foreground">{score.transcriptNote}</span>
       </div>
-      <div className="grid gap-1.5">
-        {rows.map(([label, v]) => (
-          <div key={label} className="grid grid-cols-[8rem_1fr_1.5rem] items-center gap-2">
-            <span className="text-xs text-muted-foreground">{label}</span>
-            <span className="h-1.5 overflow-hidden rounded-full bg-muted">
-              <span
-                className="block h-full rounded-full bg-primary"
-                style={{ width: `${(v / 5) * 100}%` }}
-              />
-            </span>
-            <span className="text-right text-xs tabular-nums text-muted-foreground">{v}</span>
-          </div>
-        ))}
-      </div>
+      {rows.length > 0 ? (
+        <div className="grid gap-1.5">
+          {rows.map(([label, v]) => (
+            <div key={label} className="grid grid-cols-[8rem_1fr_1.5rem] items-center gap-2">
+              <span className="text-xs text-muted-foreground">{label}</span>
+              <span className="h-1.5 overflow-hidden rounded-full bg-muted">
+                <span
+                  className="block h-full rounded-full bg-primary"
+                  style={{ width: `${(v / 5) * 100}%` }}
+                />
+              </span>
+              <span className="text-right text-xs tabular-nums text-muted-foreground">{v}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
       {score.strengths.length > 0 ? (
         <Lines title="Strengths" items={score.strengths} tone="text-emerald-400" />
       ) : null}
