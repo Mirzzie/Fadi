@@ -653,12 +653,19 @@ export const agentMessages = pgTable(
     role: text("role").notNull(),
     content: text("content").notNull(),
     contextSummary: text("context_summary"),
+    /**
+     * The work this was said about. Null is the general conversation — the one you get when
+     * you open Fadi from nowhere in particular. Scoping the talk to the work is what stops a
+     * question about one application from being answered with another one's context.
+     */
+    workItemId: uuid("work_item_id"),
     metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
     ...timestamps,
   },
   (table) => [
     index("agent_messages_user_id_idx").on(table.userId),
     index("agent_messages_role_idx").on(table.role),
+    index("agent_messages_thread_idx").on(table.userId, table.workItemId, table.createdAt),
   ]
 );
 

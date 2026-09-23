@@ -13,7 +13,7 @@ import { describeCurrentPlace } from "@/lib/ai/context/current-place";
 import { executeFadiTool, getFadiTools } from "@/lib/ai/tools/registry";
 import { toolsForTurn } from "@/lib/ai/tools/routing";
 import { toToolSpec, type FadiToolContext } from "@/lib/ai/tools/types";
-import { createAgentMessagesRepository } from "@careeros/database";
+import { createAgentMessagesRepository, createWorkItemsRepository } from "@careeros/database";
 import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
@@ -41,12 +41,17 @@ const chatRequestSchema = z.object({
    * rows on the server, so a forged label cannot put words into Fadi's context.
    */
   pathname: z.string().max(512).optional(),
+  /**
+   * The work this conversation is about, when it was opened from a piece of work. Checked
+   * against the person's own rows below: an id that is not theirs is dropped, never trusted.
+   */
+  workItemId: z.string().uuid().optional(),
   history: z
     .array(
       z.object({
         role: z.enum(["user", "assistant"]),
         content: z.string().max(8000),
-      }),
+      })
     )
     .max(20)
     .optional()
@@ -82,7 +87,7 @@ export async function POST(req: NextRequest) {
   if (!rate.allowed) {
     const mins = Math.max(1, Math.ceil(rate.retryAfterSeconds / 60));
     return sseMessage(
-      `Let's take a breath — that's a lot of messages very fast. Give me about ${mins} minute${mins === 1 ? "" : "s"} and we'll pick right back up. Nothing you've done is lost.`,
+      `Let's take a breath — that's a lot of messages very fast. Give me about ${mins} minute${mins === 1 ? "" : "s"} and we'll pick right back up. Nothing you've done is lost.`
     );
   }
 
@@ -102,6 +107,15 @@ export async function POST(req: NextRequest) {
 
   const { message, history, pathname } = parsed.data;
 
+  // Which conversation this turn belongs to. Ownership decides it — a forged id falls back to
+  // the general thread rather than reading someone else's work into the prompt.
+  const workItem = parsed.data.workItemId
+    ? ((await createWorkItemsRepository(getDatabase())
+        .get(user.id, parsed.data.workItemId)
+        .catch(() => undefined)) ?? null)
+    : null;
+  const threadId = workItem?.id ?? null;
+
   // Build context
   // Live market signals (GDELT/HN/Remotive) are cached, so Fadi's answers stay
   // grounded in real data without per-message fetch latency.
@@ -115,12 +129,14 @@ export async function POST(req: NextRequest) {
       userId: user.id,
       error: err instanceof Error ? err.message : "unknown",
     });
-    return sseMessage("I hit a snag gathering your context just now — give me a moment and try again.");
+    return sseMessage(
+      "I hit a snag gathering your context just now — give me a moment and try again."
+    );
   }
 
   if (!context) {
     return sseMessage(
-      "Let's finish your setup first — add your target role, goal, and career history, and I'll be ready to help.",
+      "Let's finish your setup first — add your target role, goal, and career history, and I'll be ready to help."
     );
   }
 
@@ -129,8 +145,19 @@ export async function POST(req: NextRequest) {
   // record is read back from their own rows (see lib/ai/context/where.ts).
   const where = await describeCurrentPlace(user.id, pathname);
 
+  // The work in hand leads the place: someone who opened Fadi on a step is asking about that
+  // step, whatever page they happen to be standing on.
+  const onWork = workItem
+    ? `They are working on: ${workItem.title}${workItem.reason ? ` — ${workItem.reason}` : ""}. Answer for this piece of work.`
+    : "";
+
   // Build messages
-  const messages = buildFadiMessages(context, history, message, where);
+  const messages = buildFadiMessages(
+    context,
+    history,
+    message,
+    [onWork, where].filter(Boolean).join("\n\n")
+  );
 
   // Resolve the user's provider chain (primary → fallback) and stream resiliently:
   // retry transient rate limits, switch providers when one is exhausted.
@@ -139,7 +166,7 @@ export async function POST(req: NextRequest) {
   // No usable provider → say so honestly (BYO-key model) instead of failing opaquely.
   if (chain.length === 0) {
     return sseMessage(
-      "I run on your own AI key for privacy — add one in Settings → AI provider and I'll be right here with you.",
+      "I run on your own AI key for privacy — add one in Settings → AI provider and I'll be right here with you."
     );
   }
 
@@ -174,7 +201,7 @@ export async function POST(req: NextRequest) {
               ],
               schema,
               name,
-              { temperature: 0.4 },
+              { temperature: 0.4 }
             ),
           text: (system, userMsg) =>
             genProvider.chat(
@@ -182,7 +209,7 @@ export async function POST(req: NextRequest) {
                 { role: "system", content: system },
                 { role: "user", content: userMsg },
               ],
-              { temperature: 0.6 },
+              { temperature: 0.6 }
             ),
         }
       : undefined,
@@ -202,7 +229,9 @@ export async function POST(req: NextRequest) {
       // Persist the conversation so it survives reloads and is shared between
       // Desk and Fadi modes (both load the same history). Best-effort.
       const agentRepo = createAgentMessagesRepository(getDatabase());
-      agentRepo.createForUser(user.id, { role: "user", content: message }).catch(() => {});
+      agentRepo
+        .createForUser(user.id, { role: "user", content: message, workItemId: threadId })
+        .catch(() => {});
       const saveAssistant = async (text: string, toolNames?: string) => {
         if (!text.trim()) return;
         try {
@@ -210,6 +239,7 @@ export async function POST(req: NextRequest) {
             role: "assistant",
             content: text,
             metadata: toolNames ? { tools: toolNames } : {},
+            workItemId: threadId,
           });
         } catch {
           /* best-effort */
@@ -230,18 +260,20 @@ export async function POST(req: NextRequest) {
               onToolResults: (results) => {
                 if (results.length > 0) {
                   controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ fadiTools: results })}\n\n`),
+                    encoder.encode(`data: ${JSON.stringify({ fadiTools: results })}\n\n`)
                   );
                 }
               },
               // …then stream Fadi's answer token by token.
               onToken: (t) => sendText(t),
-            },
+            }
           );
           // Answer already streamed via onToken; backfill a line if a tool ran
           // but produced no narration.
-          if (!result.text.trim() && result.toolResults.length > 0) sendText("Here's what I found.");
-          const saved = result.text.trim() || (result.toolResults.length > 0 ? "Here's what I found." : "");
+          if (!result.text.trim() && result.toolResults.length > 0)
+            sendText("Here's what I found.");
+          const saved =
+            result.text.trim() || (result.toolResults.length > 0 ? "Here's what I found." : "");
           await saveAssistant(saved, result.toolResults.map((t) => t.name).join(", ") || undefined);
           logger.info("fadi.chat.completed", {
             userId: user.id,
@@ -282,13 +314,16 @@ export async function POST(req: NextRequest) {
               if (r.data) {
                 controller.enqueue(
                   encoder.encode(
-                    `data: ${JSON.stringify({ fadiTools: [{ name: "generate_document", view: r.view ?? "document", data: r.data }] })}\n\n`,
-                  ),
+                    `data: ${JSON.stringify({ fadiTools: [{ name: "generate_document", view: r.view ?? "document", data: r.data }] })}\n\n`
+                  )
                 );
               }
               sendText(r.summary);
               await saveAssistant(r.summary, "generate_document");
-              logger.info("fadi.chat.completed", { userId: user.id, tools: "generate_document(fallback)" });
+              logger.info("fadi.chat.completed", {
+                userId: user.id,
+                tools: "generate_document(fallback)",
+              });
               finish();
               return;
             } catch (toolErr) {
@@ -306,13 +341,16 @@ export async function POST(req: NextRequest) {
               if (r.data) {
                 controller.enqueue(
                   encoder.encode(
-                    `data: ${JSON.stringify({ fadiTools: [{ name: "search_jobs", view: r.view ?? "jobs", data: r.data }] })}\n\n`,
-                  ),
+                    `data: ${JSON.stringify({ fadiTools: [{ name: "search_jobs", view: r.view ?? "jobs", data: r.data }] })}\n\n`
+                  )
                 );
               }
               sendText(r.summary);
               await saveAssistant(r.summary, "search_jobs");
-              logger.info("fadi.chat.completed", { userId: user.id, tools: "search_jobs(fallback)" });
+              logger.info("fadi.chat.completed", {
+                userId: user.id,
+                tools: "search_jobs(fallback)",
+              });
               finish();
               return;
             } catch (toolErr) {

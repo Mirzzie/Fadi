@@ -17,7 +17,18 @@ import { useFadi, type FadiState } from "./fadi-presence";
  * only reflects Fadi's live state and hands off seeded questions from ⌘K.
  */
 export function FadiOrb() {
-  const { open, openFadi, closeFadi, displayState, setState, seed, nudge, dismissNudge } = useFadi();
+  const {
+    open,
+    openFadi,
+    closeFadi,
+    displayState,
+    setState,
+    seed,
+    nudge,
+    dismissNudge,
+    focus,
+    clearFocus,
+  } = useFadi();
 
   return (
     <>
@@ -25,7 +36,7 @@ export function FadiOrb() {
       <div
         className={cn(
           "fixed bottom-20 right-5 z-40 flex flex-col items-end gap-2",
-          open && "pointer-events-none opacity-0",
+          open && "pointer-events-none opacity-0"
         )}
       >
         {nudge ? (
@@ -37,7 +48,10 @@ export function FadiOrb() {
               <p className="mt-0.5 line-clamp-2 text-sm text-foreground">{nudge.detail}</p>
               <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary">
                 Open
-                <ArrowUpRight className="size-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" aria-hidden="true" />
+                <ArrowUpRight
+                  className="size-3 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                  aria-hidden="true"
+                />
               </span>
             </Link>
             <button
@@ -81,8 +95,25 @@ export function FadiOrb() {
                 <X className="size-4" aria-hidden="true" />
               </button>
             </div>
+            {focus ? (
+              <div className="flex shrink-0 items-center gap-2 border-b border-border/60 bg-muted/40 px-4 py-2">
+                <span className="text-xs text-muted-foreground">On:</span>
+                <span className="min-w-0 flex-1 truncate text-xs font-medium">{focus.title}</span>
+                <button
+                  onClick={clearFocus}
+                  className="rounded-md px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                >
+                  Leave
+                </button>
+              </div>
+            ) : null}
             <div className="min-h-0 flex-1">
-              <FadiChat seed={seed} onStateChange={setState} />
+              <FadiChat
+                key={focus?.workItemId ?? "general"}
+                seed={seed}
+                onStateChange={setState}
+                workItemId={focus?.workItemId ?? null}
+              />
             </div>
           </div>
         </div>
@@ -116,7 +147,7 @@ function OrbButton({
       {...(onClick ? { type: "button" as const, onClick, "aria-label": "Open Fadi" } : {})}
       className={cn(
         "group grid place-items-center rounded-full",
-        onClick && "transition-transform hover:scale-105 active:scale-95",
+        onClick && "transition-transform hover:scale-105 active:scale-95"
       )}
       data-state={state}
     >

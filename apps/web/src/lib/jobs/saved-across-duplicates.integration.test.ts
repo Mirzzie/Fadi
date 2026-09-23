@@ -77,7 +77,10 @@ suite("saved state across duplicate postings", () => {
     await savedRepo.saveForUser(userId, reed.id, {});
 
     const visible = await jobsRepo.listActiveForUser(userId);
-    const shown = visible.filter((j) => j.title === "Deskside Support Engineer");
+    // Filter on THIS run's vacancy, not on the title: the jobs table is not user-scoped, so
+    // every earlier run of this test left a row with the same title behind and the assertion
+    // passed only against a database that had never seen it.
+    const shown = visible.filter((j) => j.canonicalKey === key);
     expect(shown).toHaveLength(1);
 
     // The board finds the save on the vacancy, whichever board's copy it came from.

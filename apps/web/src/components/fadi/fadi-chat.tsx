@@ -55,11 +55,14 @@ const VOICE_PREF_KEY = "fadi-voice-enabled";
 export function FadiChat({
   seed,
   onStateChange,
+  workItemId = null,
 }: {
   /** A question handed off from the ⌘K spotlight; fired once per nonce. */
   seed?: { text: string; nonce: number } | null;
   /** Publish Fadi's live state to the ambient orb (only the orb panel passes this). */
   onStateChange?: (state: "idle" | "listening" | "thinking" | "speaking") => void;
+  /** The work this conversation is about; null is the general conversation. */
+  workItemId?: string | null;
 } = {}) {
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
@@ -74,7 +77,7 @@ export function FadiChat({
     setVoiceEnabled(
       (localStorage.getItem(VOICE_PREF_KEY) ??
         localStorage.getItem("scout-voice-enabled") ??
-        localStorage.getItem("kai-voice-enabled")) === "1",
+        localStorage.getItem("kai-voice-enabled")) === "1"
     );
   }, []);
   useEffect(() => {
@@ -128,7 +131,7 @@ export function FadiChat({
         setFadiSpeaking(speaking);
         if (speaking && listeningRef.current) stopListening(); // stop the mic the moment Fadi starts
       }),
-    [stopListening],
+    [stopListening]
   );
 
   const startSpeaking = useCallback(
@@ -142,7 +145,7 @@ export function FadiChat({
         if (!isFadiSpeaking()) setFadiSpeaking(false);
       }, 4000);
     },
-    [speak, stopListening],
+    [speak, stopListening]
   );
 
   useEffect(() => {
@@ -155,7 +158,11 @@ export function FadiChat({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/fadi/history");
+        const res = await fetch(
+          workItemId
+            ? `/api/fadi/history?workItem=${encodeURIComponent(workItemId)}`
+            : "/api/fadi/history"
+        );
         if (!res.ok) return;
         const data = (await res.json()) as {
           messages: Array<{
@@ -166,14 +173,20 @@ export function FadiChat({
             createdAt?: string;
           }>;
         };
-        if (cancelled || data.messages.length === 0) return;
+        // A piece of work with nothing said about it yet starts clean, not on the tail of the
+        // general conversation — that is the whole point of scoping the thread.
+        if (cancelled) return;
+        if (data.messages.length === 0) {
+          setMessages([INITIAL_MESSAGE]);
+          return;
+        }
         setMessages(
           data.messages.map((m) => ({
             id: m.id,
             role: m.role === "assistant" ? "assistant" : "user",
             content: m.content,
             timestamp: new Date(),
-          })),
+          }))
         );
 
         // Fadi speaks a background digest that just landed — only the newest
@@ -191,10 +204,10 @@ export function FadiChat({
     return () => {
       cancelled = true;
     };
-    // Mount-only: history loads once; `speak` is intentionally not a dep.
+    // Re-runs when the conversation changes: switching to a piece of work loads its thread.
+    // `speak` is intentionally not a dep.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
+  }, [workItemId]);
 
   // Conversation loop: whenever Fadi is idle in hands-free mode (not thinking,
   // speaking, or already listening), resume listening for the next turn. Back
@@ -206,10 +219,18 @@ export function FadiChat({
       () => {
         if (conversationRef.current) startListening();
       },
-      error ? 4000 : 600,
+      error ? 4000 : 600
     );
     return () => clearTimeout(t);
-  }, [conversationMode, isStreaming, isSpeaking, isListening, isTranscribing, error, startListening]);
+  }, [
+    conversationMode,
+    isStreaming,
+    isSpeaking,
+    isListening,
+    isTranscribing,
+    error,
+    startListening,
+  ]);
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -253,6 +274,7 @@ export function FadiChat({
             message: text.trim(),
             history,
             pathname: typeof window !== "undefined" ? window.location.pathname : undefined,
+            ...(workItemId ? { workItemId } : {}),
           }),
           signal: abortRef.current.signal,
         });
@@ -283,7 +305,7 @@ export function FadiChat({
                 // Structured tool results → render as cards/tiles.
                 const toolResults = (parsed as { fadiTools: FadiToolResultView[] }).fadiTools;
                 setMessages((prev) =>
-                  prev.map((m) => (m.id === assistantId ? { ...m, toolResults } : m)),
+                  prev.map((m) => (m.id === assistantId ? { ...m, toolResults } : m))
                 );
                 // A voice/chat action that mutated the app (e.g. created a track) →
                 // refresh so the menu-bar switcher + dashboard follow without a reload.
@@ -291,9 +313,7 @@ export function FadiChat({
               } else if (typeof parsed === "string") {
                 fullResponse += parsed;
                 setMessages((prev) =>
-                  prev.map((m) =>
-                    m.id === assistantId ? { ...m, content: fullResponse } : m,
-                  ),
+                  prev.map((m) => (m.id === assistantId ? { ...m, content: fullResponse } : m))
                 );
               }
             } catch {
@@ -313,11 +333,10 @@ export function FadiChat({
             m.id === assistantId
               ? {
                   ...m,
-                  content:
-                    "Something went wrong. Please check your connection and try again.",
+                  content: "Something went wrong. Please check your connection and try again.",
                 }
-              : m,
-          ),
+              : m
+          )
         );
         setError("Failed to reach Fadi. Try again in a moment.");
       } finally {
@@ -325,7 +344,7 @@ export function FadiChat({
         abortRef.current = null;
       }
     },
-    [isStreaming, messages, voiceEnabled, startSpeaking],
+    [isStreaming, messages, voiceEnabled, startSpeaking, workItemId]
   );
 
   // Keep the speech callback's reference to sendMessage current.
@@ -399,7 +418,15 @@ export function FadiChat({
       {/* Messages */}
       <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
         {messages.map((message) => (
-          <MessageBubble key={message.id} message={message} isStreaming={isStreaming && message.id === messages[messages.length - 1]?.id && message.role === "assistant"} />
+          <MessageBubble
+            key={message.id}
+            message={message}
+            isStreaming={
+              isStreaming &&
+              message.id === messages[messages.length - 1]?.id &&
+              message.role === "assistant"
+            }
+          />
         ))}
         {isListening || isTranscribing ? (
           <div className="flex items-center gap-3">
@@ -454,9 +481,7 @@ export function FadiChat({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={
-              isListening
-                ? "Listening... speak now"
-                : "Ask Fadi anything about your career..."
+              isListening ? "Listening... speak now" : "Ask Fadi anything about your career..."
             }
             rows={2}
             disabled={isStreaming}
@@ -470,7 +495,9 @@ export function FadiChat({
               variant={conversationMode ? "default" : "outline"}
               className={cn("size-9 shrink-0", conversationMode && "animate-pulse")}
               onClick={toggleConversation}
-              title={conversationMode ? "End live conversation" : "Start live hands-free conversation"}
+              title={
+                conversationMode ? "End live conversation" : "Start live hands-free conversation"
+              }
               aria-label="Toggle live conversation"
             >
               <AudioLines className="size-4" aria-hidden="true" />
@@ -482,7 +509,13 @@ export function FadiChat({
               className={cn("size-9 shrink-0", isListening && "animate-pulse")}
               onClick={toggleVoiceInput}
               disabled={isTranscribing}
-              title={isListening ? "Stop & transcribe" : isTranscribing ? "Transcribing…" : "Speak to Fadi"}
+              title={
+                isListening
+                  ? "Stop & transcribe"
+                  : isTranscribing
+                    ? "Transcribing…"
+                    : "Speak to Fadi"
+              }
               aria-label={isListening ? "Stop voice input" : "Start voice input"}
             >
               {isTranscribing ? (
@@ -525,20 +558,15 @@ export function FadiChat({
           </Button>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          Press Enter to send, Shift+Enter for a new line. Fadi uses your career profile and analysis for context.
+          Press Enter to send, Shift+Enter for a new line. Fadi uses your career profile and
+          analysis for context.
         </p>
       </div>
     </div>
   );
 }
 
-function MessageBubble({
-  message,
-  isStreaming,
-}: {
-  message: Message;
-  isStreaming: boolean;
-}) {
+function MessageBubble({ message, isStreaming }: { message: Message; isStreaming: boolean }) {
   const isFadi = message.role === "assistant";
   const hasTools = (message.toolResults?.length ?? 0) > 0;
 
@@ -555,7 +583,7 @@ function MessageBubble({
         <div
           className={cn(
             "rounded-xl px-3.5 py-2.5 text-sm leading-relaxed",
-            isFadi ? "bg-card border border-border/60" : "bg-primary/15 text-foreground",
+            isFadi ? "bg-card border border-border/60" : "bg-primary/15 text-foreground"
           )}
         >
           {message.content ? (
@@ -667,7 +695,8 @@ function renderToolResult(r: FadiToolResultView) {
         <span className="min-w-0">
           <span className="block truncate text-sm font-medium">{d.label ?? "New direction"}</span>
           <span className="text-xs text-muted-foreground">
-            {d.targetRole ? `${d.targetRole} · ` : ""}new direction created &amp; active — open dashboard →
+            {d.targetRole ? `${d.targetRole} · ` : ""}new direction created &amp; active — open
+            dashboard →
           </span>
         </span>
       </a>
@@ -701,25 +730,40 @@ function renderToolResult(r: FadiToolResultView) {
       quitsRate?: number | null;
       asOf?: string | null;
     };
-    const arrow = (t?: string | null) => (t === "up" ? "▲" : t === "down" ? "▼" : t === "flat" ? "▬" : "");
+    const arrow = (t?: string | null) =>
+      t === "up" ? "▲" : t === "down" ? "▼" : t === "flat" ? "▬" : "";
     const tiles: Array<[string, string, string?]> = [
-      ["Unemployment", d.unemploymentRate != null ? `${d.unemploymentRate}%` : "—", arrow(d.unemploymentTrend)],
-      ["Job openings", d.jobOpeningsMillions != null ? `${d.jobOpeningsMillions.toFixed(1)}M` : "—", arrow(d.openingsTrend)],
+      [
+        "Unemployment",
+        d.unemploymentRate != null ? `${d.unemploymentRate}%` : "—",
+        arrow(d.unemploymentTrend),
+      ],
+      [
+        "Job openings",
+        d.jobOpeningsMillions != null ? `${d.jobOpeningsMillions.toFixed(1)}M` : "—",
+        arrow(d.openingsTrend),
+      ],
       ["Quits rate", d.quitsRate != null ? `${d.quitsRate}%` : "—"],
     ];
     return (
       <div>
         <div className="grid grid-cols-3 gap-2">
           {tiles.map(([label, value, trend]) => (
-            <div key={label} className="rounded-lg border border-border/60 bg-card/60 p-2.5 text-center">
+            <div
+              key={label}
+              className="rounded-lg border border-border/60 bg-card/60 p-2.5 text-center"
+            >
               <p className="text-lg font-semibold tabular-nums">
-                {value} {trend ? <span className="text-xs text-muted-foreground">{trend}</span> : null}
+                {value}{" "}
+                {trend ? <span className="text-xs text-muted-foreground">{trend}</span> : null}
               </p>
               <p className="text-[0.7rem] uppercase tracking-wide text-muted-foreground">{label}</p>
             </div>
           ))}
         </div>
-        {d.asOf ? <p className="mt-1.5 text-[0.7rem] text-muted-foreground">US · BLS · {d.asOf}</p> : null}
+        {d.asOf ? (
+          <p className="mt-1.5 text-[0.7rem] text-muted-foreground">US · BLS · {d.asOf}</p>
+        ) : null}
       </div>
     );
   }
@@ -734,7 +778,10 @@ function renderToolResult(r: FadiToolResultView) {
     return (
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         {tiles.map(([label, value]) => (
-          <div key={label} className="rounded-lg border border-border/60 bg-card/60 p-2.5 text-center">
+          <div
+            key={label}
+            className="rounded-lg border border-border/60 bg-card/60 p-2.5 text-center"
+          >
             <p className="text-lg font-semibold tabular-nums">{value}</p>
             <p className="text-[0.7rem] uppercase tracking-wide text-muted-foreground">{label}</p>
           </div>
@@ -763,7 +810,7 @@ function FadiOrb({ state }: { state: "speaking" | "thinking" | "listening" | "id
         className={cn(
           "relative grid size-7 place-items-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.66_0.22_285)] shadow",
           state === "idle" && "animate-pulse",
-          state === "listening" && "ring-2 ring-emerald-400/50",
+          state === "listening" && "ring-2 ring-emerald-400/50"
         )}
       >
         {state === "thinking" ? (

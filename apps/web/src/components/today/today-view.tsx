@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { ArrowRight, Check, Loader2, Plus } from "lucide-react";
+import { ArrowRight, Check, Loader2, Plus, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useFadi } from "@/components/os/fadi-presence";
 import {
   addStepAction,
   setGoalAction,
@@ -171,6 +172,7 @@ function Working({ today, pending, onRun }: { today: Today; pending: boolean; on
 }
 
 function NextAction({ today, pending, onRun }: { today: Today; pending: boolean; onRun: Runner }) {
+  const { openOnWork } = useFadi();
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
   const action = today.action;
@@ -195,14 +197,25 @@ function NextAction({ today, pending, onRun }: { today: Today; pending: boolean;
               {action.cta} <ArrowRight />
             </Button>
             {action.id ? (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={pending}
-                onClick={() => onRun(() => setStepStatusAction(action.id!, "done"))}
-              >
-                {pending ? <Loader2 className="animate-spin" /> : <Check />} Done
-              </Button>
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={pending}
+                  onClick={() => onRun(() => setStepStatusAction(action.id!, "done"))}
+                >
+                  {pending ? <Loader2 className="animate-spin" /> : <Check />} Done
+                </Button>
+                {/* Opens Fadi on THIS step: its own thread, so the answer is about this work
+                    and not the last thing that was discussed. */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => openOnWork({ workItemId: action.id!, title: action.title })}
+                >
+                  <Sparkles /> Ask Fadi
+                </Button>
+              </>
             ) : null}
             {action.dueLabel ? (
               <span className="text-xs text-muted-foreground">{action.dueLabel}</span>
@@ -247,14 +260,23 @@ function NextAction({ today, pending, onRun }: { today: Today; pending: boolean;
               className="flex items-center justify-between gap-3 rounded-lg px-1 py-1.5 text-sm"
             >
               <span className="min-w-0 truncate">{step.title}</span>
-              <Button
-                variant="ghost"
-                size="xs"
-                disabled={pending}
-                onClick={() => onRun(() => setStepStatusAction(step.id!, "done"))}
-              >
-                <Check /> Done
-              </Button>
+              <span className="flex shrink-0 items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => openOnWork({ workItemId: step.id!, title: step.title })}
+                >
+                  <Sparkles /> Ask Fadi
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  disabled={pending}
+                  onClick={() => onRun(() => setStepStatusAction(step.id!, "done"))}
+                >
+                  <Check /> Done
+                </Button>
+              </span>
             </li>
           ))}
         </ul>
