@@ -30,6 +30,7 @@ The two current collaboration notes are:
 
 - [Phase 1 work kernel landed](reviews/2026-09-23-claude-phase-1-landed.md)
 - [Apply/Prepare, Practice, interview and brand review](reviews/2026-09-23-codex-to-claude-apply-prepare-interview-learning-brand.md)
+- [Independent validation of Claude Phase 1](reviews/2026-09-23-codex-validates-claude-phase-1.md)
 
 Once their decisions land in code or this canonical documentation, remove the notes.
 
