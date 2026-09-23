@@ -38,6 +38,49 @@ export function isAutoplayBlock(error: unknown): boolean {
  * the generation that asked for it, so Stop, mute, a new utterance or an unmounted interview
  * cancel it instead of leaving it to surprise the person on their next click.
  */
+/**
+ * ONE audio element, unlocked by a real gesture, reused for every utterance after it.
+ *
+ * A browser grants permission to play to the ELEMENT that a gesture touched, not to the page.
+ * Every utterance built `new Audio(...)`, so only the first one — the greeting, which followed
+ * the button press — was ever allowed to play. Everything said afterwards was refused and put
+ * in a queue waiting for the person's next click, which in a hands-free session never comes:
+ * Fadi greeted you, then went silent for the rest of the conversation.
+ *
+ * Primed once from the press that starts listening, this element carries that permission for
+ * the whole session.
+ */
+let primedEl: HTMLAudioElement | null = null;
+
+/** A moment of silence, played on a gesture, so the element is allowed to speak later. */
+const SILENCE =
+  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=";
+
+/**
+ * Call this from inside a click or key handler. It costs nothing when already primed, and
+ * failing is not an error worth reporting: the fallback is exactly today's behaviour.
+ */
+export function primeFadiVoice(): void {
+  if (typeof window === "undefined" || primedEl) return;
+  try {
+    const el = new Audio(SILENCE);
+    el.volume = 0;
+    void el
+      .play()
+      .then(() => {
+        el.pause();
+        el.currentTime = 0;
+        el.volume = 1;
+        primedEl = el;
+      })
+      .catch(() => {
+        /* no permission to keep — speech falls back to the queue-on-gesture path */
+      });
+  } catch {
+    /* no audio at all on this platform */
+  }
+}
+
 let queuedByAutoplay: {
   at: number;
   generation: number;
@@ -229,7 +272,14 @@ export async function speakFadi(text: string): Promise<void> {
         const blob = await res.blob();
         if (ownGeneration !== generation) return;
         const url = URL.createObjectURL(blob);
-        const el = new Audio(url);
+        // Reuse the element a gesture already unlocked, when there is one. A fresh Audio() has
+        // no permission of its own and is refused on every utterance after the first.
+        const el = primedEl ?? new Audio(url);
+        if (primedEl) {
+          el.pause();
+          el.src = url;
+          el.currentTime = 0;
+        }
         audioEl = el;
         let released = false;
         const release = () => {

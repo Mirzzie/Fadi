@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { useGroqVoice } from "@/lib/voice/use-groq-voice";
-import { speakFadi, stopFadiSpeech } from "@/lib/voice/fadi-speech";
+import { primeFadiVoice, speakFadi, stopFadiSpeech } from "@/lib/voice/fadi-speech";
 import { parseVoiceCommand, VOICE_HELP, type VoiceCommand } from "@/lib/voice/commands";
 import { speakable } from "@/lib/voice/speakable";
 import {
@@ -227,6 +227,10 @@ export function useVoiceMode() {
   }, [awaitingSpeech]);
 
   const toggle = useCallback(() => {
+    // Inside the gesture, before anything async: this is the one moment the browser will grant
+    // permission to play, and everything Fadi says for the rest of the session depends on it.
+    primeFadiVoice();
+
     if (on) {
       setOn(false);
       stop();

@@ -155,6 +155,13 @@ export function useGroqVoice({
               ? "ogg"
               : "webm";
           form.append("audio", blob, `audio.${extension}`);
+          // Tell the transcriber what language to expect. Left to guess, it guessed Icelandic
+          // for an English "Hi, hello" — and a command it transcribes into another language
+          // cannot match anything Fadi knows.
+          form.append(
+            "language",
+            typeof navigator !== "undefined" && navigator.language ? navigator.language : "en"
+          );
           const response = await fetch("/api/fadi/transcribe", {
             method: "POST",
             body: form,

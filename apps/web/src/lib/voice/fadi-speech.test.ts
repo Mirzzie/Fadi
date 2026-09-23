@@ -142,3 +142,49 @@ describe("queued speech and Stop", () => {
     expect(source).toMatch(/el: HTMLAudioElement/);
   });
 });
+
+describe("speaking more than once in a session", () => {
+  /**
+   * The defect: a browser grants permission to the ELEMENT a gesture touched, and every
+   * utterance built a new one. The greeting played and everything after it was refused, so
+   * Fadi greeted you and then went silent for the rest of the conversation.
+   */
+  it("keeps the element a gesture unlocked, rather than building a new one each time", async () => {
+    const played: string[] = [];
+    const elements: unknown[] = [];
+
+    class FakeAudio {
+      src = "";
+      volume = 1;
+      currentTime = 0;
+      onplay: (() => void) | null = null;
+      onended: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      constructor(src?: string) {
+        this.src = src ?? "";
+        elements.push(this);
+      }
+      play() {
+        played.push(this.src);
+        return Promise.resolve();
+      }
+      pause() {}
+    }
+
+    const original = globalThis.Audio;
+    (globalThis as { Audio: unknown }).Audio = FakeAudio;
+    try {
+      const { primeFadiVoice } = await import("./fadi-speech");
+      primeFadiVoice();
+      await Promise.resolve();
+      primeFadiVoice();
+      await Promise.resolve();
+
+      // One element, however many times it is primed: the permission is the element.
+      expect(elements).toHaveLength(1);
+      expect(played).toHaveLength(1);
+    } finally {
+      (globalThis as { Audio: unknown }).Audio = original;
+    }
+  });
+});

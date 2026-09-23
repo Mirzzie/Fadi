@@ -370,14 +370,31 @@ export class OpenAIProvider implements AIProvider {
    * OpenAI (whisper-1) support this; other OpenAI-compatible endpoints (Gemini,
    * Ollama, OpenRouter) do not, so this throws for them.
    */
-  async transcribe(file: File): Promise<string> {
+  /**
+   * Speech to text.
+   *
+   * The language is passed, not guessed. Whisper auto-detects when it is not told, and on a
+   * short utterance it detects badly — "Hi, hello" came back as Icelandic, "Hæ, héló", which no
+   * command could match. A one-word answer like "yes" is the shortest utterance there is, and
+   * the whole hands-free loop is built on them.
+   *
+   * The prompt biases it toward the words Fadi is actually listening for. Whisper uses it as
+   * context, not instruction, which is exactly right for names it would otherwise mangle.
+   */
+  async transcribe(file: File, options: { language?: string } = {}): Promise<string> {
     if (!this.client) throw new Error("AI provider is not configured.");
     const model =
       this.id === "groq" ? "whisper-large-v3-turbo" : this.id === "openai" ? "whisper-1" : null;
     if (!model) {
       throw new Error(`${this.name} doesn't support audio transcription.`);
     }
-    const res = await this.client.audio.transcriptions.create({ file, model });
+    const res = await this.client.audio.transcriptions.create({
+      file,
+      model,
+      language: options.language || "en",
+      prompt:
+        "Fadi. Commands: what's on today, what's next, read me the plan, carry on, do the next step, start it, not now, stop the plan, apply to, open opportunities, open my career, open practice, yes, no.",
+    });
     return (res as { text?: string }).text ?? "";
   }
 
