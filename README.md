@@ -47,15 +47,15 @@ full static site (hero, animations, case studies) directly from the app — see
 ├── apps/
 │   ├── web/                  # The Next.js application (the product)
 │   └── portfolio-export/     # Static-export build of a user's portfolio (GitHub Pages target)
-├── docs/                     # Product, architecture, and engineering docs (start here to learn the app)
+├── docs/                     # Canonical product, architecture, roadmap, and engineering docs
+│   ├── README.md             # Documentation map and maintenance policy
 │   └── adr/                  # Architecture Decision Records
 ├── infrastructure/
 │   ├── docker/               # Local PostgreSQL (docker-compose.yml)
 │   ├── supabase/             # LEGACY historical migrations only — not used at runtime
 │   └── vercel/
 ├── packages/
-│   ├── database/             # Drizzle schema, migrations, repositories, seeds
-│   ├── shared/ · types/ · ui/
+│   └── database/             # Drizzle schema, migrations, repositories, seeds
 ├── scripts/
 └── tests/
 ```
@@ -204,17 +204,9 @@ To generate a new migration after changing the Drizzle schema: `npm run db:gener
 
 ## Where to learn the app (docs)
 
-Read these in order to get productive:
+Start with [`docs/README.md`](docs/README.md). It identifies the canonical product, architecture, data, UX, roadmap, security, operations, and ADR documents.
 
-1. [`docs/FadiOS-Project-Context.md`](docs/FadiOS-Project-Context.md) — **what Fadi is and what it believes** (the doctrine that shapes every feature). Start here.
-2. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — how the system is put together.
-3. [`docs/POSTGRES_FIRST_ARCHITECTURE.md`](docs/POSTGRES_FIRST_ARCHITECTURE.md) · [`docs/DATABASE_SCHEMA.md`](docs/DATABASE_SCHEMA.md) — data layer.
-4. [`docs/AUTHENTICATION_ARCHITECTURE.md`](docs/AUTHENTICATION_ARCHITECTURE.md) — Better Auth setup.
-5. [`docs/DEVELOPMENT_GUIDE.md`](docs/DEVELOPMENT_GUIDE.md) · [`docs/CODING_STANDARDS.md`](docs/CODING_STANDARDS.md) · [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) · [`docs/GIT_WORKFLOW.md`](docs/GIT_WORKFLOW.md) — how to work in the repo.
-6. [`docs/adr/`](docs/adr/) — the decisions and *why* behind them.
-
-The full `docs/` folder covers each engine (job discovery, learning, market intelligence,
-onboarding, portfolio, etc.) in depth.
+Do not infer current behavior from a dated review or audit. The code and schema define implemented behavior; the canonical docs explain the intended boundaries and next sequence.
 
 ---
 

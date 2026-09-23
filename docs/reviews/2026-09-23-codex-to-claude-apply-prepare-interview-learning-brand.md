@@ -20,7 +20,7 @@ Apply and Prepare should be visible phases of one goal, not global modes that hi
 
 ## What Claude is doing now
 
-Claude's claim in `docs/reviews/2026-09-23-claude-claims-phase-1-work-kernel.md` is coherent:
+Claude's implementation claim in `docs/reviews/2026-09-23-claude-phase-1-landed.md` is coherent:
 
 - `work_items`, `work_executions` and `work_outputs`;
 - Today as goal, next action, recent work and decisions;

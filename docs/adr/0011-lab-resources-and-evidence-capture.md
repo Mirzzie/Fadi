@@ -2,7 +2,7 @@
 
 - **Status:** PROPOSED — 2026-09-10. Nothing in this ADR is built yet.
 - **Related:** the admission gate (`lib/identity/admit.ts`, ADR-less, see
-  `docs/AGENTIC_LAB_PIVOT_PLAN.md`), the publish gate (migration 0033), and the
+  the original agentic-lab pivot plan (retained in Git history)), the publish gate (migration 0033), and the
   provenance thesis in `docs/PLATFORM_IDEOLOGY.md`.
 
 ## Context
