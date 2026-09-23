@@ -18,7 +18,7 @@ const VOICE_PREF_KEY = "fadi-voice-enabled";
 /** Top menu bar — the OS's persistent identity strip: brand, track, live Fadi
  *  state, the ⌘K spotlight, "Hey Fadi", clock, and the user menu. Fadi is
  *  ambient now, so there's no Desk/Fadi mode toggle. */
-export function MenuBar() {
+export function MenuBar({ working = null }: { working?: string | null } = {}) {
   const { displayState } = useFadi();
   const [now, setNow] = useState<Date | null>(null);
 
@@ -36,7 +36,7 @@ export function MenuBar() {
       <div className="flex items-center gap-2">
         <FadiLogo className="size-5" />
         <span className="font-semibold tracking-tight">Fadi</span>
-        <FadiStateChip state={displayState} />
+        <FadiStateChip state={displayState} working={working} />
         <span className="text-muted-foreground/50">/</span>
         <TrackSwitcher />
         <ModeSwitch />
@@ -152,7 +152,7 @@ const STATE_TEXT: Record<FadiState, string> = {
 };
 
 /** Live status dot + label reflecting Fadi's ambient state. */
-function FadiStateChip({ state }: { state: FadiState }) {
+function FadiStateChip({ state, working }: { state: FadiState; working: string | null }) {
   const busy = state !== "idle";
   return (
     <span className="hidden items-center gap-1.5 text-muted-foreground sm:flex">
@@ -164,7 +164,11 @@ function FadiStateChip({ state }: { state: FadiState }) {
             : "bg-emerald-400 shadow-[0_0_6px_var(--color-emerald-400,#34d399)]"
         )}
       />
-      {STATE_TEXT[state]}
+      {/* What it is doing beats what it is. "Fadi active" on every screen of a product that
+          runs plans is a light that is always on. */}
+      <span className="max-w-[16rem] truncate">
+        {state === "idle" && working ? `On: ${working}` : STATE_TEXT[state]}
+      </span>
     </span>
   );
 }

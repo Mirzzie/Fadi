@@ -173,9 +173,18 @@ export function createJobsRepository(db: Database) {
     async archiveStaleLiveJobs(staleBefore: Date, source?: string): Promise<number> {
       // PUBLIC rows only: a private capture's freshness is the user's business, not the crawl's —
       // it must not expire just because the systematic sync stopped re-seeing it.
+      //
+      // Staleness is WHEN A SOURCE LAST LISTED IT, not when this row was last written. Keyed on
+      // `updated_at`, this archived nothing at all: a liveness probe, an embedding write or a
+      // re-aggregation all bump that column, so every posting looked fresh forever and 2,595
+      // "active" vacancies included ones no board had carried in months.
       const conditions = [
         eq(jobs.status, "active"),
-        lt(jobs.updatedAt, staleBefore),
+        sql`coalesce(
+          (select max(${jobOccurrences.lastSeenAt}) from ${jobOccurrences}
+            where ${jobOccurrences.jobId} = ${jobs.id}),
+          ${jobs.createdAt}
+        ) < ${staleBefore}`,
         sql`${jobs.ownerUserId} is null`,
       ];
       if (source) conditions.push(eq(jobs.source, source));
@@ -186,6 +195,63 @@ export function createJobsRepository(db: Database) {
         .where(and(...conditions))
         .returning({ id: jobs.id });
       return updated.length;
+    },
+
+    /**
+     * Stand down postings from sources Fadi no longer has.
+     *
+     * A retired source's postings cannot be refreshed, re-checked or re-listed by anyone — they
+     * are frozen at the moment the provider was removed, and every one of them is a role the
+     * person might tailor a CV for. Marked expired rather than deleted: reversible, and the
+     * occurrence rows stay as the record of where they came from.
+     */
+    async expireJobsFromRetiredSources(liveSources: string[]): Promise<number> {
+      if (liveSources.length === 0) return 0;
+      // One parameter, not a list: drizzle expands a bare array into ($1, $2, …), which is a row
+      // constructor and not something `= any(...)` can read.
+      const live = sql.param(liveSources);
+      // A source id may be stamped with its sub-board ("fadi-scraper:indeed"), so a posting is
+      // kept when ANY of its occurrences came from a source that is still registered.
+      const rows = await db.execute<{ id: string }>(sql`
+        update jobs set status = 'expired', updated_at = now()
+        where status = 'active'
+          and owner_user_id is null
+          and not exists (
+            select 1 from job_occurrences o
+            where o.job_id = jobs.id
+              and (
+                o.source = any(${live}::text[])
+                or exists (
+                  select 1 from unnest(${live}::text[]) as live(id)
+                  where o.source like live.id || ':%'
+                )
+              )
+          )
+        returning id
+      `);
+      return rows.rows.length;
+    },
+
+    /**
+     * The postings most worth a liveness probe: never checked first, then longest ago.
+     *
+     * The board probes only what it is about to show, six at a time, on a twelve-hour cache —
+     * which cannot catch up with thousands of postings and never touches the ones nobody has
+     * scrolled to. This feeds the background sweep, where nobody is waiting.
+     */
+    async listForLivenessSweep(
+      limit: number
+    ): Promise<{ id: string; url: string | null; livenessCheckedAt: Date | null }[]> {
+      return db
+        .select({
+          id: jobs.id,
+          url: jobs.url,
+          livenessCheckedAt: jobs.livenessCheckedAt,
+        })
+        .from(jobs)
+        .where(and(eq(jobs.status, "active"), sql`${jobs.url} is not null`))
+        .orderBy(sql`${jobs.livenessCheckedAt} asc nulls first`)
+        .limit(limit);
     },
 
     /** Store a job's semantic vector (hybrid search). Best-effort, additive. */

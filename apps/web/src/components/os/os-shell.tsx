@@ -21,11 +21,14 @@ export function OsShell({
   children,
   initialMode,
   activeTrackKey,
+  working = null,
 }: {
   children: React.ReactNode;
   initialMode: CareerMode;
   /** Id of the active career direction — changes on switch to remount page content. */
   activeTrackKey: string;
+  /** The plan Fadi is in the middle of, so the chip can say so on every screen. */
+  working?: string | null;
 }) {
   return (
     <FadiPresenceProvider>
@@ -33,7 +36,9 @@ export function OsShell({
           the app rather than only on the page that happened to ask for it. */}
       <PendingActionsProvider>
         <CareerModeProvider initialMode={initialMode}>
-          <OsShellInner activeTrackKey={activeTrackKey}>{children}</OsShellInner>
+          <OsShellInner activeTrackKey={activeTrackKey} working={working}>
+            {children}
+          </OsShellInner>
         </CareerModeProvider>
       </PendingActionsProvider>
     </FadiPresenceProvider>
@@ -43,9 +48,11 @@ export function OsShell({
 function OsShellInner({
   children,
   activeTrackKey,
+  working,
 }: {
   children: React.ReactNode;
   activeTrackKey: string;
+  working: string | null;
 }) {
   const pathname = usePathname();
   const { mode } = useCareerMode();
@@ -57,7 +64,7 @@ function OsShellInner({
         <div className="absolute inset-0 bg-[radial-gradient(120%_70%_at_50%_-10%,oklch(0.66_0.22_285/0.08),transparent_60%)]" />
       </div>
 
-      <MenuBar />
+      <MenuBar working={working} />
       <main className="flex-1 px-3 pb-28 pt-4 sm:px-6">
         <SubNav />
         {/* Keyed by route + active direction + phase. Any of the three changing remounts the

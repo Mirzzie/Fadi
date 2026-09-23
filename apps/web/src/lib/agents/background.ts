@@ -252,14 +252,24 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
     // and it draws nothing and drafts nothing until the person presses.
     await proposeForBestMatch(userId, findings).catch(() => {});
 
+    // And take the dead postings off the board. This is the half of "fresh roles" nobody sees:
+    // adding new ones is visible and removing closed ones is not, and a closed posting costs a
+    // fit check, a tailored CV and a cover letter before the site says it is gone.
+    const { maybeRunJobUpkeep, upkeepSummary } = await import("@/lib/jobs/upkeep");
+    const upkeep = await maybeRunJobUpkeep().catch(() => null);
+
     if (execution) {
       await work
         .finishExecution(userId, execution.id, {
           status: "done",
-          receipt:
+          receipt: [
             findings.length === 0
               ? "Nothing new worth telling you about."
               : `Found ${findings.length} thing${findings.length === 1 ? "" : "s"} worth telling you about.`,
+            upkeep ? upkeepSummary(upkeep) : "",
+          ]
+            .filter(Boolean)
+            .join(" "),
         })
         .catch(() => {});
     }
@@ -321,7 +331,16 @@ async function proposeForBestMatch(
  */
 export async function maybeRunAgentForUser(userId: string): Promise<void> {
   try {
-    await runAgentForUser(userId);
+    const outcome = await runAgentForUser(userId);
+
+    // The findings pass is throttled to six hours, and that is right for "here is a new role".
+    // It is wrong for "that role has closed": nobody needs to be told, and every hour a dead
+    // posting stays on the board is an hour someone can lose to it. So upkeep runs on its own
+    // cadence even when the pass itself was skipped.
+    if (!outcome.ran) {
+      const { maybeRunJobUpkeep } = await import("@/lib/jobs/upkeep");
+      await maybeRunJobUpkeep().catch(() => null);
+    }
   } catch (err) {
     logger.error("agent.opportunistic_run_failed", {
       userId,

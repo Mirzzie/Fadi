@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Play, Sparkles } from "lucide-react";
+import { Loader2, Mic, Play, Sparkles, Square } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, useTransition } from "react";
 
@@ -14,6 +14,8 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { resolveIntentAction, startPlanAction } from "@/app/dashboard/work-actions";
+import { useGroqVoice } from "@/lib/voice/use-groq-voice";
+import { cn } from "@/lib/utils";
 import { NAV_TARGETS } from "./navigation";
 import { useFadi } from "./fadi-presence";
 
@@ -25,6 +27,10 @@ import { useFadi } from "./fadi-presence";
  *    bar that says "starting…" and picks the wrong posting is worse than one that asks which.
  * 2. GO — jump to any area.
  * 3. ASK — hand it to Fadi, because a question is still a question.
+ *
+ * And it listens. Speaking into it is the same as typing into it: what you say lands in the box,
+ * resolves to work if it names work, and nothing happens until you press. Voice that acts on
+ * what it thought it heard is how an assistant applies to the wrong job.
  *
  * Lane 1 is what makes this an orchestrator rather than a search box: work begins by saying
  * what you want, not by finding the button someone filed it under.
@@ -46,6 +52,18 @@ export function CommandBar() {
   } | null>(null);
   const [starting, startTransition] = useTransition();
   const [notice, setNotice] = useState<string | null>(null);
+
+  // Speech fills the box; it never submits. The person reads back what was heard and presses.
+  const {
+    state: voiceState,
+    start: listen,
+    stop: stopListening,
+  } = useGroqVoice({
+    onTranscript: (heard) => setQuery((current) => (current ? `${current} ${heard}` : heard)),
+    onError: (message) => setNotice(message),
+  });
+  const listening = voiceState === "recording";
+  const transcribing = voiceState === "transcribing";
 
   // Open on ⌘K / Ctrl+K, or the menu-bar trigger event. (Esc is handled by the dialog.)
   useEffect(() => {
@@ -143,11 +161,39 @@ export function CommandBar() {
       description="Search Fadi, or ask it anything"
     >
       <Command shouldFilter={false}>
-        <CommandInput
-          value={query}
-          onValueChange={setQuery}
-          placeholder="Search Fadi, or ask it anything…"
-        />
+        <div className="flex items-center gap-1 pr-2">
+          <CommandInput
+            value={query}
+            onValueChange={setQuery}
+            placeholder={
+              listening
+                ? "Listening…"
+                : transcribing
+                  ? "Writing that down…"
+                  : "Tell Fadi what you want…"
+            }
+            className="flex-1"
+          />
+          <button
+            type="button"
+            aria-label={listening ? "Stop listening" : "Speak to Fadi"}
+            onClick={() => (listening ? stopListening() : listen())}
+            className={cn(
+              "grid size-8 shrink-0 place-items-center rounded-lg transition-colors",
+              listening
+                ? "bg-primary/20 text-primary"
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            {transcribing ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : listening ? (
+              <Square className="size-4" aria-hidden="true" />
+            ) : (
+              <Mic className="size-4" aria-hidden="true" />
+            )}
+          </button>
+        </div>
         <CommandList>
           {intent ? (
             <CommandGroup heading="Start this">
