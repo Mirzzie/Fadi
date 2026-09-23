@@ -161,3 +161,108 @@ export async function runVoiceWorkAction(
     return { say: "That didn't go through. Nothing has changed." };
   }
 }
+
+/**
+ * Open the thing somebody named.
+ *
+ * Resolved against their own records, never guessed at: if two things match equally, or nothing
+ * clears the bar, Fadi says so instead of opening something plausible. Someone who cannot see
+ * the screen has no way to notice they are in the wrong place.
+ */
+export async function openThingAction(spoken: string): Promise<VoiceReply> {
+  const parsed = z.string().trim().min(2).max(200).safeParse(spoken);
+  if (!parsed.success) return { say: "I didn't catch what to open." };
+
+  const user = await getCurrentAuthUser();
+  if (!user) return { say: "You're signed out." };
+
+  try {
+    const { resolveVoiceTarget } = await import("@/lib/voice/targets");
+    const target = await resolveVoiceTarget(user.id, parsed.data);
+    if (!target) {
+      return {
+        say: `I can't find ${parsed.data} in your work. Try the company name, or say 'open opportunities' to see the board.`,
+      };
+    }
+    const what =
+      target.kind === "job"
+        ? "the workspace for"
+        : target.kind === "document"
+          ? "your"
+          : target.kind === "project"
+            ? "the project"
+            : "";
+    return { say: `Opening ${what} ${target.label}.`.replace(/\s+/g, " "), href: target.href };
+  } catch {
+    return { say: "I couldn't look that up just now." };
+  }
+}
+
+/** Name what saving or committing would do, so it can be agreed to out loud. */
+export async function previewVoiceTargetAction(
+  intent: "saveJob" | "commit",
+  spoken: string
+): Promise<{ say: string; id?: string; title?: string }> {
+  const parsed = z.string().trim().min(2).max(200).safeParse(spoken);
+  if (!parsed.success) return { say: "I didn't catch which one." };
+
+  const user = await getCurrentAuthUser();
+  if (!user) return { say: "You're signed out." };
+
+  if (intent === "saveJob") {
+    const { resolveVoiceTarget } = await import("@/lib/voice/targets");
+    const target = await resolveVoiceTarget(user.id, parsed.data, "job");
+    return target
+      ? { say: `Save ${target.label} to your board?`, id: target.id, title: target.label }
+      : { say: `I can't find a role called ${parsed.data} on your board.` };
+  }
+
+  // Committing is different: it is allowed to be something new. A course nobody has heard of
+  // yet is exactly what a person is trying to take on, so this does not require a match.
+  return {
+    say: `Commit to ${parsed.data}? I'll add it to your plan and set up the build.`,
+    title: parsed.data,
+  };
+}
+
+/** Saving a role and taking on a course — the two that write something, after a spoken yes. */
+export async function runVoiceTargetAction(
+  command: { kind: "saveJob"; id: string } | { kind: "commit"; title: string }
+): Promise<VoiceReply> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { say: "You're signed out." };
+
+  try {
+    if (command.kind === "saveJob") {
+      if (!z.string().uuid().safeParse(command.id).success)
+        return { say: "That didn't look right." };
+      const { saveJobAction } = await import("./jobs/actions");
+      const saved = await saveJobAction(command.id);
+      return {
+        say: saved.ok ? "Saved to your board." : (saved.message ?? "That didn't save."),
+        changed: saved.ok,
+      };
+    }
+
+    const title = command.title.trim().slice(0, 200);
+    if (!title) return { say: "I need a name for it." };
+
+    const { commitToProjectAction } = await import("./learning/actions");
+    const committed = await commitToProjectAction({
+      // The gap it answers is the person's own words, because Fadi did not choose this one.
+      gap: title,
+      title,
+      kind: "project",
+    });
+    return committed.ok
+      ? {
+          say: committed.runId
+            ? `Committed to ${title}, and I've set the build up in Practice.`
+            : `Committed to ${title}. It's in your plan.`,
+          changed: true,
+        }
+      : { say: committed.message ?? "That didn't go through." };
+  } catch {
+    return { say: "That didn't go through. Nothing has changed." };
+  }
+}

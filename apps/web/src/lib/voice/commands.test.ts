@@ -58,8 +58,11 @@ describe("hearing a command", () => {
       kind: "navigate",
       href: "/dashboard/portfolio",
     });
-    // No such place — asked as a question rather than sent somewhere plausible.
-    expect(parseVoiceCommand("open the billing settings for my invoices").kind).toBe("ask");
+    // Not an area — so it is a thing to look up in this person's own records, and the server
+    // decides whether it exists. What must never happen is landing on a plausible-looking page.
+    const unknown = parseVoiceCommand("open the billing settings for my invoices");
+    expect(unknown.kind).toBe("open");
+    expect(unknown).not.toHaveProperty("href");
   });
 
   it("carries the role through so the server can name it back", () => {
@@ -135,5 +138,50 @@ describe("what a transcriber actually sends", () => {
   /** A dot inside a word is part of the word, not punctuation. */
   it("keeps the dots that belong to a name", () => {
     expect(flatten("Node.js and C#.NET")).toBe("node.js and c#.net");
+  });
+});
+
+
+/**
+ * Reaching a THING by name, not a page by position. This is what makes hands-free use general:
+ * the platform's own records are what a spoken name resolves against.
+ */
+describe("opening and taking on things by name", () => {
+  it("passes an unrecognised name to the server to look up", () => {
+    expect(parseVoiceCommand("open the Deerfoot job")).toEqual({
+      kind: "open",
+      target: "the deerfoot job",
+    });
+    expect(parseVoiceCommand("open my Stripe cover letter.")).toMatchObject({ kind: "open" });
+  });
+
+  it("hears every word people use for taking a course on, and asks first", () => {
+    for (const said of [
+      "commit to the Splunk fundamentals course",
+      "enrol in Splunk fundamentals",
+      "sign up for Splunk fundamentals",
+      "take on Splunk fundamentals",
+    ]) {
+      const command = parseVoiceCommand(said);
+      expect(command.kind, said).toBe("commit");
+      expect("confirm" in command && command.confirm, said).toBe(true);
+      expect(command.kind === "commit" && command.topic).toContain("splunk fundamentals");
+    }
+  });
+
+  it("asks before saving a role, and keeps the name it heard", () => {
+    expect(parseVoiceCommand("save the Deerfoot role")).toEqual({
+      kind: "saveJob",
+      target: "deerfoot role",
+      confirm: true,
+    });
+  });
+
+  /** An area still wins over a lookup: "open practice" is a place, not a project. */
+  it("prefers a real area over a thing with a similar name", () => {
+    expect(parseVoiceCommand("open practice")).toMatchObject({
+      kind: "navigate",
+      href: "/dashboard/learning",
+    });
   });
 });

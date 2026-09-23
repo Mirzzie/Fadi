@@ -13,7 +13,10 @@ import {
 import { parseVoiceCommand, VOICE_HELP, type VoiceCommand } from "@/lib/voice/commands";
 import { speakable } from "@/lib/voice/speakable";
 import {
+  openThingAction,
   previewVoiceApplyAction,
+  previewVoiceTargetAction,
+  runVoiceTargetAction,
   runVoiceWorkAction,
   speakStateAction,
 } from "@/app/dashboard/voice-actions";
@@ -135,6 +138,29 @@ export function useVoiceMode() {
                 : "Stop the plan? What's already done stays done.";
           pending.current = { say: asking, run: () => runVoiceWorkAction({ kind }) };
           say(asking);
+          return;
+        }
+        case "open": {
+          const reply = await openThingAction(command.target);
+          say(reply.say);
+          if (reply.href) router.push(reply.href);
+          return;
+        }
+        case "saveJob":
+        case "commit": {
+          const spoken = command.kind === "saveJob" ? command.target : command.topic;
+          const preview = await previewVoiceTargetAction(command.kind, spoken);
+          if (preview.id || preview.title) {
+            const run =
+              command.kind === "saveJob"
+                ? () => runVoiceTargetAction({ kind: "saveJob", id: preview.id! })
+                : () => runVoiceTargetAction({ kind: "commit", title: preview.title! });
+            // Only offer the yes when there is something to say yes TO.
+            if (command.kind === "saveJob" ? preview.id : preview.title) {
+              pending.current = { say: preview.say, run };
+            }
+          }
+          say(preview.say);
           return;
         }
         case "apply": {

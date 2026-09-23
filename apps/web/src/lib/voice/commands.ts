@@ -19,6 +19,12 @@ import { DESTINATIONS, NAV_TARGETS } from "@/components/os/navigation";
 
 export type VoiceCommand =
   | { kind: "navigate"; href: string; label: string }
+  /** Open a THING by name — a job, a document, a project — resolved on the server. */
+  | { kind: "open"; target: string }
+  /** Save the role that was named, or the one just opened. */
+  | { kind: "saveJob"; target: string; confirm: true }
+  /** Take on a course or a build. Creates a commitment, so it asks first. */
+  | { kind: "commit"; topic: string; confirm: true }
   | { kind: "read"; what: "today" | "plan" | "next" | "did" }
   | { kind: "advance" }
   | { kind: "stopPlan"; confirm: true }
@@ -50,6 +56,11 @@ export function flatten(text: string): string {
     .replace(/\.(?![a-z0-9])/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/** Drop the words that wrap a name without being part of it. */
+function strip(text: string): string {
+  return text.replace(/^(the|a|my|that|this)\s+/, "").trim();
 }
 
 /** Strip the name and any politeness that wraps the actual instruction. */
@@ -128,6 +139,15 @@ export function parseVoiceCommand(raw: string): VoiceCommand {
     return { kind: "apply", target, confirm: true };
   }
 
+  // Taking something on. "Enrol", "sign up" and "commit" all mean the same thing to a person,
+  // and all of them write a record, so all of them ask first.
+  const commit =
+    /\b(?:commit to|enrol in|enroll in|sign up for|take on|start learning)\s+(.{2,})$/.exec(said);
+  if (commit) return { kind: "commit", topic: strip(commit[1]!), confirm: true };
+
+  const save = /\b(?:save|bookmark|keep)\s+(.{2,})$/.exec(said);
+  if (save) return { kind: "saveJob", target: strip(save[1]!), confirm: true };
+
   // Navigation. Matched against the same list the dock and ⌘K use, so voice can reach every
   // area by the name a person sees — and only by a name that exists.
   const go = /\b(?:go to|open|show me|take me to|switch to)\s+(.{2,})$/.exec(said);
@@ -141,6 +161,10 @@ export function parseVoiceCommand(raw: string): VoiceCommand {
       .trim();
     const target = matchArea(spoken) ?? matchArea(stripped);
     if (target) return { kind: "navigate", href: target.href, label: target.label };
+
+    // Not an area, so it is probably a thing: a job, a document, a project. The server looks it
+    // up in this person's own records and names it back before going anywhere.
+    return { kind: "open", target: spoken };
   }
 
   return { kind: "ask", text: raw.trim() };
@@ -192,6 +216,7 @@ function matchArea(wanted: string): { href: string; label: string } | null {
 export const VOICE_HELP = [
   "You can say: what's on today, what's next, or read me the plan.",
   "To work: apply to a role by name, do the next step, or stop the plan.",
-  "To move around: open my career, open opportunities, open practice.",
+  "To open something: open opportunities, open my career, or name a job, a CV or a project.",
+  "To take something on: save that role, or commit to a course or project by name.",
   "Anything else, just ask me a question. Say 'go to sleep' when you're done.",
 ].join(" ");
