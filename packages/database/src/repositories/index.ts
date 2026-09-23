@@ -18,6 +18,7 @@ export * from "./lab-settings.repository";
 export * from "./lab-resources.repository";
 export * from "./learning-commitments.repository";
 export * from "./linkedin-profiles.repository";
+export * from "./mcp-connections.repository";
 export * from "./mcp-tokens.repository";
 export * from "./portfolio.repository";
 export * from "./product-events.repository";

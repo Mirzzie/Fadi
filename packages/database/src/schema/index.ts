@@ -2006,3 +2006,50 @@ export const workOutputs = pgTable(
 );
 
 export type WorkOutput = typeof workOutputs.$inferSelect;
+
+/**
+ * An MCP server this person has connected, so its tools become things Fadi can do.
+ *
+ * This is the reverse of `mcp_tokens`: those let another client drive Fadi, this lets Fadi
+ * drive something else. It is the whole extension story — a connected server's tools arrive as
+ * capabilities and inherit routing, approval and receipts without any other code changing.
+ *
+ * Everything about a connected server is untrusted: its URL is fetched by our server (so it is
+ * SSRF-guarded), its tool descriptions reach the model (so they are capped and labelled), and
+ * its risk is NOT self-declared — every external tool is `external` and asks before it runs. A
+ * server that could call itself harmless would be the whole attack.
+ */
+export const mcpConnections = pgTable(
+  "mcp_connections",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** What the person calls it. Also the namespace for its tools: `<slug>.<tool>`. */
+    label: text("label").notNull(),
+    slug: text("slug").notNull(),
+    url: text("url").notNull(),
+    /** Bearer token for the server, AES-GCM encrypted at rest. Never redisplayed. */
+    authCiphertext: text("auth_ciphertext"),
+    /** connected | unreachable | refused — what happened when Fadi last tried. */
+    status: text("status").notNull().default("connected"),
+    statusDetail: text("status_detail").notNull().default(""),
+    /** The tools it offered when last asked, as Fadi stores them for routing. */
+    tools: jsonb("tools")
+      .$type<{ name: string; description: string; parameters: Record<string, unknown> }[]>()
+      .notNull()
+      .default([]),
+    /** Whether its tools may run without asking each time. Off by default, deliberately. */
+    autoApprove: boolean("auto_approve").notNull().default(false),
+    lastCheckedAt: timestamp("last_checked_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("mcp_connections_user_slug_unique").on(table.userId, table.slug),
+    index("mcp_connections_user_idx").on(table.userId),
+  ]
+);
+
+export type McpConnection = typeof mcpConnections.$inferSelect;
+export type NewMcpConnection = typeof mcpConnections.$inferInsert;

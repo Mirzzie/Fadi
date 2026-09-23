@@ -10,7 +10,7 @@ import { createResilientChatStream } from "@/lib/ai/resilient";
 import { buildFadiContext } from "@/lib/ai/context/builder";
 import { buildFadiMessages } from "@/lib/ai/prompts/system";
 import { describeCurrentPlace } from "@/lib/ai/context/current-place";
-import { executeFadiTool, getFadiTools } from "@/lib/ai/tools/registry";
+import { executeFadiTool, getToolsForUser } from "@/lib/ai/tools/registry";
 import { toolsForTurn } from "@/lib/ai/tools/routing";
 import { toToolSpec, type FadiToolContext } from "@/lib/ai/tools/types";
 import { createAgentMessagesRepository, createWorkItemsRepository } from "@careeros/database";
@@ -180,7 +180,7 @@ export async function POST(req: NextRequest) {
   // chain that supports function calling. If none do, we stream plainly.
   // Not the whole catalogue on every turn: the core questions, the area they are standing in,
   // and anything their own words point at (see lib/ai/tools/routing.ts).
-  const tools = toolsForTurn(getFadiTools(), { pathname, message }).map(toToolSpec);
+  const tools = toolsForTurn(await getToolsForUser(user.id), { pathname, message }).map(toToolSpec);
   // All tool-capable providers (primary → fallback) so the agentic loop fails
   // over when one is rate-limited/exhausted (e.g. Groq's daily token cap).
   const toolProviders = chain.filter((p) => typeof p.runWithTools === "function");

@@ -2,12 +2,13 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Cpu } from "lucide-react";
 
-import { createProfilesRepository } from "@careeros/database";
+import { createMcpConnectionsRepository, createProfilesRepository } from "@careeros/database";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { AiProviderForm } from "@/components/settings/ai-provider-form";
 import { AutoPrepToggle } from "@/components/settings/auto-prep-toggle";
 import { ConnectedAccounts } from "@/components/settings/connected-accounts";
+import { ConnectedTools } from "@/components/settings/connected-tools";
 import { McpTokens } from "@/components/settings/mcp-tokens";
 import { NotionIntegration } from "@/components/settings/notion-integration";
 import { listMcpTokens } from "@/lib/mcp/tokens";
@@ -27,6 +28,7 @@ export default async function SettingsPage() {
   const settings = await getUserAiSettingsView(user.id);
   const profile = await createProfilesRepository(getDatabase()).getByUserId(user.id);
   const mcpTokens = await listMcpTokens(user.id);
+  const connections = await createMcpConnectionsRepository(getDatabase()).listForUser(user.id);
 
   return (
     <AppShell>
@@ -57,6 +59,20 @@ export default async function SettingsPage() {
         </section>
 
         <AiProviderForm descriptors={PROVIDER_DESCRIPTORS} initial={settings} />
+
+        <ConnectedTools
+          connections={connections.map((connection) => ({
+            id: connection.id,
+            label: connection.label,
+            slug: connection.slug,
+            url: connection.url,
+            status: connection.status,
+            statusDetail: connection.statusDetail,
+            toolCount: connection.tools.length,
+            mayAct: connection.autoApprove,
+            lastCheckedAt: connection.lastCheckedAt?.toISOString() ?? null,
+          }))}
+        />
 
         <AutoPrepToggle initial={profile?.autoPrepEnabled ?? false} />
 

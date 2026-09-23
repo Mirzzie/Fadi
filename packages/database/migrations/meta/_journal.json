@@ -407,6 +407,13 @@
       "when": 1790166772928,
       "tag": "0057_work_invariants",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1790187019078,
+      "tag": "0058_mcp_connections",
+      "breakpoints": true
     }
   ]
 }

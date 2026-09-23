@@ -1151,6 +1151,18 @@ export function getFadiTool(name: string): FadiTool | undefined {
   return TOOLS.find((t) => t.name === name);
 }
 
+/**
+ * Fadi's own capabilities plus the ones this person has connected.
+ *
+ * Built-ins are listed first and a connected tool can never take their name — it is namespaced
+ * `<connection>.<tool>` — so nothing from outside can shadow `generate_document` and receive a
+ * call that was meant for Fadi's own.
+ */
+export async function getToolsForUser(userId: string): Promise<FadiTool[]> {
+  const { connectedToolsForUser } = await import("./connected");
+  return [...TOOLS, ...(await connectedToolsForUser(userId))];
+}
+
 export async function executeFadiTool(
   name: string,
   args: Record<string, unknown>,
