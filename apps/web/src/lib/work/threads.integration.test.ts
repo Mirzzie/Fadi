@@ -59,7 +59,7 @@ suite("Conversations scoped to a piece of work", () => {
     expect(await messages.listRecentForUser(userId, 50)).toHaveLength(3);
   });
 
-  it("does not lose the conversation when the work is deleted", async () => {
+  it("returns the conversation to general history when the work is deleted", async () => {
     const step = await work.create(userId, {
       kind: "step",
       title: "Send it",
@@ -73,11 +73,16 @@ suite("Conversations scoped to a piece of work", () => {
 
     await work.remove(userId, step.id);
 
-    // agent_messages carries no foreign key on purpose: what was said stays said, and the
-    // turn falls back to the general conversation rather than vanishing with the work.
-    const kept = await pool.query("select work_item_id from agent_messages where content = $1", [
-      "Sent, and I logged the follow-up.",
-    ]);
-    expect(kept.rowCount).toBe(1);
+    // Surviving in the table is not enough — it has to be REACHABLE. Keeping the dead id left
+    // the turn out of general history and openable by no screen at all.
+    const general = await messages.listRecentForUser(userId, 50, { workItemId: null });
+    const kept = general.find((row) => row.content === "Sent, and I logged the follow-up.");
+    expect(kept).toBeDefined();
+    expect(kept!.workItemId).toBeNull();
+    // And it still says what it was about, so the turn can be explained after the fact.
+    expect((kept!.metadata as { formerWork?: string }).formerWork).toBe("Send it");
+
+    const stillThreaded = await messages.listRecentForUser(userId, 50, { workItemId: step.id });
+    expect(stillThreaded).toHaveLength(0);
   });
 });

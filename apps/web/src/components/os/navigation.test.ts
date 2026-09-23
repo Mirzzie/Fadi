@@ -1,6 +1,10 @@
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import { DESTINATIONS, NAV_TARGETS, areaFor, destinationFor } from "./navigation";
+
+const APP = fileURLToPath(new URL("../../app", import.meta.url));
 
 describe("four destinations", () => {
   it("puts every route under exactly one destination", () => {
@@ -35,9 +39,24 @@ describe("four destinations", () => {
     expect(areaFor("/dashboard/settings")).toBeNull();
   });
 
+  /**
+   * The mapping tests below prove a href is filed under the right destination. They cannot
+   * prove it goes anywhere: "Directions" pointed at /dashboard/tracks, which has actions and
+   * no page, and shipped as a labelled 404.
+   */
+  it("points every label at a page that exists", () => {
+    for (const target of NAV_TARGETS) {
+      const route = target.href.replace(/^\//, "").split("?")[0];
+      expect(existsSync(`${APP}/${route}/page.tsx`), `${target.label} → ${target.href}`).toBe(
+        true
+      );
+    }
+  });
+
   it("offers every area to search, plus the account pages", () => {
     const hrefs = NAV_TARGETS.map((target) => target.href);
     expect(hrefs).toContain("/dashboard/network");
+    expect(hrefs).toContain("/dashboard/portfolio");
     expect(hrefs).toContain("/dashboard/settings");
     expect(new Set(hrefs).size).toBe(hrefs.length);
   });

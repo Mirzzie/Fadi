@@ -71,7 +71,9 @@ export const DESTINATIONS: Destination[] = [
       { href: "/dashboard/evidence", label: "My record" },
       { href: "/dashboard/documents", label: "CVs and letters" },
       { href: "/dashboard/portfolio", label: "Portfolio" },
-      { href: "/dashboard/tracks", label: "Directions" },
+      // No "Directions" entry: /dashboard/tracks has actions and no page, and switching or
+      // creating a direction already lives in the switcher at the top of every screen. A
+      // labelled destination that 404s is worse than one fewer label.
     ],
   },
 ];

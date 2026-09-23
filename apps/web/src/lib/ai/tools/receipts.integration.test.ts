@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { getFadiTools } from "./registry";
+import { executeFadiTool, getFadiTools } from "./registry";
 import { runWithReceipt } from "./receipts";
 import type { FadiTool } from "./types";
 
@@ -59,7 +59,7 @@ suite("receipts for what Fadi did", () => {
       risk: "write",
       effect: "Did the thing.",
       parameters: {},
-      execute: async () => ({ summary: "It worked." }),
+      execute: async () => ({ summary: "It worked.", outcome: "performed" as const }),
       ...over,
     } as FadiTool;
   }
@@ -92,6 +92,18 @@ suite("receipts for what Fadi did", () => {
     expect(receipt.error).toBe("Could not reach it.");
   });
 
+  it("refuses to call an unreported result a success", async () => {
+    // Only reachable by a tool that got past the type — the receipt must not invent a verdict.
+    await runWithReceipt(
+      tool({ execute: async () => ({ summary: "Ambiguous." }) as never }),
+      {},
+      { userId }
+    );
+    const [receipt] = await work.listExecutions(userId, { limit: 1 });
+    expect(receipt.status).toBe("failed");
+    expect(receipt.receipt).toBe("Fadi could not tell whether this ran.");
+  });
+
   it("records a crash instead of swallowing it", async () => {
     await expect(
       runWithReceipt(
@@ -110,6 +122,22 @@ suite("receipts for what Fadi did", () => {
     expect(receipt.status).toBe("failed");
     expect(receipt.risk).toBe("external");
     expect(receipt.error).toContain("the host refused");
+  });
+
+  /**
+   * The stub above always represents a success. That is exactly why it could not catch the
+   * defect: real write tools return clarification as an ordinary result, and the receipt read
+   * "Create a career direction — before I start that direction I need ..." marked done.
+   */
+  it("does not call a real tool's question a completed action", async () => {
+    const result = await executeFadiTool("create_career_track", {}, { userId });
+    expect(result.summary).toMatch(/I need/i);
+
+    const [receipt] = await work.listExecutions(userId, { limit: 1 });
+    expect(receipt.action).toBe("Create a career direction");
+    expect(receipt.status).toBe("needs_input");
+    expect(receipt.status).not.toBe("done");
+    expect(receipt.error).toBeNull();
   });
 
   it("lands the receipt on the work it was done for", async () => {

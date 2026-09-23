@@ -1,7 +1,8 @@
-import { and, asc, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 
 import type { DbOrTx } from "../client";
 import {
+  agentMessages,
   workExecutions,
   workItems,
   workOutputs,
@@ -30,6 +31,8 @@ export const EXECUTION_STATUSES = [
   "proposed",
   "approved",
   "running",
+  /** It ran, and stopped to ask the person something. Not a success and not a failure. */
+  "needs_input",
   "done",
   "failed",
   "refused",
@@ -72,7 +75,7 @@ export type StartExecutionInput = {
 };
 
 export type FinishExecutionInput = {
-  status: Extract<ExecutionStatus, "done" | "failed" | "refused">;
+  status: Extract<ExecutionStatus, "done" | "needs_input" | "failed" | "refused">;
   receipt?: string;
   error?: string | null;
 };
@@ -194,27 +197,65 @@ export function createWorkItemsRepository(db: DbOrTx) {
     },
 
     /**
-     * Makes one goal the active one and stands every other goal down, in a single statement
-     * so there is never a moment where two goals both claim to be what you are working on.
+     * Makes one goal the active one and stands every other goal down.
+     *
+     * Two people switching at once is not the risk; one person with two tabs is. A single
+     * statement was not enough: two transactions that each saw no active goal both committed
+     * one, and Today then led with a goal the person had switched away from. So this takes a
+     * per-person lock first, and stands the old goal down BEFORE raising the new one — if it
+     * dies in between, the person has no active goal, which the first screen can say, rather
+     * than two, which it cannot.
+     *
+     * `work_items_one_active_goal_per_user` is the backstop: the lock only serialises callers
+     * that take it, and a unique index binds every writer.
      */
     async setActiveGoal(userId: string, id: string): Promise<WorkItem> {
-      const rows = await db
+      await db.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${`work-goal:${userId}`}, 0))`
+      );
+
+      const [owned] = await db
+        .select()
+        .from(workItems)
+        .where(and(eq(workItems.userId, userId), eq(workItems.id, id), eq(workItems.kind, "goal")))
+        .limit(1);
+      if (!owned) throw new Error("Work item unavailable.");
+
+      await db
         .update(workItems)
-        .set({
-          status: sql`case when ${workItems.id} = ${id} then 'active' else 'open' end`,
-          updatedAt: new Date(),
-        })
+        .set({ status: "open", updatedAt: new Date() })
         .where(
           and(
             eq(workItems.userId, userId),
             eq(workItems.kind, "goal"),
-            or(eq(workItems.id, id), eq(workItems.status, "active"))
+            eq(workItems.status, "active"),
+            ne(workItems.id, id)
           )
-        )
+        );
+
+      const [chosen] = await db
+        .update(workItems)
+        .set({ status: "active", updatedAt: new Date() })
+        .where(and(eq(workItems.userId, userId), eq(workItems.id, id)))
         .returning();
-      const chosen = rows.find((row) => row.id === id);
       if (!chosen) throw new Error("Work item unavailable.");
       return chosen;
+    },
+
+    /** The goal the person is on, or nothing when they have not set one. */
+    async activeGoal(userId: string): Promise<WorkItem | undefined> {
+      const [row] = await db
+        .select()
+        .from(workItems)
+        .where(
+          and(
+            eq(workItems.userId, userId),
+            eq(workItems.kind, "goal"),
+            eq(workItems.status, "active")
+          )
+        )
+        .limit(1);
+      return row;
     },
 
     async listChildren(userId: string, parentId: string): Promise<WorkItem[]> {
@@ -242,7 +283,18 @@ export function createWorkItemsRepository(db: DbOrTx) {
      * Overdue and dated work first, then undated, then insertion order. `blocked` is left out —
      * a step waiting on someone else is not an action, and offering it as one is a lie.
      */
-    async nextActions(userId: string, limit = 5): Promise<WorkItem[]> {
+    async nextActions(
+      userId: string,
+      options: { goalId?: string | null; limit?: number } = {}
+    ): Promise<WorkItem[]> {
+      // Scoped to one goal, because "what should I do next" is only true relative to what the
+      // person said they are doing. Unscoped, switching goals left the same step on Today.
+      let under: string[] | null = null;
+      if (options.goalId) {
+        under = await descendantIds(userId, options.goalId);
+        if (under.length === 0) return [];
+      }
+
       return db
         .select()
         .from(workItems)
@@ -250,7 +302,8 @@ export function createWorkItemsRepository(db: DbOrTx) {
           and(
             eq(workItems.userId, userId),
             eq(workItems.kind, "step"),
-            inArray(workItems.status, ["open", "active"])
+            inArray(workItems.status, ["open", "active"]),
+            under ? inArray(workItems.id, under) : undefined
           )
         )
         .orderBy(
@@ -259,7 +312,7 @@ export function createWorkItemsRepository(db: DbOrTx) {
           asc(workItems.sortOrder),
           asc(workItems.createdAt)
         )
-        .limit(limit);
+        .limit(options.limit ?? 5);
     },
 
     /** Live work that points at a given thing, so a job or document page can show its own work. */
@@ -325,27 +378,60 @@ export function createWorkItemsRepository(db: DbOrTx) {
       return row;
     },
 
-    /** Deletes the item and everything under it. Outputs and receipts cascade with them. */
+    /**
+     * Deletes the item and everything under it.
+     *
+     * What was SAID about the work is not the work's to take with it. Before the rows go, each
+     * message is returned to the general conversation and stamped with what the work was
+     * called — otherwise the turns keep a dead id, disappear from general history and become
+     * unreachable by any screen. Receipts survive too: `work_executions` keeps its own copy of
+     * the label and its pointer is set null, so the account of what Fadi did outlives a delete.
+     */
     async remove(userId: string, id: string): Promise<number> {
-      const ids = await descendantIds(userId, id);
-      if (ids.length === 0) return 0;
+      const items = await db
+        .select({ id: workItems.id, title: workItems.title })
+        .from(workItems)
+        .where(
+          and(eq(workItems.userId, userId), inArray(workItems.id, await descendantIds(userId, id)))
+        );
+      if (items.length === 0) return 0;
+
+      for (const item of items) {
+        await db
+          .update(agentMessages)
+          .set({
+            workItemId: null,
+            metadata: sql`${agentMessages.metadata} || ${JSON.stringify({ formerWork: item.title })}::jsonb`,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(agentMessages.userId, userId), eq(agentMessages.workItemId, item.id)));
+      }
+
       const rows = await db
         .delete(workItems)
-        .where(and(eq(workItems.userId, userId), inArray(workItems.id, ids)))
+        .where(
+          and(
+            eq(workItems.userId, userId),
+            inArray(
+              workItems.id,
+              items.map((item) => item.id)
+            )
+          )
+        )
         .returning({ id: workItems.id });
       return rows.length;
     },
 
     /** Records the attempt before it runs, so a crash still leaves a trace of what was tried. */
     async startExecution(userId: string, input: StartExecutionInput): Promise<WorkExecution> {
-      if (input.workItemId && !(await own(userId, input.workItemId))) {
-        throw new Error("Work item unavailable.");
-      }
+      const item = input.workItemId ? await own(userId, input.workItemId) : undefined;
+      if (input.workItemId && !item) throw new Error("Work item unavailable.");
       const [row] = await db
         .insert(workExecutions)
         .values({
           userId,
           workItemId: input.workItemId ?? null,
+          workLabel: item?.title ?? "",
           action: input.action,
           surface: input.surface ?? "web",
           risk: input.risk ?? "read",

@@ -400,6 +400,13 @@
       "when": 1790163350531,
       "tag": "0056_agent_message_threads",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1790166772928,
+      "tag": "0057_work_invariants",
+      "breakpoints": true
     }
   ]
 }

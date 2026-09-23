@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 import { createWorkItemsRepository } from "@careeros/database";
 
@@ -10,35 +11,42 @@ import { getDatabase } from "@/lib/database/client";
 /**
  * The only writes Today needs: name what you are working towards, break it into steps, and
  * mark one done. Everything else on the page is read from work that already happened.
+ *
+ * A server action is a network entry point, not a function call. Every argument is parsed at
+ * runtime — a TypeScript union does not survive the wire, and without this a forged call could
+ * write any status string onto any item the person happens to own.
  */
 
 type Result = { ok: true } | { ok: false; error: string };
 
 const FAILED: Result = { ok: false, error: "Could not save that. Please try again." };
+const REJECTED: Result = { ok: false, error: "That request did not look right." };
 
-async function withWork<T>(
-  run: (userId: string, repo: ReturnType<typeof createWorkItemsRepository>) => Promise<T>
-) {
+const uuid = z.string().uuid();
+const title = z.string().trim().min(1).max(200);
+const reason = z.string().trim().max(500);
+const stepStatus = z.enum(["open", "active", "blocked", "done", "dropped"]);
+
+export async function setGoalAction(rawTitle: string, rawReason = ""): Promise<Result> {
+  const parsed = z.object({ title, reason }).safeParse({ title: rawTitle, reason: rawReason });
+  if (!parsed.success) return { ok: false, error: "Give the goal a name." };
+
   const user = await getCurrentAuthUser();
-  if (!user) return null;
-  return run(user.id, createWorkItemsRepository(getDatabase()));
-}
+  if (!user) return FAILED;
 
-export async function setGoalAction(title: string, reason = ""): Promise<Result> {
-  const clean = title.trim().slice(0, 200);
-  if (!clean) return { ok: false, error: "Give the goal a name." };
   try {
-    const done = await withWork(async (userId, repo) => {
-      const goal = await repo.create(userId, {
+    // One transaction: a goal that was created but never activated would leave the person
+    // with a goal they cannot see and no way to reach it.
+    await getDatabase().transaction(async (tx) => {
+      const repo = createWorkItemsRepository(tx);
+      const goal = await repo.create(user.id, {
         kind: "goal",
-        title: clean,
-        reason: reason.trim().slice(0, 500),
-        status: "active",
+        title: parsed.data.title,
+        reason: parsed.data.reason,
+        status: "open",
       });
-      await repo.setActiveGoal(userId, goal.id);
-      return true;
+      await repo.setActiveGoal(user.id, goal.id);
     });
-    if (!done) return FAILED;
     revalidatePath("/dashboard");
     return { ok: true };
   } catch {
@@ -47,9 +55,16 @@ export async function setGoalAction(title: string, reason = ""): Promise<Result>
 }
 
 export async function switchGoalAction(id: string): Promise<Result> {
+  if (!uuid.safeParse(id).success) return REJECTED;
+
+  const user = await getCurrentAuthUser();
+  if (!user) return FAILED;
+
   try {
-    const done = await withWork((userId, repo) => repo.setActiveGoal(userId, id));
-    if (!done) return FAILED;
+    // In a transaction so the per-person lock inside setActiveGoal is held for both writes.
+    await getDatabase().transaction(async (tx) =>
+      createWorkItemsRepository(tx).setActiveGoal(user.id, id)
+    );
     revalidatePath("/dashboard");
     return { ok: true };
   } catch {
@@ -61,27 +76,25 @@ export async function switchGoalAction(id: string): Promise<Result> {
  * A step hangs under the active goal. When there is no goal yet the step has nowhere honest to
  * live, so the caller is told to name the goal first rather than having one invented for them.
  */
-export async function addStepAction(title: string, reason = ""): Promise<Result> {
-  const clean = title.trim().slice(0, 200);
-  if (!clean) return { ok: false, error: "Give the step a name." };
+export async function addStepAction(rawTitle: string, rawReason = ""): Promise<Result> {
+  const parsed = z.object({ title, reason }).safeParse({ title: rawTitle, reason: rawReason });
+  if (!parsed.success) return { ok: false, error: "Give the step a name." };
+
+  const user = await getCurrentAuthUser();
+  if (!user) return FAILED;
+
   try {
-    const result = await withWork(async (userId, repo) => {
-      const goals = await repo.listGoals(userId);
-      const goal = goals.find((row) => row.status === "active") ?? goals[0];
-      if (!goal) return "no-goal" as const;
-      await repo.create(userId, {
-        kind: "step",
-        title: clean,
-        reason: reason.trim().slice(0, 500),
-        parentId: goal.id,
-        careerProfileId: goal.careerProfileId,
-      });
-      return "done" as const;
+    const repo = createWorkItemsRepository(getDatabase());
+    const goal = (await repo.activeGoal(user.id)) ?? (await repo.listGoals(user.id))[0];
+    if (!goal) return { ok: false, error: "Name what you are working towards first." };
+
+    await repo.create(user.id, {
+      kind: "step",
+      title: parsed.data.title,
+      reason: parsed.data.reason,
+      parentId: goal.id,
+      careerProfileId: goal.careerProfileId,
     });
-    if (result === "no-goal") {
-      return { ok: false, error: "Name what you are working towards first." };
-    }
-    if (!result) return FAILED;
     revalidatePath("/dashboard");
     return { ok: true };
   } catch {
@@ -89,13 +102,24 @@ export async function addStepAction(title: string, reason = ""): Promise<Result>
   }
 }
 
-export async function setStepStatusAction(
-  id: string,
-  status: "open" | "active" | "blocked" | "done" | "dropped"
-): Promise<Result> {
+/**
+ * Moves ONE STEP. Today has no control that finishes a goal or a plan, so neither does this:
+ * an action that can be reached from the network may only do the thing the screen offers.
+ */
+export async function setStepStatusAction(id: string, status: string): Promise<Result> {
+  const parsed = z.object({ id: uuid, status: stepStatus }).safeParse({ id, status });
+  if (!parsed.success) return REJECTED;
+
+  const user = await getCurrentAuthUser();
+  if (!user) return FAILED;
+
   try {
-    const done = await withWork((userId, repo) => repo.setStatus(userId, id, status));
-    if (!done) return FAILED;
+    const repo = createWorkItemsRepository(getDatabase());
+    const item = await repo.get(user.id, parsed.data.id);
+    if (!item) return REJECTED;
+    if (item.kind !== "step") return { ok: false, error: "Only a step can be ticked off here." };
+
+    await repo.setStatus(user.id, parsed.data.id, parsed.data.status);
     revalidatePath("/dashboard");
     return { ok: true };
   } catch {

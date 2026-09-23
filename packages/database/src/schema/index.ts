@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   index,
   integer,
   jsonb,
@@ -1901,6 +1902,22 @@ export const workItems = pgTable(
   (table) => [
     index("work_items_user_status_idx").on(table.userId, table.status),
     index("work_items_parent_idx").on(table.userId, table.parentId, table.sortOrder),
+    /**
+     * Hard invariant: at most ONE active goal per person. Today leads with the active goal and
+     * offers only work beneath it, so a second active row means the first screen can point
+     * somewhere the person is not going. Two transactions that each see no active goal will
+     * otherwise both commit one — enforce it where that race is visible.
+     */
+    uniqueIndex("work_items_one_active_goal_per_user")
+      .on(table.userId)
+      .where(sql`${table.kind} = 'goal' and ${table.status} = 'active'`),
+    // The kind and the status are a state machine, and a server action is a network entry
+    // point: a TypeScript union does not survive the wire.
+    check("work_items_kind_check", sql`${table.kind} in ('goal', 'plan', 'step')`),
+    check(
+      "work_items_status_check",
+      sql`${table.status} in ('open', 'active', 'blocked', 'done', 'dropped')`
+    ),
   ]
 );
 
@@ -1920,14 +1937,21 @@ export const workExecutions = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    workItemId: uuid("work_item_id").references(() => workItems.id, { onDelete: "cascade" }),
+    /**
+     * The work this served, kept as a pointer only. Deleting the work does NOT delete the
+     * record of what was done — an account of Fadi's actions that a delete can edit is not an
+     * account. The label below is what the receipt still reads by afterwards.
+     */
+    workItemId: uuid("work_item_id").references(() => workItems.id, { onDelete: "set null" }),
+    /** What the work was called when this ran, so a deleted goal leaves a readable receipt. */
+    workLabel: text("work_label").notNull().default(""),
     /** web | voice | background | extension — where the attempt came from. */
     surface: text("surface").notNull().default("web"),
     /** The capability attempted, named as the person would hear it. */
     action: text("action").notNull(),
     /** read | write | external — what it could touch, so approval policy is data not code. */
     risk: text("risk").notNull().default("read"),
-    /** proposed | approved | running | done | failed | refused */
+    /** proposed | approved | running | needs_input | done | failed | refused */
     status: text("status").notNull().default("running"),
     /** What happened, in one sentence, for the person to read. */
     receipt: text("receipt").notNull().default(""),
@@ -1941,6 +1965,11 @@ export const workExecutions = pgTable(
   (table) => [
     index("work_executions_user_idx").on(table.userId, table.startedAt),
     index("work_executions_item_idx").on(table.workItemId, table.startedAt),
+    check("work_executions_risk_check", sql`${table.risk} in ('read', 'write', 'external')`),
+    check(
+      "work_executions_status_check",
+      sql`${table.status} in ('proposed', 'approved', 'running', 'needs_input', 'done', 'failed', 'refused')`
+    ),
   ]
 );
 

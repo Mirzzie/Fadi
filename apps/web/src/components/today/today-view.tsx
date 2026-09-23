@@ -289,7 +289,15 @@ const RECEIPT_TONE: Record<string, string> = {
   done: "text-foreground",
   failed: "text-destructive",
   refused: "text-muted-foreground",
+  needs_input: "text-foreground",
   running: "text-muted-foreground",
+};
+
+/** What the status means, said plainly. An empty string means the receipt speaks for itself. */
+const RECEIPT_NOTE: Record<string, string> = {
+  running: "still running",
+  needs_input: "waiting on you",
+  refused: "did not run",
 };
 
 function WhatFadiDid({ today }: { today: Today }) {
@@ -316,8 +324,8 @@ function WhatFadiDid({ today }: { today: Today }) {
               {receipt.receipt ? (
                 <span className="text-muted-foreground"> — {receipt.receipt}</span>
               ) : null}
-              {receipt.status === "running" ? (
-                <span className="text-muted-foreground"> — still running</span>
+              {RECEIPT_NOTE[receipt.status] ? (
+                <span className="text-muted-foreground"> — {RECEIPT_NOTE[receipt.status]}</span>
               ) : null}
               {receipt.error ? <span className="text-destructive"> — {receipt.error}</span> : null}
             </li>

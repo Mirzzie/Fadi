@@ -22,7 +22,7 @@ import { getLaborMarket } from "./labor-market";
 import { getWorldShifts } from "./world-shifts";
 import { trackApplication } from "./track-application";
 import { runWithReceipt } from "./receipts";
-import type { FadiTool, FadiToolContext, FadiToolResult } from "./types";
+import type { ConsequentialResult, FadiTool, FadiToolContext, FadiToolResult } from "./types";
 
 /**
  * Fadi's tool registry. Each tool wraps a real Fadi service so Fadi can act on
@@ -179,7 +179,7 @@ const REFERRAL_RELATIONSHIPS = [
 const draftReferralOutreachTool: FadiTool = {
   name: "draft_referral_outreach",
   risk: "write",
-  effect: "Added a referral target and drafted the message.",
+  effect: "Add a referral target and draft the message",
   description:
     "Add a referral target at a company and draft a short, sendable outreach message asking for a referral or warm intro. Use for 'help me get a referral at X', 'draft my message to someone at X', 'who should I ask at X'. A referral is an independent draw that routes around the correlated screening software — the highest-leverage move. Company is required; role/contact are optional.",
   parameters: {
@@ -197,10 +197,11 @@ const draftReferralOutreachTool: FadiTool = {
     },
     required: ["company"],
   },
-  async execute(args, ctx): Promise<FadiToolResult> {
+  async execute(args, ctx): Promise<ConsequentialResult> {
     const company = typeof args.company === "string" ? args.company.trim() : "";
     if (!company) {
       return {
+        outcome: "needs_input",
         summary:
           "Which company do you want a referral into? Tell me and I'll set it up and draft the message.",
         view: "none",
@@ -224,6 +225,7 @@ const draftReferralOutreachTool: FadiTool = {
     const res = await draftOutreachFor(ctx.userId, target.id);
 
     return {
+      outcome: "performed",
       summary: res.draft
         ? `I added ${company} as a referral target and drafted a message you can send:\n\n${res.draft}\n\nWhen you actually reach out, mark "I reached out" on the Network page — that ask is your highest-leverage move.`
         : `I added ${company} as a referral target. Open the Network page to draft and send your outreach.`,
@@ -358,7 +360,7 @@ const evaluateFitTool: FadiTool = {
 const planProjectTool: FadiTool = {
   name: "plan_project",
   risk: "write",
-  effect: "Planned a project and saved its steps.",
+  effect: "Plan a project and save its steps",
   description:
     "Turn a project idea into concrete steps the user can execute TONIGHT on hardware they actually own. Use when they commit to a project, ask how to start one, or say a suggestion is too vague. Each step gets a way to verify it worked and names what it produces. Never answer a 'how do I build X' question with links when this can produce a real plan.",
   parameters: {
@@ -369,16 +371,22 @@ const planProjectTool: FadiTool = {
     },
     required: ["title"],
   },
-  async execute(args, ctx): Promise<FadiToolResult> {
+  async execute(args, ctx): Promise<ConsequentialResult> {
     const title = typeof args.title === "string" ? args.title.trim() : "";
-    if (!title) return { summary: "I need the project title to plan it.", view: "none" };
+    if (!title)
+      return {
+        summary: "I need the project title to plan it.",
+        view: "none",
+        outcome: "needs_input",
+      };
     const { planProjectRun } = await import("@/lib/lab/plan-run");
     const res = await planProjectRun(ctx.userId, {
       title,
       detail: typeof args.detail === "string" ? args.detail : null,
     });
-    if (!res.ok) return { summary: res.message, view: "none" };
+    if (!res.ok) return { summary: res.message, view: "none", outcome: "failed" };
     return {
+      outcome: "performed",
       summary: `Planned "${title}" as ${res.plan.steps} steps against your own hardware. Open Learning to work through them — each one says how to tell it worked.`,
       view: "none",
       data: { runId: res.plan.runId, steps: res.plan.steps },
@@ -403,11 +411,11 @@ const planProjectTool: FadiTool = {
 const inspectMachineTool: FadiTool = {
   name: "inspect_machine",
   risk: "external",
-  effect: "Looked at the machine.",
+  effect: "Look at the machine",
   description:
     "Look at what is actually installed on the user's own machine — container runtimes, hypervisors, memory and CPU — before planning a project or claiming something will run. Use when hardware matters to the answer. Requires the user's permission; if they have not granted it, this returns what to ask them for. Never guess the user's hardware when this tool can read it.",
   parameters: { type: "object", properties: {} },
-  async execute(_args, ctx): Promise<FadiToolResult> {
+  async execute(_args, ctx): Promise<ConsequentialResult> {
     const { scanLocalMachine } = await import("@/lib/lab/local-probe");
     // The audit row says which surface asked. "An MCP client wanted to see my hypervisor"
     // and "the assistant I am talking to wanted to" are different facts, and the log is
@@ -421,6 +429,7 @@ const inspectMachineTool: FadiTool = {
 
     if (scan.needsGrant.length > 0 && scan.findings.length === 0) {
       return {
+        outcome: "refused",
         // Said as a request, because that is what it is. A model that reports "I checked
         // and found nothing" when it was actually blocked has told the user something
         // false about their own computer.
@@ -440,6 +449,7 @@ const inspectMachineTool: FadiTool = {
         (scan.host.freeDiskGb !== null ? `, ${scan.host.freeDiskGb}GB free.` : ".")
       : "";
     return {
+      outcome: "performed",
       summary: scan.findings.length
         ? `On this machine: ${found} ${host}`.trim()
         : `Nothing detectable here${scan.absent.length ? ` — no ${scan.absent.slice(0, 3).join(", ")}` : ""}. ${host}`.trim(),
@@ -465,7 +475,7 @@ const inspectMachineTool: FadiTool = {
 const proposeLabActionTool: FadiTool = {
   name: "propose_lab_action",
   risk: "external",
-  effect: "Put a change to the machine in front of you to approve.",
+  effect: "Ask you to approve a change to the machine",
   description:
     "Propose a concrete change to the user's own machine — start, stop or remove a lab container — so they can approve it and it actually happens. Use when a project step needs a service running and the user has allowed container access. Recipes: container.run (params: image, name, optional port), container.stop (name), container.remove (name). Images are a fixed set: nginx, postgres, redis, grafana, portainer. This NEVER runs anything by itself; it puts the exact command in front of the user for approval. Tell them to check Machine access in Learning.",
   parameters: {
@@ -490,7 +500,7 @@ const proposeLabActionTool: FadiTool = {
     },
     required: ["recipe", "name"],
   },
-  async execute(args, ctx): Promise<FadiToolResult> {
+  async execute(args, ctx): Promise<ConsequentialResult> {
     const { proposeAction } = await import("@/lib/lab/broker");
     const surface = ctx.surface ?? "chat";
     const result = await proposeAction({
@@ -504,9 +514,10 @@ const proposeLabActionTool: FadiTool = {
       origin: "tool:propose_lab_action",
     });
 
-    if (!result.ok) return { summary: result.message, view: "none" };
+    if (!result.ok) return { summary: result.message, view: "none", outcome: "failed" };
 
     return {
+      outcome: "performed",
       // Said as a request, not as an accomplishment. A model reporting "I started nginx"
       // when it has only queued a question would be lying about the user's own machine.
       summary:
@@ -533,11 +544,11 @@ const proposeLabActionTool: FadiTool = {
 const labCapacityTool: FadiTool = {
   name: "lab_capacity",
   risk: "external",
-  effect: "Checked what the machine could host.",
+  effect: "Check what the machine could host",
   description:
     "List the lab machines Fadi can build (Windows Server, Windows 11, Ubuntu, nginx, Postgres) and say which of the user's own machines could host each. Use before suggesting a lab, and whenever the user asks what they can run. Reports 'not enough recorded to tell' for machines nobody has measured rather than guessing.",
   parameters: { type: "object", properties: {} },
-  async execute(_args, ctx): Promise<FadiToolResult> {
+  async execute(_args, ctx): Promise<ConsequentialResult> {
     const { LAB_TEMPLATES, specForTemplate } = await import("@/lib/lab/templates");
     const { placeLab } = await import("@/lib/lab/capability");
     const { createLabResourcesRepository } = await import("@careeros/database");
@@ -560,6 +571,7 @@ const labCapacityTool: FadiTool = {
         summary:
           "Fadi doesn't know what machines you have yet, so it can't say where anything would run. Ask them to add one under Learning → the lab panel, or let Fadi detect this machine.",
         view: "none",
+        outcome: "needs_input",
       };
     }
 
@@ -579,6 +591,7 @@ const labCapacityTool: FadiTool = {
     }
 
     return {
+      outcome: "performed",
       summary: lines.join("\n"),
       view: "none",
       data: { templates: Object.keys(LAB_TEMPLATES) },
@@ -599,7 +612,7 @@ const labCapacityTool: FadiTool = {
 const startLabMachineTool: FadiTool = {
   name: "start_lab_machine",
   risk: "external",
-  effect: "Put a machine start in front of you to approve.",
+  effect: "Ask you to approve starting a machine",
   description:
     "Propose starting a lab operating system on the user's machine: windows-server-2025 or windows-11 (real VMs via dockur — several GB to download and 20+ minutes to install before usable), or linux-ubuntu, linux-web, linux-postgres (ordinary containers, ready in seconds). Use when a project needs a whole OS rather than a service. Prefer Linux when the project allows it. This NEVER starts anything by itself; it puts the exact command in front of the user for approval.",
   parameters: {
@@ -625,7 +638,7 @@ const startLabMachineTool: FadiTool = {
     },
     required: ["template", "name"],
   },
-  async execute(args, ctx): Promise<FadiToolResult> {
+  async execute(args, ctx): Promise<ConsequentialResult> {
     return proposeThrough(
       ctx,
       "lab.start",
@@ -648,7 +661,7 @@ const startLabMachineTool: FadiTool = {
 const buildLabImageTool: FadiTool = {
   name: "build_lab_image",
   risk: "external",
-  effect: "Put an image build in front of you to approve.",
+  effect: "Ask you to approve an image build",
   description:
     "Propose building a Linux lab image with specific tools installed, when no stock template fits the project. Fadi writes the Dockerfile itself from a vetted vocabulary and puts it in the user's workspace; it cannot install packages outside that list. Use when a project needs a particular combination of tools. This NEVER builds anything by itself.",
   parameters: {
@@ -674,7 +687,7 @@ const buildLabImageTool: FadiTool = {
     },
     required: ["name", "base"],
   },
-  async execute(args, ctx): Promise<FadiToolResult> {
+  async execute(args, ctx): Promise<ConsequentialResult> {
     return proposeThrough(ctx, "lab.build", {
       name: args.name,
       base: args.base,
@@ -695,7 +708,7 @@ async function proposeThrough(
   recipe: string,
   params: Record<string, unknown>,
   project: { runId?: string | null; stepId?: string | null } = {}
-): Promise<FadiToolResult> {
+): Promise<ConsequentialResult> {
   const { proposeAction } = await import("@/lib/lab/broker");
   const surface = ctx.surface ?? "chat";
   let runId: string | null = null;
@@ -711,6 +724,7 @@ async function proposeThrough(
       return {
         summary: "That project is not available in this account. Nothing was proposed.",
         view: "none",
+        outcome: "refused",
       };
     }
     const requestedStep = project.stepId
@@ -720,6 +734,7 @@ async function proposeThrough(
       return {
         summary: "That step does not belong to this project. Nothing was proposed.",
         view: "none",
+        outcome: "refused",
       };
     }
     runId = detail.run.id;
@@ -739,11 +754,12 @@ async function proposeThrough(
         resource ? { id: resource.id, label: resource.label, endpoint: resource.endpoint } : null
       );
       if (target.kind === "unconnected")
-        return { summary: unconnectedMessage(target), view: "none" };
+        return { summary: unconnectedMessage(target), view: "none", outcome: "refused" };
       if (target.kind !== "local-docker") {
         return {
           summary: `This project runs on the VMware machine ${target.label}, not in a local container. Nothing was proposed.`,
           view: "none",
+          outcome: "refused",
         };
       }
     }
@@ -758,9 +774,12 @@ async function proposeThrough(
     stepId,
   });
 
-  if (!result.ok) return { summary: result.message, view: "none" };
+  if (!result.ok) return { summary: result.message, view: "none", outcome: "failed" };
 
   return {
+    // Asking is the whole job of these tools, so asking IS the performance. What it must never
+    // claim is that anything ran.
+    outcome: "performed",
     summary:
       "I've asked for your approval — nothing has run yet. " +
       result.summary +
@@ -835,7 +854,7 @@ const projectStatusTool: FadiTool = {
 const completeProjectStepTool: FadiTool = {
   name: "complete_project_step",
   risk: "write",
-  effect: "Marked a project step done.",
+  effect: "Mark a project step done",
   description:
     "Mark the user's current project step as done, recording what it produced (a file, a repo, a screenshot). Use when they say they finished a step or show you the result. Recording what was produced is what later turns the project into evidence — never mark a step done without asking what it left behind.",
   parameters: {
@@ -850,7 +869,7 @@ const completeProjectStepTool: FadiTool = {
     },
     required: ["stepId"],
   },
-  async execute(args, ctx): Promise<FadiToolResult> {
+  async execute(args, ctx): Promise<ConsequentialResult> {
     const stepId = typeof args.stepId === "string" ? args.stepId : "";
     const { createProjectRunsRepository } = await import("@careeros/database");
     const { getDatabase } = await import("@/lib/database/client");
@@ -862,8 +881,10 @@ const completeProjectStepTool: FadiTool = {
         artifact: typeof args.artifact === "string" ? args.artifact : null,
       }
     );
-    if (!updated) return { summary: "I can't find that step.", view: "none" };
+    if (!updated)
+      return { summary: "I can't find that step.", view: "none", outcome: "needs_input" };
     return {
+      outcome: "performed",
       summary: `Marked "${updated.title}" done.${updated.artifact ? ` Recorded: ${updated.artifact}` : ""}`,
       view: "none",
     };
@@ -959,7 +980,7 @@ const scoreAnswerTool: FadiTool = {
   name: "score_interview_answer",
   risk: "read",
   description:
-    "Score the user's answer to an interview question: a delivery read (length, pacing, filler words) plus structure/specificity/relevance/concision, with improvements and a stronger version that reshapes ONLY what they said (never invents). Use after they give a practice answer.",
+    "Review an interview answer transcript: report transcript facts plus structure/specificity/relevance/concision when an AI provider is available, with improvements and a stronger version that reshapes ONLY what was said (never invents). Use after a practice answer.",
   parameters: {
     type: "object",
     properties: {
@@ -980,7 +1001,10 @@ const scoreAnswerTool: FadiTool = {
     });
     if (!res.ok) return { summary: res.message, view: "none" };
     const s = res.score;
-    const head = `Overall ${s.overall.toFixed(1)}/5 — structure ${s.scores.structure}, specifics ${s.scores.specificity}, relevance ${s.scores.relevance}, concision ${s.scores.concision}. ${s.deliveryNote}`;
+    const content = s.overall !== null && s.scores
+      ? `Overall ${s.overall.toFixed(1)}/5 — structure ${s.scores.structure}, specifics ${s.scores.specificity}, relevance ${s.scores.relevance}, concision ${s.scores.concision}.`
+      : "Content was not scored.";
+    const head = `${content} ${s.transcriptNote}`;
     const fixes = s.improvements.length ? `\nTo improve: ${s.improvements.join("; ")}.` : "";
     const stronger = s.strongerVersion
       ? `\n\nStronger version (your content, tightened):\n${s.strongerVersion}`

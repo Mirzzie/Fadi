@@ -19,6 +19,21 @@ export type FadiToolView =
   | "track_created"
   | "none";
 
+/**
+ * What actually happened when a capability ran.
+ *
+ * Most tools answer "did it work?" by returning prose, and prose is not a status: a document
+ * tool that says "drafting isn't available this turn" was returning an ordinary success, and
+ * the receipt read "Drafted and saved a document — drafting isn't available this turn", marked
+ * done. A surface built to account for Fadi's actions cannot be allowed to contradict itself.
+ *
+ * - `performed`   it did the thing.
+ * - `needs_input` it stopped to ask the person something. Nothing changed.
+ * - `refused`     it declined, or the person had not allowed it. Nothing changed.
+ * - `failed`      it tried and could not.
+ */
+export type ToolOutcome = "performed" | "needs_input" | "refused" | "failed";
+
 export interface FadiToolResult {
   /** Natural-language result for the model to speak/narrate. */
   summary: string;
@@ -26,6 +41,12 @@ export interface FadiToolResult {
   data?: unknown;
   /** Render hint for the chat UI. */
   view?: FadiToolView;
+  /**
+   * What happened, for the receipt. Required in practice of every consequential tool — a test
+   * holds that each of their no-op paths says so — because the default cannot be guessed:
+   * a summary that reads like an apology is still a summary.
+   */
+  outcome?: ToolOutcome;
   /**
    * True when this result represents a genuine FAILURE (the tool couldn't do its
    * job — e.g. unknown tool). Surfaced to MCP clients as `result.isError: true` so
@@ -77,24 +98,41 @@ export interface FadiToolContext {
  */
 export type ToolRisk = "read" | "write" | "external";
 
-export interface FadiTool {
+/** A consequential tool must say what happened on EVERY path — the compiler holds it. */
+export type ConsequentialResult = FadiToolResult & { outcome: ToolOutcome };
+
+interface ToolBase {
   readonly name: string;
   readonly description: string;
-  /**
-   * Required on purpose. A capability that does not say what it touches cannot be routed,
-   * approved or receipted safely, and a default would let a new tool inherit "harmless"
-   * by forgetting to answer.
-   */
-  readonly risk: ToolRisk;
-  /**
-   * What running it does, in the person's words, for the receipt they read afterwards.
-   * Omitted for reads, which produce no receipt.
-   */
-  readonly effect?: string;
   /** JSON Schema for the tool's arguments (OpenAI/Groq/Gemini tool format). */
   readonly parameters: Record<string, unknown>;
+}
+
+/** Answers a question. Nothing of the person's changes, so there is nothing to account for. */
+export interface ReadTool extends ToolBase {
+  readonly risk: "read";
+  readonly effect?: never;
   execute(args: Record<string, unknown>, ctx: FadiToolContext): Promise<FadiToolResult>;
 }
+
+/**
+ * Changes something, or reaches outside Fadi. Must name what it attempts, and must report the
+ * outcome of every return path — including the ones that ask a question and do nothing, which
+ * is exactly where a receipt used to be able to claim a success that never happened.
+ */
+export interface ConsequentialTool extends ToolBase {
+  readonly risk: "write" | "external";
+  /** What it attempts, named neutrally: the status says whether it happened. */
+  readonly effect: string;
+  execute(args: Record<string, unknown>, ctx: FadiToolContext): Promise<ConsequentialResult>;
+}
+
+/**
+ * The risk is required on purpose, and splitting the type on it is what makes the rest
+ * enforceable: a capability that does not say what it touches cannot be routed, approved or
+ * receipted safely, and a default would let a new tool inherit "harmless" by forgetting.
+ */
+export type FadiTool = ReadTool | ConsequentialTool;
 
 /** The OpenAI/Groq/Gemini-compatible function-tool spec sent to the model. */
 export function toToolSpec(tool: FadiTool) {

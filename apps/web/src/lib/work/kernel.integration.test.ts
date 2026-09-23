@@ -110,7 +110,7 @@ suite("Work kernel", () => {
       status: "done",
     });
 
-    const actions = await repo.nextActions(userId, 10);
+    const actions = await repo.nextActions(userId, { goalId: goal.id, limit: 10 });
     const ids = actions.map((row) => row.id);
 
     expect(ids).toEqual([dueSoon.id, dueLater.id, undated.id]);
@@ -120,7 +120,7 @@ suite("Work kernel", () => {
 
     // Work in progress comes before anything not yet started.
     await repo.setStatus(userId, undated.id, "active");
-    expect((await repo.nextActions(userId, 1))[0]!.id).toBe(undated.id);
+    expect((await repo.nextActions(userId, { goalId: goal.id, limit: 1 }))[0]!.id).toBe(undated.id);
 
     await repo.remove(userId, goal.id);
   });
@@ -177,10 +177,15 @@ suite("Work kernel", () => {
     );
     expect(orphans.rowCount).toBe(0);
 
-    const receipts = await pool.query("select id from work_executions where id = $1", [
-      execution.id,
-    ]);
-    expect(receipts.rowCount).toBe(0);
+    // The receipt OUTLIVES the work on purpose: an account of what Fadi did that a delete can
+    // edit is not an account. It keeps the label so it still reads as a sentence.
+    const receipts = await pool.query(
+      "select work_item_id, work_label from work_executions where id = $1",
+      [execution.id]
+    );
+    expect(receipts.rowCount).toBe(1);
+    expect(receipts.rows[0].work_item_id).toBeNull();
+    expect(receipts.rows[0].work_label).toBe("Branch step");
 
     const outputs = await pool.query("select id from work_outputs where work_item_id = $1", [
       step.id,
@@ -279,6 +284,65 @@ suite("Work kernel", () => {
     await repo.remove(userId, first.id);
     await repo.remove(userId, second.id);
     await repo.remove(strangerId, theirs.id);
+  });
+
+  it("holds one active goal against two connections switching at once", async () => {
+    const { Pool } = await import("pg");
+    const { drizzle } = await import("drizzle-orm/node-postgres");
+    const { createWorkItemsRepository } = await import("@careeros/database");
+
+    const first = await repo.create(userId, { kind: "goal", title: "Race A" });
+    const second = await repo.create(userId, { kind: "goal", title: "Race B" });
+
+    // Two pools, so the two switches are genuinely concurrent rather than queued on one
+    // connection. The sequential test above cannot see this: it was the defect.
+    const pools = [new Pool({ connectionString: URL }), new Pool({ connectionString: URL })];
+    const switchOn = (pool: import("pg").Pool, id: string) =>
+      drizzle(pool).transaction(async (tx) =>
+        createWorkItemsRepository(tx as never).setActiveGoal(userId, id)
+      );
+
+    const results = await Promise.allSettled([
+      switchOn(pools[0]!, first.id),
+      switchOn(pools[1]!, second.id),
+    ]);
+    await Promise.all(pools.map((pool) => pool.end()));
+
+    const active = (await repo.listGoals(userId)).filter((row) => row.status === "active");
+    expect(active).toHaveLength(1);
+    // Both may legitimately succeed (one after the other) — what must never happen is two.
+    expect(results.some((result) => result.status === "fulfilled")).toBe(true);
+
+    await repo.remove(userId, first.id);
+    await repo.remove(userId, second.id);
+  });
+
+  it("offers only work under the goal you are actually on", async () => {
+    const abandoned = await repo.create(userId, { kind: "goal", title: "Old direction" });
+    const oldStep = await repo.create(userId, {
+      kind: "step",
+      title: "Old goal step",
+      parentId: abandoned.id,
+    });
+    const current = await repo.create(userId, { kind: "goal", title: "Current direction" });
+    const newStep = await repo.create(userId, {
+      kind: "step",
+      title: "Current goal step",
+      parentId: current.id,
+    });
+    await repo.setActiveGoal(userId, current.id);
+
+    const actions = await repo.nextActions(userId, { goalId: current.id, limit: 10 });
+    expect(actions.map((row) => row.id)).toEqual([newStep.id]);
+    expect(actions.map((row) => row.id)).not.toContain(oldStep.id);
+
+    // A goal with nothing under it offers nothing, rather than borrowing another goal's work.
+    const empty = await repo.create(userId, { kind: "goal", title: "Nothing planned yet" });
+    expect(await repo.nextActions(userId, { goalId: empty.id })).toHaveLength(0);
+
+    await repo.remove(userId, abandoned.id);
+    await repo.remove(userId, current.id);
+    await repo.remove(userId, empty.id);
   });
 
   it("finds the work that points at a job", async () => {

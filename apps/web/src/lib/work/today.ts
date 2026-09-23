@@ -129,10 +129,14 @@ export async function getToday(
   const db = getDatabase();
   const work = createWorkItemsRepository(db);
 
-  const [goals, steps, receipts, lastRun, direction, pendingReview, labRequests, setup, findings] =
+  // The goals first: "what should I do next" is only true relative to the goal the person is
+  // on, so the active goal has to be known before the next actions can be asked for.
+  const goals = await work.listGoals(userId);
+  const activeGoal = goals.find((row) => row.status === "active") ?? goals[0];
+
+  const [steps, receipts, lastRun, direction, pendingReview, labRequests, setup, findings] =
     await Promise.all([
-      work.listGoals(userId),
-      work.nextActions(userId, 4),
+      activeGoal ? work.nextActions(userId, { goalId: activeGoal.id, limit: 4 }) : [],
       work.listExecutions(userId, { limit: 4 }),
       createAgentRunsRepository(db).getLastFinishedRunForUser(userId),
       createCareerProfilesRepository(db).getActiveForUser(userId),
@@ -142,7 +146,6 @@ export async function getToday(
       createAgentRunsRepository(db).listUnseenForUser(userId, 3),
     ]);
 
-  const activeGoal = goals.find((row) => row.status === "active") ?? goals[0];
   const goal: TodayGoal = activeGoal
     ? {
         id: activeGoal.id,
