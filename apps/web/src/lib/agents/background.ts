@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   createAgentRunsRepository,
+  createWorkItemsRepository,
   createCareerProfilesRepository,
   createJobsRepository,
   createLearningCommitmentsRepository,
@@ -72,6 +73,16 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
     : new Date(Date.now() - FIRST_RUN_WINDOW_MS);
 
   const run = await runsRepo.startRun(userId);
+  // The same pass, told as a receipt: Today shows what Fadi did, and it must come from the
+  // attempt itself rather than from a claim written afterwards.
+  const work = createWorkItemsRepository(db);
+  const execution = await work
+    .startExecution(userId, {
+      action: "Checked your market and your record",
+      surface: "background",
+      risk: "read",
+    })
+    .catch(() => null);
 
   try {
     const relevanceProfile = {
@@ -234,6 +245,18 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
     await runsRepo.insertFindings(run.id, userId, findings);
     await runsRepo.finishRun(run.id, { status: "ok", findingsCount: findings.length });
 
+    if (execution) {
+      await work
+        .finishExecution(userId, execution.id, {
+          status: "done",
+          receipt:
+            findings.length === 0
+              ? "Nothing new worth telling you about."
+              : `Found ${findings.length} thing${findings.length === 1 ? "" : "s"} worth telling you about.`,
+        })
+        .catch(() => {});
+    }
+
     logger.info("agent.run_completed", { userId, findings: findings.length });
     return { ran: true, findings: findings.length };
   } catch (err) {
@@ -241,6 +264,15 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
     await runsRepo
       .finishRun(run.id, { status: "error", findingsCount: 0, error: message })
       .catch(() => {});
+    if (execution) {
+      await work
+        .finishExecution(userId, execution.id, {
+          status: "failed",
+          receipt: "The check did not finish.",
+          error: message,
+        })
+        .catch(() => {});
+    }
     logger.error("agent.run_failed", { userId, error: message });
     return { ran: false, reason: "error" };
   }

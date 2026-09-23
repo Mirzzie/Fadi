@@ -257,6 +257,30 @@ suite("Work kernel", () => {
     await repo.remove(userId, goal.id);
   });
 
+  it("never lets two goals both claim to be what you are working on", async () => {
+    const first = await repo.create(userId, { kind: "goal", title: "First goal" });
+    const second = await repo.create(userId, { kind: "goal", title: "Second goal" });
+    const theirs = await repo.create(strangerId, { kind: "goal", title: "Their goal" });
+    await repo.setActiveGoal(strangerId, theirs.id);
+
+    await repo.setActiveGoal(userId, first.id);
+    await repo.setActiveGoal(userId, second.id);
+
+    const goals = await repo.listGoals(userId);
+    expect(goals.filter((row) => row.status === "active").map((row) => row.id)).toEqual([
+      second.id,
+    ]);
+    expect(goals[0]!.id).toBe(second.id);
+
+    // Standing one person's goals down must not touch anyone else's.
+    expect((await repo.get(strangerId, theirs.id))!.status).toBe("active");
+    await expect(repo.setActiveGoal(userId, theirs.id)).rejects.toThrow(/unavailable/);
+
+    await repo.remove(userId, first.id);
+    await repo.remove(userId, second.id);
+    await repo.remove(strangerId, theirs.id);
+  });
+
   it("finds the work that points at a job", async () => {
     const goal = await repo.create(userId, {
       kind: "goal",

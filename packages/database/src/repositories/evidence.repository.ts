@@ -397,6 +397,15 @@ export function createEvidenceRepository(db: DbOrTx) {
       });
     },
 
+    /** Imports Fadi could not place on its own, and is waiting on a person to decide. */
+    async countPendingReview(userId: string): Promise<number> {
+      const [row] = await db
+        .select({ value: count() })
+        .from(evidenceItems)
+        .where(and(eq(evidenceItems.userId, userId), eq(evidenceItems.reviewStatus, "pending")));
+      return row?.value ?? 0;
+    },
+
     async count(userId: string): Promise<number> {
       // COUNT in the database, not in Node. The previous version selected every row's
       // id and took `.length` — transferring the whole pool over the wire to learn a

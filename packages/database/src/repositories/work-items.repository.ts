@@ -177,6 +177,46 @@ export function createWorkItemsRepository(db: DbOrTx) {
         .orderBy(asc(workItems.sortOrder), asc(workItems.createdAt));
     },
 
+    /** The goals, the active one first. A person has one thing they are working towards. */
+    async listGoals(userId: string, options: { includeFinished?: boolean } = {}) {
+      return db
+        .select()
+        .from(workItems)
+        .where(
+          and(
+            eq(workItems.userId, userId),
+            eq(workItems.kind, "goal"),
+            options.includeFinished ? undefined : inArray(workItems.status, LIVE_STATUSES)
+          )
+        )
+        .orderBy(desc(eq(workItems.status, "active")), asc(workItems.sortOrder))
+        .then((rows) => rows as WorkItem[]);
+    },
+
+    /**
+     * Makes one goal the active one and stands every other goal down, in a single statement
+     * so there is never a moment where two goals both claim to be what you are working on.
+     */
+    async setActiveGoal(userId: string, id: string): Promise<WorkItem> {
+      const rows = await db
+        .update(workItems)
+        .set({
+          status: sql`case when ${workItems.id} = ${id} then 'active' else 'open' end`,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(workItems.userId, userId),
+            eq(workItems.kind, "goal"),
+            or(eq(workItems.id, id), eq(workItems.status, "active"))
+          )
+        )
+        .returning();
+      const chosen = rows.find((row) => row.id === id);
+      if (!chosen) throw new Error("Work item unavailable.");
+      return chosen;
+    },
+
     async listChildren(userId: string, parentId: string): Promise<WorkItem[]> {
       return db
         .select()
