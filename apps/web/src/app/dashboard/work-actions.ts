@@ -206,3 +206,60 @@ export async function applyWithFadiAction(
     return { ok: false, error: FAILED.error };
   }
 }
+
+/**
+ * What one line would start, named before anything happens.
+ *
+ * Read-only: the command bar asks this as the person types, and only a deliberate press turns
+ * the answer into a plan. Naming the target first is the difference between an orchestrator and
+ * a button that guesses.
+ */
+export async function resolveIntentAction(
+  text: string
+): Promise<{ label: string; template: string; refs: { type: string; id: string }[] } | null> {
+  if (text.trim().length < 3) return null;
+
+  const user = await getCurrentAuthUser();
+  if (!user) return null;
+
+  try {
+    const { resolveIntent } = await import("@/lib/work/intent");
+    const intent = await resolveIntent(user.id, text.slice(0, 200));
+    return intent.kind === "plan"
+      ? { label: intent.label, template: intent.template, refs: intent.refs }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Start a plan the command bar has already named back to the person. */
+export async function startPlanAction(
+  template: string,
+  refs: { type: string; id: string }[]
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const parsed = z
+    .object({
+      template: z.enum(["apply-to-role"]),
+      refs: z
+        .array(z.object({ type: z.enum(["job"]), id: uuid }))
+        .min(1)
+        .max(4),
+    })
+    .safeParse({ template, refs });
+  if (!parsed.success) return { ok: false, error: REJECTED.error };
+
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, error: FAILED.error };
+
+  try {
+    const { startPlan } = await import("@/lib/work/run-plan");
+    const started = await startPlan(user.id, parsed.data.template, parsed.data.refs);
+    if (!started.ok) return { ok: false, error: started.reason };
+
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch {
+    return { ok: false, error: FAILED.error };
+  }
+}

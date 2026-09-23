@@ -71,6 +71,27 @@ export async function startPlan(
   const goal = await work.activeGoal(userId);
   if (!goal) return { ok: false, reason: "Set what you are working towards first." };
 
+  // One plan per thing. Pressing "Apply with Fadi" twice, or saying it twice, must land you
+  // back in the plan you already have — two plans for one posting means two tailored CVs, two
+  // sets of receipts, and a person deciding which of Fadi's answers is the real one.
+  const existing = (await work.listForRef(userId, { type: "template", id: templateId })).find(
+    (item) =>
+      item.kind === "plan" &&
+      (item.status === "active" || item.status === "open") &&
+      refs.every((ref) => item.refs.some((held) => held.type === ref.type && held.id === ref.id))
+  );
+  if (existing) return { ok: true, planId: existing.id };
+
+  // One thing at a time. Two plans running at once is two sets of steps competing for one
+  // screen and one person's attention, and neither of them is "what Fadi is doing".
+  const busy = await runningPlan(userId);
+  if (busy) {
+    return {
+      ok: false,
+      reason: `Fadi is already working on "${busy.title}". Finish or stop that first.`,
+    };
+  }
+
   const context = await contextFor(userId, { refs } as WorkItem);
 
   return db.transaction(async (tx) => {

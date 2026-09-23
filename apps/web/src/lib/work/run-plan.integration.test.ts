@@ -65,6 +65,20 @@ suite("running a plan", () => {
     await pool?.end();
   });
 
+  async function createJobsSecond() {
+    const { createJobsRepository } = await import("@careeros/database");
+    const job = await createJobsRepository(holder.db as never).upsertSeedJob({
+      source: "reed",
+      externalId: `plan-second-${Date.now()}`,
+      title: "Application Security Engineer",
+      company: "Intercom",
+      location: "Dublin",
+      description: "Security role in Dublin.",
+      url: "https://example.test/apply/2",
+    });
+    return job.id;
+  }
+
   async function freshGoal(title: string) {
     await pool.query("delete from work_items where user_id = $1", [userId]);
     const goal = await work.create(userId, { kind: "goal", title });
@@ -102,6 +116,34 @@ suite("running a plan", () => {
     // Creating a plan runs nothing. A job card must not start drafting in someone's name.
     expect(holder.calls).toHaveLength(0);
     expect(steps.every((step) => step.status === "open")).toBe(true);
+  });
+
+  it("hands back the plan you already have instead of starting a second", async () => {
+    await freshGoal("No duplicates");
+    const first = (await plans.startPlan(userId, "apply-to-role", [
+      { type: "job", id: jobId },
+    ])) as { ok: true; planId: string };
+    const again = (await plans.startPlan(userId, "apply-to-role", [
+      { type: "job", id: jobId },
+    ])) as { ok: true; planId: string };
+
+    expect(again.planId).toBe(first.planId);
+    const plans_ = (await work.listLive(userId)).filter((item) => item.kind === "plan");
+    expect(plans_).toHaveLength(1);
+    // And the steps were not written twice.
+    expect(await plans.planSteps(userId, first.planId)).toHaveLength(6);
+  });
+
+  it("will not start a second plan while one is running", async () => {
+    await freshGoal("One at a time, please");
+    await plans.startPlan(userId, "apply-to-role", [{ type: "job", id: jobId }]);
+
+    const other = await createJobsSecond();
+    const second = await plans.startPlan(userId, "apply-to-role", [{ type: "job", id: other }]);
+
+    expect(second.ok).toBe(false);
+    expect(second.ok === false && second.reason).toMatch(/already working on/);
+    expect((await work.listLive(userId)).filter((item) => item.kind === "plan")).toHaveLength(1);
   });
 
   it("does one step per call, with the arguments computed from the plan's own job", async () => {
