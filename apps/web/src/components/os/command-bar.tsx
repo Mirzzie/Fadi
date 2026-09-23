@@ -13,7 +13,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { DOCK_APPS } from "./dock";
+import { NAV_TARGETS } from "./navigation";
 import { useFadi } from "./fadi-presence";
 
 /**
@@ -59,8 +59,14 @@ export function CommandBar() {
 
   const q = query.trim().toLowerCase();
   const apps = useMemo(
-    () => (q ? DOCK_APPS.filter((a) => a.label.toLowerCase().includes(q)) : DOCK_APPS),
-    [q],
+    () =>
+      q
+        ? NAV_TARGETS.filter(
+            (target) =>
+              target.label.toLowerCase().includes(q) || target.within.toLowerCase().includes(q)
+          )
+        : NAV_TARGETS,
+    [q]
   );
   const hasQuery = query.trim().length > 0;
 
@@ -78,13 +84,13 @@ export function CommandBar() {
       open={open}
       onOpenChange={setOpen}
       title="Command bar"
-      description="Search apps, or ask Fadi anything"
+      description="Search Fadi, or ask it anything"
     >
       <Command shouldFilter={false}>
         <CommandInput
           value={query}
           onValueChange={setQuery}
-          placeholder="Search apps, or ask Fadi anything…"
+          placeholder="Search Fadi, or ask it anything…"
         />
         <CommandList>
           {hasQuery ? (
@@ -96,17 +102,18 @@ export function CommandBar() {
             </CommandGroup>
           ) : null}
 
-          <CommandGroup heading="Apps">
+          <CommandGroup heading="Go to">
             {apps.map((app) => (
               <CommandItem key={app.href} value={app.href} onSelect={() => goApp(app.href)}>
                 <app.icon className="size-4 text-muted-foreground" aria-hidden="true" />
                 {app.label}
+                <span className="ml-auto text-xs text-muted-foreground">{app.within}</span>
               </CommandItem>
             ))}
           </CommandGroup>
 
           {hasQuery && apps.length === 0 ? (
-            <CommandEmpty>No apps match — press Enter to ask Fadi.</CommandEmpty>
+            <CommandEmpty>Nothing matches — press Enter to ask Fadi.</CommandEmpty>
           ) : null}
         </CommandList>
       </Command>
