@@ -10,6 +10,8 @@ import type { FadiTool, FadiToolContext, FadiToolResult } from "./types";
  */
 export const generateDocument: FadiTool = {
   name: "generate_document",
+  risk: "write",
+  effect: "Drafted and saved a document.",
   description:
     "Draft and save a tailored career document (resume/CV, cover letter, cold email, or value proposition) for a specific role/company, then open it in the editor. Use when the user asks to create, draft, write, generate, build or tailor any of these.",
   parameters: {

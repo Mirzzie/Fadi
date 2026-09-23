@@ -66,6 +66,8 @@ export function validateTrackArgs(args: Record<string, unknown>): ValidateTrackR
 
 export const createTrackTool: FadiTool = {
   name: "create_career_track",
+  risk: "write",
+  effect: "Created a career direction.",
   description:
     "Create and switch to a NEW career direction/track when the user wants to pursue a different role or path (e.g. 'start a new direction as a data analyst', 'I want to switch into product management'). Gather a short name, the target role, and their goal first.",
   parameters: {

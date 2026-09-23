@@ -12,6 +12,8 @@ import type { FadiTool, FadiToolContext, FadiToolResult } from "./types";
  */
 export const trackApplication: FadiTool = {
   name: "track_application",
+  risk: "write",
+  effect: "Recorded an application.",
   description:
     "Add a job to the user's application tracker (records company, role, and optionally the job description). Use when the user says things like 'track this', 'add this job', 'I'm applying to X', or 'save this application'.",
   parameters: {

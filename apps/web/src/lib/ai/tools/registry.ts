@@ -2,7 +2,11 @@ import "server-only";
 
 import { getRecommendedJobsForUser } from "@/lib/jobs/data";
 import { parseLocation, getCountry } from "@/lib/jobs/locations";
-import { getMomentumReflection, getMomentumSummary, summarizeRejectionPatterns } from "@/lib/resilience/service";
+import {
+  getMomentumReflection,
+  getMomentumSummary,
+  summarizeRejectionPatterns,
+} from "@/lib/resilience/service";
 import { answerBehavioral } from "@/lib/interview/story-bank";
 import { prepareInterviewForJob } from "@/lib/interview/jd-prep";
 import { formatPrepQuestion } from "@/lib/interview/jd-prep";
@@ -17,6 +21,7 @@ import { generateDocument } from "./generate-document";
 import { getLaborMarket } from "./labor-market";
 import { getWorldShifts } from "./world-shifts";
 import { trackApplication } from "./track-application";
+import { runWithReceipt } from "./receipts";
 import type { FadiTool, FadiToolContext, FadiToolResult } from "./types";
 
 /**
@@ -27,6 +32,7 @@ import type { FadiTool, FadiToolContext, FadiToolResult } from "./types";
 
 const searchJobs: FadiTool = {
   name: "search_jobs",
+  risk: "read",
   description:
     "Search live job postings for the user, optionally scoped to a country/city and keywords. Use when the user asks to see, list, or find jobs — anywhere in the world, any employment type.",
   parameters: {
@@ -51,7 +57,7 @@ const searchJobs: FadiTool = {
 
     const where = parsed.city
       ? `${parsed.city}${getCountry(parsed.country) ? `, ${getCountry(parsed.country)!.name}` : ""}`
-      : getCountry(parsed.country)?.name ?? "your target market";
+      : (getCountry(parsed.country)?.name ?? "your target market");
 
     if (jobs.length === 0) {
       return {
@@ -84,6 +90,7 @@ const searchJobs: FadiTool = {
 
 const getPerformance: FadiTool = {
   name: "get_performance",
+  risk: "read",
   description:
     "Get the user's career momentum and performance: momentum score, band, resting state, cadence adherence, and quality applications this period. Use for 'how am I doing', 'my performance', 'my progress'.",
   parameters: { type: "object", properties: {} },
@@ -108,6 +115,7 @@ const getPerformance: FadiTool = {
 
 const getCareerUpdates: FadiTool = {
   name: "get_career_updates",
+  risk: "read",
   description:
     "Get what's new for the user: freshly matched roles. Use for 'what's new', 'any updates', 'what did you find'.",
   parameters: { type: "object", properties: {} },
@@ -134,6 +142,7 @@ const getCareerUpdates: FadiTool = {
 
 const getRejectionPatterns: FadiTool = {
   name: "get_rejection_patterns",
+  risk: "read",
   description:
     "Run a rejection autopsy across the user's rejected applications: surface the named pattern (e.g. filtered before a human, or losing at the interview stage) and the sharper next move. Use for 'why do I keep getting rejected', 'run a rejection autopsy', 'what's the pattern in my no's'. Grounded only in real logged rejections.",
   parameters: { type: "object", properties: {} },
@@ -169,6 +178,8 @@ const REFERRAL_RELATIONSHIPS = [
 
 const draftReferralOutreachTool: FadiTool = {
   name: "draft_referral_outreach",
+  risk: "write",
+  effect: "Added a referral target and drafted the message.",
   description:
     "Add a referral target at a company and draft a short, sendable outreach message asking for a referral or warm intro. Use for 'help me get a referral at X', 'draft my message to someone at X', 'who should I ask at X'. A referral is an independent draw that routes around the correlated screening software — the highest-leverage move. Company is required; role/contact are optional.",
   parameters: {
@@ -189,12 +200,18 @@ const draftReferralOutreachTool: FadiTool = {
   async execute(args, ctx): Promise<FadiToolResult> {
     const company = typeof args.company === "string" ? args.company.trim() : "";
     if (!company) {
-      return { summary: "Which company do you want a referral into? Tell me and I'll set it up and draft the message.", view: "none" };
+      return {
+        summary:
+          "Which company do you want a referral into? Tell me and I'll set it up and draft the message.",
+        view: "none",
+      };
     }
     const opt = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : undefined);
-    const rel = typeof args.relationship === "string" && (REFERRAL_RELATIONSHIPS as readonly string[]).includes(args.relationship)
-      ? (args.relationship as (typeof REFERRAL_RELATIONSHIPS)[number])
-      : "cold";
+    const rel =
+      typeof args.relationship === "string" &&
+      (REFERRAL_RELATIONSHIPS as readonly string[]).includes(args.relationship)
+        ? (args.relationship as (typeof REFERRAL_RELATIONSHIPS)[number])
+        : "cold";
 
     const { addReferralTarget, draftOutreachFor } = await import("@/lib/network/referrals");
     const target = await addReferralTarget(ctx.userId, {
@@ -218,6 +235,7 @@ const draftReferralOutreachTool: FadiTool = {
 
 const answerBehavioralTool: FadiTool = {
   name: "answer_behavioral_question",
+  risk: "read",
   description:
     "Answer a behavioral interview question ('tell me about a time you…', 'describe a situation where…') using the candidate's OWN interview story bank — their real STAR+Reflection stories. Use when the user is practicing interviews or asks how to answer a behavioral question. Grounded only in their real stories; never invents experience.",
   parameters: {
@@ -230,7 +248,11 @@ const answerBehavioralTool: FadiTool = {
   async execute(args, ctx): Promise<FadiToolResult> {
     const question = typeof args.question === "string" ? args.question.trim() : "";
     if (!question) {
-      return { summary: "What behavioral question do you want to practice? Give me the prompt and I'll answer it from your real stories.", view: "none" };
+      return {
+        summary:
+          "What behavioral question do you want to practice? Give me the prompt and I'll answer it from your real stories.",
+        view: "none",
+      };
     }
     const res = await answerBehavioral(ctx.userId, question);
     if (!res.ok) return { summary: res.message ?? "Build your story bank first.", view: "none" };
@@ -244,6 +266,7 @@ const answerBehavioralTool: FadiTool = {
 
 const scanCompanyJobsTool: FadiTool = {
   name: "scan_company_jobs",
+  risk: "read",
   description:
     "Pull a company's CURRENTLY OPEN roles straight from its applicant-tracking board (Greenhouse / Lever / Ashby) — fresher and far less ghost-prone than aggregators. Use for 'what's open at <company>', 'show me roles at <company>', or to check companies the user is targeting. Provide the company name; optionally a role to filter by.",
   parameters: {
@@ -282,6 +305,7 @@ const scanCompanyJobsTool: FadiTool = {
 
 const evaluateFitTool: FadiTool = {
   name: "evaluate_fit",
+  risk: "read",
   description:
     "Run an honest FIT CHECK before the user applies: is this specific job worth their limited time? Use when they paste a job description and ask 'should I apply', 'is this worth it', 'am I a fit'. Returns a 0–5 verdict (apply / stretch / skip) graded against their real experience — anti-spray, not résumé scoring.",
   parameters: {
@@ -302,8 +326,14 @@ const evaluateFitTool: FadiTool = {
     });
     if (!res.ok) return { summary: res.message, view: "none" };
     const e = res.evaluation;
-    const reasons = e.topReasons.slice(0, 3).map((r) => `• ${r}`).join("\n");
-    const gaps = e.gapsToClose.length > 0 ? `\nTo close the gap: ${e.gapsToClose.slice(0, 3).join("; ")}.` : "";
+    const reasons = e.topReasons
+      .slice(0, 3)
+      .map((r) => `• ${r}`)
+      .join("\n");
+    const gaps =
+      e.gapsToClose.length > 0
+        ? `\nTo close the gap: ${e.gapsToClose.slice(0, 3).join("; ")}.`
+        : "";
     return {
       summary: `Fit: ${e.overall.toFixed(1)}/5 — ${e.verdict.toUpperCase()}.\n${e.verdictReason}\n${reasons}${gaps}`,
       view: "none",
@@ -327,6 +357,8 @@ const evaluateFitTool: FadiTool = {
 
 const planProjectTool: FadiTool = {
   name: "plan_project",
+  risk: "write",
+  effect: "Planned a project and saved its steps.",
   description:
     "Turn a project idea into concrete steps the user can execute TONIGHT on hardware they actually own. Use when they commit to a project, ask how to start one, or say a suggestion is too vague. Each step gets a way to verify it worked and names what it produces. Never answer a 'how do I build X' question with links when this can produce a real plan.",
   parameters: {
@@ -370,6 +402,8 @@ const planProjectTool: FadiTool = {
  */
 const inspectMachineTool: FadiTool = {
   name: "inspect_machine",
+  risk: "external",
+  effect: "Looked at the machine.",
   description:
     "Look at what is actually installed on the user's own machine — container runtimes, hypervisors, memory and CPU — before planning a project or claiming something will run. Use when hardware matters to the answer. Requires the user's permission; if they have not granted it, this returns what to ask them for. Never guess the user's hardware when this tool can read it.",
   parameters: { type: "object", properties: {} },
@@ -430,6 +464,8 @@ const inspectMachineTool: FadiTool = {
  */
 const proposeLabActionTool: FadiTool = {
   name: "propose_lab_action",
+  risk: "external",
+  effect: "Put a change to the machine in front of you to approve.",
   description:
     "Propose a concrete change to the user's own machine — start, stop or remove a lab container — so they can approve it and it actually happens. Use when a project step needs a service running and the user has allowed container access. Recipes: container.run (params: image, name, optional port), container.stop (name), container.remove (name). Images are a fixed set: nginx, postgres, redis, grafana, portainer. This NEVER runs anything by itself; it puts the exact command in front of the user for approval. Tell them to check Machine access in Learning.",
   parameters: {
@@ -447,7 +483,8 @@ const proposeLabActionTool: FadiTool = {
       },
       name: {
         type: "string",
-        description: "Short lowercase name for the container, e.g. \"web\". Fadi prefixes it with fadi-.",
+        description:
+          'Short lowercase name for the container, e.g. "web". Fadi prefixes it with fadi-.',
       },
       port: { type: "number", description: "Optional port to publish, 1024-65535." },
     },
@@ -495,6 +532,8 @@ const proposeLabActionTool: FadiTool = {
  */
 const labCapacityTool: FadiTool = {
   name: "lab_capacity",
+  risk: "external",
+  effect: "Checked what the machine could host.",
   description:
     "List the lab machines Fadi can build (Windows Server, Windows 11, Ubuntu, nginx, Postgres) and say which of the user's own machines could host each. Use before suggesting a lab, and whenever the user asks what they can run. Reports 'not enough recorded to tell' for machines nobody has measured rather than guessing.",
   parameters: { type: "object", properties: {} },
@@ -535,11 +574,15 @@ const labCapacityTool: FadiTool = {
           template.label +
           "): " +
           (fits.length ? "runs on " + fits.join(", ") : "nothing you have fits it") +
-          (maybe.length ? "; unmeasured: " + maybe.join(", ") : ""),
+          (maybe.length ? "; unmeasured: " + maybe.join(", ") : "")
       );
     }
 
-    return { summary: lines.join("\n"), view: "none", data: { templates: Object.keys(LAB_TEMPLATES) } };
+    return {
+      summary: lines.join("\n"),
+      view: "none",
+      data: { templates: Object.keys(LAB_TEMPLATES) },
+    };
   },
 };
 
@@ -555,6 +598,8 @@ const labCapacityTool: FadiTool = {
  */
 const startLabMachineTool: FadiTool = {
   name: "start_lab_machine",
+  risk: "external",
+  effect: "Put a machine start in front of you to approve.",
   description:
     "Propose starting a lab operating system on the user's machine: windows-server-2025 or windows-11 (real VMs via dockur — several GB to download and 20+ minutes to install before usable), or linux-ubuntu, linux-web, linux-postgres (ordinary containers, ready in seconds). Use when a project needs a whole OS rather than a service. Prefer Linux when the project allows it. This NEVER starts anything by itself; it puts the exact command in front of the user for approval.",
   parameters: {
@@ -588,7 +633,7 @@ const startLabMachineTool: FadiTool = {
       {
         runId: typeof args.runId === "string" ? args.runId : null,
         stepId: typeof args.stepId === "string" ? args.stepId : null,
-      },
+      }
     );
   },
 };
@@ -602,6 +647,8 @@ const startLabMachineTool: FadiTool = {
  */
 const buildLabImageTool: FadiTool = {
   name: "build_lab_image",
+  risk: "external",
+  effect: "Put an image build in front of you to approve.",
   description:
     "Propose building a Linux lab image with specific tools installed, when no stock template fits the project. Fadi writes the Dockerfile itself from a vetted vocabulary and puts it in the user's workspace; it cannot install packages outside that list. Use when a project needs a particular combination of tools. This NEVER builds anything by itself.",
   parameters: {
@@ -619,7 +666,11 @@ const buildLabImageTool: FadiTool = {
         description:
           "Packages to install, by their ordinary names (nginx, openssh-server, tcpdump, ansible, postgresql-client...). Anything outside Fadi's vetted list is refused and named.",
       },
-      ports: { type: "array", items: { type: "number" }, description: "Ports to expose, 1024-65535." },
+      ports: {
+        type: "array",
+        items: { type: "number" },
+        description: "Ports to expose, 1024-65535.",
+      },
     },
     required: ["name", "base"],
   },
@@ -643,7 +694,7 @@ async function proposeThrough(
   ctx: FadiToolContext,
   recipe: string,
   params: Record<string, unknown>,
-  project: { runId?: string | null; stepId?: string | null } = {},
+  project: { runId?: string | null; stepId?: string | null } = {}
 ): Promise<FadiToolResult> {
   const { proposeAction } = await import("@/lib/lab/broker");
   const surface = ctx.surface ?? "chat";
@@ -654,16 +705,22 @@ async function proposeThrough(
     const { getDatabase } = await import("@/lib/database/client");
     const detail = await createProjectRunsRepository(getDatabase()).getWithSteps(
       ctx.userId,
-      project.runId,
+      project.runId
     );
     if (!detail) {
-      return { summary: "That project is not available in this account. Nothing was proposed.", view: "none" };
+      return {
+        summary: "That project is not available in this account. Nothing was proposed.",
+        view: "none",
+      };
     }
     const requestedStep = project.stepId
       ? detail.steps.find((candidate) => candidate.id === project.stepId)
       : detail.steps.find((candidate) => candidate.status === "pending");
     if (project.stepId && !requestedStep) {
-      return { summary: "That step does not belong to this project. Nothing was proposed.", view: "none" };
+      return {
+        summary: "That step does not belong to this project. Nothing was proposed.",
+        view: "none",
+      };
     }
     runId = detail.run.id;
     stepId = requestedStep?.id ?? null;
@@ -679,9 +736,10 @@ async function proposeThrough(
         : null;
       const target = resolveTarget(
         detail.run,
-        resource ? { id: resource.id, label: resource.label, endpoint: resource.endpoint } : null,
+        resource ? { id: resource.id, label: resource.label, endpoint: resource.endpoint } : null
       );
-      if (target.kind === "unconnected") return { summary: unconnectedMessage(target), view: "none" };
+      if (target.kind === "unconnected")
+        return { summary: unconnectedMessage(target), view: "none" };
       if (target.kind !== "local-docker") {
         return {
           summary: `This project runs on the VMware machine ${target.label}, not in a local container. Nothing was proposed.`,
@@ -713,12 +771,19 @@ async function proposeThrough(
         : "") +
       "\n\nApprove it under Machine access in Learning.",
     view: "none",
-    data: { requestId: result.requestId, runId, stepId, argv: result.argv, preflight: result.preflight },
+    data: {
+      requestId: result.requestId,
+      runId,
+      stepId,
+      argv: result.argv,
+      preflight: result.preflight,
+    },
   };
 }
 
 const projectStatusTool: FadiTool = {
   name: "project_status",
+  risk: "read",
   description:
     "Read where the user is in their in-progress projects: which step is next, what it asks, and how to verify it. Use when they ask 'what's next', 'where was I', 'what should I do now', or before advising on a project they have already started — so the advice continues their plan instead of restarting it.",
   parameters: { type: "object", properties: {} },
@@ -733,7 +798,10 @@ const projectStatusTool: FadiTool = {
       (r) => r.status === "running" && (r.careerProfileId ?? null) === (track?.id ?? null)
     );
     if (runs.length === 0) {
-      return { summary: "No project is in progress. plan_project turns an idea into steps.", view: "none" };
+      return {
+        summary: "No project is in progress. plan_project turns an idea into steps.",
+        view: "none",
+      };
     }
     const lines: string[] = [];
     for (const run of runs.slice(0, 3)) {
@@ -745,7 +813,7 @@ const projectStatusTool: FadiTool = {
         `${run.title} — ${done}/${detail.steps.length} done${run.resourceLabel ? ` on ${run.resourceLabel}` : ""}.` +
           (next
             ? `\n  Next: ${next.title}. ${next.instruction}${next.verify ? `\n  Worked when: ${next.verify}` : ""}`
-            : "\n  All steps done — it can be finished."),
+            : "\n  All steps done — it can be finished.")
       );
     }
     const projects = [];
@@ -766,6 +834,8 @@ const projectStatusTool: FadiTool = {
 
 const completeProjectStepTool: FadiTool = {
   name: "complete_project_step",
+  risk: "write",
+  effect: "Marked a project step done.",
   description:
     "Mark the user's current project step as done, recording what it produced (a file, a repo, a screenshot). Use when they say they finished a step or show you the result. Recording what was produced is what later turns the project into evidence — never mark a step done without asking what it left behind.",
   parameters: {
@@ -774,7 +844,8 @@ const completeProjectStepTool: FadiTool = {
       stepId: { type: "string", description: "The step's id, from project_status." },
       artifact: {
         type: "string",
-        description: "What the step produced — a path, a repo URL, or a short description of the result.",
+        description:
+          "What the step produced — a path, a repo URL, or a short description of the result.",
       },
     },
     required: ["stepId"],
@@ -783,10 +854,14 @@ const completeProjectStepTool: FadiTool = {
     const stepId = typeof args.stepId === "string" ? args.stepId : "";
     const { createProjectRunsRepository } = await import("@careeros/database");
     const { getDatabase } = await import("@/lib/database/client");
-    const updated = await createProjectRunsRepository(getDatabase()).setStepStatus(ctx.userId, stepId, {
-      status: "done",
-      artifact: typeof args.artifact === "string" ? args.artifact : null,
-    });
+    const updated = await createProjectRunsRepository(getDatabase()).setStepStatus(
+      ctx.userId,
+      stepId,
+      {
+        status: "done",
+        artifact: typeof args.artifact === "string" ? args.artifact : null,
+      }
+    );
     if (!updated) return { summary: "I can't find that step.", view: "none" };
     return {
       summary: `Marked "${updated.title}" done.${updated.artifact ? ` Recorded: ${updated.artifact}` : ""}`,
@@ -797,6 +872,7 @@ const completeProjectStepTool: FadiTool = {
 
 const getMomentumReflectionTool: FadiTool = {
   name: "get_momentum_reflection",
+  risk: "read",
   description:
     "Give an honest 'how am I really doing' read: how this week compares to the user's OWN past weeks (never other people), plus a morale-aware single next step. Use for 'am I improving', 'how am I really doing', or when they sound discouraged or stuck.",
   parameters: { type: "object", properties: {} },
@@ -812,6 +888,7 @@ const getMomentumReflectionTool: FadiTool = {
 
 const prepInterviewTool: FadiTool = {
   name: "prep_interview",
+  risk: "read",
   description:
     "Prepare the user for a behavioral interview for a SPECIFIC job: infer the likely STAR questions from the job description and answer each from their REAL LinkedIn/career history. Use when they paste a JD and ask to 'prep me', 'interview prep', 'what will they ask', 'help me practice for this role'.",
   parameters: {
@@ -841,15 +918,22 @@ const prepInterviewTool: FadiTool = {
 
 const mockQuestionsTool: FadiTool = {
   name: "mock_interview_questions",
+  risk: "read",
   description:
     "Generate a realistic mock-interview question set tailored to a role, seniority, and country's interview norms (and an optional job description). Use for 'give me mock interview questions', 'interview me for X', 'practice interview'. Defaults role/country/seniority from the user's active direction if not given.",
   parameters: {
     type: "object",
     properties: {
-      role: { type: "string", description: "Role to interview for (defaults to the active direction)." },
+      role: {
+        type: "string",
+        description: "Role to interview for (defaults to the active direction).",
+      },
       country: { type: "string", description: "Country/region for interview norms." },
       seniority: { type: "string", description: "Seniority level." },
-      jobDescription: { type: "string", description: "Optional job description to tailor against." },
+      jobDescription: {
+        type: "string",
+        description: "Optional job description to tailor against.",
+      },
     },
   },
   async execute(args, ctx): Promise<FadiToolResult> {
@@ -873,13 +957,17 @@ const mockQuestionsTool: FadiTool = {
 
 const scoreAnswerTool: FadiTool = {
   name: "score_interview_answer",
+  risk: "read",
   description:
     "Score the user's answer to an interview question: a delivery read (length, pacing, filler words) plus structure/specificity/relevance/concision, with improvements and a stronger version that reshapes ONLY what they said (never invents). Use after they give a practice answer.",
   parameters: {
     type: "object",
     properties: {
       question: { type: "string", description: "The interview question that was asked." },
-      answer: { type: "string", description: "The user's answer (their spoken answer, transcribed, or typed)." },
+      answer: {
+        type: "string",
+        description: "The user's answer (their spoken answer, transcribed, or typed).",
+      },
       role: { type: "string", description: "The role, for relevance scoring." },
     },
     required: ["question", "answer"],
@@ -894,29 +982,43 @@ const scoreAnswerTool: FadiTool = {
     const s = res.score;
     const head = `Overall ${s.overall.toFixed(1)}/5 — structure ${s.scores.structure}, specifics ${s.scores.specificity}, relevance ${s.scores.relevance}, concision ${s.scores.concision}. ${s.deliveryNote}`;
     const fixes = s.improvements.length ? `\nTo improve: ${s.improvements.join("; ")}.` : "";
-    const stronger = s.strongerVersion ? `\n\nStronger version (your content, tightened):\n${s.strongerVersion}` : "";
+    const stronger = s.strongerVersion
+      ? `\n\nStronger version (your content, tightened):\n${s.strongerVersion}`
+      : "";
     return { summary: `${head}${fixes}${stronger}`, view: "none", data: { score: s } };
   },
 };
 
 const relevantEvidenceTool: FadiTool = {
   name: "get_relevant_evidence",
+  risk: "read",
   description:
     "Return the user's strongest evidence (real roles, projects, achievements, skills) ranked for their ACTIVE career direction — the shared evidence pool framed for this path. Use for 'what's my best evidence for this direction', 'what should I highlight', or to ground a resume/answer. Grounded only in their real history.",
   parameters: { type: "object", properties: {} },
   async execute(_args, ctx): Promise<FadiToolResult> {
     const { track, ranked } = await rankedEvidenceForActiveTrack(ctx.userId);
     if (ranked.length === 0) {
-      return { summary: "Your evidence pool is empty. Build it from your LinkedIn/résumé on the Evidence page, then I can frame it for any direction.", view: "none" };
+      return {
+        summary:
+          "Your evidence pool is empty. Build it from your LinkedIn/résumé on the Evidence page, then I can frame it for any direction.",
+        view: "none",
+      };
     }
     const top = ranked
       .filter((r) => r.score > 0)
       .slice(0, 6)
-      .map((r) => `• ${r.item.title}${r.item.organization ? ` (${r.item.organization})` : ""}${r.item.metrics ? ` — ${r.item.metrics}` : ""}`)
+      .map(
+        (r) =>
+          `• ${r.item.title}${r.item.organization ? ` (${r.item.organization})` : ""}${r.item.metrics ? ` — ${r.item.metrics}` : ""}`
+      )
       .join("\n");
-    const head = track ? `Your strongest evidence for ${track.role}:` : "Your evidence (set a direction to rank it):";
+    const head = track
+      ? `Your strongest evidence for ${track.role}:`
+      : "Your evidence (set a direction to rank it):";
     return {
-      summary: top ? `${head}\n${top}` : `${head}\nNothing in your pool maps cleanly to this direction yet — add evidence or tags that fit it.`,
+      summary: top
+        ? `${head}\n${top}`
+        : `${head}\nNothing in your pool maps cleanly to this direction yet — add evidence or tags that fit it.`,
       view: "none",
       data: { track, count: ranked.length },
     };
@@ -925,6 +1027,7 @@ const relevantEvidenceTool: FadiTool = {
 
 const companyBriefTool: FadiTool = {
   name: "company_interview_brief",
+  risk: "read",
   description:
     "Build an honest interview prep brief for a company: what they do, the role's focus, the industry's durable dynamics, smart questions to ASK the interviewer, and talking points connecting the user's REAL evidence to the role. Use for 'help me research <company>', 'prep me for my interview at <company>', 'what should I ask them'. Never fabricates recent news — it tells the user to verify live.",
   parameters: {
@@ -988,11 +1091,13 @@ export function getFadiTool(name: string): FadiTool | undefined {
 export async function executeFadiTool(
   name: string,
   args: Record<string, unknown>,
-  ctx: FadiToolContext,
+  ctx: FadiToolContext
 ): Promise<FadiToolResult> {
   const tool = getFadiTool(name);
   if (!tool) {
     return { summary: `Unknown tool "${name}".`, view: "none", isError: true };
   }
-  return tool.execute(args, ctx);
+  // Every caller goes through here — chat, MCP, the background agent — so a capability that
+  // changes something is receipted once, at the only door it can be reached through.
+  return runWithReceipt(tool, args, ctx);
 }

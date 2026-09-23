@@ -52,6 +52,8 @@ export interface FadiToolContext {
    * omission there should read as the least alarming truth, not the most.
    */
   surface?: "chat" | "mcp" | "agent";
+  /** The work this call serves, so its receipt lands on that piece of work. */
+  workItemId?: string | null;
   /**
    * Generation capability, supplied by the chat route from the user's provider,
    * so tools that need the model (e.g. generate_document) can produce content
@@ -63,9 +65,32 @@ export interface FadiToolContext {
   };
 }
 
+/**
+ * What a capability can touch — declared on the tool, not discovered when it runs.
+ *
+ * Routing, approval and the receipt all need to reason about a tool BEFORE calling it, so the
+ * risk lives on the contract and is copied onto the execution when one is opened.
+ *
+ * - `read`     answers a question. Nothing of the person's changes.
+ * - `write`    changes the person's own records inside Fadi.
+ * - `external` reaches outside Fadi — their machine, another service, the world.
+ */
+export type ToolRisk = "read" | "write" | "external";
+
 export interface FadiTool {
   readonly name: string;
   readonly description: string;
+  /**
+   * Required on purpose. A capability that does not say what it touches cannot be routed,
+   * approved or receipted safely, and a default would let a new tool inherit "harmless"
+   * by forgetting to answer.
+   */
+  readonly risk: ToolRisk;
+  /**
+   * What running it does, in the person's words, for the receipt they read afterwards.
+   * Omitted for reads, which produce no receipt.
+   */
+  readonly effect?: string;
   /** JSON Schema for the tool's arguments (OpenAI/Groq/Gemini tool format). */
   readonly parameters: Record<string, unknown>;
   execute(args: Record<string, unknown>, ctx: FadiToolContext): Promise<FadiToolResult>;
