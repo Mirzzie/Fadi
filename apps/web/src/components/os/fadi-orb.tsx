@@ -1,12 +1,13 @@
 "use client";
 
-import { ArrowUpRight, X } from "lucide-react";
+import { ArrowUpRight, Ear, Loader2, MessageSquare, MicOff, X } from "lucide-react";
 import Link from "next/link";
 
 import { FadiChat } from "@/components/fadi/fadi-chat";
 import { cn } from "@/lib/utils";
 import { FadiCore } from "./fadi-core";
 import { useFadi, type FadiState } from "./fadi-presence";
+import { useVoiceMode } from "./use-voice-mode";
 
 /**
  * The ambient, *living* Fadi — present on every screen. It's not a button you
@@ -15,6 +16,11 @@ import { useFadi, type FadiState } from "./fadi-presence";
  * the background agency found (the nudge bubble). Clicking it — or saying
  * "Hey Fadi" — expands the conversation. The chat engine is unchanged; the orb
  * only reflects Fadi's live state and hands off seeded questions from ⌘K.
+ *
+ * It is also the ear. Talking to Fadi and seeing Fadi were two floating controls sitting on top
+ * of each other, which is two things to find and one of them redundant. The orb is the presence,
+ * so the orb is what you talk to: press it to speak, and open the thread from the label beside
+ * it when you want to read rather than listen.
  */
 export function FadiOrb() {
   const {
@@ -29,6 +35,7 @@ export function FadiOrb() {
     focus,
     clearFocus,
   } = useFadi();
+  const voice = useVoiceMode();
 
   return (
     <>
@@ -65,7 +72,56 @@ export function FadiOrb() {
           </div>
         ) : null}
 
-        <OrbButton state={displayState} onClick={openFadi} />
+        {/* What Fadi just heard and said. Already spoken — this is for whoever can see. */}
+        {voice.on && (voice.heard || voice.said) ? (
+          <div className="max-w-[18rem] rounded-2xl border border-border/60 bg-popover/95 p-3 text-sm shadow-xl backdrop-blur-xl">
+            {voice.heard ? <p className="text-muted-foreground">“{voice.heard}”</p> : null}
+            {voice.said ? <p className="mt-1">{voice.said}</p> : null}
+          </div>
+        ) : null}
+
+        <div className="flex items-center gap-2">
+          {/* Reading rather than listening: the same conversation, in text. */}
+          <button
+            type="button"
+            onClick={openFadi}
+            aria-label="Open the conversation"
+            className="flex items-center gap-1.5 rounded-full border border-border/60 bg-popover/90 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-lg backdrop-blur transition-colors hover:text-foreground"
+          >
+            <MessageSquare className="size-3.5" aria-hidden="true" />
+            Read
+          </button>
+
+          <button
+            type="button"
+            onClick={voice.toggle}
+            aria-pressed={voice.on}
+            aria-label={voice.on ? "Stop listening" : "Talk to Fadi, hands free"}
+            title={voice.on ? "Stop listening" : "Talk to Fadi, hands free"}
+            className="relative grid place-items-center rounded-full"
+          >
+            <OrbButton state={voice.on ? "listening" : displayState} />
+            <span
+              className={cn(
+                "pointer-events-none absolute -bottom-1 grid size-6 place-items-center rounded-full border shadow-md transition-colors",
+                voice.on
+                  ? "border-primary/50 bg-primary text-primary-foreground"
+                  : "border-border/60 bg-popover text-muted-foreground"
+              )}
+            >
+              {voice.busy ? (
+                <Loader2 className="size-3 animate-spin" aria-hidden="true" />
+              ) : voice.on ? (
+                <Ear
+                  className={cn("size-3", voice.listening && "animate-pulse")}
+                  aria-hidden="true"
+                />
+              ) : (
+                <MicOff className="size-3" aria-hidden="true" />
+              )}
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Conversation panel */}

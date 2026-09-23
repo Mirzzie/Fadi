@@ -2,9 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Ear, Loader2, MicOff } from "lucide-react";
 
-import { cn } from "@/lib/utils";
 import { useGroqVoice } from "@/lib/voice/use-groq-voice";
 import { speakFadi, stopFadiSpeech } from "@/lib/voice/fadi-speech";
 import { parseVoiceCommand, VOICE_HELP, type VoiceCommand } from "@/lib/voice/commands";
@@ -34,6 +32,9 @@ import { useFadi } from "./fadi-presence";
  *    question, not acted on.
  *
  * It does not listen until it is turned on, and it says so when it stops.
+ *
+ * It is a hook, and the orb renders it. Two floating controls for one assistant is two things
+ * to find and one of them redundant — the orb IS Fadi's presence, so it is what you talk to.
  */
 
 type Pending = {
@@ -41,7 +42,7 @@ type Pending = {
   run: () => Promise<{ say: string; changed?: boolean }>;
 };
 
-export function VoiceMode() {
+export function useVoiceMode() {
   const router = useRouter();
   const { setState } = useFadi();
   const [on, setOn] = useState(false);
@@ -186,7 +187,7 @@ export function VoiceMode() {
     setState(busy ? "thinking" : listening ? "listening" : "idle");
   }, [busy, listening, setState]);
 
-  function toggle() {
+  const toggle = useCallback(() => {
     if (on) {
       setOn(false);
       stop();
@@ -196,43 +197,9 @@ export function VoiceMode() {
     }
     setOn(true);
     say("I'm listening. Say 'what's on today', or ask me for help.");
-  }
+  }, [on, say, stop]);
 
-  return (
-    // Above the orb, not on top of it: the orb is Fadi's presence and this is its ear.
-    <div className="pointer-events-auto fixed right-4 bottom-40 z-40 flex max-w-sm flex-col items-end gap-2">
-      {on && (heard || said) ? (
-        // Shown for anyone who can see, and needed by nobody who cannot: everything here has
-        // already been spoken.
-        <div className="rounded-xl border border-border/60 bg-card/95 p-3 text-sm shadow-lg backdrop-blur">
-          {heard ? <p className="text-muted-foreground">“{heard}”</p> : null}
-          {said ? <p className="mt-1">{said}</p> : null}
-        </div>
-      ) : null}
-
-      <button
-        type="button"
-        onClick={toggle}
-        aria-pressed={on}
-        aria-label={on ? "Stop listening" : "Talk to Fadi, hands free"}
-        className={cn(
-          "flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium shadow-lg transition-colors",
-          on
-            ? "border-primary/40 bg-primary/15 text-primary"
-            : "border-border/60 bg-card/95 text-muted-foreground hover:text-foreground"
-        )}
-      >
-        {busy ? (
-          <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-        ) : on ? (
-          <Ear className={cn("size-4", listening && "animate-pulse")} aria-hidden="true" />
-        ) : (
-          <MicOff className="size-4" aria-hidden="true" />
-        )}
-        {on ? (busy ? "Working…" : listening ? "Listening…" : "Ready") : "Hands free"}
-      </button>
-    </div>
-  );
+  return { on, busy, listening, heard, said, toggle };
 }
 
 /** Fadi's own answer to a plain question, as text, so the loop can speak it. */
