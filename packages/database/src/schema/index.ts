@@ -1847,3 +1847,126 @@ export const careerContextSnapshots = pgTable(
   },
   (table) => [index("career_context_snapshots_user").on(table.userId)]
 );
+
+/**
+ * THE WORK KERNEL — what the person is trying to do, what Fadi did about it, and what came out.
+ *
+ * Fadi stored career entities and a chat transcript, and nothing that held a MISSION: the goal,
+ * the plan under it, which step is live, what was attempted, what it produced and what happens
+ * next. Without that, every capability had to be re-orchestrated by the person — open this page,
+ * press that sync, carry the result to the other screen — which is the complaint behind every
+ * usability report this week.
+ *
+ * Deliberately three small tables that REFERENCE the domain instead of copying it. A work item
+ * never holds a job, a document or a record; it holds their ids. The kernel must not become a
+ * second place where career facts live.
+ */
+export const workItems = pgTable(
+  "work_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** The direction this work serves; null for work that spans directions. */
+    careerProfileId: uuid("career_profile_id").references(() => careerProfiles.id, {
+      onDelete: "set null",
+    }),
+    /** goal → plan → step, in one table because a plan is only a goal with a parent. */
+    parentId: uuid("parent_id"),
+    kind: text("kind").notNull(), // goal | plan | step
+    title: text("title").notNull(),
+    detail: text("detail").notNull().default(""),
+    /** open | active | blocked | done | dropped — 'blocked' names a wait, it is not a failure. */
+    status: text("status").notNull().default("open"),
+    /**
+     * WHY THIS EXISTS, in the person's terms. A plan step nobody can explain is a step nobody
+     * should be asked to do, and this is what Today shows under the next action.
+     */
+    reason: text("reason").notNull().default(""),
+    /** What this work is about: [{ type: "job", id }, { type: "document", id }]. Ids only. */
+    refs: jsonb("refs").$type<{ type: string; id: string }[]>().notNull().default([]),
+    dueAt: timestamp("due_at", { withTimezone: true }),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    sortOrder: integer("sort_order").notNull().default(0),
+    ...timestamps,
+  },
+  (table) => [
+    index("work_items_user_status_idx").on(table.userId, table.status),
+    index("work_items_parent_idx").on(table.userId, table.parentId, table.sortOrder),
+  ]
+);
+
+export type WorkItem = typeof workItems.$inferSelect;
+export type NewWorkItem = typeof workItems.$inferInsert;
+
+/**
+ * One attempt Fadi made, and how it ended.
+ *
+ * A receipt, not a log line: the person can be shown what was tried, whether it needed their
+ * approval, and what actually happened — instead of a model's own claim that it worked.
+ */
+export const workExecutions = pgTable(
+  "work_executions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    workItemId: uuid("work_item_id").references(() => workItems.id, { onDelete: "cascade" }),
+    /** web | voice | background | extension — where the attempt came from. */
+    surface: text("surface").notNull().default("web"),
+    /** The capability attempted, named as the person would hear it. */
+    action: text("action").notNull(),
+    /** read | write | external — what it could touch, so approval policy is data not code. */
+    risk: text("risk").notNull().default("read"),
+    /** proposed | approved | running | done | failed | refused */
+    status: text("status").notNull().default("running"),
+    /** What happened, in one sentence, for the person to read. */
+    receipt: text("receipt").notNull().default(""),
+    error: text("error"),
+    /** Ties an attempt to the approval that authorised it, when one was needed. */
+    approvalId: uuid("approval_id"),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    finishedAt: timestamp("finished_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index("work_executions_user_idx").on(table.userId, table.startedAt),
+    index("work_executions_item_idx").on(table.workItemId, table.startedAt),
+  ]
+);
+
+export type WorkExecution = typeof workExecutions.$inferSelect;
+
+/**
+ * What a piece of work produced or used.
+ *
+ * Named `work_outputs` rather than "artifacts" on purpose: `evidence_artifacts` already means
+ * the proof media attached to a career fact, and two different meanings for one word in one
+ * schema is a trap for whoever reads it next.
+ */
+export const workOutputs = pgTable(
+  "work_outputs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    workItemId: uuid("work_item_id")
+      .notNull()
+      .references(() => workItems.id, { onDelete: "cascade" }),
+    /** document | evidence | application | portfolio_item | project_run | link */
+    kind: text("kind").notNull(),
+    /** The id in its own table. The kernel never copies the thing itself. */
+    refId: text("ref_id").notNull(),
+    label: text("label").notNull().default(""),
+    ...timestamps,
+  },
+  (table) => [
+    uniqueIndex("work_outputs_item_ref_unique").on(table.workItemId, table.kind, table.refId),
+    index("work_outputs_user_idx").on(table.userId, table.kind),
+  ]
+);
+
+export type WorkOutput = typeof workOutputs.$inferSelect;
