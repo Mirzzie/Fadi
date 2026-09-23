@@ -47,14 +47,27 @@ export const DOCK_APPS: DockApp[] = [
   { href: "/dashboard/settings", label: "Settings", icon: Settings, group: "system" },
 ];
 
-// The mode transforms the whole shell: Apply drops the build tools (Niche/Interview/Learning),
-// Prepare drops the pipeline (Jobs/Applications/Network). Shared groups (Home, You, System) stay.
-const APPLY_HIDES = new Set<DockGroup>(["orient", "prepare"]);
-const PREPARE_HIDES = new Set<DockGroup>(["pursue"]);
+/**
+ * THE MODE ORDERS THE DOCK. IT NO LONGER EMPTIES IT.
+ *
+ * Apply used to remove Interview and Learning; Prepare removed Jobs, Applications and Network.
+ * Real career work crosses that line constantly — read a posting, notice a gap, practise it,
+ * come back to the application — and a switch that deletes half the product made the person
+ * remember which half they were in, then hunt for the switch when something vanished.
+ *
+ * What the phase is actually good for is emphasis, so it leads with the group that matters now
+ * and keeps everything else one click away.
+ */
+const LEADS: Record<CareerMode, DockGroup[]> = {
+  apply: ["start", "pursue", "you", "prepare", "orient", "system"],
+  prepare: ["start", "prepare", "you", "orient", "pursue", "system"],
+};
 
 function appsForMode(mode: CareerMode): DockApp[] {
-  const hidden = mode === "apply" ? APPLY_HIDES : PREPARE_HIDES;
-  return DOCK_APPS.filter((a) => !hidden.has(a.group));
+  const order = LEADS[mode];
+  return [...DOCK_APPS].sort(
+    (a, b) => order.indexOf(a.group) - order.indexOf(b.group)
+  );
 }
 
 /** The OS dock — navigation, transformed by the current career phase. */

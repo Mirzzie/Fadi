@@ -9,7 +9,9 @@ import { getUserProviderConfigs } from "@/lib/ai/user-settings";
 import { createResilientChatStream } from "@/lib/ai/resilient";
 import { buildFadiContext } from "@/lib/ai/context/builder";
 import { buildFadiMessages } from "@/lib/ai/prompts/system";
+import { describeCurrentPlace } from "@/lib/ai/context/current-place";
 import { executeFadiTool, getFadiTools } from "@/lib/ai/tools/registry";
+import { toolsForTurn } from "@/lib/ai/tools/routing";
 import { toToolSpec, type FadiToolContext } from "@/lib/ai/tools/types";
 import { createAgentMessagesRepository } from "@careeros/database";
 import { getDatabase } from "@/lib/database/client";
@@ -34,6 +36,11 @@ function sseMessage(text: string): Response {
 
 const chatRequestSchema = z.object({
   message: z.string().min(1).max(4000),
+  /**
+   * The path the person is on. Only the path: the record behind it is resolved from their own
+   * rows on the server, so a forged label cannot put words into Fadi's context.
+   */
+  pathname: z.string().max(512).optional(),
   history: z
     .array(
       z.object({
@@ -93,7 +100,7 @@ export async function POST(req: NextRequest) {
     return new Response("Invalid request body", { status: 400 });
   }
 
-  const { message, history } = parsed.data;
+  const { message, history, pathname } = parsed.data;
 
   // Build context
   // Live market signals (GDELT/HN/Remotive) are cached, so Fadi's answers stay
@@ -117,8 +124,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // WHAT THEY ARE LOOKING AT. Fadi knew their record and their market and not their screen, so
+  // "fix this" had to be answered by asking which "this". The place comes from the path; the
+  // record is read back from their own rows (see lib/ai/context/where.ts).
+  const where = await describeCurrentPlace(user.id, pathname);
+
   // Build messages
-  const messages = buildFadiMessages(context, history, message);
+  const messages = buildFadiMessages(context, history, message, where);
 
   // Resolve the user's provider chain (primary → fallback) and stream resiliently:
   // retry transient rate limits, switch providers when one is exhausted.
@@ -139,7 +151,9 @@ export async function POST(req: NextRequest) {
 
   // Fadi's tools (search_jobs, get_performance, …) + the first provider in the
   // chain that supports function calling. If none do, we stream plainly.
-  const tools = getFadiTools().map(toToolSpec);
+  // Not the whole catalogue on every turn: the core questions, the area they are standing in,
+  // and anything their own words point at (see lib/ai/tools/routing.ts).
+  const tools = toolsForTurn(getFadiTools(), { pathname, message }).map(toToolSpec);
   // All tool-capable providers (primary → fallback) so the agentic loop fails
   // over when one is rate-limited/exhausted (e.g. Groq's daily token cap).
   const toolProviders = chain.filter((p) => typeof p.runWithTools === "function");

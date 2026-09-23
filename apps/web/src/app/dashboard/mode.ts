@@ -6,16 +6,15 @@ export type CareerMode = "apply" | "prepare";
  *  hydration mismatch. The DB (jobPreferences.mode) stays the durable source of truth. */
 export const MODE_COOKIE = "fadi_mode";
 
-/** Pages that belong to only ONE phase (mirrors the dock's per-mode hiding). Switching INTO a
- *  mode that hides the current page sends the user to the dashboard, so the switch actually
- *  transforms the view instead of stranding them on a page the new mode has hidden. */
-export const MODE_HIDDEN_PREFIXES: Record<CareerMode, string[]> = {
-  // Apply = the pipeline. Hides the orient/build tools.
-  apply: ["/dashboard/niche-finder", "/dashboard/interview", "/dashboard/learning"],
-  // Prepare = building up. Hides the live pipeline.
-  prepare: ["/dashboard/jobs", "/dashboard/applications", "/dashboard/network"],
-};
-
-export function isPathHiddenInMode(pathname: string, mode: CareerMode): boolean {
-  return MODE_HIDDEN_PREFIXES[mode].some((prefix) => pathname.startsWith(prefix));
+/**
+ * NO PAGE BELONGS TO ONE PHASE.
+ *
+ * This used to list the destinations each mode HID, and switching modes redirected anyone
+ * standing on one of them. Career work crosses the line — a posting reveals a gap, the gap needs
+ * practice, the practice belongs on the application — so hiding made the person track which half
+ * of the product they were in. The phase now only orders the dock and steers what Fadi leads
+ * with; nothing is removed and nobody is redirected.
+ */
+export function isPathHiddenInMode(): boolean {
+  return false;
 }

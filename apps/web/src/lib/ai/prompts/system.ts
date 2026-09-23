@@ -70,12 +70,20 @@ export function buildFadiMessages(
   userContext: FadiUserContext,
   conversationHistory: Array<{ role: "user" | "assistant"; content: string }>,
   userMessage: string,
+  /**
+   * One sentence about the screen they are on, resolved from their own rows — see
+   * lib/ai/context/where.ts. Empty when Fadi cannot say anything true about it, which is why it
+   * is appended rather than woven into the prompt.
+   */
+  where = "",
 ): AIMessage[] {
   const contextBlock = formatFadiContextAsPrompt(userContext);
 
   const systemMessage: AIMessage = {
     role: "system",
-    content: `${FADI_SYSTEM_PROMPT}\n\n---\n\n${contextBlock}`,
+    content: [`${FADI_SYSTEM_PROMPT}\n\n---\n\n${contextBlock}`, where.trim()]
+      .filter(Boolean)
+      .join("\n\n"),
   };
 
   const history: AIMessage[] = conversationHistory.map((m) => ({

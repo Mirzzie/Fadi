@@ -33,20 +33,21 @@ describe("the setup checklist per phase", () => {
     for (const id of APPLY_ONLY) expect(src).toMatch(new RegExp(`APPLY_ONLY[\\s\\S]{0,120}"${id}"`));
   });
 
-  it("never points a Prepare step at a route Prepare hides", async () => {
-    const [setupSrc, modeSrc] = await Promise.all([
-      import("node:fs").then((fs) => fs.readFileSync("src/lib/guidance/setup.ts", "utf8")),
-      import("node:fs").then((fs) => fs.readFileSync("src/app/dashboard/mode.ts", "utf8")),
-    ]);
-    const hidden = [...(modeSrc.match(/prepare: \[([\s\S]*?)\]/)?.[1] ?? "").matchAll(/"([^"]+)"/g)].map(
-      (m) => m[1],
-    );
-    expect(hidden.length).toBeGreaterThan(0);
-
-    // Every step whose href is hidden in Prepare must be in the apply-only list.
-    const steps = [...setupSrc.matchAll(/id: "([a-z-]+)",[\s\S]*?href: "([^"]+)"/g)];
-    for (const [, id, href] of steps) {
-      if (hidden.some((h) => href.startsWith(h))) expect(APPLY_ONLY).toContain(id);
+  it("can point anywhere, because no phase hides a destination any more", async () => {
+    // This used to assert that no Prepare step pointed at a route Prepare HID. Apply removed
+    // Interview and Learning; Prepare removed Jobs, Applications and Network — and real career
+    // work crosses that line constantly, so the phase now orders the dock instead of emptying
+    // it. Guidance can therefore name any destination without stranding anyone.
+    const { isPathHiddenInMode } = await import("@/app/dashboard/mode");
+    for (const route of [
+      "/dashboard/jobs",
+      "/dashboard/applications",
+      "/dashboard/network",
+      "/dashboard/interview",
+      "/dashboard/learning",
+      "/dashboard/niche-finder",
+    ]) {
+      expect(isPathHiddenInMode(), route).toBe(false);
     }
   });
 });

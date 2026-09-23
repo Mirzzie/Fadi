@@ -247,7 +247,13 @@ export function FadiChat({
         const res = await fetch("/api/fadi/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message: text.trim(), history }),
+          // Tell Fadi which screen this was asked from. Only the path — the server decides what
+          // record that is and whether it belongs to this person.
+          body: JSON.stringify({
+            message: text.trim(),
+            history,
+            pathname: typeof window !== "undefined" ? window.location.pathname : undefined,
+          }),
           signal: abortRef.current.signal,
         });
 
