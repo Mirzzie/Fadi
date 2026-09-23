@@ -11,6 +11,7 @@ import {
 
 import { getDatabase } from "@/lib/database/client";
 import { getSetupState } from "@/lib/guidance/setup";
+import { planSteps, runningPlan } from "./run-plan";
 import type { CareerMode } from "@/app/dashboard/mode";
 
 /**
@@ -66,9 +67,35 @@ export type TodayDecision = {
 
 export type TodaySuggestion = { label: string; detail: string; href: string };
 
+/** A step of the plan Fadi is in the middle of, as the person watches it go. */
+export type TodayPlanStep = {
+  id: string;
+  title: string;
+  reason: string;
+  /** open | active | blocked | done — `blocked` carries why in `note`. */
+  status: string;
+  /** Whether Fadi can do this one, or it is the person's to do. */
+  automatic: boolean;
+  /** What the step found or produced, once it has run. */
+  outcome: string;
+  /** What it left behind, linked — a step that drafted a CV you cannot open is half a step. */
+  output: { label: string; href: string } | null;
+  note: string;
+};
+
+export type TodayPlan = {
+  id: string;
+  title: string;
+  steps: TodayPlanStep[];
+  /** True when the next thing to happen is Fadi's, not the person's. */
+  fadiCanContinue: boolean;
+};
+
 export type Today = {
   firstName: string;
   goal: TodayGoal;
+  /** The plan in flight, when there is one. This is what "Fadi is working" shows. */
+  plan: TodayPlan | null;
   otherGoals: { id: string; title: string }[];
   action: TodayAction | null;
   alsoOpen: TodayAction[];
@@ -134,6 +161,12 @@ export async function getToday(
   const goals = await work.listGoals(userId);
   const activeGoal = goals.find((row) => row.status === "active") ?? goals[0];
 
+  const inFlight = await runningPlan(userId);
+  const planRows = inFlight ? await planSteps(userId, inFlight.id) : [];
+  const planOutputs = inFlight
+    ? await createWorkItemsRepository(db).listOutputs(userId, { kind: "document" })
+    : [];
+
   const [steps, receipts, lastRun, direction, pendingReview, labRequests, setup, findings] =
     await Promise.all([
       activeGoal ? work.nextActions(userId, { goalId: activeGoal.id, limit: 4 }) : [],
@@ -164,7 +197,8 @@ export async function getToday(
 
   // Real work wins. The setup path is the fallback for someone who has not set any work yet —
   // it is computed from their actual state, so it is a real next step, not a tour.
-  const workActions = steps.map(toAction);
+  const planStepIds = new Set(planRows.map((row) => row.id));
+  const workActions = steps.filter((step) => !planStepIds.has(step.id)).map(toAction);
   const action: TodayAction | null =
     workActions[0] ??
     (setup.nextStep
@@ -203,9 +237,36 @@ export async function getToday(
     })),
   ];
 
+  const planStepViews: TodayPlanStep[] = planRows.map((row) => ({
+    id: row.id,
+    title: row.title,
+    reason: row.reason,
+    status: row.status,
+    automatic: row.refs.some((ref) => ref.type === "capability"),
+    outcome: row.status === "done" ? row.detail : "",
+    output: (() => {
+      const made = planOutputs.find((item) => item.workItemId === row.id);
+      return made ? { label: "Open it", href: `/dashboard/documents/${made.refId}` } : null;
+    })(),
+    // `reason` carries the capability's own words when a step stopped, so it is shown as the
+    // note rather than the template's explanation of why the step exists.
+    note: row.status === "blocked" ? row.reason : "",
+  }));
+  const nextInPlan = planStepViews.find(
+    (step) => step.status === "open" || step.status === "active"
+  );
+
   return {
     firstName,
     goal,
+    plan: inFlight
+      ? {
+          id: inFlight.id,
+          title: inFlight.title,
+          steps: planStepViews,
+          fadiCanContinue: Boolean(nextInPlan?.automatic),
+        }
+      : null,
     otherGoals: goals
       .filter((row) => row.id !== activeGoal?.id)
       .map((row) => ({ id: row.id, title: row.title })),

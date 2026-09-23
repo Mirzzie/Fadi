@@ -1075,6 +1075,43 @@ const companyBriefTool: FadiTool = {
   },
 };
 
+/**
+ * The first step of applying, and the one people skip: is this posting still open?
+ *
+ * A read — it fetches a page Fadi was already given, changes nothing, and answers "unknown"
+ * rather than guessing when the site will not say.
+ */
+const checkPostingOpen: FadiTool = {
+  name: "check_posting_open",
+  risk: "read",
+  description:
+    "Check whether a saved job posting is still open, by its job id. Use before tailoring anything for a role, and whenever the user asks if a posting is still live.",
+  parameters: {
+    type: "object",
+    properties: { jobId: { type: "string", description: "The job's id in Fadi." } },
+    required: ["jobId"],
+  },
+  async execute(args, ctx): Promise<FadiToolResult> {
+    const jobId = typeof args.jobId === "string" ? args.jobId : "";
+    if (!jobId) return { summary: "I need the job to check.", view: "none" };
+
+    const { createJobsRepository } = await import("@careeros/database");
+    const { getDatabase } = await import("@/lib/database/client");
+    const job = await createJobsRepository(getDatabase()).findByIdForUser(ctx.userId, jobId);
+    if (!job?.url) return { summary: "I can't find that posting to check.", view: "none" };
+
+    const { checkPostingLiveness } = await import("@/lib/jobs/liveness");
+    const liveness = await checkPostingLiveness(job.url);
+    const said =
+      liveness.state === "live"
+        ? `Still open: ${job.title} at ${job.company}.`
+        : liveness.state === "closed"
+          ? `That one has closed — ${job.title} at ${job.company}. ${liveness.reason ?? ""}`.trim()
+          : `The site won't say whether ${job.title} at ${job.company} is still open. ${liveness.reason ?? ""}`.trim();
+    return { summary: said, view: "none", data: { state: liveness.state, url: job.url } };
+  },
+};
+
 const TOOLS: FadiTool[] = [
   searchJobs,
   getPerformance,
@@ -1103,6 +1140,7 @@ const TOOLS: FadiTool[] = [
   getLaborMarket,
   getWorldShifts,
   createTrackTool,
+  checkPostingOpen,
 ];
 
 export function getFadiTools(): FadiTool[] {

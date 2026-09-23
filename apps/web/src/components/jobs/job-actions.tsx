@@ -1,6 +1,6 @@
 "use client";
 
-import { Bookmark, BookmarkCheck, ExternalLink, Loader2, Sparkles } from "lucide-react";
+import { Bookmark, BookmarkCheck, ExternalLink, Loader2, Sparkles, Wand2 } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 
@@ -10,6 +10,7 @@ import {
   unsaveJobAction,
   updateApplicationStatusAction,
 } from "@/app/dashboard/jobs/actions";
+import { applyWithFadiAction } from "@/app/dashboard/work-actions";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { FadiGuardianCallout } from "@/components/workspace/fadi-guardian-callout";
 import { FadiGuardianVoice } from "@/components/os/fadi-guardian-voice";
@@ -36,6 +37,22 @@ export function JobActions({ jobId, isSaved, applicationStatus, url }: JobAction
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<JobActionResult | null>(null);
 
+  /**
+   * Hands the role to Fadi as a plan and sends the person to watch it. It does not start
+   * drafting: the plan appears with its steps, and they press on when they want the next one.
+   */
+  function applyWithFadi() {
+    setResult(null);
+    startTransition(async () => {
+      const started = await applyWithFadiAction(jobId);
+      setResult(
+        started.ok
+          ? { ok: true, message: "Fadi has the plan — it's on Today." }
+          : { ok: false, message: started.error }
+      );
+    });
+  }
+
   function runAction(action: () => Promise<JobActionResult>) {
     setResult(null);
     startTransition(async () => {
@@ -60,6 +77,10 @@ export function JobActions({ jobId, isSaved, applicationStatus, url }: JobAction
             <Bookmark className="size-4" aria-hidden="true" />
           )}
           {isSaved ? "Saved" : "Save job"}
+        </Button>
+        <Button type="button" variant="outline" disabled={isPending} onClick={applyWithFadi}>
+          <Wand2 className="size-4" aria-hidden="true" />
+          Apply with Fadi
         </Button>
         <Link
           href={`/dashboard/applications/${jobId}/workspace`}

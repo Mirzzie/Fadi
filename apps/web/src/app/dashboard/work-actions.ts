@@ -19,8 +19,8 @@ import { getDatabase } from "@/lib/database/client";
 
 type Result = { ok: true } | { ok: false; error: string };
 
-const FAILED: Result = { ok: false, error: "Could not save that. Please try again." };
-const REJECTED: Result = { ok: false, error: "That request did not look right." };
+const FAILED = { ok: false, error: "Could not save that. Please try again." } as const;
+const REJECTED = { ok: false, error: "That request did not look right." } as const;
 
 const uuid = z.string().uuid();
 const title = z.string().trim().min(1).max(200);
@@ -124,5 +124,85 @@ export async function setStepStatusAction(id: string, status: string): Promise<R
     return { ok: true };
   } catch {
     return FAILED;
+  }
+}
+
+/**
+ * Do the next thing the running plan can do by itself, and stop.
+ *
+ * One step per press on purpose. A plan that runs to the end unattended has taken every
+ * decision in it, including the fit check whose honest answer is sometimes "don't apply".
+ */
+export async function advancePlanAction(
+  planId: string
+): Promise<{ ok: true; state: string; summary?: string } | { ok: false; error: string }> {
+  if (!uuid.safeParse(planId).success) return { ok: false, error: REJECTED.error };
+
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, error: FAILED.error };
+
+  try {
+    const { advancePlan } = await import("@/lib/work/run-plan");
+    const outcome = await advancePlan(user.id, planId);
+    revalidatePath("/dashboard");
+
+    if (outcome.state === "unavailable") return { ok: false, error: outcome.reason };
+    return {
+      ok: true,
+      state: outcome.state,
+      summary: "summary" in outcome ? outcome.summary : undefined,
+    };
+  } catch (error) {
+    // The person asked Fadi to do something and it did not happen — say so in their words.
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : "That step did not finish.",
+    };
+  }
+}
+
+/** Put the plan down. The steps stay, so what was already done is still on the record. */
+export async function stopPlanAction(planId: string): Promise<Result> {
+  if (!uuid.safeParse(planId).success) return REJECTED;
+
+  const user = await getCurrentAuthUser();
+  if (!user) return FAILED;
+
+  try {
+    const repo = createWorkItemsRepository(getDatabase());
+    const plan = await repo.get(user.id, planId);
+    if (!plan || plan.kind !== "plan") return REJECTED;
+
+    await repo.setStatus(user.id, planId, "dropped", { reason: "You stopped it." });
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch {
+    return FAILED;
+  }
+}
+
+/**
+ * "Apply with Fadi" — turn a posting into the plan for applying to it.
+ *
+ * The plan is created, not run. The person sees the six steps on Today and presses on when they
+ * want the next one; nothing about a job card should quietly start drafting in their name.
+ */
+export async function applyWithFadiAction(
+  jobId: string
+): Promise<{ ok: true; planId: string } | { ok: false; error: string }> {
+  if (!uuid.safeParse(jobId).success) return { ok: false, error: REJECTED.error };
+
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, error: FAILED.error };
+
+  try {
+    const { startPlan } = await import("@/lib/work/run-plan");
+    const started = await startPlan(user.id, "apply-to-role", [{ type: "job", id: jobId }]);
+    if (!started.ok) return { ok: false, error: started.reason };
+
+    revalidatePath("/dashboard");
+    return { ok: true, planId: started.planId };
+  } catch {
+    return { ok: false, error: FAILED.error };
   }
 }

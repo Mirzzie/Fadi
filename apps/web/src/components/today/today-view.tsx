@@ -3,14 +3,16 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { ArrowRight, Check, Loader2, Plus, Sparkles } from "lucide-react";
+import { ArrowRight, Check, CircleDot, Loader2, Plus, Sparkles, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useFadi } from "@/components/os/fadi-presence";
 import {
   addStepAction,
+  advancePlanAction,
   setGoalAction,
   setStepStatusAction,
+  stopPlanAction,
   switchGoalAction,
 } from "@/app/dashboard/work-actions";
 import type { Today } from "@/lib/work/today";
@@ -43,6 +45,7 @@ export function TodayView({ today }: { today: Today }) {
       </header>
 
       <Working today={today} pending={pending} onRun={run} />
+      <RunningPlan today={today} pending={pending} onRun={run} />
       <NextAction today={today} pending={pending} onRun={run} />
       <Decisions today={today} />
       <WhatFadiDid today={today} />
@@ -283,6 +286,91 @@ function NextAction({ today, pending, onRun }: { today: Today; pending: boolean;
       ) : null}
     </Section>
   );
+}
+
+/**
+ * The plan, as it runs.
+ *
+ * This is the surface that replaces a chat window. What Fadi is doing is a list of steps that
+ * tick over in place — not prose claiming work happened, and not a spinner with no content. A
+ * step that stopped says what stopped it, in the capability's own words.
+ */
+function RunningPlan({ today, pending, onRun }: { today: Today; pending: boolean; onRun: Runner }) {
+  const plan = today.plan;
+  if (!plan) return null;
+
+  return (
+    <Section
+      title="Fadi is working"
+      aside={
+        <Button
+          variant="ghost"
+          size="xs"
+          disabled={pending}
+          onClick={() => onRun(() => stopPlanAction(plan.id))}
+        >
+          <X /> Stop
+        </Button>
+      }
+    >
+      <p className="text-base font-medium">{plan.title}</p>
+
+      <ol className="mt-3 space-y-2">
+        {plan.steps.map((step) => (
+          <li key={step.id} className="flex gap-2.5 text-sm">
+            <StepMark status={step.status} />
+            <span className="min-w-0">
+              <span className={step.status === "done" ? "text-muted-foreground" : ""}>
+                {step.title}
+              </span>
+              {!step.automatic && step.status !== "done" ? (
+                <span className="ml-2 text-xs text-muted-foreground">yours to do</span>
+              ) : null}
+              {step.outcome ? (
+                <span className="line-clamp-2 text-xs text-muted-foreground">{step.outcome}</span>
+              ) : null}
+              {step.output ? (
+                <Link
+                  href={step.output.href}
+                  className="text-xs text-primary underline underline-offset-4"
+                >
+                  {step.output.label}
+                </Link>
+              ) : null}
+              {step.note ? (
+                <span className="block text-xs text-destructive">{step.note}</span>
+              ) : null}
+            </span>
+          </li>
+        ))}
+      </ol>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {plan.fadiCanContinue ? (
+          <Button
+            size="sm"
+            disabled={pending}
+            onClick={() => onRun(() => advancePlanAction(plan.id))}
+          >
+            {pending ? <Loader2 className="animate-spin" /> : <ArrowRight />} Do the next step
+          </Button>
+        ) : (
+          <span className="text-xs text-muted-foreground">
+            The next step is yours. Fadi will pick it up again after.
+          </span>
+        )}
+      </div>
+    </Section>
+  );
+}
+
+function StepMark({ status }: { status: string }) {
+  if (status === "done") return <Check className="mt-0.5 size-4 shrink-0 text-primary" />;
+  if (status === "active")
+    return <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-primary" />;
+  if (status === "blocked")
+    return <CircleDot className="mt-0.5 size-4 shrink-0 text-destructive" />;
+  return <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/40" />;
 }
 
 const RECEIPT_TONE: Record<string, string> = {
