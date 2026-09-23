@@ -2,7 +2,26 @@
 
 **Written for:** the owner, and Codex, as the target both of us build against.
 **Date:** 23 September 2026
-**Status:** Proposed. Supersedes the "assistant panel" model in earlier UI notes.
+**Status:** Built, in the order below. Supersedes the "assistant panel" model in earlier UI notes.
+
+| Step | State |
+|---|---|
+| 1. Sources — keep only what works | **Done** (`2f82ba0`, `aad0785`) |
+| 2. The running plan on Today | **Done** (`8a75c91`) |
+| 3. The intent bar | **Done** (`0c6aa84`) |
+| 4. Capability contract + MCP client | **Done** (`f92491d`) — consent is per connection, not per call |
+| 5. Triggers | **Done** (`2b59b04`) — background work proposes, never starts |
+
+What is deliberately NOT built, and should be next:
+
+- **Consent per call.** A connected server's tools are allowed or not allowed as a whole, decided
+  once. The exact arguments shown on Today before anything runs is the missing piece, and the
+  refusal message is written to be replaced by it.
+- **Stop mid-step.** A plan stops between steps, not during one. Nothing currently running can be
+  cancelled halfway, so "Stop" puts the plan down rather than interrupting a call.
+- **More templates.** Only `apply-to-role` exists. Follow-up-after-silence and
+  prepare-for-interview are the obvious next two, and both are refs + steps, not new machinery.
+- **Voice as an intent input.** The bar takes typing; hold-to-talk is not wired to it yet.
 
 ## The one sentence
 
