@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseVoiceCommand } from "./commands";
+import { flatten, parseVoiceCommand } from "./commands";
 
 /**
  * These are written for the person who cannot see the screen. The test that matters most is
@@ -102,5 +102,38 @@ describe("hearing a command", () => {
     // Plausible but not a command Fadi has: asked, not acted on.
     expect(parseVoiceCommand("delete everything").kind).toBe("ask");
     expect(parseVoiceCommand("send my application to Google").kind).toBe("ask");
+  });
+});
+
+/**
+ * Whisper punctuates everything. Every one of these arrived as a question for the chat instead
+ * of the command it plainly is — "Hi, open opportunities." came back as a table of jobs.
+ */
+describe("what a transcriber actually sends", () => {
+  it("is not defeated by a full stop", () => {
+    expect(parseVoiceCommand("Hi, open opportunities.")).toMatchObject({
+      kind: "navigate",
+      href: "/dashboard/jobs",
+    });
+    expect(parseVoiceCommand("Open my career.")).toMatchObject({
+      kind: "navigate",
+      href: "/dashboard/evidence",
+    });
+    expect(parseVoiceCommand("What's next?")).toEqual({ kind: "read", what: "next" });
+    expect(parseVoiceCommand("Carry on.")).toEqual({ kind: "advance" });
+    expect(parseVoiceCommand("Yes.")).toEqual({ kind: "yes" });
+  });
+
+  it("does not carry punctuation into the thing it looks up", () => {
+    expect(parseVoiceCommand("Apply to the Deerfoot role.")).toEqual({
+      kind: "apply",
+      target: "deerfoot role",
+      confirm: true,
+    });
+  });
+
+  /** A dot inside a word is part of the word, not punctuation. */
+  it("keeps the dots that belong to a name", () => {
+    expect(flatten("Node.js and C#.NET")).toBe("node.js and c#.net");
   });
 });

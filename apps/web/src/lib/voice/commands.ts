@@ -34,11 +34,20 @@ export type VoiceCommand =
   | { kind: "ask"; text: string }
   | { kind: "unknown" };
 
-/** Lower-case, no punctuation, single spaces — what every pattern below is matched against. */
+/**
+ * Lower-case, no punctuation, single spaces — what every pattern below is matched against.
+ *
+ * The full stop is the one that bites. Whisper punctuates everything it hears, so "open
+ * opportunities" arrives as "Open opportunities." and the trailing dot travelled all the way
+ * into the destination name, where "opportunities." matched nothing and the whole command fell
+ * through to chat. Dots are kept only between characters — node.js, c#.net — and dropped
+ * everywhere else.
+ */
 export function flatten(text: string): string {
   return text
     .toLowerCase()
     .replace(/[^a-z0-9+#. ]+/g, " ")
+    .replace(/\.(?![a-z0-9])/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }

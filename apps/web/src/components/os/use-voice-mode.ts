@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useGroqVoice } from "@/lib/voice/use-groq-voice";
 import { speakFadi, stopFadiSpeech } from "@/lib/voice/fadi-speech";
 import { parseVoiceCommand, VOICE_HELP, type VoiceCommand } from "@/lib/voice/commands";
+import { speakable } from "@/lib/voice/speakable";
 import {
   previewVoiceApplyAction,
   runVoiceWorkAction,
@@ -44,20 +45,35 @@ type Pending = {
 
 export function useVoiceMode() {
   const router = useRouter();
-  const { setState } = useFadi();
+  const { setState, speaking } = useFadi();
   const [on, setOn] = useState(false);
   const [busy, setBusy] = useState(false);
   const [heard, setHeard] = useState("");
   const [said, setSaid] = useState("");
   const pending = useRef<Pending | null>(null);
+  // True from the moment Fadi is asked to speak until it has actually finished. `speaking` alone
+  // is not enough: the audio is fetched first, so for a second after saying something Fadi is
+  // neither speaking nor done — and that is exactly when the loop reopened the microphone and
+  // recorded the answer that was about to play.
+  const [awaitingSpeech, setAwaitingSpeech] = useState(false);
+  const hasSpoken = useRef(false);
   const lastSaid = useRef("");
   const onRef = useRef(false);
   onRef.current = on;
 
+  // Set once the recogniser below exists. `say` is declared first because the handler needs it,
+  // so it reaches the microphone through this rather than through a variable that is not yet
+  // initialised at the moment this closure is built.
+  const stopListeningRef = useRef<() => void>(() => {});
+
   const say = useCallback((text: string) => {
     lastSaid.current = text;
     setSaid(text);
-    void speakFadi(text);
+    // Close the microphone before opening the mouth: a capture already running would record
+    // Fadi talking over it and send that to be transcribed as if the person had said it.
+    stopListeningRef.current();
+    setAwaitingSpeech(true);
+    void speakFadi(speakable(text));
   }, []);
 
   const handle = useCallback(
@@ -172,20 +188,43 @@ export function useVoiceMode() {
   });
 
   const listening = voiceState === "recording";
+  stopListeningRef.current = stop;
 
   // The loop: whenever it is on and nothing else is happening, listen again. This is what makes
   // it hands-free — after the first press, the person never has to find a control.
+  //
+  // NOT while Fadi is speaking. The microphone hears the speakers: it transcribed Fadi's own
+  // answer, parsed that as the next command, and answered itself — which from the outside looks
+  // exactly like "it isn't hearing me and it's doing the wrong things". The pause afterwards is
+  // long enough for the last word to finish leaving the room.
   useEffect(() => {
-    if (!on || busy || listening || voiceState === "transcribing") return;
+    if (!on || busy || listening || speaking || awaitingSpeech || voiceState === "transcribing")
+      return;
     const timer = setTimeout(() => {
       if (onRef.current) start();
-    }, 400);
+    }, 700);
     return () => clearTimeout(timer);
-  }, [on, busy, listening, voiceState, start]);
+  }, [on, busy, listening, speaking, awaitingSpeech, voiceState, start]);
 
   useEffect(() => {
     setState(busy ? "thinking" : listening ? "listening" : "idle");
   }, [busy, listening, setState]);
+
+  // Speech has finished when it started and then stopped.
+  useEffect(() => {
+    if (speaking) hasSpoken.current = true;
+    else if (hasSpoken.current) {
+      hasSpoken.current = false;
+      setAwaitingSpeech(false);
+    }
+  }, [speaking]);
+
+  // ...or when it never started at all. A missing voice must not leave the loop deaf forever.
+  useEffect(() => {
+    if (!awaitingSpeech) return;
+    const timer = setTimeout(() => setAwaitingSpeech(false), 8000);
+    return () => clearTimeout(timer);
+  }, [awaitingSpeech]);
 
   const toggle = useCallback(() => {
     if (on) {
