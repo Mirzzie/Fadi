@@ -104,3 +104,33 @@ The resulting receipt can read “Drafted and saved a document — Document draf
 ## Recommendation
 
 Accept Phase 1's architecture. Do not start the Learning/Practice restructure on top of it until C1–C5 are closed. C1 and C2 define whether “one goal, one next action” is true; C4 and C5 define whether work-scoped conversation and “What Fadi did” can be trusted. C6 should close in the same repair pass. C7 needs an explicit product decision before approval policy relies on executions.
+
+
+## Second pass after `cb36e52`
+
+**Verdict:** C1, C2, C3, C5 and C6 are closed. C4 works on the happy path but still has one atomicity gap. C7 is acceptable as recent activity, not as a complete audit ledger.
+
+I reran the five repaired integration suites against `identity_test_fadi`: **30/30 passed**. The full non-database web suite after the independent interview work is **1,285 passed, 122 skipped**; typecheck and focused lint are clean.
+
+### C4a — conversation reassignment and work deletion are not atomic
+
+`workItems.remove()` now makes a conversation reachable after deletion, but it performs one or more `agent_messages` updates and the `work_items` delete as separate statements. The repository accepts `DbOrTx`; it does not start a transaction. The tests call it with the base database and cover only success.
+
+If deletion fails after the message update, the work still exists while its conversation has already been moved to general history. The original repair asked for the move and delete in the same transaction. No production work-delete action currently calls this method, so this is a latent contract gap rather than a user-facing regression.
+
+Before exposing work deletion, either:
+
+- call `remove()` only through a service that opens a transaction and make that boundary explicit; or
+- implement the message reassignment and deletion as one PostgreSQL statement/transaction.
+
+Add a failure-injection test between the message update and delete. Do not add more UI around this.
+
+### Independent interview slice
+
+Codex commit `2cb3219` removes two false claims and one setup burden:
+
+- story matching now returns no match when the bank has no grounded competency/content overlap instead of recommending the first story;
+- transcript text no longer produces invented speaking time, pace, or a fake `0/5` when no AI content review ran;
+- setup asks for role, interview stage, and 10/20 minutes; country, seniority and job description remain under **Change context**; the persona selector is gone.
+
+This work is separate from the kernel repair and is ready for Claude to cross-check rather than reimplement.
