@@ -289,12 +289,11 @@ export function createWorkItemsRepository(db: DbOrTx) {
     ): Promise<WorkItem[]> {
       // Scoped to one goal, because "what should I do next" is only true relative to what the
       // person said they are doing. Unscoped, switching goals left the same step on Today.
-      let under: string[] | null = null;
-      if (options.goalId) {
-        under = await descendantIds(userId, options.goalId);
-        if (under.length === 0) return [];
-      }
-
+      //
+      // And only the goal's OWN steps: a step under a plan belongs to that plan and is shown
+      // there, in its order, with what it found. Returning them here too put "Read it, then
+      // send it" on the list twice — once inside the plan and once as loose work with no plan
+      // around it — and kept doing it after the plan was stopped.
       return db
         .select()
         .from(workItems)
@@ -303,7 +302,7 @@ export function createWorkItemsRepository(db: DbOrTx) {
             eq(workItems.userId, userId),
             eq(workItems.kind, "step"),
             inArray(workItems.status, ["open", "active"]),
-            under ? inArray(workItems.id, under) : undefined
+            options.goalId ? eq(workItems.parentId, options.goalId) : undefined
           )
         )
         .orderBy(
@@ -375,6 +374,22 @@ export function createWorkItemsRepository(db: DbOrTx) {
         .where(and(eq(workItems.userId, userId), eq(workItems.id, id)))
         .returning();
       if (!row) throw new Error("Work item unavailable.");
+
+      // Finishing a plan finishes what is left of it. Its steps only meant anything as part of
+      // it: left open, they came back as loose next actions — "Read it, then send it", with no
+      // it to send — which is how a stopped plan haunted the screen that stopped it.
+      if (finished && row.kind === "plan") {
+        await db
+          .update(workItems)
+          .set({ status, completedAt: new Date(), updatedAt: new Date() })
+          .where(
+            and(
+              eq(workItems.userId, userId),
+              eq(workItems.parentId, id),
+              inArray(workItems.status, ["open", "active", "blocked"])
+            )
+          );
+      }
       return row;
     },
 

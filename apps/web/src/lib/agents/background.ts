@@ -99,7 +99,7 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
     // Recent findings, for dedupe — never report the same thing twice.
     const recent = await runsRepo.listRecentForUser(userId, 30);
     const seenJobIds = new Set(
-      recent.map((f) => f.data?.jobId).filter((id): id is string => typeof id === "string"),
+      recent.map((f) => f.data?.jobId).filter((id): id is string => typeof id === "string")
     );
     const seenTitles = new Set(recent.map((f) => f.title));
 
@@ -129,7 +129,7 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
           !j.isSaved &&
           !j.applicationStatus &&
           new Date(j.firstSeenAt).getTime() > baseline.getTime() &&
-          !seenJobIds.has(j.id),
+          !seenJobIds.has(j.id)
       )
       .slice(0, MAX_NEW_ROLE_FINDINGS);
 
@@ -155,7 +155,7 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
         (j) =>
           j.status !== "active" &&
           new Date(j.updatedAt).getTime() > baseline.getTime() &&
-          !seenTitles.has(`${j.title} at ${j.company} looks closed`),
+          !seenTitles.has(`${j.title} at ${j.company} looks closed`)
       );
       for (const job of expired) {
         findings.push({
@@ -207,7 +207,7 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
             // Only the ACTIVE direction's commitments — don't nudge about a build
             // that belongs to a track the user isn't currently pursuing.
             c.careerProfileId === (track?.id ?? null) &&
-            Date.now() - new Date(c.createdAt).getTime() > staleMs,
+            Date.now() - new Date(c.createdAt).getTime() > staleMs
         )
         .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())[0];
       if (stale && !seenTitles.has(`Still on “${stale.title}”?`)) {
@@ -240,10 +240,17 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
 
     // 5. Does Fadi's own data still agree with itself? Same ledger as everything
     //    else — no separate panel, no button to remember.
-    findings.push(...(await coherenceFindings(userId, lastRun ? new Date(lastRun.startedAt) : null)));
+    findings.push(
+      ...(await coherenceFindings(userId, lastRun ? new Date(lastRun.startedAt) : null))
+    );
 
     await runsRepo.insertFindings(run.id, userId, findings);
     await runsRepo.finishRun(run.id, { status: "ok", findingsCount: findings.length });
+
+    // The one thing background work is allowed to do beyond telling you: have the paperwork
+    // ready for the strongest new match, unstarted. Bounded to the active goal, one at a time,
+    // and it draws nothing and drafts nothing until the person presses.
+    await proposeForBestMatch(userId, findings).catch(() => {});
 
     if (execution) {
       await work
@@ -276,6 +283,36 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
     logger.error("agent.run_failed", { userId, error: message });
     return { ran: false, reason: "error" };
   }
+}
+
+/** A match has to be strong to be worth laying a plan out for; anything less is a suggestion. */
+const PLAN_WORTHY_MATCH = 75;
+
+/**
+ * Lay out an apply plan for the best new role this pass found, if one clears the bar.
+ *
+ * Deliberately narrow. It proposes for ONE finding, only `new_role`, only above a match score,
+ * and `proposePlan` refuses if anything is running or already waiting. Everything that would
+ * cost the person money or write in their name is behind the press that starts it.
+ */
+async function proposeForBestMatch(
+  userId: string,
+  findings: Array<{ kind: string; data?: Record<string, unknown> }>
+): Promise<void> {
+  const best = findings
+    .filter((finding) => finding.kind === "new_role")
+    .map((finding) => ({
+      jobId: typeof finding.data?.jobId === "string" ? finding.data.jobId : null,
+      score: typeof finding.data?.matchScore === "number" ? finding.data.matchScore : 0,
+    }))
+    .filter((candidate): candidate is { jobId: string; score: number } => Boolean(candidate.jobId))
+    .sort((a, b) => b.score - a.score)[0];
+
+  if (!best || best.score < PLAN_WORTHY_MATCH) return;
+
+  const { proposePlan } = await import("@/lib/work/run-plan");
+  const proposed = await proposePlan(userId, "apply-to-role", [{ type: "job", id: best.jobId }]);
+  if (proposed.ok) logger.info("work.plan.proposed", { userId, jobId: best.jobId });
 }
 
 /**

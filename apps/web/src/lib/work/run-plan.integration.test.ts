@@ -146,6 +146,39 @@ suite("running a plan", () => {
     expect((await work.listLive(userId)).filter((item) => item.kind === "plan")).toHaveLength(1);
   });
 
+  it("lays a plan out without starting it, and only one at a time", async () => {
+    await freshGoal("Proposals");
+    const proposed = (await plans.proposePlan(userId, "apply-to-role", [
+      { type: "job", id: jobId },
+    ])) as { ok: true; planId: string };
+    expect(proposed.ok).toBe(true);
+
+    const waiting = (await plans.proposedPlan(userId))!;
+    expect(waiting.id).toBe(proposed.planId);
+    expect(waiting.status).toBe("open");
+    // Laid out in full, and untouched: background work must not draft in someone's name.
+    expect(await plans.planSteps(userId, waiting.id)).toHaveLength(6);
+    expect(holder.calls).toHaveLength(0);
+    // It is not "what Fadi is working on" until the person starts it.
+    expect(await plans.runningPlan(userId)).toBeUndefined();
+
+    const second = await plans.proposePlan(userId, "apply-to-role", [
+      { type: "job", id: await createJobsSecond() },
+    ]);
+    expect(second.ok).toBe(false);
+  });
+
+  it("proposes nothing while something is running", async () => {
+    await freshGoal("Busy");
+    await plans.startPlan(userId, "apply-to-role", [{ type: "job", id: jobId }]);
+
+    const proposed = await plans.proposePlan(userId, "apply-to-role", [
+      { type: "job", id: await createJobsSecond() },
+    ]);
+    expect(proposed.ok).toBe(false);
+    expect(await plans.proposedPlan(userId)).toBeUndefined();
+  });
+
   it("does one step per call, with the arguments computed from the plan's own job", async () => {
     await freshGoal("One at a time");
     const { planId } = (await plans.startPlan(userId, "apply-to-role", [
@@ -211,6 +244,27 @@ suite("running a plan", () => {
     const again = await plans.advancePlan(userId, planId);
     expect(again.state).toBe("stopped");
     expect(holder.calls).toHaveLength(0);
+  });
+
+  it("takes the rest of the plan with it when it is stopped", async () => {
+    await freshGoal("Stopping");
+    const { planId } = (await plans.startPlan(userId, "apply-to-role", [
+      { type: "job", id: jobId },
+    ])) as { ok: true; planId: string };
+    await plans.advancePlan(userId, planId);
+
+    await work.setStatus(userId, planId, "dropped", { reason: "You stopped it." });
+
+    const steps = await plans.planSteps(userId, planId);
+    expect(steps.filter((step) => step.status === "open")).toHaveLength(0);
+    // The step that already ran keeps its result; only the unfinished ones are stood down.
+    expect(steps[0]!.status).toBe("done");
+    // And nothing from the stopped plan comes back as loose work to do.
+    const loose = await work.nextActions(userId, {
+      goalId: (await work.activeGoal(userId))!.id,
+      limit: 10,
+    });
+    expect(loose).toHaveLength(0);
   });
 
   it("finishes the plan when its steps are done", async () => {

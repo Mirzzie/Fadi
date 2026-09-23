@@ -336,6 +336,21 @@ suite("Work kernel", () => {
     expect(actions.map((row) => row.id)).toEqual([newStep.id]);
     expect(actions.map((row) => row.id)).not.toContain(oldStep.id);
 
+    // A plan's steps are the plan's. They are shown inside it, not offered as loose work too.
+    const plan = await repo.create(userId, {
+      kind: "plan",
+      title: "A plan",
+      parentId: current.id,
+    });
+    const inPlan = await repo.create(userId, {
+      kind: "step",
+      title: "Step inside the plan",
+      parentId: plan.id,
+    });
+    const withPlan = await repo.nextActions(userId, { goalId: current.id, limit: 10 });
+    expect(withPlan.map((row) => row.id)).toEqual([newStep.id]);
+    expect(withPlan.map((row) => row.id)).not.toContain(inPlan.id);
+
     // A goal with nothing under it offers nothing, rather than borrowing another goal's work.
     const empty = await repo.create(userId, { kind: "goal", title: "Nothing planned yet" });
     expect(await repo.nextActions(userId, { goalId: empty.id })).toHaveLength(0);

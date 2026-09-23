@@ -11,7 +11,7 @@ import {
 
 import { getDatabase } from "@/lib/database/client";
 import { getSetupState } from "@/lib/guidance/setup";
-import { planSteps, runningPlan } from "./run-plan";
+import { planSteps, proposedPlan, runningPlan } from "./run-plan";
 import type { CareerMode } from "@/app/dashboard/mode";
 
 /**
@@ -96,6 +96,8 @@ export type Today = {
   goal: TodayGoal;
   /** The plan in flight, when there is one. This is what "Fadi is working" shows. */
   plan: TodayPlan | null;
+  /** A plan Fadi has laid out and not started. One press from running, one from gone. */
+  proposal: { id: string; title: string; steps: number } | null;
   otherGoals: { id: string; title: string }[];
   action: TodayAction | null;
   alsoOpen: TodayAction[];
@@ -162,6 +164,8 @@ export async function getToday(
   const activeGoal = goals.find((row) => row.status === "active") ?? goals[0];
 
   const inFlight = await runningPlan(userId);
+  const waiting = inFlight ? undefined : await proposedPlan(userId);
+  const waitingSteps = waiting ? await planSteps(userId, waiting.id) : [];
   const planRows = inFlight ? await planSteps(userId, inFlight.id) : [];
   const planOutputs = inFlight
     ? await createWorkItemsRepository(db).listOutputs(userId, { kind: "document" })
@@ -197,8 +201,7 @@ export async function getToday(
 
   // Real work wins. The setup path is the fallback for someone who has not set any work yet —
   // it is computed from their actual state, so it is a real next step, not a tour.
-  const planStepIds = new Set(planRows.map((row) => row.id));
-  const workActions = steps.filter((step) => !planStepIds.has(step.id)).map(toAction);
+  const workActions = steps.map(toAction);
   const action: TodayAction | null =
     workActions[0] ??
     (setup.nextStep
@@ -259,6 +262,7 @@ export async function getToday(
   return {
     firstName,
     goal,
+    proposal: waiting ? { id: waiting.id, title: waiting.title, steps: waitingSteps.length } : null,
     plan: inFlight
       ? {
           id: inFlight.id,

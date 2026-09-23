@@ -10,6 +10,8 @@ import { useFadi } from "@/components/os/fadi-presence";
 import {
   addStepAction,
   advancePlanAction,
+  dismissProposedPlanAction,
+  startProposedPlanAction,
   setGoalAction,
   setStepStatusAction,
   stopPlanAction,
@@ -46,6 +48,7 @@ export function TodayView({ today }: { today: Today }) {
 
       <Working today={today} pending={pending} onRun={run} />
       <RunningPlan today={today} pending={pending} onRun={run} />
+      <Proposal today={today} pending={pending} onRun={run} />
       <NextAction today={today} pending={pending} onRun={run} />
       <Decisions today={today} />
       <WhatFadiDid today={today} />
@@ -359,6 +362,44 @@ function RunningPlan({ today, pending, onRun }: { today: Today; pending: boolean
             The next step is yours. Fadi will pick it up again after.
           </span>
         )}
+      </div>
+    </Section>
+  );
+}
+
+/**
+ * Work Fadi lined up while nobody was looking — and did not start.
+ *
+ * The whole point is the two buttons. Background work that acts on its own spends the person's
+ * money and writes in their name; background work that only leaves notes is a newsletter. This
+ * is the middle: the paperwork is ready, and starting it is still a decision.
+ */
+function Proposal({ today, pending, onRun }: { today: Today; pending: boolean; onRun: Runner }) {
+  const proposal = today.proposal;
+  if (!proposal) return null;
+
+  return (
+    <Section title="Fadi lined this up">
+      <p className="text-base font-medium">{proposal.title}</p>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {proposal.steps} steps, ready to go. Nothing has run and nothing has been written.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          disabled={pending}
+          onClick={() => onRun(() => startProposedPlanAction(proposal.id))}
+        >
+          {pending ? <Loader2 className="animate-spin" /> : <ArrowRight />} Start it
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={pending}
+          onClick={() => onRun(() => dismissProposedPlanAction(proposal.id))}
+        >
+          Not now
+        </Button>
       </div>
     </Section>
   );

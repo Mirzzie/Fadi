@@ -263,3 +263,43 @@ export async function startPlanAction(
     return { ok: false, error: FAILED.error };
   }
 }
+
+/** Take up a plan Fadi laid out. This is the press that lets it act. */
+export async function startProposedPlanAction(planId: string): Promise<Result> {
+  if (!uuid.safeParse(planId).success) return REJECTED;
+
+  const user = await getCurrentAuthUser();
+  if (!user) return FAILED;
+
+  try {
+    const repo = createWorkItemsRepository(getDatabase());
+    const plan = await repo.get(user.id, planId);
+    if (!plan || plan.kind !== "plan" || plan.status !== "open") return REJECTED;
+
+    await repo.setStatus(user.id, planId, "active");
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch {
+    return FAILED;
+  }
+}
+
+/** Not now. The plan goes, and the reason it was offered stays in the record. */
+export async function dismissProposedPlanAction(planId: string): Promise<Result> {
+  if (!uuid.safeParse(planId).success) return REJECTED;
+
+  const user = await getCurrentAuthUser();
+  if (!user) return FAILED;
+
+  try {
+    const repo = createWorkItemsRepository(getDatabase());
+    const plan = await repo.get(user.id, planId);
+    if (!plan || plan.kind !== "plan") return REJECTED;
+
+    await repo.setStatus(user.id, planId, "dropped", { reason: "You said not now." });
+    revalidatePath("/dashboard");
+    return { ok: true };
+  } catch {
+    return FAILED;
+  }
+}

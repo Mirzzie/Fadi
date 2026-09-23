@@ -61,7 +61,8 @@ function templateOf(plan: WorkItem): PlanTemplate | undefined {
 export async function startPlan(
   userId: string,
   templateId: string,
-  refs: { type: string; id: string }[]
+  refs: { type: string; id: string }[],
+  options: { status?: "active" | "open" } = {}
 ): Promise<{ ok: true; planId: string } | { ok: false; reason: string }> {
   const template = planTemplate(templateId);
   if (!template) return { ok: false, reason: "Fadi does not know that plan." };
@@ -84,7 +85,7 @@ export async function startPlan(
 
   // One thing at a time. Two plans running at once is two sets of steps competing for one
   // screen and one person's attention, and neither of them is "what Fadi is doing".
-  const busy = await runningPlan(userId);
+  const busy = options.status === "open" ? undefined : await runningPlan(userId);
   if (busy) {
     return {
       ok: false,
@@ -101,7 +102,7 @@ export async function startPlan(
       title: template.title(context),
       parentId: goal.id,
       careerProfileId: goal.careerProfileId,
-      status: "active",
+      status: options.status ?? "active",
       refs: [{ type: "template", id: template.id }, ...refs],
     });
 
@@ -118,6 +119,47 @@ export async function startPlan(
     }
     return { ok: true as const, planId: plan.id };
   });
+}
+
+/**
+ * Lay a plan out without starting it.
+ *
+ * This is how background work is allowed to reach the person: it can have the paperwork ready,
+ * and it cannot begin. An agent that woke up and drafted a CV for a role nobody had looked at
+ * would be spending their AI allowance and writing in their name on its own initiative — so a
+ * proposal is a plan with its steps written and its status `open`, waiting on one press.
+ *
+ * At most one waiting at a time, and never while something is running: a queue of suggestions
+ * is the card wall Today was built to replace.
+ */
+export async function proposePlan(
+  userId: string,
+  templateId: string,
+  refs: { type: string; id: string }[]
+): Promise<{ ok: true; planId: string } | { ok: false; reason: string }> {
+  const work = createWorkItemsRepository(getDatabase());
+  const goal = await work.activeGoal(userId);
+  if (!goal) return { ok: false, reason: "No active goal." };
+
+  if (await runningPlan(userId)) return { ok: false, reason: "Already working on something." };
+
+  const waiting = (await work.listChildren(userId, goal.id)).find(
+    (child) => child.kind === "plan" && child.status === "open"
+  );
+  if (waiting) return { ok: false, reason: "A proposal is already waiting." };
+
+  const started = await startPlan(userId, templateId, refs, { status: "open" });
+  return started;
+}
+
+/** The plan Fadi has laid out and not started. Today asks the person about this one. */
+export async function proposedPlan(userId: string): Promise<WorkItem | undefined> {
+  const work = createWorkItemsRepository(getDatabase());
+  const goal = await work.activeGoal(userId);
+  if (!goal) return undefined;
+
+  const children = await work.listChildren(userId, goal.id);
+  return children.find((child) => child.kind === "plan" && child.status === "open");
 }
 
 /** The plan a person is in the middle of: active, under their active goal, most recent first. */
