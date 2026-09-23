@@ -110,3 +110,20 @@ describe("the source registry", () => {
     }
   });
 });
+
+/**
+ * The board count is looked up by source id, and one source does not use its own id on the
+ * postings it produces: the scraper registers as `fadi-scraper` and stamps
+ * `fadi-scraper:indeed`. An exact-match lookup silently reported zero for the single source
+ * that produced more than half of this person's usable postings.
+ */
+describe("counting what a source put on the board", () => {
+  it("counts postings stamped with a source's sub-board", async () => {
+    const { boardCount } = await import("@/components/jobs/job-control-bar");
+    const board = { "fadi-scraper:indeed": 12, "fadi-scraper:totaljobs": 3, jooble: 4 };
+
+    expect(boardCount("fadi-scraper", board)).toBe(15);
+    expect(boardCount("jooble", board)).toBe(4);
+    expect(boardCount("reed", board)).toBe(0);
+  });
+});

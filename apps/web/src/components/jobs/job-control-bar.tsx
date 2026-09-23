@@ -63,11 +63,26 @@ const LABEL: Record<Health, string> = {
  * hundred postings and put none in front of you — Arbeitnow did exactly that for months before
  * it was retired — and a row of green dots said everything was fine.
  */
+/**
+ * Postings a source put on the board.
+ *
+ * Not a plain lookup: the scraper registers as `fadi-scraper` but stamps every posting with the
+ * board it came from (`fadi-scraper:indeed`), so an exact match reported zero for the single
+ * source that has produced more than half of everything this person could apply to.
+ */
+export function boardCount(id: string, onBoard: Record<string, number>): number {
+  let total = 0;
+  for (const [source, count] of Object.entries(onBoard)) {
+    if (source === id || source.startsWith(`${id}:`)) total += count;
+  }
+  return total;
+}
+
 function sourceLine(source: JobSourceHealth, onBoard: number, health: Health): string {
   if (!source.configured || health === "no-coverage") return LABEL[health];
   const parts: string[] = [];
   if (onBoard > 0) parts.push(`${onBoard} on your board`);
-  if (source.lastRun) parts.push(`${source.lastRun.count} returned`);
+  if (source.lastRun) parts.push(`${source.lastRun.count} from the last pull`);
   parts.push(LABEL[health]);
   return parts.join(" · ");
 }
@@ -186,7 +201,7 @@ export function JobControlBar({
                   <span className={cn(!s.configured && "text-muted-foreground")}>{s.name}</span>
                 </span>
                 <span className="text-xs text-muted-foreground">
-                  {sourceLine(s, onBoard[s.id] ?? 0, h)}
+                  {sourceLine(s, boardCount(s.id, onBoard), h)}
                 </span>
               </div>
             );
