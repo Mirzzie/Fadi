@@ -188,3 +188,31 @@ describe("speaking more than once in a session", () => {
     }
   });
 });
+
+describe("telling someone how to get the voice back", () => {
+  /**
+   * The question this answers: "I have a new Groq token, will it work?" A daily cap is on the
+   * ACCOUNT, so a new key on the same account changes nothing — and advice that implies it
+   * might is worse than none.
+   */
+  it("says a new key will not lift a daily cap", async () => {
+    const { __adviceForTest } = await import("./fadi-speech");
+    const advice = __adviceForTest(
+      "Rate limit reached for model canopylabs/orpheus-v1-english ... tokens per day (TPD): Limit 3600"
+    );
+
+    expect(advice).toContain("daily limit on the whole account");
+    expect(advice).toContain("new key on the same account will not lift it");
+    expect(advice).toMatch(/OpenAI|local/);
+  });
+
+  it("names the one-click fix when the model just needs its terms accepted", async () => {
+    const { __adviceForTest } = await import("./fadi-speech");
+    expect(__adviceForTest("The model requires terms acceptance.")).toContain("one click");
+  });
+
+  it("sends a refused key back to Settings, not to a different provider", async () => {
+    const { __adviceForTest } = await import("./fadi-speech");
+    expect(__adviceForTest("Invalid API key provided")).toContain("Check the key in Settings");
+  });
+});

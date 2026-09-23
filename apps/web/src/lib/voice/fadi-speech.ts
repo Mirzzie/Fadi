@@ -148,6 +148,30 @@ function waitForGesture(el: HTMLAudioElement, release: () => void, ownGeneration
   window.addEventListener("pointerdown", go);
   window.addEventListener("keydown", go);
 }
+/**
+ * What to actually do about it, by what the provider said.
+ *
+ * A daily cap is not fixed by a new key on the same account — the limit is on the organisation,
+ * not the token — so telling someone to "check their key" sends them round a loop they cannot
+ * win. The fixes that work are a different provider, a local voice, or waiting.
+ */
+function adviceFor(reason: string): string {
+  const lower = reason.toLowerCase();
+  if (lower.includes("rate limit") || lower.includes("tokens per day") || lower.includes("tpd")) {
+    return "That is a daily limit on the whole account, so a new key on the same account will not lift it. Add an OpenAI key in Settings for a voice with no daily cap, run a local voice server, or wait for the reset.";
+  }
+  if (lower.includes("terms")) {
+    return "That is one click: accept the model's terms in the provider's console, and the voice works.";
+  }
+  if (lower.includes("invalid") || lower.includes("unauthor") || lower.includes("api key")) {
+    return "Check the key in Settings — the provider is refusing it.";
+  }
+  return "Add an OpenAI key in Settings, or run a local voice server, for a voice that does not depend on this one.";
+}
+
+/** Exposed for tests: the advice is the product here, so it is checked like one. */
+export const __adviceForTest = adviceFor;
+
 /** The provider's own explanation for refusing the premium voice, when it gave one. */
 let cloudTtsReason: string | null = null;
 
@@ -254,8 +278,8 @@ function browserFallback(text: string, ownGeneration: number) {
     warnedNoVoices = true;
     setVoiceProblem(
       cloudTtsReason
-        ? `Fadi has lost its voice: ${cloudTtsReason.slice(0, 200)} This machine has no system voice to fall back on either — on Linux, install speech-dispatcher and espeak-ng, then restart the browser. Fadi still hears you, and everything it says is on screen.`
-        : "This machine has no text-to-speech voice, so Fadi can't speak. It still hears you, and everything it says is on screen."
+        ? `Fadi has lost its voice: ${cloudTtsReason.slice(0, 200)} ${adviceFor(cloudTtsReason)} Fadi still hears you, and everything it says is on screen.`
+        : "This machine has no text-to-speech voice, so Fadi can't speak. Add an OpenAI key in Settings, or install speech-dispatcher and espeak-ng. It still hears you, and everything it says is on screen."
     );
     console.warn(
       cloudTtsReason
