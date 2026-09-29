@@ -380,30 +380,29 @@ export async function getRecommendedJobsForUser(
     }
   }
 
-  // Drop postings the source has already CLOSED ("no longer accepting
-  // applications" / 404). Bounded, DB-cached probe of just the jobs we're about to
-  // show — only on the live page (skipSync = the fast dashboard read). Confirmed-
-  // closed roles are persisted (status → "closed") so they leave the board for
-  // everyone and never come back on a re-sync. Tracked (saved/applied) roles are
-  // never hidden — the workspace shows their liveness banner instead.
+  // Probe the postings we're about to show for ones the source has CLOSED ("no longer
+  // accepting applications" / 404), AFTER the response. Awaiting it held every Jobs load for up
+  // to its 5s budget. Confirmed-closed roles are persisted (status → "closed"), and the board
+  // only lists active rows, so they leave on the next load and never come back on a re-sync.
+  // Tracked (saved/applied) roles are never probed out — the workspace shows their liveness
+  // banner instead. Only on the live page (skipSync = the fast dashboard read).
   if (!opts.skipSync && shown.length > 0) {
+    const probe = shown
+      .filter((j) => !tracked(j))
+      .map((j) => ({
+        id: j.id,
+        url: j.url,
+        livenessCheckedAt: byId.get(j.id)?.livenessCheckedAt ?? null,
+      }));
+    const sweep = () =>
+      sweepJobsLiveness(probe, {
+        check: checkPostingLiveness,
+        persist: (id, state) => jobsRepository.setJobLiveness(id, state),
+      }).catch(() => undefined); // best-effort — a flaky probe never touches the board
     try {
-      const closed = await sweepJobsLiveness(
-        shown
-          .filter((j) => !tracked(j))
-          .map((j) => ({
-            id: j.id,
-            url: j.url,
-            livenessCheckedAt: byId.get(j.id)?.livenessCheckedAt ?? null,
-          })),
-        {
-          check: checkPostingLiveness,
-          persist: (id, state) => jobsRepository.setJobLiveness(id, state),
-        }
-      );
-      if (closed.size > 0) shown = shown.filter((j) => !closed.has(j.id));
+      after(sweep);
     } catch {
-      // Best-effort — a flaky probe never blocks the board.
+      void sweep(); // not in a request scope (a background caller) — nothing to wait for
     }
   }
 

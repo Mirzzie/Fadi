@@ -92,7 +92,9 @@ async function buildSignals(): Promise<{ signals: Signal[]; personalized: boolea
 
   const [report, jobs, momentum, momentumHistory] = await Promise.all([
     getLatestCareerReport(user.id),
-    getRecommendedJobsForUser(user.id, 5),
+    // Stored jobs only. The landing page shows one number; a live crawl and liveness probes
+    // here held every visit to the home page for ~20s. The Jobs page does the live refresh.
+    getRecommendedJobsForUser(user.id, 5, undefined, { skipSync: true }),
     getMomentumSummary(user.id),
     getMomentumSparkline(user.id, 10),
   ]);
