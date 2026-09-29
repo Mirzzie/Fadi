@@ -52,9 +52,14 @@ export function isAutoplayBlock(error: unknown): boolean {
  */
 let primedEl: HTMLAudioElement | null = null;
 
-/** A moment of silence, played on a gesture, so the element is allowed to speak later. */
-const SILENCE =
-  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=";
+/**
+ * A moment of silence, played on a gesture, so the element is allowed to speak later.
+ *
+ * 100 ms of it. The clip used to hold zero samples, so it ended the instant it started and
+ * Chrome rejected the play() with "interrupted by end of playback" — every time. Priming never
+ * succeeded, and each utterance fell back to a fresh element the browser was free to refuse.
+ */
+const SILENCE = "data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSADAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==";
 
 /**
  * Call this from inside a click or key handler. It costs nothing when already primed, and
@@ -363,6 +368,13 @@ export async function speakFadi(text: string): Promise<void> {
           // absent Linux speech engine for a policy decision the browser had just made.
           if (ownGeneration !== generation) {
             release();
+            return;
+          }
+          // Interrupted, not refused: playback was ended or replaced while play() was settling.
+          // Nothing failed, so the browser voice must not repeat the sentence.
+          if (error instanceof DOMException && error.name === "AbortError") {
+            release();
+            emit(false);
             return;
           }
           if (!isAutoplayBlock(error)) release();
