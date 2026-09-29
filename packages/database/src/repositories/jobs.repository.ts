@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, lt, sql } from "drizzle-orm";
 
-import { canonicalizeUrl, canonicalOccurrenceJobKey } from "../canonical";
+import { canonicalizeUrl, canonicalOccurrenceJobKey, stableExternalId } from "../canonical";
 import type { Database } from "../client";
 import { jobOccurrences, jobs, type Job, type JobOccurrence } from "../schema";
 
@@ -313,7 +313,9 @@ export function createJobsRepository(db: Database) {
         .orderBy(asc(jobOccurrences.source));
     },
 
-    async upsertSeedJob(input: SeedJobInput): Promise<Job> {
+    async upsertSeedJob(rawInput: SeedJobInput): Promise<Job> {
+      // One stable id for the row, its key and its occurrence (see stableExternalId).
+      const input = { ...rawInput, externalId: stableExternalId(rawInput.externalId) };
       const ownerUserId = input.ownerUserId ?? null;
       const canonicalKey =
         input.canonicalKey ??
@@ -322,7 +324,7 @@ export function createJobsRepository(db: Database) {
           input.title,
           input.location,
           input.source,
-          input.externalId,
+          input.externalId
         );
       const url = canonicalizeUrl(input.url) ?? null;
 
@@ -373,8 +375,8 @@ export function createJobsRepository(db: Database) {
               eq(jobOccurrences.externalId, input.externalId),
               ownerUserId === null
                 ? sql`${jobs.ownerUserId} is null`
-                : eq(jobs.ownerUserId, ownerUserId),
-            ),
+                : eq(jobs.ownerUserId, ownerUserId)
+            )
           )
           .limit(1);
 
@@ -408,8 +410,8 @@ export function createJobsRepository(db: Database) {
               and(
                 eq(jobOccurrences.jobId, exact.jobId),
                 eq(jobOccurrences.source, input.source),
-                eq(jobOccurrences.externalId, input.externalId),
-              ),
+                eq(jobOccurrences.externalId, input.externalId)
+              )
             );
           const updated = await reaggregate(tx, exact.jobId);
           if (!updated) throw new Error("Existing job occurrence has no canonical job");

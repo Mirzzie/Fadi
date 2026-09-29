@@ -81,15 +81,29 @@ export function canonicalJobKey(
  * in the same city. A stable provider id keeps those records apart. Callers with a
  * verified cross-source identity may still pass `canonicalKey` explicitly.
  */
+/**
+ * A provider id that stays the same across crawls.
+ *
+ * Scrapers that have no id of their own use the posting's link — and a listing link carries
+ * per-visit tracking. Indeed's `/rc/clk?jk=…&bb=…&xkcb=…` changes `bb` and `xkcb` on every
+ * crawl while `jk` stays put, so the same vacancy got a new key each time and was stored again
+ * (82 postings, 208 extra rows on 29 Sep 2026). A link-shaped id is reduced exactly as the
+ * stored apply link is; any other id is untouched.
+ */
+export function stableExternalId(externalId: string): string {
+  const id = externalId.trim();
+  return /^https?:\/\//i.test(id) ? (canonicalizeUrl(id) ?? id) : id;
+}
+
 export function canonicalOccurrenceJobKey(
   company: string | null | undefined,
   title: string | null | undefined,
   location: string | null | undefined,
   source: string,
-  externalId: string,
+  externalId: string
 ): string {
   const content = canonicalJobKey(company, title, location);
-  return `${content}|source:${encodeURIComponent(source.trim().toLowerCase())}|id:${encodeURIComponent(externalId.trim())}`;
+  return `${content}|source:${encodeURIComponent(source.trim().toLowerCase())}|id:${encodeURIComponent(stableExternalId(externalId))}`;
 }
 
 // UNAMBIGUOUS tracking params — safe to drop on ANY host. Deliberately excludes generic names
