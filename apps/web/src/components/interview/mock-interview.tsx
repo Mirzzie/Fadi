@@ -12,6 +12,7 @@ import { speakFadi, stopFadiSpeech } from "@/lib/voice/fadi-speech";
 import { useGroqVoice } from "@/lib/voice/use-groq-voice";
 import type { AnswerScore, MockQuestion } from "@/lib/interview/mock";
 import {
+  finishMockInterviewSession,
   saveMockAnswerAsStory,
   scoreMockAnswer,
   startMockInterview,
@@ -30,16 +31,50 @@ const INTERVIEW_STAGES: Array<{ value: InterviewStage; label: string }> = [
 ];
 
 /** A real posting to practise against — its title, employer and description seed the session. */
-export type PracticeJob = { title: string; company: string; description: string | null };
+export type PracticeJob = {
+  jobId: string;
+  applicationId: string | null;
+  title: string;
+  company: string;
+  description: string | null;
+};
 
-export function MockInterview({ defaults, job }: { defaults: Defaults; job?: PracticeJob | null }) {
+export type PracticeSession = {
+  id: string;
+  role: string;
+  company: string | null;
+  stage: InterviewStage;
+  durationMinutes: 10 | 20;
+  questions: MockQuestion[];
+};
+
+export function MockInterview({
+  defaults,
+  job,
+  initialSession,
+}: {
+  defaults: Defaults;
+  job?: PracticeJob | null;
+  initialSession?: PracticeSession | null;
+}) {
   // Practising for a specific posting: the questions come from THAT job's description and title,
   // not the profile's generic direction. Everything stays editable — this is a starting point.
-  const [config, setConfig] = useState(job ? { ...defaults, role: job.title } : defaults);
+  const [config, setConfig] = useState(
+    initialSession
+      ? { ...defaults, role: initialSession.role }
+      : job
+        ? { ...defaults, role: job.title }
+        : defaults
+  );
   const [jd, setJd] = useState(job?.description ?? "");
-  const [stage, setStage] = useState<InterviewStage>("hiring_manager");
-  const [durationMinutes, setDurationMinutes] = useState<10 | 20>(10);
-  const [questions, setQuestions] = useState<MockQuestion[] | null>(null);
+  const [stage, setStage] = useState<InterviewStage>(initialSession?.stage ?? "hiring_manager");
+  const [durationMinutes, setDurationMinutes] = useState<10 | 20>(
+    initialSession?.durationMinutes ?? 10
+  );
+  const [questions, setQuestions] = useState<MockQuestion[] | null>(
+    initialSession?.questions ?? null
+  );
+  const [sessionId, setSessionId] = useState<string | null>(initialSession?.id ?? null);
   const [idx, setIdx] = useState(0);
   const [answer, setAnswer] = useState("");
   const [score, setScore] = useState<AnswerScore | null>(null);
@@ -66,12 +101,19 @@ export function MockInterview({ defaults, job }: { defaults: Defaults; job?: Pra
     return () => stopFadiSpeech();
   }, [readAloud, idx, questions]);
 
-  function endInterview() {
+  function finishInterview(status: "completed" | "abandoned") {
     turn.current += 1;
     voice.cancel();
     stopFadiSpeech();
+    const finishing = sessionId;
     setQuestions(null);
+    setSessionId(null);
     setError(null);
+    if (finishing) {
+      void finishMockInterviewSession({ sessionId: finishing, status }).then((result) => {
+        if (!result.ok) setError("The interview ended here, but Fadi could not save its status.");
+      });
+    }
   }
 
   function recordAnswer() {
@@ -91,10 +133,14 @@ export function MockInterview({ defaults, job }: { defaults: Defaults; job?: Pra
         stage,
         durationMinutes,
         jobDescription: jd || undefined,
+        company: job?.company ?? initialSession?.company ?? null,
+        jobId: job?.jobId ?? null,
+        applicationId: job?.applicationId ?? null,
       });
       if (ownTurn !== turn.current) return;
       if (!res.ok) return setError(res.message);
       setQuestions(res.questions);
+      setSessionId(res.sessionId);
       setIdx(0);
       setAnswer("");
       setScore(null);
@@ -266,7 +312,12 @@ export function MockInterview({ defaults, job }: { defaults: Defaults; job?: Pra
         <span className="text-xs text-muted-foreground">
           Question {idx + 1} of {questions.length}
         </span>
-        <Button size="sm" variant="ghost" onClick={endInterview} className="text-muted-foreground">
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => finishInterview("abandoned")}
+          className="text-muted-foreground"
+        >
           End interview
         </Button>
       </div>
@@ -358,7 +409,16 @@ export function MockInterview({ defaults, job }: { defaults: Defaults; job?: Pra
           <Button size="sm" variant="outline" onClick={next} disabled={pending || captureBusy}>
             Next question <ChevronRight className="size-4" aria-hidden="true" />
           </Button>
-        ) : null}
+        ) : (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => finishInterview("completed")}
+            disabled={pending || captureBusy}
+          >
+            <Check className="size-4" aria-hidden="true" /> Finish interview
+          </Button>
+        )}
       </div>
 
       {score ? <ScoreCard score={score} saveState={saveState} onSave={saveAnswerAsStory} /> : null}

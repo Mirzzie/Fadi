@@ -414,6 +414,13 @@
       "when": 1790187019078,
       "tag": "0058_mcp_connections",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1790694627187,
+      "tag": "0059_interview_sessions",
+      "breakpoints": true
     }
   ]
 }

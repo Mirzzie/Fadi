@@ -105,6 +105,23 @@ suite("Today", () => {
     await work.remove(userId, goal.id);
   });
 
+  it("returns an active interview to its durable session", async () => {
+    const goal = await work.create(userId, { kind: "goal", title: "Prepare for interviews" });
+    const sessionId = "6d812269-cab8-41ea-8159-50621e633f4c";
+    await work.create(userId, {
+      kind: "step",
+      title: "Practice the technical interview",
+      parentId: goal.id,
+      refs: [{ type: "interview_session", id: sessionId }],
+    });
+    await work.setActiveGoal(userId, goal.id);
+
+    const today = await getToday(userId, "Mirzad", "prepare");
+    expect(today.action?.href).toBe(`/dashboard/interview?sessionId=${sessionId}`);
+
+    await work.remove(userId, goal.id);
+  });
+
   it("falls back to the computed step when a goal has no work under it", async () => {
     const goal = await work.create(userId, { kind: "goal", title: "Nothing planned" });
     await work.setActiveGoal(userId, goal.id);

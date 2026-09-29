@@ -911,6 +911,54 @@ export const interviewStories = pgTable(
   (table) => [index("interview_stories_user_id_idx").on(table.userId)]
 );
 
+/**
+ * One actual interview-practice session.
+ *
+ * Questions used to exist only in browser state. Refreshing erased the session, so Fadi could
+ * not resume it, relate it to an application, or learn from its outcome. Answers and audio are
+ * not stored here by default.
+ */
+export const interviewSessions = pgTable(
+  "interview_sessions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    applicationId: uuid("application_id").references(() => applications.id, {
+      onDelete: "set null",
+    }),
+    jobId: uuid("job_id").references(() => jobs.id, { onDelete: "set null" }),
+    careerProfileId: uuid("career_profile_id").references(() => careerProfiles.id, {
+      onDelete: "set null",
+    }),
+    role: text("role").notNull(),
+    company: text("company"),
+    stage: text("stage").notNull(),
+    durationMinutes: integer("duration_minutes").notNull(),
+    mode: text("mode").notNull().default("turn_based"),
+    status: text("status").notNull().default("active"),
+    questions: jsonb("questions").$type<Record<string, unknown>[]>().notNull().default([]),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (table) => [
+    index("interview_sessions_user_status_idx").on(table.userId, table.status),
+    index("interview_sessions_application_idx").on(table.applicationId),
+    check(
+      "interview_sessions_stage_check",
+      sql`${table.stage} in ('recruiter', 'hiring_manager', 'technical', 'behavioral')`
+    ),
+    check("interview_sessions_mode_check", sql`${table.mode} in ('turn_based', 'realtime')`),
+    check(
+      "interview_sessions_status_check",
+      sql`${table.status} in ('active', 'completed', 'abandoned', 'failed')`
+    ),
+    check("interview_sessions_duration_check", sql`${table.durationMinutes} in (10, 20)`),
+  ]
+);
+
 // ── MCP integration tokens (FadiOS-as-Lego, multi-user) ───────────────────────
 // Personal access tokens that let an external agentic client (Claude Code, OpenClaw)
 // call this user's FadiOS tools over MCP. We store only a hash of the token; the
@@ -1693,6 +1741,8 @@ export type ReferralTarget = typeof referralTargets.$inferSelect;
 export type NewReferralTarget = typeof referralTargets.$inferInsert;
 export type InterviewStory = typeof interviewStories.$inferSelect;
 export type NewInterviewStory = typeof interviewStories.$inferInsert;
+export type InterviewSession = typeof interviewSessions.$inferSelect;
+export type NewInterviewSession = typeof interviewSessions.$inferInsert;
 export type McpToken = typeof mcpTokens.$inferSelect;
 export type NewMcpToken = typeof mcpTokens.$inferInsert;
 export type EvidenceItem = typeof evidenceItems.$inferSelect;
@@ -1992,7 +2042,7 @@ export const workOutputs = pgTable(
     workItemId: uuid("work_item_id")
       .notNull()
       .references(() => workItems.id, { onDelete: "cascade" }),
-    /** document | evidence | application | portfolio_item | project_run | link */
+    /** document | evidence | application | portfolio_item | project_run | interview_session | link */
     kind: text("kind").notNull(),
     /** The id in its own table. The kernel never copies the thing itself. */
     refId: text("ref_id").notNull(),
