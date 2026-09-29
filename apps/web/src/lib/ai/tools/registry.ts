@@ -1112,7 +1112,45 @@ const checkPostingOpen: FadiTool = {
   },
 };
 
+/**
+ * Move the person to a page. The voice parser catches the common phrasings; this is for every
+ * other way of asking, typed or spoken, so "can you pull the opportunities screen up" goes there
+ * instead of being answered as a question. Only pages that exist can be reached.
+ */
+const openPageTool: FadiTool = {
+  name: "open_page",
+  risk: "read",
+  description:
+    "Take the user to a page of the app when they ask to go, navigate, open, show or switch to a place (e.g. Today, Opportunities, Practice, My career, Jobs, Applications, Learning, Interview practice, Documents, Evidence, Portfolio, Settings). Use this instead of describing the page's contents.",
+  parameters: {
+    type: "object",
+    properties: {
+      destination: { type: "string", description: "The page as the user named it." },
+    },
+    required: ["destination"],
+  },
+  async execute(args): Promise<FadiToolResult> {
+    const { resolveDestination } = await import("@/lib/voice/commands");
+    const spoken = typeof args.destination === "string" ? args.destination : "";
+    const target = resolveDestination(spoken);
+    if (!target) {
+      return {
+        summary: `There is no page called "${spoken}". Ask which page they meant.`,
+        outcome: "needs_input",
+        view: "none",
+      };
+    }
+    return {
+      summary: `Opening ${target.label}. Say only that you are opening it.`,
+      data: target,
+      view: "navigate",
+      outcome: "performed",
+    };
+  },
+};
+
 const TOOLS: FadiTool[] = [
+  openPageTool,
   searchJobs,
   getPerformance,
   getMomentumReflectionTool,

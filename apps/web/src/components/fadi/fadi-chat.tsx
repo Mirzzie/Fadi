@@ -310,6 +310,9 @@ export function FadiChat({
                 // A voice/chat action that mutated the app (e.g. created a track) →
                 // refresh so the menu-bar switcher + dashboard follow without a reload.
                 if (toolResults.some((t) => t.view === "track_created")) router.refresh();
+                const go = toolResults.find((t) => t.view === "navigate");
+                const href = (go?.data as { href?: unknown } | undefined)?.href;
+                if (typeof href === "string" && href.startsWith("/")) router.push(href);
               } else if (typeof parsed === "string") {
                 fullResponse += parsed;
                 setMessages((prev) =>

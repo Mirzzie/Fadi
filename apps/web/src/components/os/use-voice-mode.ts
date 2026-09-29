@@ -198,7 +198,9 @@ export function useVoiceMode() {
         case "ask": {
           // A question is still a question: it goes to Fadi's own answer, spoken back.
           const answer = await askFadi(command.text);
-          say(answer);
+          say(answer.text);
+          // Fadi decided this was a request to go somewhere, not a question.
+          if (answer.href) router.push(answer.href);
           return;
         }
         default:
@@ -280,7 +282,7 @@ export function useVoiceMode() {
 }
 
 /** Fadi's own answer to a plain question, as text, so the loop can speak it. */
-async function askFadi(question: string): Promise<string> {
+async function askFadi(question: string): Promise<{ text: string; href?: string }> {
   try {
     const response = await fetch("/api/fadi/chat", {
       method: "POST",
@@ -291,11 +293,12 @@ async function askFadi(question: string): Promise<string> {
         pathname: typeof window !== "undefined" ? window.location.pathname : undefined,
       }),
     });
-    if (!response.ok || !response.body) return "I couldn't reach my answer just then.";
+    if (!response.ok || !response.body) return { text: "I couldn't reach my answer just then." };
 
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let text = "";
+    let href: string | undefined;
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -306,13 +309,21 @@ async function askFadi(question: string): Promise<string> {
         try {
           const parsed = JSON.parse(payload);
           if (typeof parsed === "string") text += parsed;
+          else if (parsed && Array.isArray(parsed.fadiTools)) {
+            const go = parsed.fadiTools.find((t: { view?: string }) => t.view === "navigate");
+            const target = go?.data?.href;
+            if (typeof target === "string" && target.startsWith("/")) href = target;
+          }
         } catch {
           /* tool cards and other frames are not speech */
         }
       }
     }
-    return text.trim() || "I don't have an answer for that one.";
+    return {
+      text: text.trim() || (href ? "Opening it." : "I don't have an answer for that one."),
+      href,
+    };
   } catch {
-    return "I couldn't reach my answer just then.";
+    return { text: "I couldn't reach my answer just then." };
   }
 }

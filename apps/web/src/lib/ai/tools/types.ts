@@ -17,6 +17,8 @@ export type FadiToolView =
   | "labor"
   | "world_shifts"
   | "track_created"
+  /** data is { href, label }: the client goes there. */
+  | "navigate"
   | "none";
 
 /**

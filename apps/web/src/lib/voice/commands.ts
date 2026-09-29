@@ -150,16 +150,14 @@ export function parseVoiceCommand(raw: string): VoiceCommand {
 
   // Navigation. Matched against the same list the dock and ⌘K use, so voice can reach every
   // area by the name a person sees — and only by a name that exists.
-  const go = /\b(?:go to|open|show me|take me to|switch to)\s+(.{2,})$/.exec(said);
+  //
+  // People say this many ways. "Navigate to opportunities" fell through to chat because only
+  // five verbs were listed, and chat answered it as a question with a list of jobs. The verbs
+  // are now the ones people actually use, and a destination's name said on its own is enough.
+  const go = GO_TO.exec(said);
   if (go) {
-    // Both forms: "my career" IS a destination's name, so stripping "my" before matching lost
-    // it and left "career", which then matched "Career report" — a different page entirely.
     const spoken = go[1]!.trim();
-    const stripped = spoken
-      .replace(/\b(the|page|screen|section|tab)\b/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
-    const target = matchArea(spoken) ?? matchArea(stripped);
+    const target = resolveDestination(spoken);
     if (target) return { kind: "navigate", href: target.href, label: target.label };
 
     // Not an area, so it is probably a thing: a job, a document, a project. The server looks it
@@ -167,7 +165,41 @@ export function parseVoiceCommand(raw: string): VoiceCommand {
     return { kind: "open", target: spoken };
   }
 
+  const bare = matchDestinationExactly(said);
+  if (bare) return { kind: "navigate", href: bare.href, label: bare.label };
+
   return { kind: "ask", text: raw.trim() };
+}
+
+const GO_TO =
+  /\b(?:go(?: back)? to|navigate to|head (?:over )?to|jump to|move to|take me(?: back)? to|bring me to|bring up|pull up|switch to|show me|open(?: up)?|load)\s+(.{2,})$/;
+
+/** Only a destination's own name, said by itself: "Opportunities", "My career". */
+function matchDestinationExactly(said: string): { href: string; label: string } | null {
+  const bare = said
+    .replace(/\b(the|page|screen|section|tab|please)\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  for (const destination of DESTINATIONS) {
+    if (flatten(destination.label) === bare)
+      return { href: destination.href, label: destination.label };
+  }
+  return null;
+}
+
+/**
+ * A place in the product from how someone named it, or null. Shared with the chat model's
+ * open_page tool, so typing and speaking reach exactly the same set of pages.
+ */
+export function resolveDestination(spoken: string): { href: string; label: string } | null {
+  // Both forms: "my career" IS a destination's name, so stripping "my" before matching lost
+  // it and left "career", which then matched "Career report" — a different page entirely.
+  const wanted = flatten(spoken);
+  const stripped = wanted
+    .replace(/\b(the|page|screen|section|tab|please)\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return matchArea(wanted) ?? matchArea(stripped);
 }
 
 /**

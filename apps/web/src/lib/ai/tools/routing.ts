@@ -16,6 +16,7 @@ export type RoutableTool = { name: string; description?: string };
 
 /** Always available: the questions a person asks anywhere. */
 const CORE = new Set([
+  "open_page",
   "get_career_updates",
   "get_relevant_evidence",
   "get_performance",
@@ -24,21 +25,45 @@ const CORE = new Set([
 
 /** The tools that belong to each place in the product. */
 const BY_PLACE: [RegExp, string[]][] = [
-  [/\/dashboard\/jobs/, ["search_jobs", "evaluate_fit", "scan_company_jobs", "get_rejection_patterns"]],
+  [
+    /\/dashboard\/jobs/,
+    ["search_jobs", "evaluate_fit", "scan_company_jobs", "get_rejection_patterns"],
+  ],
   [
     /\/dashboard\/applications/,
-    ["evaluate_fit", "prep_interview", "company_interview_brief", "draft_referral_outreach", "get_rejection_patterns"],
+    [
+      "evaluate_fit",
+      "prep_interview",
+      "company_interview_brief",
+      "draft_referral_outreach",
+      "get_rejection_patterns",
+    ],
   ],
   [/\/dashboard\/documents/, ["get_relevant_evidence", "evaluate_fit"]],
   [/\/dashboard\/evidence/, ["get_relevant_evidence", "get_career_updates"]],
   [/\/dashboard\/portfolio/, ["get_relevant_evidence"]],
   [
     /\/dashboard\/interview/,
-    ["prep_interview", "mock_interview_questions", "score_interview_answer", "answer_behavioral_question", "company_interview_brief"],
+    [
+      "prep_interview",
+      "mock_interview_questions",
+      "score_interview_answer",
+      "answer_behavioral_question",
+      "company_interview_brief",
+    ],
   ],
   [
     /\/dashboard\/learning/,
-    ["plan_project", "project_status", "complete_project_step", "propose_lab_action", "inspect_machine", "lab_capacity", "start_lab_machine", "build_lab_image"],
+    [
+      "plan_project",
+      "project_status",
+      "complete_project_step",
+      "propose_lab_action",
+      "inspect_machine",
+      "lab_capacity",
+      "start_lab_machine",
+      "build_lab_image",
+    ],
   ],
   [/\/dashboard\/network/, ["draft_referral_outreach", "scan_company_jobs"]],
 ];
@@ -46,10 +71,19 @@ const BY_PLACE: [RegExp, string[]][] = [
 /** Words that make a tool obviously relevant however far from its screen the person is. */
 const CUES: [RegExp, string[]][] = [
   [/\bjobs?\b|vacanc|hiring|role|position|advert/i, ["search_jobs", "evaluate_fit"]],
-  [/\binterview|star\b|behavioural|behavioral|question/i, ["prep_interview", "mock_interview_questions", "answer_behavioral_question"]],
+  [
+    /\binterview|star\b|behavioural|behavioral|question/i,
+    ["prep_interview", "mock_interview_questions", "answer_behavioral_question"],
+  ],
   [/\bcv\b|r[ée]sum[ée]|cover letter|document/i, ["get_relevant_evidence"]],
-  [/\blab\b|machine|container|vm\b|docker/i, ["inspect_machine", "propose_lab_action", "lab_capacity"]],
-  [/\bproject\b|practi[cs]e|learn|course|skill gap/i, ["plan_project", "project_status", "complete_project_step"]],
+  [
+    /\blab\b|machine|container|vm\b|docker/i,
+    ["inspect_machine", "propose_lab_action", "lab_capacity"],
+  ],
+  [
+    /\bproject\b|practi[cs]e|learn|course|skill gap/i,
+    ["plan_project", "project_status", "complete_project_step"],
+  ],
   [/\brejection|ghosted|no reply|feedback/i, ["get_rejection_patterns", "get_performance"]],
   [/\brefer|network|connection|outreach/i, ["draft_referral_outreach"]],
   [/\bcompany\b|employer|they do|about them/i, ["scan_company_jobs", "company_interview_brief"]],

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { flatten, parseVoiceCommand } from "./commands";
+import { flatten, parseVoiceCommand, resolveDestination } from "./commands";
 
 /**
  * These are written for the person who cannot see the screen. The test that matters most is
@@ -183,5 +183,40 @@ describe("opening and taking on things by name", () => {
       kind: "navigate",
       href: "/dashboard/learning",
     });
+  });
+});
+
+describe("the ways people ask to go somewhere", () => {
+  // Reported 29 Sep: "Navigate to opportunities." was answered with a list of jobs.
+  it.each([
+    "Navigate to opportunities.",
+    "Head over to opportunities",
+    "Take me back to opportunities",
+    "Pull up opportunities",
+    "Bring up the opportunities page",
+    "Jump to opportunities",
+    "Opportunities.",
+    "Fadi, opportunities please",
+  ])("%s → Opportunities", (said) => {
+    expect(parseVoiceCommand(said)).toMatchObject({ kind: "navigate", label: "Opportunities" });
+  });
+
+  it("still treats a named thing as a thing to open, not a page", () => {
+    expect(parseVoiceCommand("Navigate to the Deerfoot job")).toEqual({
+      kind: "open",
+      target: "the deerfoot job",
+    });
+  });
+
+  it("does not mistake a sentence that mentions a page for a request to go there", () => {
+    expect(parseVoiceCommand("How many opportunities did you find")).toMatchObject({ kind: "ask" });
+  });
+});
+
+describe("resolveDestination", () => {
+  it("finds a page by the name a person used, and nothing for a page that does not exist", () => {
+    expect(resolveDestination("the opportunities screen")?.label).toBe("Opportunities");
+    expect(resolveDestination("My career")?.label).toBe("My career");
+    expect(resolveDestination("the moon")).toBeNull();
   });
 });
