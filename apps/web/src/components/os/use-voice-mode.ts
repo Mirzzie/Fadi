@@ -77,7 +77,13 @@ export function useVoiceMode() {
   // initialised at the moment this closure is built.
   const stopListeningRef = useRef<() => void>(() => {});
 
-  const say = useCallback((text: string) => {
+  // Every switch on or off starts a new session. An answer still being fetched when the person
+  // clicked belongs to the old one: it used to arrive afterwards and be spoken over the new
+  // greeting, or after "Listening off." — two voices for one press.
+  const session = useRef(0);
+  const lastToggle = useRef(0);
+
+  const speakNow = useCallback((text: string) => {
     lastSaid.current = text;
     setSaid(text);
     // Close the microphone before opening the mouth: a capture already running would record
@@ -88,7 +94,16 @@ export function useVoiceMode() {
   }, []);
 
   const handle = useCallback(
-    async (command: VoiceCommand) => {
+    async (command: VoiceCommand, token: number) => {
+      // Everything this command says or does is dropped once the person has switched Fadi off
+      // or on again since it was heard.
+      const stale = () => token !== session.current;
+      const say = (text: string) => {
+        if (!stale()) speakNow(text);
+      };
+      const go = (href: string) => {
+        if (!stale()) router.push(href);
+      };
       // An answer to a question Fadi asked comes first: while something is pending, yes and no
       // mean that thing and nothing else.
       if (pending.current) {
@@ -117,7 +132,7 @@ export function useVoiceMode() {
         }
         case "navigate": {
           say(`Opening ${command.label}.`);
-          router.push(command.href);
+          go(command.href);
           return;
         }
         case "advance": {
@@ -143,7 +158,7 @@ export function useVoiceMode() {
         case "open": {
           const reply = await openThingAction(command.target);
           say(reply.say);
-          if (reply.href) router.push(reply.href);
+          if (reply.href) go(reply.href);
           return;
         }
         case "saveJob":
@@ -200,14 +215,14 @@ export function useVoiceMode() {
           const answer = await askFadi(command.text);
           say(answer.text);
           // Fadi decided this was a request to go somewhere, not a question.
-          if (answer.href) router.push(answer.href);
+          if (answer.href) go(answer.href);
           return;
         }
         default:
           say("I didn't catch that. Say 'help' for what I can do.");
       }
     },
-    [router, say]
+    [router, speakNow]
   );
 
   const {
@@ -218,9 +233,9 @@ export function useVoiceMode() {
     onTranscript: (text) => {
       setHeard(text);
       setBusy(true);
-      void handle(parseVoiceCommand(text)).finally(() => setBusy(false));
+      void handle(parseVoiceCommand(text), session.current).finally(() => setBusy(false));
     },
-    onError: () => say("I didn't hear that. Try again."),
+    onError: () => speakNow("I didn't hear that. Try again."),
   });
 
   const listening = voiceState === "recording";
@@ -267,16 +282,26 @@ export function useVoiceMode() {
     // permission to play, and everything Fadi says for the rest of the session depends on it.
     primeFadiVoice();
 
-    if (on) {
+    // A double-click, or a second press while the first is still landing, is one intention.
+    // Two toggles inside half a second turned Fadi on and straight off, and the greeting and
+    // "Listening off." raced each other.
+    const now = Date.now();
+    if (now - lastToggle.current < 500) return;
+    lastToggle.current = now;
+
+    session.current += 1;
+    pending.current = null; // a question asked in the old session is not still open
+
+    if (onRef.current) {
       setOn(false);
       stop();
       stopFadiSpeech();
-      say("Listening off.");
+      speakNow("Listening off.");
       return;
     }
     setOn(true);
-    say("I'm listening. Say 'what's on today', or ask me for help.");
-  }, [on, say, stop]);
+    speakNow("I'm listening. Say 'what's on today', or ask me for help.");
+  }, [speakNow, stop]);
 
   return { on, busy, listening, heard, said, voiceProblem, toggle };
 }
