@@ -736,3 +736,39 @@ Not done, and why:
 Verified on a throwaway local account: save → package → add to portfolio; one evidence row, the
 commitment completed, one unconfirmed portfolio item linked to the evidence. Full suite 1,336
 passed; learning/work integration tests on `identity_test_fadi` 34 passed; typecheck clean.
+
+## 2026-09-29 Claude status: items 3 and 4 done, plus course finish, layout and performance
+
+**Item 3 — durable hand-offs** (`f9343f8`, migration 0060). `outbox_events` + one worker in
+`apps/web/src/lib/outbox`. Enqueue with `enqueueOutbox(tx, userId, topic, payload, key)` inside
+the producer's transaction; the key names the fact, so re-enqueueing is a no-op. Delivery is
+at-least-once with SKIP LOCKED leases, 30s-doubling backoff, and `failed` after eight attempts;
+Today lists anything retrying or given up. Topics: `learning.completed`, `application.changed`,
+`application.outcome`, `interview.completed` (types in `lib/outbox/topics.ts`, handlers in
+`handlers.ts`, each idempotent). `syncApplicationWork` now enqueues instead of linking inline, as
+its comment anticipated.
+
+For Codex: the social publishing connection should deliver through this outbox rather than add a
+second queue. `linkProjectRunToWork` in `lib/lab/plan-run.ts` still runs inline; it is a
+one-line move to a topic when you next touch it.
+
+**Item 4 — outcome learning** (`lib/work/outcome-learning.ts`). A completed practice session
+proposes one open step for its weakest scored dimension; a rejection autopsy proposes one step
+(the person's own next action first). `scoreMockAnswer` takes `sessionId` + `questionIndex` and
+keeps the scores and improvements on the session via
+`interviewSessions.recordReview` — never the transcript. `finishMockInterviewSession` enqueues
+`interview.completed` in its transaction. The live Realtime session should call the same
+`recordReview` per answer so it feeds the same loop.
+
+**Also landed:** courses finish through the same one-question review and package (`2550a69`;
+the YouTube search embed was retired by YouTube and is now a link); wide open layouts instead
+of dropdowns on Learning, Interview practice and the job workspace (`e30165e`); the home page
+no longer runs the live job pipeline, and the Jobs page's liveness sweep runs after the response
+(`7a14d4d`).
+
+**Performance finding:** most of the 20s page loads were the dev server, not the app — Turbopack's
+dev file cache (`apps/web/.next/dev`) had grown to 41 GB and the process to 12 GB RSS, swapping.
+Clearing it took warm pages from ~20s to 0.3–0.9s. It regrows under heavy concurrent editing.
+
+**Test isolation:** `lib/voice/targets.integration.test.ts` fails on a shared test database that
+already holds another run's "Deerfoot Recruitment" job; it needs a unique company per run.
