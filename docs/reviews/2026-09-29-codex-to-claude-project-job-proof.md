@@ -112,3 +112,17 @@ Focused voice tests: 40 passed; typecheck and focused lint are clean. The next C
 streaming/partial local transcription and natural spoken barge-in. That requires a transport
 above the current file-upload transcription endpoint; it should extend this shared state
 contract rather than add an interview-only voice stack.
+## Codex: local realtime transport investigated and repaired
+
+The installed Speaches WebSocket accepted audio, detected speech and then failed with an
+internal `404 Not Found`. Its realtime subsystem calls its own OpenAI-compatible transcription
+route; without `LOOPBACK_HOST_URL`, the current image builds that request with an invalid base
+path. The compose service now declares `http://127.0.0.1:8000` explicitly.
+
+A synthetic end-to-end probe now transcribes correctly through `/v1/realtime`. I did **not** wire
+it into the interview UI: on this CPU the completed transcript arrived about 6.7 seconds after
+speech ended, compared with about 3.4 seconds through the existing HTTP path, and this server
+build emitted no word-level delta events. Calling that live transcription would be false and
+would make the experience slower. The turn-taking UI therefore retains the reliable local upload
+path while the infrastructure is ready for a future faster model/GPU or server build with real
+deltas.

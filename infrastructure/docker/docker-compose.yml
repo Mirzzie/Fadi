@@ -49,6 +49,11 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:${STT_HOST_PORT:-8000}:8000"
+    environment:
+      # Speaches realtime calls its own OpenAI-compatible transcription route. Without an
+      # explicit loopback URL, current images build that internal request with an invalid
+      # base path and return 404 after speech is detected.
+      LOOPBACK_HOST_URL: http://127.0.0.1:8000
     volumes:
       - careeros_hf_cache:/home/ubuntu/.cache/huggingface/hub
 
