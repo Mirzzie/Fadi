@@ -185,6 +185,18 @@ export function createCareerProfilesRepository(db: Database) {
     },
 
     /** Store the Fadi-generated role synonyms for a specific track. */
+    /** Owner-scoped: a direction's flagship projects and when they were researched. */
+    async setFlagships(
+      userId: string,
+      id: string,
+      flagshipProjects: Record<string, unknown>[]
+    ): Promise<void> {
+      await db
+        .update(careerProfiles)
+        .set({ flagshipProjects, flagshipsRefreshedAt: new Date(), updatedAt: new Date() })
+        .where(and(eq(careerProfiles.id, id), eq(careerProfiles.userId, userId)));
+    },
+
     async setRoleSynonyms(id: string, roleSynonyms: string[]): Promise<void> {
       await db
         .update(careerProfiles)

@@ -40,6 +40,7 @@ describe("the record's reflection", () => {
       body: "Just a summary.",
       decision: "",
       wentWrong: "",
+      problem: "",
     });
   });
 });
@@ -93,5 +94,20 @@ describe("caseStudyReadme without repetition", () => {
       detail: "- Apply the Terraform plan: 12 resources created",
     });
     expect(md).not.toContain("## What it shows");
+  });
+});
+
+describe("the problem leads the record", () => {
+  it("is stored first and read back separately from the summary", () => {
+    const saved = withReflection("Built the scanner.", {
+      problem: "A startup keeps leaking keys.",
+      decision: "",
+      wentWrong: "",
+    });
+    expect(saved.split("\n\n")[0]).toBe("The problem: A startup keeps leaking keys.");
+    expect(readReflection(saved)).toMatchObject({
+      problem: "A startup keeps leaking keys.",
+      body: "Built the scanner.",
+    });
   });
 });

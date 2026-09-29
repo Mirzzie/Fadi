@@ -4,9 +4,11 @@ import { BookOpen, GraduationCap, Map, MonitorPlay, Target } from "lucide-react"
 import type { RunView } from "@/app/dashboard/learning/lab-actions";
 import { CommitmentsList, GapGrowth } from "@/components/learning/gap-growth";
 import { CareerBlueprint } from "@/components/learning/career-blueprint";
+import { FlagshipProjects } from "@/components/learning/flagships";
 import { ProjectCard } from "@/components/learning/project-run";
 import type { CommitmentView } from "@/lib/learning/commitments-view";
 import type { StoredCareerReport } from "@/lib/career-report/schema";
+import type { FlagshipsState } from "@/lib/learning/flagships";
 import { buildPracticeHome } from "@/lib/learning/practice-home";
 import { learningResources } from "@/lib/learning/resources";
 
@@ -45,6 +47,7 @@ type Props = {
   commitments?: CommitmentView[];
   runs?: RunView[];
   role?: string | null;
+  flagships?: FlagshipsState | null;
 };
 
 /**
@@ -56,7 +59,13 @@ type Props = {
  * answers side by side at the top. The rest sits in open panels below: hidden content behind
  * dropdowns was harder to find than a wide page, so nothing here collapses.
  */
-export function LearningShell({ report, commitments = [], runs = [], role = null }: Props) {
+export function LearningShell({
+  report,
+  commitments = [],
+  runs = [],
+  role = null,
+  flagships = null,
+}: Props) {
   const home = buildPracticeHome({
     runs,
     commitments,
@@ -66,6 +75,11 @@ export function LearningShell({ report, commitments = [], runs = [], role = null
   const direction = role ?? "your next role";
   const { browse } = home;
   const inProgressCount = browse.runs.length + browse.commitments.length;
+  // The single gap recommendation is a smaller step now; flagships are the headline.
+  const gapList = [
+    ...(home.recommended.kind === "gap" ? [home.recommended.gap] : []),
+    ...browse.gaps,
+  ];
 
   return (
     <div className="mx-auto w-full max-w-[96rem] space-y-8 px-2 sm:px-4">
@@ -76,50 +90,34 @@ export function LearningShell({ report, commitments = [], runs = [], role = null
         </p>
       </header>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="space-y-3">
-          <SectionHeading icon={MonitorPlay} eyebrow="Continue" title="Where you left off" />
-          {home.continue?.kind === "run" ? (
-            <ProjectCard run={home.continue.run} featured />
-          ) : home.continue?.kind === "commitment" ? (
-            <CommitmentsList commitments={[home.continue.commitment]} heading={null} />
-          ) : (
-            <p className="rounded-xl border border-dashed border-border bg-card/40 p-4 text-sm text-muted-foreground">
-              Nothing in progress. Start with the recommendation beside this.
-            </p>
-          )}
-        </section>
+      <section className="space-y-3">
+        <SectionHeading icon={MonitorPlay} eyebrow="Continue" title="Where you left off" />
+        {home.continue?.kind === "run" ? (
+          <ProjectCard run={home.continue.run} featured />
+        ) : home.continue?.kind === "commitment" ? (
+          <CommitmentsList commitments={[home.continue.commitment]} heading={null} />
+        ) : (
+          <p className="rounded-xl border border-dashed border-border bg-card/40 p-4 text-sm text-muted-foreground">
+            Nothing in progress. Take on one of the flagship projects below.
+          </p>
+        )}
+      </section>
 
-        <section className="space-y-3">
-          <SectionHeading icon={Target} eyebrow="Recommended next" title="What to take on next" />
-          {home.recommended.kind === "gap" ? (
-            <article className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
-              <h3 className="font-semibold">{home.recommended.gap.title}</h3>
-              <p className="mt-2 text-xs font-medium text-muted-foreground">Why this</p>
-              <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">
-                {home.recommended.gap.detail}{" "}
-                {home.recommended.routeStep
-                  ? `It is step ${home.recommended.routeStep} of the route in your latest career report, and nothing is under way for it yet.`
-                  : "Your latest career report names it as a gap, and nothing is under way for it yet."}
-              </p>
-              <ResourceLinks skill={home.recommended.gap.title} />
-              <GapGrowth
-                gapTitle={home.recommended.gap.title}
-                gapDetail={home.recommended.gap.detail}
-              />
-            </article>
-          ) : (
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">
-                {home.recommended.reason === "no-report"
-                  ? `Fadi can map the certifications and projects that lead to ${direction} from your direction and history.`
-                  : "Every gap in your latest report already has work against it. Map what comes after them."}
-              </p>
-              <CareerBlueprint role={role} />
-            </div>
-          )}
-        </section>
-      </div>
+      {/* Two or three substantial projects beat a pile of small ones. Each answers a problem
+          organisations are dealing with now, cited, so the finished work reads as someone who
+          can take such a problem on — the smaller gap-closing steps sit below. */}
+      <section className="space-y-3">
+        <SectionHeading
+          icon={Target}
+          eyebrow="Flagship projects"
+          title={`Two or three projects worth being known for as a ${direction}`}
+        />
+        <FlagshipProjects
+          flagships={flagships?.flagships ?? []}
+          refreshedAt={flagships?.refreshedAt ?? null}
+          underWay={[...runs.map((run) => run.title), ...commitments.map((c) => c.title)]}
+        />
+      </section>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Panel title="Also in progress" count={inProgressCount}>
@@ -135,8 +133,8 @@ export function LearningShell({ report, commitments = [], runs = [], role = null
           )}
         </Panel>
 
-        <Panel title="Other gaps from your report" count={browse.gaps.length}>
-          {browse.gaps.length === 0 ? (
+        <Panel title="Smaller steps: close one gap" count={gapList.length}>
+          {gapList.length === 0 ? (
             <Empty>
               {report
                 ? "No other open gaps in your latest report."
@@ -144,10 +142,11 @@ export function LearningShell({ report, commitments = [], runs = [], role = null
             </Empty>
           ) : (
             <div className="space-y-2">
-              {browse.gaps.map((gap) => (
+              {gapList.map((gap) => (
                 <article key={gap.title} className="rounded-xl border border-border/60 p-3">
                   <h4 className="text-sm font-medium">{gap.title}</h4>
                   <p className="mt-0.5 text-xs text-muted-foreground">{gap.detail}</p>
+                  <ResourceLinks skill={gap.title} />
                   <GapGrowth gapTitle={gap.title} gapDetail={gap.detail} />
                 </article>
               ))}
@@ -199,12 +198,10 @@ export function LearningShell({ report, commitments = [], runs = [], role = null
         </Panel>
       </div>
 
-      {home.recommended.kind === "gap" ? (
-        <section className="space-y-3">
-          <SectionHeading icon={Map} eyebrow="Longer plan" title="Where this leads" />
-          <CareerBlueprint role={role} />
-        </section>
-      ) : null}
+      <section className="space-y-3">
+        <SectionHeading icon={Map} eyebrow="Longer plan" title="Where this leads" />
+        <CareerBlueprint role={role} />
+      </section>
     </div>
   );
 }

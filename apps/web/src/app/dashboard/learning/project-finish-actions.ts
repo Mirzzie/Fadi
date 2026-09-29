@@ -151,6 +151,8 @@ export async function saveProjectEvidenceAction(input: {
       organization: null,
       period: new Date().getFullYear().toString(),
       detail: withReflection(parsed.data.summary, {
+        // The scenario the project was planned around: the first paragraph of its description.
+        problem: project.run.detail?.split(/\n{2,}/)[0]?.trim() ?? "",
         decision: parsed.data.reflection?.decision ?? "",
         wentWrong: parsed.data.reflection?.wentWrong ?? "",
       }),

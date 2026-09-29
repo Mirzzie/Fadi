@@ -11,6 +11,13 @@ import type { ZodSchema } from "zod";
  * on a domain. (Part of the lib/ai dependency-inversion — see docs/ARCHITECTURE_ASSESSMENT.md.)
  */
 export interface DocGenerate {
-  structured<T>(system: string, user: string, schema: ZodSchema<T>, name: string): Promise<T>;
+  structured<T>(
+    system: string,
+    user: string,
+    schema: ZodSchema<T>,
+    name: string,
+    /** For long outputs: reasoning models spend part of the budget before answering. */
+    options?: { maxTokens?: number }
+  ): Promise<T>;
   text(system: string, user: string): Promise<string>;
 }

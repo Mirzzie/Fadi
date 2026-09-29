@@ -12,14 +12,20 @@
  * Pure, so every rule about what may appear is pinned by tests.
  */
 
-export type Reflection = { decision: string; wentWrong: string };
+export type Reflection = { decision: string; wentWrong: string; problem?: string };
 
+const PROBLEM = "The problem:";
 const DECISION = "Key decision:";
 const WENT_WRONG = "What went wrong, and the fix:";
 
-/** The record as saved: the person's summary, then their decision and their mistake, labelled. */
+/**
+ * The record as saved: the problem it answered, the person's summary, then their decision and
+ * their mistake, labelled. The problem leads because the record feeds the portfolio, and a
+ * portfolio entry that opens with the problem reads as work for an organisation, not homework.
+ */
 export function withReflection(summary: string, reflection: Reflection): string {
   return [
+    reflection.problem?.trim() ? `${PROBLEM} ${reflection.problem.trim()}` : "",
     summary.trim(),
     reflection.decision.trim() ? `${DECISION} ${reflection.decision.trim()}` : "",
     reflection.wentWrong.trim() ? `${WENT_WRONG} ${reflection.wentWrong.trim()}` : "",
@@ -29,7 +35,9 @@ export function withReflection(summary: string, reflection: Reflection): string 
 }
 
 /** Read a saved record back into its parts. A record saved before these existed is all body. */
-export function readReflection(detail: string): { body: string } & Reflection {
+export function readReflection(
+  detail: string
+): { body: string } & Reflection & { problem: string } {
   const paragraphs = detail.split(/\n{2,}/);
   const take = (label: string) =>
     paragraphs
@@ -38,9 +46,10 @@ export function readReflection(detail: string): { body: string } & Reflection {
       .trim() ?? "";
   return {
     body: paragraphs
-      .filter((p) => !p.startsWith(DECISION) && !p.startsWith(WENT_WRONG))
+      .filter((p) => !p.startsWith(DECISION) && !p.startsWith(WENT_WRONG) && !p.startsWith(PROBLEM))
       .join("\n\n")
       .trim(),
+    problem: take(PROBLEM),
     decision: take(DECISION),
     wentWrong: take(WENT_WRONG),
   };
@@ -63,11 +72,11 @@ export type CaseStudyInput = {
 
 /** README.md for the project's repository. */
 export function caseStudyReadme(input: CaseStudyInput): string {
-  const { body, decision, wentWrong } = readReflection(input.detail);
+  const { body, decision, wentWrong, problem } = readReflection(input.detail);
   // A summary that already lists a result need not list it twice.
   const unsaid = input.results.filter((line) => !body.includes(line.title));
   const sections: Array<[string, string]> = [
-    ["The problem", input.scenario?.trim() ?? ""],
+    ["The problem", problem || input.scenario?.trim() || ""],
     ["What I did", body],
     [
       "What it shows",

@@ -228,6 +228,11 @@ export const careerProfiles = pgTable(
     embedding: jsonb("embedding").$type<number[]>(),
     embeddingModel: text("embedding_model"),
     embeddingBasis: text("embedding_basis"),
+    // The two or three substantial projects Fadi proposes for THIS direction, built from the
+    // person's record and current, cited business problems (apps/web lib/learning/flagships).
+    // Refreshed on a clock so they follow what organisations are dealing with now.
+    flagshipProjects: jsonb("flagship_projects").$type<Record<string, unknown>[]>(),
+    flagshipsRefreshedAt: timestamp("flagships_refreshed_at", { withTimezone: true }),
     ...timestamps,
   },
   (table) => [

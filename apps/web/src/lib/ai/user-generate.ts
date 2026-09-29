@@ -59,7 +59,7 @@ export async function getUserDocGenerate(userId: string): Promise<DocGenerate | 
   const provider = chain[0];
   if (!provider) return null;
   return {
-    structured: async (system, user, schema, name) => {
+    structured: async (system, user, schema, name, options) => {
       await chargeOrThrow(userId);
       return provider.parseStructured(
         [
@@ -68,7 +68,7 @@ export async function getUserDocGenerate(userId: string): Promise<DocGenerate | 
         ],
         schema,
         name,
-        { temperature: 0.4 },
+        { temperature: 0.4, maxTokens: options?.maxTokens },
       );
     },
     text: async (system, user) => {
