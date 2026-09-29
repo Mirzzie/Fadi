@@ -229,64 +229,49 @@ export function MockInterview({
           />
         </Field>
         <div className="grid gap-3 sm:grid-cols-2">
-          <label className="block space-y-1 text-sm">
-            <span className="text-xs text-muted-foreground">Interview stage</span>
-            <select
-              className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm text-foreground"
-              value={stage}
-              onChange={(event) => setStage(event.target.value as InterviewStage)}
-            >
-              {INTERVIEW_STAGES.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="block space-y-1 text-sm">
-            <span className="text-xs text-muted-foreground">Practice length</span>
-            <select
-              className="h-9 w-full rounded-md border border-border bg-background px-2 text-sm text-foreground"
-              value={durationMinutes}
-              onChange={(event) => setDurationMinutes(Number(event.target.value) as 10 | 20)}
-            >
-              <option value={10}>10 minutes · 4 questions</option>
-              <option value={20}>20 minutes · 7 questions</option>
-            </select>
-          </label>
+          <ChoiceRow
+            label="Interview stage"
+            options={INTERVIEW_STAGES}
+            value={stage}
+            onChange={setStage}
+          />
+          <ChoiceRow
+            label="Practice length"
+            options={[
+              { value: 10 as const, label: "10 min · 4 questions" },
+              { value: 20 as const, label: "20 min · 7 questions" },
+            ]}
+            value={durationMinutes}
+            onChange={setDurationMinutes}
+          />
         </div>
-        <details className="rounded-lg border border-border px-3 py-2">
-          <summary className="cursor-pointer text-sm text-muted-foreground">Change context</summary>
-          <div className="mt-3 space-y-3">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Country / region">
-                <Input
-                  value={config.country}
-                  onChange={(event) =>
-                    setConfig((previous) => ({
-                      ...previous,
-                      country: event.target.value,
-                    }))
-                  }
-                />
-              </Field>
-              <Field label="Seniority">
-                <Input
-                  value={config.seniority}
-                  onChange={(event) =>
-                    setConfig((previous) => ({
-                      ...previous,
-                      seniority: event.target.value,
-                    }))
-                  }
-                />
-              </Field>
-            </div>
-            <Field label="Job description (optional)">
-              <Textarea rows={3} value={jd} onChange={(event) => setJd(event.target.value)} />
-            </Field>
-          </div>
-        </details>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Country / region">
+            <Input
+              value={config.country}
+              onChange={(event) =>
+                setConfig((previous) => ({
+                  ...previous,
+                  country: event.target.value,
+                }))
+              }
+            />
+          </Field>
+          <Field label="Seniority">
+            <Input
+              value={config.seniority}
+              onChange={(event) =>
+                setConfig((previous) => ({
+                  ...previous,
+                  seniority: event.target.value,
+                }))
+              }
+            />
+          </Field>
+        </div>
+        <Field label="Job description (optional)">
+          <Textarea rows={3} value={jd} onChange={(event) => setJd(event.target.value)} />
+        </Field>
         <label className="flex items-center gap-2 text-sm text-muted-foreground">
           <input
             type="checkbox"
@@ -536,5 +521,44 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       <span className="text-xs text-muted-foreground">{label}</span>
       {children}
     </label>
+  );
+}
+
+/**
+ * A handful of options, all visible, one tap to choose. Replaces a dropdown: with four choices
+ * or fewer there is room to show them, and a closed select hides what the choices even are.
+ */
+function ChoiceRow<T extends string | number>({
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  label: string;
+  options: Array<{ value: T; label: string }>;
+  value: T;
+  onChange: (value: T) => void;
+}) {
+  return (
+    <fieldset className="space-y-1 text-sm">
+      <legend className="text-xs text-muted-foreground">{label}</legend>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={option.value === value}
+            onClick={() => onChange(option.value)}
+            className={
+              option.value === value
+                ? "rounded-md border border-primary/50 bg-primary/12 px-2.5 py-1.5 text-xs font-medium text-primary"
+                : "rounded-md border border-border px-2.5 py-1.5 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+            }
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </fieldset>
   );
 }

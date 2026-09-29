@@ -110,7 +110,7 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
 
   return (
     <AppShell>
-      <main className="mx-auto w-full max-w-4xl space-y-4 pb-12">
+      <main className="mx-auto w-full max-w-[96rem] space-y-4 px-2 pb-12 sm:px-4">
         <header>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-lg font-semibold">
@@ -147,95 +147,36 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
         {!hasJobContext ? (
           <JobContextCard jobId={job.id} initialDescription="" />
         ) : (
-          <>
-            {profile?.autoPrepEnabled && beforeApplying ? (
-              <AutoPrepRunner jobId={job.id} enabled hasDocs={jobDocs.length > 0} />
-            ) : null}
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
+            <div className="min-w-0 space-y-4">
+              {profile?.autoPrepEnabled && beforeApplying ? (
+                <AutoPrepRunner jobId={job.id} enabled hasDocs={jobDocs.length > 0} />
+              ) : null}
 
-            {beforeApplying ? (
-              <section aria-labelledby="workspace-next-action" className="space-y-2">
-                <p
-                  id="workspace-next-action"
-                  className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-                >
-                  Next: decide whether this role is worth your time
-                </p>
-                <FitGatePanel
-                  jobTitle={jobTitle}
-                  jobCompany={jobCompany}
-                  jobDescription={jobDescription}
-                />
-              </section>
-            ) : null}
+              {beforeApplying ? (
+                <section aria-labelledby="workspace-next-action" className="space-y-2">
+                  <p
+                    id="workspace-next-action"
+                    className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                  >
+                    Next: decide whether this role is worth your time
+                  </p>
+                  <FitGatePanel
+                    jobTitle={jobTitle}
+                    jobCompany={jobCompany}
+                    jobDescription={jobDescription}
+                  />
+                </section>
+              ) : null}
 
-            {inInterviewJourney ? (
-              <section aria-labelledby="workspace-interview-action" className="space-y-2">
-                <p
-                  id="workspace-interview-action"
-                  className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-                >
-                  Next: prepare for the conversation
-                </p>
-                <InterviewPrepPanel
-                  applicationId={savedApplication?.id}
-                  jobId={job.id}
-                  jobTitle={jobTitle}
-                  jobCompany={jobCompany}
-                  jobDescription={jobDescription}
-                />
-              </section>
-            ) : null}
-
-            {journeyFinished ? (
-              <section aria-labelledby="workspace-outcome-action" className="space-y-2">
-                <p
-                  id="workspace-outcome-action"
-                  className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
-                >
-                  Outcome
-                </p>
-                <ApplicationOutcomePanel
-                  jobId={job.id}
-                  jobCompany={jobCompany}
-                  jobTitle={jobTitle}
-                  application={application}
-                  autopsyPrompts={[...REJECTION_AUTOPSY_PROMPTS]}
-                />
-              </section>
-            ) : null}
-
-            <WorkspaceDocActions jobId={job.id} documents={documents} canDraft={!journeyFinished} />
-
-            {!journeyFinished ? (
-              <ApplicationOutcomePanel
-                jobId={job.id}
-                jobCompany={jobCompany}
-                jobTitle={jobTitle}
-                application={application}
-                autopsyPrompts={[...REJECTION_AUTOPSY_PROMPTS]}
-              />
-            ) : null}
-
-            <details className="rounded-xl border border-border/60 bg-card">
-              <summary className="cursor-pointer px-4 py-3 text-sm font-medium">More tools</summary>
-              <div className="space-y-3 border-t border-border/60 p-4">
-                {jobDocs.length > 0 ? (
-                  <>
-                    <ApplicationQualityPanel
-                      jobId={job.id}
-                      jobTitle={jobTitle}
-                      jobCompany={jobCompany}
-                      jobDescription={jobDescription}
-                    />
-                    <CvReviewPanel
-                      jobId={job.id}
-                      jobTitle={jobTitle}
-                      jobCompany={jobCompany}
-                      jobDescription={jobDescription}
-                    />
-                  </>
-                ) : null}
-                {beforeApplying ? (
+              {inInterviewJourney ? (
+                <section aria-labelledby="workspace-interview-action" className="space-y-2">
+                  <p
+                    id="workspace-interview-action"
+                    className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                  >
+                    Next: prepare for the conversation
+                  </p>
                   <InterviewPrepPanel
                     applicationId={savedApplication?.id}
                     jobId={job.id}
@@ -243,22 +184,96 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
                     jobCompany={jobCompany}
                     jobDescription={jobDescription}
                   />
-                ) : null}
-                {!journeyFinished ? (
-                  <CompanyBriefPanel
-                    jobTitle={jobTitle}
-                    jobCompany={jobCompany}
-                    jobDescription={jobDescription}
-                  />
-                ) : null}
-                {jobDocs.length === 0 && !beforeApplying && journeyFinished ? (
-                  <p className="text-sm text-muted-foreground">
-                    No additional tools for this application.
+                </section>
+              ) : null}
+
+              {journeyFinished ? (
+                <section aria-labelledby="workspace-outcome-action" className="space-y-2">
+                  <p
+                    id="workspace-outcome-action"
+                    className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                  >
+                    Outcome
                   </p>
-                ) : null}
-              </div>
-            </details>
-          </>
+                  <ApplicationOutcomePanel
+                    jobId={job.id}
+                    jobCompany={jobCompany}
+                    jobTitle={jobTitle}
+                    application={application}
+                    autopsyPrompts={[...REJECTION_AUTOPSY_PROMPTS]}
+                  />
+                </section>
+              ) : null}
+
+              <WorkspaceDocActions
+                jobId={job.id}
+                documents={documents}
+                canDraft={!journeyFinished}
+              />
+            </div>
+
+            {/* Everything else for this role, open beside the main task rather than folded
+                under "More tools": a wide page is easier to scan than a hidden one. */}
+            <div className="min-w-0 space-y-4">
+              {!journeyFinished ? (
+                <ApplicationOutcomePanel
+                  jobId={job.id}
+                  jobCompany={jobCompany}
+                  jobTitle={jobTitle}
+                  application={application}
+                  autopsyPrompts={[...REJECTION_AUTOPSY_PROMPTS]}
+                />
+              ) : null}
+
+              <section aria-labelledby="workspace-tools" className="space-y-3">
+                <p
+                  id="workspace-tools"
+                  className="text-xs font-semibold uppercase tracking-wide text-muted-foreground"
+                >
+                  Tools for this role
+                </p>
+                <div className="space-y-3">
+                  {jobDocs.length > 0 ? (
+                    <>
+                      <ApplicationQualityPanel
+                        jobId={job.id}
+                        jobTitle={jobTitle}
+                        jobCompany={jobCompany}
+                        jobDescription={jobDescription}
+                      />
+                      <CvReviewPanel
+                        jobId={job.id}
+                        jobTitle={jobTitle}
+                        jobCompany={jobCompany}
+                        jobDescription={jobDescription}
+                      />
+                    </>
+                  ) : null}
+                  {beforeApplying ? (
+                    <InterviewPrepPanel
+                      applicationId={savedApplication?.id}
+                      jobId={job.id}
+                      jobTitle={jobTitle}
+                      jobCompany={jobCompany}
+                      jobDescription={jobDescription}
+                    />
+                  ) : null}
+                  {!journeyFinished ? (
+                    <CompanyBriefPanel
+                      jobTitle={jobTitle}
+                      jobCompany={jobCompany}
+                      jobDescription={jobDescription}
+                    />
+                  ) : null}
+                  {jobDocs.length === 0 && !beforeApplying && journeyFinished ? (
+                    <p className="text-sm text-muted-foreground">
+                      No additional tools for this application.
+                    </p>
+                  ) : null}
+                </div>
+              </section>
+            </div>
+          </div>
         )}
       </main>
     </AppShell>

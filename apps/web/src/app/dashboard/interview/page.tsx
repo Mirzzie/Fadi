@@ -48,18 +48,23 @@ export default async function InterviewPage({
 
   return (
     <AppShell>
-      <div className="mx-auto w-full max-w-3xl space-y-6 p-4 sm:p-6">
-        <MockInterview
-          job={job}
-          initialSession={initialSession}
-          defaults={{
-            role: profile?.targetRole ?? "",
-            country: profile?.locationPreference ?? "",
-            seniority: profile?.experienceLevel ?? "",
-          }}
-        />
+      {/* Practice and the stories it draws on, side by side on a wide screen. */}
+      <div className="mx-auto grid w-full max-w-[96rem] gap-2 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
+        <div className="min-w-0 space-y-6 p-4 sm:p-6">
+          <MockInterview
+            job={job}
+            initialSession={initialSession}
+            defaults={{
+              role: profile?.targetRole ?? "",
+              country: profile?.locationPreference ?? "",
+              seniority: profile?.experienceLevel ?? "",
+            }}
+          />
+        </div>
+        <div className="min-w-0">
+          <StoryBank stories={stories} />
+        </div>
       </div>
-      <StoryBank stories={stories} />
     </AppShell>
   );
 }

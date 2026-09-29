@@ -64,9 +64,9 @@ export function WorkspaceDocActions({
       </div>
 
       {canDraft ? (
-        <details className="mt-3 text-sm">
-          <summary className="cursor-pointer text-muted-foreground">Other documents</summary>
-          <div className="mt-2 flex flex-wrap gap-2">
+        <div className="mt-3 text-sm">
+          <p className="text-xs text-muted-foreground">Other documents</p>
+          <div className="mt-1.5 flex flex-wrap gap-2">
             {SECONDARY_ACTIONS.map((action) => (
               <Button
                 key={action.kind}
@@ -84,7 +84,7 @@ export function WorkspaceDocActions({
               </Button>
             ))}
           </div>
-        </details>
+        </div>
       ) : null}
 
       {error ? <p className="mt-2 text-xs text-destructive">{error}</p> : null}
