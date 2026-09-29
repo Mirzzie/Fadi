@@ -18,6 +18,14 @@ import {
   type ReviewLine,
 } from "@/lib/learning/project-review";
 import type { StoryDraft } from "@/lib/interview/story-bank";
+import {
+  ANGLE_BRIEF,
+  availableAngles,
+  caseStudyReadme,
+  walkthroughOutline,
+  withReflection,
+  type PostAngle,
+} from "@/lib/learning/case-study";
 import { logger } from "@/lib/observability/logger";
 import { recordForwardMotion } from "@/lib/resilience/service";
 
@@ -89,6 +97,8 @@ export async function projectFinishAction(input: {
 export async function saveProjectEvidenceAction(input: {
   runId: string;
   summary: string;
+  /** The decision behind the work and what went wrong — the two-minute test's hardest parts. */
+  reflection?: { decision?: string; wentWrong?: string };
 }): Promise<{
   ok: boolean;
   message: string;
@@ -98,7 +108,16 @@ export async function saveProjectEvidenceAction(input: {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
   const parsed = z
-    .object({ runId: z.string().uuid(), summary: z.string().trim().min(20).max(4_000) })
+    .object({
+      runId: z.string().uuid(),
+      summary: z.string().trim().min(20).max(4_000),
+      reflection: z
+        .object({
+          decision: z.string().trim().max(1_000).optional().default(""),
+          wentWrong: z.string().trim().max(1_000).optional().default(""),
+        })
+        .optional(),
+    })
     .safeParse(input);
   if (!parsed.success) {
     return { ok: false, message: "Say what you did in a sentence or two before saving it." };
@@ -131,7 +150,10 @@ export async function saveProjectEvidenceAction(input: {
       title: project.run.title,
       organization: null,
       period: new Date().getFullYear().toString(),
-      detail: parsed.data.summary,
+      detail: withReflection(parsed.data.summary, {
+        decision: parsed.data.reflection?.decision ?? "",
+        wentWrong: parsed.data.reflection?.wentWrong ?? "",
+      }),
       metrics: null,
       tags: commitment?.gap ? [commitment.gap.toLowerCase().trim()] : [],
       origin: "learning",
@@ -237,6 +259,12 @@ type SavedRecord = {
   corpus: string;
   /** Step results backed by more than the person's word; empty for a course. */
   shown: ReviewLine[];
+  /** The saved record's own text, and what the README and walkthrough are built from. */
+  detail: string;
+  factId: string;
+  scenario: string | null;
+  steps: string[];
+  repoUrl: string | null;
 };
 
 /** The saved record behind a finished project or course. Refuses until the record is settled. */
@@ -253,12 +281,19 @@ async function savedRecord(
   let kind: SavedRecord["kind"];
   let evidenceItemId: string | null;
   let shown: ReviewLine[] = [];
+  let scenario: string | null = null;
+  let steps: string[] = [];
+  let repoUrl: string | null = null;
   if ("runId" in source) {
     const project = await createProjectRunsRepository(db).getWithSteps(userId, source.runId);
     if (!project) return { ok: false, message: "That project is unavailable." };
     title = project.run.title;
     kind = "project";
     evidenceItemId = project.run.evidenceItemId;
+    // Suggestions open with the scenario as their own paragraph; that is "the problem".
+    scenario = project.run.detail?.split(/\n{2,}/)[0]?.trim() || null;
+    steps = [...project.steps].sort((a, b) => a.ordinal - b.ordinal).map((step) => step.title);
+    repoUrl = project.run.repoUrl ?? null;
     shown = completionReview(project.run.title, project.steps).lines.filter(
       (line) => line.proof !== "self-reported"
     );
@@ -271,6 +306,7 @@ async function savedRecord(
     title = commitment.title;
     kind = commitment.kind === "project" ? "project" : "course";
     evidenceItemId = commitment.evidenceItemId;
+    scenario = commitment.detail?.split(/\n{2,}/)[0]?.trim() || null;
   }
   if (!evidenceItemId) {
     return { ok: false, message: "Save it to your career record first." };
@@ -295,7 +331,95 @@ async function savedRecord(
         : `${line.title}: ${line.result ?? ""}`
     ),
   ].join("\n");
-  return { ok: true, title, kind, evidenceItemId, corpus, shown };
+  return {
+    ok: true,
+    title,
+    kind,
+    evidenceItemId,
+    corpus,
+    shown,
+    detail: evidence.detail ?? "",
+    factId: evidence.factId ?? evidence.id,
+    scenario,
+    steps,
+    repoUrl,
+  };
+}
+
+async function walkthroughOf(userId: string, factId: string): Promise<string | null> {
+  const { createEvidenceArtifactsRepository } = await import("@careeros/database");
+  const proof = await createEvidenceArtifactsRepository(getDatabase()).listForUser(userId);
+  return proof.find((item) => item.factId === factId && item.kind === "video")?.url ?? null;
+}
+
+export type CaseStudyView = {
+  readme: string;
+  outline: Array<{ at: string; say: string }>;
+  angles: PostAngle[];
+  walkthroughUrl: string | null;
+};
+
+/**
+ * The two-minute package, built from the record alone: a README for the repository, the beats of
+ * a five-minute walkthrough, and the post angles the record can honestly support.
+ */
+export async function caseStudyAction(
+  input: FinishSource
+): Promise<{ ok: true; view: CaseStudyView } | { ok: false; message: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  const saved = await savedRecord(user.id, input);
+  if (!saved.ok) return saved;
+  const walkthroughUrl = await walkthroughOf(user.id, saved.factId);
+  const study = {
+    title: saved.title,
+    kind: saved.kind,
+    scenario: saved.scenario,
+    detail: saved.detail,
+    results: saved.shown.map((line) => ({
+      title: line.title,
+      proof: line.proof as "checked" | "result recorded",
+      result: line.result,
+    })),
+    steps: saved.steps,
+    walkthroughUrl,
+    repoUrl: saved.repoUrl,
+  };
+  return {
+    ok: true,
+    view: {
+      readme: caseStudyReadme(study),
+      outline: walkthroughOutline(study),
+      angles: availableAngles(saved.detail, saved.kind),
+      walkthroughUrl,
+    },
+  };
+}
+
+/** Attach the recorded walkthrough to the record, so the portfolio and README can show it. */
+export async function saveWalkthroughAction(
+  input: FinishSource & { url: string }
+): Promise<{ ok: boolean; message: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  let url: URL;
+  try {
+    url = new URL(input.url.trim());
+  } catch {
+    return { ok: false, message: "Paste the full link to the video, starting with https://." };
+  }
+  if (url.protocol !== "https:")
+    return { ok: false, message: "The link needs to start with https://." };
+  // The source schema keeps runId / commitmentId and drops the url.
+  const saved = await savedRecord(user.id, input);
+  if (!saved.ok) return saved;
+  const { createEvidenceArtifactsRepository } = await import("@careeros/database");
+  await createEvidenceArtifactsRepository(getDatabase()).addForFact(user.id, saved.factId, [
+    { kind: "video", url: url.toString(), label: "Five-minute walkthrough" },
+  ]);
+  revalidatePath("/dashboard/evidence");
+  revalidatePath("/dashboard/portfolio");
+  return { ok: true, message: "Saved. It shows with this project on your record and portfolio." };
 }
 
 /** Where a saved record stands, for the package shown after a course is completed. */
@@ -370,6 +494,7 @@ Use ONLY the facts in their saved evidence and step results. Structure, in plain
 A line marked "(checked in the lab: …)" means Fadi confirmed that result — write it as a confirmed result ("confirmed the configuration is valid"), never as a command the person ran.
 Rules: 60–150 words. No invented numbers, business impact, production use, employers, clients or mastery claims.
 No hashtags walls (at most 3 relevant hashtags at the end). No emoji. No exclamation marks. No "thrilled", "excited to share", "journey", "delve".
+Write it as work done ("I tested", "I built", "I found"), never as studying ("I'm learning", "I started learning", "my journey") — the same facts read as a practitioner, not a student.
 Return the post text only in the "post" field.`;
 
 const COURSE_POST_SYSTEM = `You draft a short LinkedIn post for a person who finished a course or certification.
@@ -379,18 +504,34 @@ Use ONLY the facts in their saved record. Structure, in plain first person:
 3) ONLY IF the record says so, what they will apply it to next.
 Rules: 50–120 words. Completing a course is not mastery: never claim expertise, production use, employers, clients or numbers the record does not state.
 No hashtag walls (at most 3 relevant hashtags at the end). No emoji. No exclamation marks. No "thrilled", "excited to share", "journey", "delve".
+Write it as work done ("I tested", "I built", "I found"), never as studying ("I'm learning", "I started learning", "my journey") — the same facts read as a practitioner, not a student.
 Return the post text only in the "post" field.`;
 
 /** Draft a post on request, from the saved record only. Never posts anything. */
 export async function draftRecordPostAction(
-  input: FinishSource
+  input: FinishSource & { angle?: PostAngle }
 ): Promise<{ ok: true; draft: PostDraft } | { ok: false; message: string }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
-  const saved = await savedRecord(user.id, input);
+  const { angle, ...source } = input;
+  const saved = await savedRecord(user.id, source);
   if (!saved.ok) return saved;
-  const { corpus, shown } = saved;
-  const system = saved.kind === "course" ? COURSE_POST_SYSTEM : POST_SYSTEM;
+  const shown = saved.shown;
+  const walkthrough = await walkthroughOf(user.id, saved.factId);
+  const corpus = [
+    saved.scenario ? `The problem it answers: ${saved.scenario}` : "",
+    saved.corpus,
+    walkthrough ? `Walkthrough video: ${walkthrough}` : "",
+    saved.repoUrl ? `Repository: ${saved.repoUrl}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+  // One project, several true posts: each angle is a different part of the same work.
+  const system = `${saved.kind === "course" ? COURSE_POST_SYSTEM : POST_SYSTEM}${
+    angle && availableAngles(saved.detail, saved.kind).includes(angle)
+      ? `\n\nThis post's angle: ${ANGLE_BRIEF[angle]}`
+      : ""
+  }`;
 
   const { getUserDocGenerate, AiRateLimitError } = await import("@/lib/ai/user-generate");
   const generate = await getUserDocGenerate(user.id);

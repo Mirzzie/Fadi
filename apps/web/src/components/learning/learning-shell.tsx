@@ -167,6 +167,12 @@ export function LearningShell({ report, commitments = [], runs = [], role = null
               ))}
             </ul>
           )}
+          {browse.finished.length > 0 ? (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Three or four strong projects, each with a README, a short walkthrough and a few
+              posts, do more than twenty quiet ones. Package each from its finish review.
+            </p>
+          ) : null}
           <nav
             aria-label="More in Learning"
             className="mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t border-border/60 pt-3 text-xs"

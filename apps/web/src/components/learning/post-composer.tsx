@@ -9,13 +9,22 @@ import {
   type PostDraft,
 } from "@/app/dashboard/learning/project-finish-actions";
 import { Button } from "@/components/ui/button";
+import type { PostAngle } from "@/lib/learning/case-study";
 
 /**
  * A post about a finished project, drafted on request from the saved evidence. Fadi never posts:
  * the person copies the text, downloads the card, and posts it themselves on LinkedIn. Opening
  * LinkedIn does not pre-fill anything reliably, so the page says to paste rather than pretending.
  */
-export function PostComposer({ source }: { source: FinishSource }) {
+export function PostComposer({
+  source,
+  angle,
+  label = "Draft a LinkedIn post",
+}: {
+  source: FinishSource;
+  angle?: PostAngle;
+  label?: string;
+}) {
   const [draft, setDraft] = useState<PostDraft | null>(null);
   const [text, setText] = useState("");
   const [note, setNote] = useState<string | null>(null);
@@ -25,7 +34,7 @@ export function PostComposer({ source }: { source: FinishSource }) {
   const make = () =>
     start(async () => {
       setNote(null);
-      const result = await draftRecordPostAction(source);
+      const result = await draftRecordPostAction({ ...source, angle });
       if (!result.ok) return setNote(result.message);
       setDraft(result.draft);
       setText(result.draft.text);
@@ -40,7 +49,7 @@ export function PostComposer({ source }: { source: FinishSource }) {
       <div>
         <Button variant="outline" size="sm" disabled={busy} onClick={make}>
           {busy ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-          {busy ? "Drafting…" : "Draft a LinkedIn post"}
+          {busy ? "Drafting…" : label}
         </Button>
         {note ? <p className="mt-2 text-xs text-destructive">{note}</p> : null}
       </div>
@@ -102,7 +111,13 @@ export function PostComposer({ source }: { source: FinishSource }) {
           size="sm"
           variant="outline"
           nativeButton={false}
-          render={<a href="https://www.linkedin.com/feed/?shareActive=true" target="_blank" rel="noreferrer" />}
+          render={
+            <a
+              href="https://www.linkedin.com/feed/?shareActive=true"
+              target="_blank"
+              rel="noreferrer"
+            />
+          }
         >
           <ExternalLink aria-hidden="true" /> Open LinkedIn
         </Button>

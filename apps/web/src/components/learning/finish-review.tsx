@@ -6,9 +6,12 @@ import { Check, Circle, Clock, Loader2 } from "lucide-react";
 
 import {
   addRecordToPortfolioAction,
+  caseStudyAction,
   draftRecordStoryAction,
   projectFinishAction,
   saveProjectEvidenceAction,
+  saveWalkthroughAction,
+  type CaseStudyView,
   type FinishSource,
   type FinishView,
 } from "@/app/dashboard/learning/project-finish-actions";
@@ -16,6 +19,7 @@ import { saveStory } from "@/app/dashboard/interview/actions";
 import { PostComposer } from "@/components/learning/post-composer";
 import { Button } from "@/components/ui/button";
 import type { StoryDraft } from "@/lib/interview/story-bank";
+import { ANGLE_LABEL, type PostAngle } from "@/lib/learning/case-study";
 import { completionPackage, type PackageItem } from "@/lib/learning/project-review";
 
 /**
@@ -29,6 +33,8 @@ import { completionPackage, type PackageItem } from "@/lib/learning/project-revi
 export function FinishReview({ runId, stepsKey }: { runId: string; stepsKey: string }) {
   const [view, setView] = useState<FinishView | null>(null);
   const [summary, setSummary] = useState("");
+  const [decision, setDecision] = useState("");
+  const [wentWrong, setWentWrong] = useState("");
   const [note, setNote] = useState<string | null>(null);
   const [busy, start] = useTransition();
 
@@ -100,12 +106,49 @@ export function FinishReview({ runId, stepsKey }: { runId: string; stepsKey: str
         </p>
       ) : null}
 
+      {/* The two-minute test. A reviewer learns more from one real decision and one real
+          mistake than from a list of steps — they are what separate doing from following. */}
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <label className="block text-sm">
+          <span className="font-medium">A decision you made, and why</span>
+          <span className="block text-xs text-muted-foreground">
+            What you chose over what, and the trade-off. Optional, but it is what reviewers look
+            for.
+          </span>
+          <textarea
+            value={decision}
+            onChange={(event) => setDecision(event.target.value)}
+            rows={3}
+            placeholder="e.g. Kept the database in a private subnet with no NAT gateway: harder to patch, but nothing can reach it from the internet."
+            className="mt-1 w-full rounded-md border border-border bg-background p-2.5 text-sm"
+          />
+        </label>
+        <label className="block text-sm">
+          <span className="font-medium">What went wrong, and how you fixed it</span>
+          <span className="block text-xs text-muted-foreground">
+            Real work rarely works first time. How you found and fixed it says more than a clean
+            run.
+          </span>
+          <textarea
+            value={wentWrong}
+            onChange={(event) => setWentWrong(event.target.value)}
+            rows={3}
+            placeholder="e.g. My first IAM policy allowed s3:* — the analyzer flagged it, so I scoped it to the one bucket."
+            className="mt-1 w-full rounded-md border border-border bg-background p-2.5 text-sm"
+          />
+        </label>
+      </div>
+
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Button
           disabled={busy || summary.trim().length < 20}
           onClick={() =>
             start(async () => {
-              const result = await saveProjectEvidenceAction({ runId, summary });
+              const result = await saveProjectEvidenceAction({
+                runId,
+                summary,
+                reflection: { decision, wentWrong },
+              });
               setNote(result.ok ? null : result.message);
               if (result.ok && result.evidenceItemId && result.recordStatus) {
                 setView({
@@ -207,12 +250,14 @@ export function CompletionPackage({
           ) : null}
         </Row>
 
+        {state("post") === "ready" ? <ShowcaseRows source={source} /> : null}
+
         <Row
           state={state("post")}
-          title="LinkedIn post"
-          detail="A short post drafted from this record only. You post it yourself."
+          title="Posts about it"
+          detail="One project, several true posts — each a different part of the same work, drafted from this record only. You post them yourself, a few days apart."
         >
-          {state("post") === "ready" ? <PostComposer source={source} /> : null}
+          {state("post") === "ready" ? <PostAngles source={source} /> : null}
         </Row>
       </ol>
     </section>
@@ -342,6 +387,160 @@ function StoryAction({ source, onAdded }: { source: FinishSource; onAdded: () =>
         </Button>
       </div>
       {note ? <p className="text-xs text-destructive">{note}</p> : null}
+    </div>
+  );
+}
+
+/**
+ * The README and the walkthrough: packaging that lets a reviewer understand the work in two
+ * minutes, and hear the person explain it in five.
+ */
+function ShowcaseRows({ source }: { source: FinishSource }) {
+  const [view, setView] = useState<CaseStudyView | null>(null);
+  const [url, setUrl] = useState("");
+  const [note, setNote] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [busy, start] = useTransition();
+  const sourceKey = JSON.stringify(source);
+
+  useEffect(() => {
+    let alive = true;
+    void caseStudyAction(JSON.parse(sourceKey) as FinishSource).then((result) => {
+      if (alive && result.ok) setView(result.view);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [sourceKey]);
+
+  if (!view) return null;
+
+  const download = () => {
+    const blob = new Blob([view.readme], { type: "text/markdown" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = "README.md";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(link.href), 1_000);
+  };
+
+  return (
+    <>
+      <Row
+        state="ready"
+        title="README for the repository"
+        detail="The problem, what you did, what it shows, the decision and the fix — built from your record, nothing added. Put it at the top of the repo."
+      >
+        <details className="rounded-lg border border-border/60">
+          <summary className="cursor-pointer px-3 py-2 text-xs text-muted-foreground">
+            Preview
+          </summary>
+          <pre className="max-h-72 overflow-auto whitespace-pre-wrap border-t border-border/60 p-3 text-xs">
+            {view.readme}
+          </pre>
+        </details>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Button size="sm" variant="outline" onClick={download}>
+            Download README.md
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() =>
+              void navigator.clipboard
+                .writeText(view.readme)
+                .then(() => setCopied(true))
+                .catch(() => setCopied(false))
+            }
+          >
+            {copied ? "Copied" : "Copy"}
+          </Button>
+        </div>
+      </Row>
+
+      <Row
+        state={view.walkthroughUrl ? "done" : "ready"}
+        title="A five-minute walkthrough"
+        detail={
+          view.walkthroughUrl
+            ? "Saved with this record. It shows on your portfolio and in the README."
+            : "Record yourself explaining it — Loom, YouTube or your phone. Few candidates do this, and a reviewer can hear that you understand the work."
+        }
+      >
+        {view.walkthroughUrl ? (
+          <a
+            href={view.walkthroughUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs text-primary hover:underline"
+          >
+            {view.walkthroughUrl}
+          </a>
+        ) : (
+          <div className="space-y-2">
+            <ol className="space-y-1 text-xs">
+              {view.outline.map((beat) => (
+                <li key={beat.at} className="flex gap-2">
+                  <span className="w-9 shrink-0 font-mono text-muted-foreground">{beat.at}</span>
+                  <span>{beat.say}</span>
+                </li>
+              ))}
+            </ol>
+            <div className="flex flex-wrap items-center gap-2">
+              <input
+                value={url}
+                onChange={(event) => setUrl(event.target.value)}
+                placeholder="https://www.loom.com/share/…"
+                aria-label="Walkthrough video link"
+                className="h-8 min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 text-sm"
+              />
+              <Button
+                size="sm"
+                disabled={busy || !url.trim()}
+                onClick={() =>
+                  start(async () => {
+                    const result = await saveWalkthroughAction({ ...source, url });
+                    setNote(result.message);
+                    if (!result.ok) return;
+                    // The README names the walkthrough, so rebuild it now that there is one.
+                    const fresh = await caseStudyAction(source);
+                    setView(fresh.ok ? fresh.view : { ...view, walkthroughUrl: url.trim() });
+                  })
+                }
+              >
+                Save link
+              </Button>
+            </div>
+            {note ? <p className="text-xs text-muted-foreground">{note}</p> : null}
+          </div>
+        )}
+      </Row>
+    </>
+  );
+}
+
+/** A post per angle the record can honestly support. */
+function PostAngles({ source }: { source: FinishSource }) {
+  const [angles, setAngles] = useState<PostAngle[] | null>(null);
+  const sourceKey = JSON.stringify(source);
+  useEffect(() => {
+    let alive = true;
+    void caseStudyAction(JSON.parse(sourceKey) as FinishSource).then((result) => {
+      if (alive) setAngles(result.ok ? result.view.angles : ["result"]);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [sourceKey]);
+  if (!angles) return null;
+  return (
+    <div className="grid gap-3 md:grid-cols-2">
+      {angles.map((angle) => (
+        <div key={angle} className="rounded-lg border border-border/60 p-3">
+          <p className="mb-2 text-xs font-medium">{ANGLE_LABEL[angle]}</p>
+          <PostComposer source={source} angle={angle} label="Draft this post" />
+        </div>
+      ))}
     </div>
   );
 }

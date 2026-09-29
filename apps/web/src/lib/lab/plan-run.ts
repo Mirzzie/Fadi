@@ -59,6 +59,8 @@ Write steps that person can actually execute tonight. Rules:
 - Every step names what it PRODUCES where there is something: a file, a config, a screenshot, a repo. These become the person's evidence, so they must be real artefacts, not feelings.
 - No step may be "watch a tutorial" or "read the docs". Linking is not doing. If a concept must be learned, fold it into the doing.
 - Assume competence but not familiarity: they can use a terminal, they have not done THIS before.
+- Shape it as a response to the problem in the project description: build it, then TEST OR BREAK it the way an attacker, a user or a failure would, then fix what that finds. At least one step must try to break or bypass what was built and record what happened — findings and fixes are the evidence hiring managers look for, far more than a clean install.
+- Where a real choice is made (a design, a control, a tool), say what the options were so the person can record the decision and its trade-off.
 - 3 to 8 steps. A plan longer than that is a course, and it will not be finished.
 - Never invent details about their environment beyond what you are told.`;
 
