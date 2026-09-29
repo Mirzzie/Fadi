@@ -5,6 +5,7 @@ import {
   createApplicationsRepository,
   createCareerProfilesRepository,
   createDocumentsRepository,
+  createEvidenceArtifactsRepository,
   createJobsRepository,
   createProfilesRepository,
 } from "@careeros/database";
@@ -23,7 +24,9 @@ import { JobContextCard } from "@/components/workspace/job-context-card";
 import { JobLivenessBanner } from "@/components/workspace/job-liveness-banner";
 import { WorkspaceDocActions } from "@/components/workspace/workspace-doc-actions";
 import { resolveApplicationJobContext } from "@/lib/applications/job-context";
+import { selectProjectProof } from "@/lib/applications/project-proof";
 import { getCurrentAuthUser } from "@/lib/auth/session";
+import { buildCareerContext } from "@/lib/career/context";
 import { getDatabase } from "@/lib/database/client";
 import { evaluateApply } from "@/lib/guardian/guardian";
 import { scoreJobForUser } from "@/lib/jobs/job-matching";
@@ -107,6 +110,24 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
     kind: document.kind,
     title: document.title,
   }));
+
+  const careerContext = hasJobContext
+    ? await buildCareerContext(user.id, {
+        directionId: savedApplication?.careerProfileId ?? track?.id,
+        applicationId: savedApplication?.id,
+        jobId: job.id,
+      })
+    : null;
+  const projectSelection = careerContext
+    ? selectProjectProof(careerContext.payload.records, [])
+    : null;
+  const projectArtifacts = await createEvidenceArtifactsRepository(db).listForFacts(
+    user.id,
+    projectSelection ? [projectSelection.factId] : []
+  );
+  const projectProof = careerContext
+    ? selectProjectProof(careerContext.payload.records, projectArtifacts)
+    : null;
 
   return (
     <AppShell>
@@ -208,6 +229,7 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
               <WorkspaceDocActions
                 jobId={job.id}
                 documents={documents}
+                projectProof={projectProof}
                 canDraft={!journeyFinished}
               />
             </div>

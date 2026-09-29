@@ -87,11 +87,14 @@ export async function buildCareerContext(
       preferences.filter((p) => p.scope === directionScope) as Selection[],
       preferences.filter((p) => p.scope === applicationScope) as Selection[],
       {
-        role: job?.title ?? direction?.targetRole ?? "",
+        // Once a person saves a role, their application copy is authoritative.
+        // Discovery rows can be refreshed or corrected independently; ranking and
+        // generation must use the same posting the workspace shows.
+        role: application?.title ?? job?.title ?? direction?.targetRole ?? "",
         domain: direction?.domain,
         synonyms: [
           ...(direction?.roleSynonyms ?? []),
-          ...(job?.description?.split(/\s+/).slice(0, 600) ?? []),
+          ...((application?.jobDescription ?? job?.description)?.split(/\s+/).slice(0, 600) ?? []),
         ],
       },
       scope.all ? Number.MAX_SAFE_INTEGER : 8
@@ -104,10 +107,10 @@ export async function buildCareerContext(
       jobId: job?.id ?? null,
       target: {
         title:
-          job?.title ?? application?.title ?? options.target?.title ?? direction?.targetRole ?? "",
-        company: job?.company ?? application?.company ?? options.target?.company ?? "",
+          application?.title ?? job?.title ?? options.target?.title ?? direction?.targetRole ?? "",
+        company: application?.company ?? job?.company ?? options.target?.company ?? "",
         description:
-          job?.description ?? application?.jobDescription ?? options.target?.description ?? "",
+          application?.jobDescription ?? job?.description ?? options.target?.description ?? "",
       },
       job: job
         ? {

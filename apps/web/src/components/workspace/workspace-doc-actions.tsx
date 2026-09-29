@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 
 import { generateJobDocumentAction } from "@/app/dashboard/applications/[jobId]/workspace/actions";
 import { Button } from "@/components/ui/button";
+import type { ProjectProof } from "@/lib/applications/project-proof";
 import type { DocKind } from "@/lib/jobs/application-types";
 
 type DocView = { id: string; kind: string; title: string };
@@ -18,10 +19,12 @@ const SECONDARY_ACTIONS: { kind: DocKind; label: string }[] = [
 export function WorkspaceDocActions({
   jobId,
   documents,
+  projectProof,
   canDraft = true,
 }: {
   jobId: string;
   documents: DocView[];
+  projectProof?: ProjectProof | null;
   canDraft?: boolean;
 }) {
   const router = useRouter();
@@ -63,6 +66,36 @@ export function WorkspaceDocActions({
         ) : null}
       </div>
 
+      {projectProof ? (
+        <div className="mt-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+            Best proof for this role
+          </p>
+          <p className="mt-0.5 text-sm font-medium">{projectProof.title}</p>
+          {projectProof.matched.length ? (
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Matches {projectProof.matched.join(", ")}
+            </p>
+          ) : null}
+          {projectProof.artifacts.length ? (
+            <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1">
+              {projectProof.artifacts.map((artifact) => (
+                <a
+                  key={artifact.url}
+                  href={artifact.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                >
+                  {artifact.label?.trim() || artifact.kind}
+                  <ExternalLink className="size-3" aria-hidden="true" />
+                </a>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {canDraft ? (
         <div className="mt-3 text-sm">
           <p className="text-xs text-muted-foreground">Other documents</p>
@@ -80,7 +113,7 @@ export function WorkspaceDocActions({
                 ) : (
                   <Sparkles className="size-4" aria-hidden="true" />
                 )}
-                {action.label}
+                {action.kind === "email" && projectProof ? "Email with this proof" : action.label}
               </Button>
             ))}
           </div>

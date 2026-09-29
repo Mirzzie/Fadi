@@ -2,6 +2,7 @@ import "server-only";
 
 import { createDocumentsRepository } from "@careeros/database";
 
+import { selectProjectProof } from "@/lib/applications/project-proof";
 import { getDatabase } from "@/lib/database/client";
 import {
   HUMANIZE_CORE,
@@ -95,6 +96,13 @@ export async function generateCareerDocument(
   const company = payload.target.company;
   const jobDescription = payload.target.description.slice(0, 5000).trim();
   const truthCorpus = context.block;
+  // The record is already present in context.block. This pointer tells prose
+  // generators which accepted project to lead with without disclosing its
+  // repository or walkthrough URLs to the configured AI provider.
+  const projectProof = selectProjectProof(payload.records, []);
+  const projectLead = projectProof
+    ? `PROJECT TO LEAD WITH FOR THIS ROLE: [${projectProof.factId}] ${projectProof.title}`
+    : "";
   const evidenceNotice = `Drafted from ${payload.records.length} selected career records. Review the wording before use; accepted records and automated checks do not establish every claim.`;
   const candidateContext = [
     `Candidate: ${payload.person.name || "the candidate"}`,
@@ -115,6 +123,7 @@ export async function generateCareerDocument(
     }),
     "",
     context.block,
+    projectLead ? `\n${projectLead}` : "",
     opts.guidance?.trim()
       ? `\nRED-PEN REVIEW OF THE PREVIOUS DRAFT — incorporate every fix below that is grounded in the candidate's REAL experience (keep any [ADD REAL NUMBER] placeholders literally; never invent the number):\n${opts.guidance.trim().slice(0, 4000)}`
       : "",
@@ -184,7 +193,11 @@ ${HUMANIZE_RESUME}`;
   }
 
   const label = KIND_LABEL[opts.kind] ?? "document";
-  const system = `You are Fadi, an expert career writer. Write a concise, specific, honest ${label} for the target role${jobDescription ? ", tailored to the provided job description" : ""}. Ground every claim in the candidate's REAL experience — never invent. Return plain text ready to use.
+  const outreachInstruction =
+    opts.kind === "email" && projectProof
+      ? " Open with a brief, specific connection between the named lead project and the role's problem. Do not add a repository or walkthrough URL; those stay local unless the person chooses to attach one."
+      : "";
+  const system = `You are Fadi, an expert career writer. Write a concise, specific, honest ${label} for the target role${jobDescription ? ", tailored to the provided job description" : ""}. Ground every claim in the candidate's REAL experience — never invent.${outreachInstruction} Return plain text ready to use.
 
 ${HUMANIZE_CORE}
 

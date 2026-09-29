@@ -128,6 +128,56 @@ suite("career selection → captured context → saved document in Postgres", ()
     expect(context.payload.records.map((r) => r.factId)).toEqual([second]);
     expect(context.payload.target.title).toBe("Support engineer");
   });
+  it("uses the saved application copy when its discovery job has changed", async () => {
+    const key = `context-${randomUUID()}`;
+    const jobId = (
+      await pool.query(
+        "insert into jobs (source, external_id, owner_user_id, canonical_key, title, company, description) values ('test', $1, $2, $1, 'Stale DevOps title', 'Old company', 'Kubernetes deployment') returning id",
+        [key, userId]
+      )
+    ).rows[0].id;
+    const applicationId = (
+      await pool.query(
+        "insert into applications (user_id, career_profile_id, job_id, company, title, job_description) values ($1, $2, $3, 'Saved company', 'Support engineer', 'Linux incident support') returning id",
+        [userId, directionId, jobId]
+      )
+    ).rows[0].id;
+
+    const context = await buildCareerContext(userId, { applicationId, jobId });
+    expect(context.payload.target).toMatchObject({
+      title: "Support engineer",
+      company: "Saved company",
+      description: "Linux incident support",
+    });
+    expect(context.payload.records[0].matched).toContain("support");
+    expect(context.payload.records[0].matched).not.toContain("kubernetes");
+  });
+  it("uses the best matching selected project as the outreach lead", async () => {
+    const projectId = (
+      await pool.query(
+        "insert into evidence_items (user_id, kind, title, detail, tags, market_tags) values ($1, 'project', 'Linux incident response lab', 'Investigated and resolved Linux service incidents.', '[\"linux\", \"incident response\"]'::jsonb, '[\"technical support\"]'::jsonb) returning id",
+        [userId]
+      )
+    ).rows[0].id;
+    let capturedSystem = "";
+    let capturedPrompt = "";
+    const generator: DocGenerate = {
+      structured: vi.fn(),
+      text: async (system, prompt) => {
+        capturedSystem = system;
+        capturedPrompt = prompt;
+        return "Hello — I built a Linux incident response lab relevant to this role.";
+      },
+    };
+
+    await generateCareerDocument(userId, { kind: "email", applicationId: appId }, generator);
+
+    expect(capturedSystem).toContain("Open with a brief, specific connection");
+    expect(capturedPrompt).toContain(
+      `PROJECT TO LEAD WITH FOR THIS ROLE: [${projectId}] Linux incident response lab`
+    );
+    expect(capturedPrompt).not.toContain("https://");
+  });
   it("rejects foreign scopes, foreign records and direction/application mismatches", async () => {
     await expect(buildCareerContext(otherId, { directionId })).rejects.toThrow(
       "Direction unavailable"
