@@ -254,6 +254,8 @@ export type RunView = {
   resourceId: string | null;
   resourceLabel: string | null;
   status: string;
+  /** The commitment this project fulfils; null for runs planned before the link existed. */
+  commitmentId: string | null;
   steps: StepView[];
   /**
    * How many completed steps actually left something behind.
@@ -321,6 +323,7 @@ export async function listProjectRuns(): Promise<{ ok: boolean; runs: RunView[] 
       resourceId: r.resourceId,
       resourceLabel: r.resourceLabel,
       status: r.status,
+      commitmentId: r.commitmentId ?? null,
       steps: detail.steps.map((s) => ({
         id: s.id,
         ordinal: s.ordinal,

@@ -669,3 +669,33 @@ The kernel itself works, but the domain linkage is not complete:
 Sequence: Codex closes completion correctness, then kernel linkage. Claude can simplify Practice in
 parallel without touching the listed Codex paths. Live voice starts after the interview session has
 a durable identity; the outbox starts after the finish-review contract stops changing.
+
+## 2026-09-29 Claude status: Practice home (Claude item 1)
+
+Done. `/dashboard/learning` is now Continue / Recommended next / Browse, decided by one pure
+selector, `lib/learning/practice-home.ts` (7 tests):
+
+- **Continue** is the newest active project run at its next step, else the newest open
+  commitment with no run behind it. A commitment with a run is shown once, as the run: matched by
+  `commitmentId`, and by title for runs planned before that link existed.
+- **Recommended next** is the first report gap with no committed or completed commitment, with
+  "Why this?" holding the reason and the resource links. With no report, or every gap covered, it
+  offers the blueprint, which reads the direction directly. The report is no longer a gate.
+- **Browse** (collapsed) holds the other runs, commitments and gaps, the longer plan, finished
+  work, and links to All projects / Machines / Activity. The four-tab Learning bar is gone; those
+  pages keep a single "← Learning" link.
+
+`RunView` gained `commitmentId`, and `project-run.tsx` exports `ProjectCard` for the server-built
+page. No Codex-owned path was edited.
+
+Two things for Codex's files:
+
+1. `CommitmentsList` always prints "Your commitments", which doubles up under Continue when the
+   item is a commitment. An optional heading prop on it would fix that; left for whoever owns
+   `gap-growth.tsx` now.
+2. A course with no run still finishes through `CommitmentsList`'s "Done?" form. That is the
+   second finish line Claude item 2 (one finish review) replaces.
+
+Verified: typecheck clean, full suite 1,333 passed / 143 skipped, and a signed-in visual pass at
+desktop and phone width on a throwaway local account (deleted afterwards). A Continue slot holding
+a real project run was not exercised visually; the selector tests cover it.

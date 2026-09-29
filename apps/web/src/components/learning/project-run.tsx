@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { ChevronRight, Hammer, Loader2, Play, X } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -88,6 +89,12 @@ export function ProjectRuns({ mode = "overview" }: { mode?: "overview" | "all" }
   );
 }
 
+/** One project, rendered by the server-built Learning home, which re-reads on a stop. */
+export function ProjectCard({ run, featured = false }: { run: RunView; featured?: boolean }) {
+  const router = useRouter();
+  return <RunCard run={run} onChanged={() => router.refresh()} featured={featured} />;
+}
+
 function RunCard({
   run,
   onChanged,
@@ -118,7 +125,10 @@ function RunCard({
         <div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} />
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Button nativeButton={false} render={<Link href={`/dashboard/learning/projects/${run.id}`} />}>
+        <Button
+          nativeButton={false}
+          render={<Link href={`/dashboard/learning/projects/${run.id}`} />}
+        >
           {next ? <Play className="size-3.5" aria-hidden="true" /> : null}
           {next ? "Continue" : "Review"}
           <ChevronRight className="size-3.5" aria-hidden="true" />

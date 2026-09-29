@@ -1,65 +1,23 @@
-"use client";
-
 import Link from "next/link";
-import { History, BookOpen, Boxes, MonitorCog } from "lucide-react";
-import { usePathname } from "next/navigation";
+import { ChevronLeft } from "lucide-react";
 
-import { cn } from "@/lib/utils";
-
-const destinations = [
-  {
-    href: "/dashboard/learning",
-    label: "Overview",
-    icon: BookOpen,
-    exact: true,
-  },
-  {
-    href: "/dashboard/learning/projects",
-    label: "Projects",
-    icon: Boxes,
-  },
-  {
-    href: "/dashboard/learning/machines",
-    label: "Machines",
-    icon: MonitorCog,
-  },
-];
-
-/** The Learning Hub has three jobs. Keeping them visible prevents machine control,
- * project work and career planning from collapsing back into one long dashboard. */
+/**
+ * The way back from Learning's deeper pages.
+ *
+ * This used to be a four-tab bar — Overview, Projects, Machines, Activity — shown on every
+ * Learning page, which taught every learner the infrastructure model before they had a
+ * project that needed a machine. Those pages still exist, reached from Browse on the
+ * Learning home and from the project that uses them; they just stop competing with it.
+ */
 export function LearningNavigation() {
-  const pathname = usePathname();
-
   return (
-    <nav
-      aria-label="Learning Hub"
-      className="flex w-full max-w-full flex-wrap items-center gap-1 border-b border-border pb-2"
-    >
-      {destinations.map(({ href, label, icon: Icon, exact }) => {
-        const active = exact ? pathname === href : pathname.startsWith(href);
-        return (
-          <Link
-            key={href}
-            href={href}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-medium transition-colors",
-              active
-                ? "bg-primary/12 text-primary shadow-sm"
-                : "text-muted-foreground hover:bg-muted hover:text-foreground"
-            )}
-          >
-            <Icon className="size-3.5" aria-hidden="true" />
-            {label}
-          </Link>
-        );
-      })}
+    <nav aria-label="Learning" className="border-b border-border pb-2">
       <Link
-        href="/dashboard/learning/activity"
-        aria-current={pathname.startsWith("/dashboard/learning/activity") ? "page" : undefined}
-        className="ml-auto inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-3 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+        href="/dashboard/learning"
+        className="inline-flex h-8 items-center gap-1 rounded-lg px-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
       >
-        <History className="size-3.5" aria-hidden="true" /> Activity
+        <ChevronLeft className="size-3.5" aria-hidden="true" />
+        Learning
       </Link>
     </nav>
   );

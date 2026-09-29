@@ -1,14 +1,13 @@
 import Link from "next/link";
-import { BookOpen, GraduationCap, Layers3, Map, MonitorPlay, Target } from "lucide-react";
+import { BookOpen, GraduationCap, Map, MonitorPlay, Target } from "lucide-react";
 
-import { FadiBadge } from "@/components/ui/fadi-badge";
-import { buttonVariants } from "@/components/ui/button";
+import type { RunView } from "@/app/dashboard/learning/lab-actions";
 import { CommitmentsList, GapGrowth } from "@/components/learning/gap-growth";
 import { CareerBlueprint } from "@/components/learning/career-blueprint";
-import { LearningNavigation } from "@/components/learning/learning-navigation";
+import { ProjectCard } from "@/components/learning/project-run";
 import type { CommitmentView } from "@/lib/learning/commitments-view";
-import { ProjectRuns } from "@/components/learning/project-run";
 import type { StoredCareerReport } from "@/lib/career-report/schema";
+import { buildPracticeHome } from "@/lib/learning/practice-home";
 import { learningResources } from "@/lib/learning/resources";
 
 /** Free reference links for a skill. ("Build a project" lives in the AI suggest
@@ -47,19 +46,32 @@ function ResourceLinks({ skill }: { skill: string }) {
 type Props = {
   report: StoredCareerReport | null;
   commitments?: CommitmentView[];
+  runs?: RunView[];
   role?: string | null;
 };
 
-export function LearningShell({ report, commitments = [], role = null }: Props) {
-  const skillGaps = report?.missing_skills ?? [];
-  const learningPath = report?.recommended_learning_path ?? [];
-  const hasContent = skillGaps.length > 0 || learningPath.length > 0;
+/**
+ * CONTINUE, RECOMMENDED NEXT, BROWSE — in that order, one decision each.
+ *
+ * This page used to lay out the running projects, the report's route, every gap, a second
+ * generated plan and the commitments side by side, and leave the person to work out which
+ * one mattered. Fadi makes that call now (lib/learning/practice-home.ts); the rest is
+ * still here, under Browse, for anyone who wants to choose for themselves.
+ */
+export function LearningShell({ report, commitments = [], runs = [], role = null }: Props) {
+  const home = buildPracticeHome({
+    runs,
+    commitments,
+    gaps: report?.missing_skills ?? [],
+    route: report?.recommended_learning_path ?? [],
+  });
   const direction = role ?? "your next role";
+  const { browse } = home;
+  const browseCount =
+    browse.runs.length + browse.commitments.length + browse.gaps.length + browse.finished.length;
 
   return (
-    <div className="mx-auto w-full max-w-[96rem] space-y-6 px-2 sm:px-4">
-      <LearningNavigation />
-
+    <div className="mx-auto w-full max-w-3xl space-y-8 px-2 sm:px-4">
       <header className="space-y-1">
         <h1 className="font-heading text-2xl font-semibold">Learning</h1>
         <p className="text-sm text-muted-foreground">
@@ -68,118 +80,137 @@ export function LearningShell({ report, commitments = [], role = null }: Props) 
       </header>
 
       <section className="space-y-3">
-        <SectionHeading
-          icon={MonitorPlay}
-          eyebrow="Continue"
-          title="Continue your project"
-          detail=""
-        />
-        <ProjectRuns mode="overview" />
+        <SectionHeading icon={MonitorPlay} eyebrow="Continue" title="Where you left off" />
+        {home.continue?.kind === "run" ? (
+          <ProjectCard run={home.continue.run} featured />
+        ) : home.continue?.kind === "commitment" ? (
+          <CommitmentsList commitments={[home.continue.commitment]} />
+        ) : (
+          <p className="rounded-xl border border-dashed border-border bg-card/40 p-4 text-sm text-muted-foreground">
+            Nothing in progress. Start with the recommendation below.
+          </p>
+        )}
       </section>
 
-      <details className="rounded-xl border border-border bg-card p-4" open>
-        <summary className="cursor-pointer text-sm font-semibold">Find your next project</summary>
-        <div className="mt-4">
-          {!hasContent ? (
-            <div className="gradient-border glass-card rounded-xl p-6">
-              <div className="flex items-start gap-4">
-                <FadiBadge size="sm" showName={false} />
-                <div className="space-y-3">
-                  <p className="text-sm font-medium text-primary">Fadi</p>
-                  <p className="text-sm leading-relaxed text-card-foreground">
-                    Generate your Career Intelligence Report from the dashboard and I&apos;ll turn
-                    your skill gaps into a prioritized learning plan tied to your target role.
-                  </p>
-                  <Link href="/dashboard#career-report" className={buttonVariants({ size: "sm" })}>
-                    Generate report
-                  </Link>
-                </div>
+      <section className="space-y-3">
+        <SectionHeading icon={Target} eyebrow="Recommended next" title="What to take on next" />
+        {home.recommended.kind === "gap" ? (
+          <article className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-5">
+            <h3 className="font-semibold">{home.recommended.gap.title}</h3>
+            <details className="mt-1">
+              <summary className="cursor-pointer text-xs text-muted-foreground">Why this?</summary>
+              <div className="mt-2 space-y-1.5 text-xs leading-relaxed text-muted-foreground">
+                <p>{home.recommended.gap.detail}</p>
+                <p>
+                  {home.recommended.routeStep
+                    ? `It is step ${home.recommended.routeStep} of the route in your latest career report, and nothing is under way for it yet.`
+                    : "Your latest career report names it as a gap, and nothing is under way for it yet."}
+                </p>
+                <ResourceLinks skill={home.recommended.gap.title} />
               </div>
-            </div>
-          ) : (
-            <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
-              <section className="space-y-3">
-                <SectionHeading
-                  icon={Layers3}
-                  eyebrow="Route"
-                  title="Learn in this order"
-                  detail="A recommendation from your latest report, not a claim that every stage is complete."
-                />
-                <ol className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
-                  {learningPath.map((step, index) => (
-                    <li
-                      key={step.title}
-                      className="relative grid grid-cols-[2.5rem_1fr] gap-3 border-b border-border/60 p-4 last:border-b-0"
-                    >
-                      <div className="relative flex justify-center">
-                        <span className="grid size-7 place-items-center rounded-full border border-primary/40 bg-primary/10 text-xs font-semibold text-primary tabular-nums">
-                          {index + 1}
-                        </span>
-                        {index < learningPath.length - 1 ? (
-                          <span
-                            className="absolute bottom-[-1rem] top-8 w-px bg-border"
-                            aria-hidden="true"
-                          />
-                        ) : null}
-                      </div>
-                      <div className="min-w-0">
-                        <h3 className="text-sm font-semibold">{step.title}</h3>
-                        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                          {step.detail}
-                        </p>
-                        <ResourceLinks skill={step.title} />
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              </section>
+            </details>
+            <GapGrowth
+              gapTitle={home.recommended.gap.title}
+              gapDetail={home.recommended.gap.detail}
+            />
+          </article>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">
+              {home.recommended.reason === "no-report"
+                ? `Fadi can map the certifications and projects that lead to ${direction} from your direction and history.`
+                : "Every gap in your latest report already has work against it. Map what comes after them."}
+            </p>
+            <CareerBlueprint role={role} />
+          </div>
+        )}
+      </section>
 
-              <section className="space-y-3">
-                <SectionHeading
-                  icon={Target}
-                  eyebrow="Prove"
-                  title="Skills that need evidence"
-                  detail="Turn a gap into a build when you are ready. A completed tutorial alone does not become evidence."
-                />
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {skillGaps.map((gap, index) => (
-                    <article
-                      key={gap.title}
-                      className="rounded-2xl border border-border bg-card p-4 shadow-sm"
-                    >
-                      <div className="flex items-start gap-3">
-                        <span className="grid size-7 shrink-0 place-items-center rounded-lg bg-muted text-xs font-semibold text-muted-foreground tabular-nums">
-                          {index + 1}
-                        </span>
-                        <div className="min-w-0">
-                          <h3 className="text-sm font-semibold">{gap.title}</h3>
-                          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                            {gap.detail}
-                          </p>
-                        </div>
-                      </div>
-                      <ResourceLinks skill={gap.title} />
-                      <GapGrowth gapTitle={gap.title} gapDetail={gap.detail} />
-                    </article>
-                  ))}
-                </div>
-              </section>
-            </div>
-          )}
-        </div>
-      </details>
-
-      <details className="rounded-xl border border-border bg-card p-4">
+      <details className="group rounded-xl border border-border bg-card p-4">
         <summary className="cursor-pointer text-sm font-semibold">
-          Explore a longer learning plan
+          Browse{browseCount > 0 ? ` (${browseCount})` : ""}
+          <span className="ml-2 text-xs font-normal text-muted-foreground">
+            everything else, when you want to choose yourself
+          </span>
         </summary>
-        <div className="mt-4">
-          <CareerBlueprint role={role} />
+        <div className="mt-4 space-y-6">
+          {browse.runs.length > 0 ? (
+            <BrowseGroup title="Other projects in progress">
+              <div className="space-y-3">
+                {browse.runs.map((run) => (
+                  <ProjectCard key={run.id} run={run} />
+                ))}
+              </div>
+            </BrowseGroup>
+          ) : null}
+
+          {browse.commitments.length > 0 ? (
+            <CommitmentsList commitments={browse.commitments} />
+          ) : null}
+
+          {browse.gaps.length > 0 ? (
+            <BrowseGroup title="Other gaps from your report">
+              <div className="space-y-2">
+                {browse.gaps.map((gap) => (
+                  <article key={gap.title} className="rounded-xl border border-border/60 p-3">
+                    <h4 className="text-sm font-medium">{gap.title}</h4>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{gap.detail}</p>
+                    <GapGrowth gapTitle={gap.title} gapDetail={gap.detail} />
+                  </article>
+                ))}
+              </div>
+            </BrowseGroup>
+          ) : null}
+
+          {home.recommended.kind === "gap" ? (
+            <BrowseGroup title="A longer plan">
+              <CareerBlueprint role={role} />
+            </BrowseGroup>
+          ) : null}
+
+          {browse.finished.length > 0 ? (
+            <BrowseGroup title="Finished">
+              <p className="text-sm text-muted-foreground">{browse.finished.join(" · ")}</p>
+            </BrowseGroup>
+          ) : null}
+
+          <nav
+            aria-label="More in Learning"
+            className="flex flex-wrap gap-x-4 gap-y-1 border-t border-border/60 pt-3 text-xs"
+          >
+            <Link
+              href="/dashboard/learning/projects"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              All projects
+            </Link>
+            <Link
+              href="/dashboard/learning/machines"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              Machines
+            </Link>
+            <Link
+              href="/dashboard/learning/activity"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              Activity
+            </Link>
+          </nav>
         </div>
       </details>
-
-      <CommitmentsList commitments={commitments} />
     </div>
+  );
+}
+
+function BrowseGroup({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-2">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        {title}
+      </h3>
+      {children}
+    </section>
   );
 }
 
@@ -192,7 +223,7 @@ function SectionHeading({
   icon: typeof BookOpen;
   eyebrow: string;
   title: string;
-  detail: string;
+  detail?: string;
 }) {
   return (
     <div className="flex items-start gap-3">

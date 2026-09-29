@@ -1,8 +1,12 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { createCareerProfilesRepository, createLearningCommitmentsRepository } from "@careeros/database";
+import {
+  createCareerProfilesRepository,
+  createLearningCommitmentsRepository,
+} from "@careeros/database";
 
+import { listProjectRuns } from "@/app/dashboard/learning/lab-actions";
 import { AppShell } from "@/components/layout/app-shell";
 import { LearningShell } from "@/components/learning/learning-shell";
 import { toCommitmentView } from "@/lib/learning/commitments-view";
@@ -31,10 +35,11 @@ export default async function LearningPage() {
   }
 
   const db = getDatabase();
-  const [report, commitments, track] = await Promise.all([
+  const [report, commitments, track, projects] = await Promise.all([
     getLatestCareerReport(user.id),
     createLearningCommitmentsRepository(db).listForUser(user.id),
     createCareerProfilesRepository(db).getActiveForUser(user.id),
+    listProjectRuns(),
   ]);
 
   return (
@@ -46,6 +51,7 @@ export default async function LearningPage() {
         commitments={commitments
           .filter((c) => c.careerProfileId === (track?.id ?? null))
           .map(toCommitmentView)}
+        runs={projects.runs}
         role={track?.targetRole ?? null}
       />
     </AppShell>
