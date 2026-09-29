@@ -3,7 +3,11 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Copy, Download, ExternalLink, Loader2 } from "lucide-react";
 
-import { draftProjectPostAction, type PostDraft } from "@/app/dashboard/learning/project-finish-actions";
+import {
+  draftRecordPostAction,
+  type FinishSource,
+  type PostDraft,
+} from "@/app/dashboard/learning/project-finish-actions";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -11,7 +15,7 @@ import { Button } from "@/components/ui/button";
  * the person copies the text, downloads the card, and posts it themselves on LinkedIn. Opening
  * LinkedIn does not pre-fill anything reliably, so the page says to paste rather than pretending.
  */
-export function PostComposer({ runId }: { runId: string }) {
+export function PostComposer({ source }: { source: FinishSource }) {
   const [draft, setDraft] = useState<PostDraft | null>(null);
   const [text, setText] = useState("");
   const [note, setNote] = useState<string | null>(null);
@@ -21,7 +25,7 @@ export function PostComposer({ runId }: { runId: string }) {
   const make = () =>
     start(async () => {
       setNote(null);
-      const result = await draftProjectPostAction({ runId });
+      const result = await draftRecordPostAction(source);
       if (!result.ok) return setNote(result.message);
       setDraft(result.draft);
       setText(result.draft.text);
@@ -123,7 +127,7 @@ function drawCard(canvas: HTMLCanvasElement, card: PostDraft["card"]) {
 
   ctx.fillStyle = "#5eead4";
   ctx.font = "600 28px system-ui, sans-serif";
-  ctx.fillText("PROJECT COMPLETE", 80, 110);
+  ctx.fillText(card.kind === "course" ? "COURSE COMPLETE" : "PROJECT COMPLETE", 80, 110);
 
   ctx.fillStyle = "#f8fafc";
   ctx.font = "700 56px system-ui, sans-serif";
@@ -143,9 +147,11 @@ function drawCard(canvas: HTMLCanvasElement, card: PostDraft["card"]) {
     y += 50;
   }
 
-  ctx.fillStyle = "#64748b";
-  ctx.font = "400 24px system-ui, sans-serif";
-  ctx.fillText("Built in a local lab", 80, height - 60);
+  if (card.kind === "project") {
+    ctx.fillStyle = "#64748b";
+    ctx.font = "400 24px system-ui, sans-serif";
+    ctx.fillText("Built in a local lab", 80, height - 60);
+  }
 }
 
 function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {

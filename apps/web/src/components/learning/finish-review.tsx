@@ -5,10 +5,11 @@ import { useEffect, useState, useTransition } from "react";
 import { Check, Circle, Clock, Loader2 } from "lucide-react";
 
 import {
-  addProjectToPortfolioAction,
-  draftProjectStoryAction,
+  addRecordToPortfolioAction,
+  draftRecordStoryAction,
   projectFinishAction,
   saveProjectEvidenceAction,
+  type FinishSource,
   type FinishView,
 } from "@/app/dashboard/learning/project-finish-actions";
 import { saveStory } from "@/app/dashboard/interview/actions";
@@ -54,7 +55,7 @@ export function FinishReview({ runId, stepsKey }: { runId: string; stepsKey: str
   if (view.savedEvidenceId && view.recordStatus) {
     return (
       <CompletionPackage
-        runId={runId}
+        source={{ runId }}
         recordStatus={view.recordStatus}
         onPortfolio={view.onPortfolio}
       />
@@ -129,14 +130,20 @@ export function FinishReview({ runId, stepsKey }: { runId: string; stepsKey: str
   );
 }
 
-function CompletionPackage({
-  runId,
+/**
+ * What a saved record can become. Shared by projects and by courses that never had a
+ * project, so both finish the same way.
+ */
+export function CompletionPackage({
+  source,
   recordStatus,
   onPortfolio: initiallyOnPortfolio,
+  eyebrow = "Project complete",
 }: {
-  runId: string;
+  source: FinishSource;
   recordStatus: "saved" | "needs-review";
   onPortfolio: boolean;
+  eyebrow?: string;
 }) {
   const [onPortfolio, setOnPortfolio] = useState(initiallyOnPortfolio);
   const [storyAdded, setStoryAdded] = useState(false);
@@ -145,7 +152,7 @@ function CompletionPackage({
 
   return (
     <section className="rounded-2xl border border-primary/30 bg-card p-5">
-      <p className="text-xs font-medium text-primary">Project complete</p>
+      <p className="text-xs font-medium text-primary">{eyebrow}</p>
       <h2 className="mt-0.5 text-lg font-semibold">
         {recordStatus === "saved" ? "It's on your record" : "One thing to decide first"}
       </h2>
@@ -178,11 +185,11 @@ function CompletionPackage({
           detail={
             onPortfolio
               ? "On your portfolio. It goes public once you confirm it there."
-              : "Add this project to your portfolio. It stays private until you confirm it."
+              : "Add it to your portfolio. It stays private until you confirm it."
           }
         >
           {state("portfolio") === "ready" ? (
-            <PortfolioAction runId={runId} onAdded={() => setOnPortfolio(true)} />
+            <PortfolioAction source={source} onAdded={() => setOnPortfolio(true)} />
           ) : null}
         </Row>
 
@@ -196,7 +203,7 @@ function CompletionPackage({
           }
         >
           {state("story") === "ready" ? (
-            <StoryAction runId={runId} onAdded={() => setStoryAdded(true)} />
+            <StoryAction source={source} onAdded={() => setStoryAdded(true)} />
           ) : null}
         </Row>
 
@@ -205,7 +212,7 @@ function CompletionPackage({
           title="LinkedIn post"
           detail="A short post drafted from this record only. You post it yourself."
         >
-          {state("post") === "ready" ? <PostComposer runId={runId} /> : null}
+          {state("post") === "ready" ? <PostComposer source={source} /> : null}
         </Row>
       </ol>
     </section>
@@ -239,7 +246,7 @@ function Row({
   );
 }
 
-function PortfolioAction({ runId, onAdded }: { runId: string; onAdded: () => void }) {
+function PortfolioAction({ source, onAdded }: { source: FinishSource; onAdded: () => void }) {
   const [note, setNote] = useState<string | null>(null);
   const [busy, start] = useTransition();
   return (
@@ -250,7 +257,7 @@ function PortfolioAction({ runId, onAdded }: { runId: string; onAdded: () => voi
         disabled={busy}
         onClick={() =>
           start(async () => {
-            const result = await addProjectToPortfolioAction({ runId });
+            const result = await addRecordToPortfolioAction(source);
             if (result.ok) return onAdded();
             setNote(result.message);
           })
@@ -264,7 +271,7 @@ function PortfolioAction({ runId, onAdded }: { runId: string; onAdded: () => voi
   );
 }
 
-function StoryAction({ runId, onAdded }: { runId: string; onAdded: () => void }) {
+function StoryAction({ source, onAdded }: { source: FinishSource; onAdded: () => void }) {
   const [draft, setDraft] = useState<StoryDraft | null>(null);
   const [skipped, setSkipped] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -282,7 +289,7 @@ function StoryAction({ runId, onAdded }: { runId: string; onAdded: () => void })
           onClick={() =>
             start(async () => {
               setNote(null);
-              const result = await draftProjectStoryAction({ runId });
+              const result = await draftRecordStoryAction(source);
               if (!result.ok) return setNote(result.message);
               setDraft(result.draft);
             })

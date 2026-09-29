@@ -228,11 +228,11 @@ export async function storyFromMockAnswer(
   return { ok: true, story: toStoryView(row) };
 }
 
-const RECORD_TO_STORY_SYSTEM = `You turn ONE finished practice project from the candidate's career record into a STAR+Reflection interview story.
+const RECORD_TO_STORY_SYSTEM = `You turn ONE finished piece of self-directed learning — a practice project or a course — from the candidate's career record into a STAR+Reflection interview story.
 
 Hard rules:
 - Use ONLY the record and step results provided. Never invent achievements, metrics, employers, clients, production use, dates or outcomes.
-- It was a self-directed project in their own lab. Say so in the situation; never present it as work for an employer.
+- It was self-directed: a project in their own lab, or a course they chose to take (the input says which). Say so in the situation; never present it as work for an employer, and never treat finishing a course as mastery.
 - action is what THEY did, naming the real tools. result is what the record shows they produced or confirmed.
 - reflection only if the record states a lesson or difficulty; otherwise leave it empty rather than inventing one.
 - competencies are lowercase tags this story could answer (for example: learning, ownership, troubleshooting).
@@ -246,7 +246,7 @@ export type StoryDraft = StarStory;
  */
 export async function draftStoryFromRecord(
   userId: string,
-  input: { title: string; record: string }
+  input: { title: string; kind: "project" | "course"; record: string }
 ): Promise<{ ok: true; draft: StoryDraft } | { ok: false; message: string }> {
   const { getUserDocGenerate } = await import("@/lib/ai/user-generate");
   const generate = await getUserDocGenerate(userId);
@@ -259,7 +259,7 @@ export async function draftStoryFromRecord(
   try {
     const s = await generate.structured(
       RECORD_TO_STORY_SYSTEM,
-      `Project: ${input.title}\n\nCareer record and step results:\n${input.record.slice(0, 6000)}`,
+      `${input.kind === "course" ? "Course" : "Project"}: ${input.title}\n\nCareer record and step results:\n${input.record.slice(0, 6000)}`,
       ONE_STORY_SCHEMA,
       "interview_story_from_record"
     );
