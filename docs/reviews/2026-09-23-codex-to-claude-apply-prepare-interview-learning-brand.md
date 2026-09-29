@@ -621,3 +621,51 @@ Changed implementation paths:
 Verification: 1,326 tests passed, 140 skipped; full database and web typecheck passed; targeted lint
 and formatting passed. The unauthenticated route compiled and returned HTTP 200. A logged-in visual
 pass remains necessary because no browser session was available to the verifier.
+
+## 2026-09-29 ownership reset: Claude and Codex
+
+This section replaces the earlier broad coordination paragraph. The file paths are part of the
+ownership boundary so both agents can work without overwriting each other.
+
+### Codex owns
+
+1. **Completion correctness** — in progress in
+   `learning/actions.ts`, `gap-growth.tsx`, and
+   `project-runs.repository.ts`. New project runs must carry their commitment ID, and a
+   commitment with an active run must open that workspace instead of creating evidence through
+   the shortcut.
+2. **Kernel linkage** — audit and then connect project runs, applications, and interview sessions
+   through work refs/outputs. This belongs in `lib/work/**` and narrow calls from the domain
+   actions. Domain tables remain authoritative.
+3. **Live interview foundation** — after linkage exists, replace the unused legacy Realtime broker
+   with one work-scoped WebRTC session and the listening/thinking/speaking state machine. Do not
+   change the Practice landing-page layout while Claude owns it.
+4. **Social publishing connection** — only after the shared text/voice/screen gateway is stable.
+   Separate OAuth consent, preview, approval, idempotency and receipt.
+
+### Claude owns
+
+1. **Practice information architecture** — replace Learning home with Continue / Recommended next /
+   Browse; demote Machines and Activity. Primary files:
+   `components/learning/learning-shell.tsx` and the Practice navigation components.
+2. **One project finish review** — simplify `project-workspace.tsx` and the completion-package UI
+   so the final step leads to one factual review. Use the existing
+   `project-finish-actions.ts`; do not edit Codex's completion guard while it is in progress.
+3. **Durable lifecycle hand-offs** — transactional outbox plus idempotent worker for completion
+   proposals after the finish review is stable.
+4. **Outcome learning** — application/interview outcomes create or reprioritise work only after the
+   outbox and kernel links are present.
+
+### Verified gap in Phase 1
+
+The kernel itself works, but the domain linkage is not complete:
+
+- apply plans carry a `job` ref, but application rows are not recorded as refs or outputs;
+- project runs are not represented in work items or outputs;
+- mock interviews have no persisted session identity to link;
+- Today's project-ref route pointed to `/dashboard/learning?project=...`, although the real route
+  is `/dashboard/learning/projects/[runId]`. Codex fixed that route while auditing.
+
+Sequence: Codex closes completion correctness, then kernel linkage. Claude can simplify Practice in
+parallel without touching the listed Codex paths. Live voice starts after the interview session has
+a durable identity; the outbox starts after the finish-review contract stops changing.

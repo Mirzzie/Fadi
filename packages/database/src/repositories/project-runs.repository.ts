@@ -1,4 +1,4 @@
-import { and, asc, eq, ne } from "drizzle-orm";
+import { and, asc, desc, eq, ne } from "drizzle-orm";
 
 import type { Database } from "../client";
 import {
@@ -43,9 +43,26 @@ export function createProjectRunsRepository(db: Database) {
         .orderBy(asc(projectRuns.createdAt));
     },
 
+    /** The active project run that fulfils this commitment, if one exists. */
+    async getForCommitment(userId: string, commitmentId: string): Promise<ProjectRun | null> {
+      const [run] = await db
+        .select()
+        .from(projectRuns)
+        .where(
+          and(
+            eq(projectRuns.userId, userId),
+            eq(projectRuns.commitmentId, commitmentId),
+            ne(projectRuns.status, "abandoned")
+          )
+        )
+        .orderBy(desc(projectRuns.createdAt))
+        .limit(1);
+      return run ?? null;
+    },
+
     async getWithSteps(
       userId: string,
-      runId: string,
+      runId: string
     ): Promise<{ run: ProjectRun; steps: ProjectStep[] } | null> {
       const [run] = await db
         .select()
@@ -76,7 +93,7 @@ export function createProjectRunsRepository(db: Database) {
         resourceId?: string | null;
         resourceLabel?: string | null;
       },
-      steps: Array<Omit<NewProjectStep, "id" | "runId" | "createdAt" | "updatedAt">>,
+      steps: Array<Omit<NewProjectStep, "id" | "runId" | "createdAt" | "updatedAt">>
     ): Promise<{ run: ProjectRun; steps: ProjectStep[] }> {
       return db.transaction(async (tx) => {
         const [created] = await tx
@@ -110,7 +127,7 @@ export function createProjectRunsRepository(db: Database) {
         artifact?: string | null;
         /** attested | evidenced | verified — see the schema comment. Null when reopened. */
         completion?: "attested" | "evidenced" | "verified" | null;
-      },
+      }
     ): Promise<ProjectStep | null> {
       return db.transaction(async (tx) => {
         // Scope by owner through the run, so a step id alone cannot reach another user's row.
@@ -182,7 +199,7 @@ export function createProjectRunsRepository(db: Database) {
     async saveEvidenceOnce<T extends { id: string }>(
       userId: string,
       runId: string,
-      create: (tx: Database) => Promise<T>,
+      create: (tx: Database) => Promise<T>
     ): Promise<
       | { status: "created"; evidenceItemId: string; commitmentId: string | null }
       | { status: "existing"; evidenceItemId: string }
@@ -195,7 +212,8 @@ export function createProjectRunsRepository(db: Database) {
           .where(and(eq(projectRuns.id, runId), eq(projectRuns.userId, userId)))
           .for("update");
         if (!run) return { status: "not_found" as const };
-        if (run.evidenceItemId) return { status: "existing" as const, evidenceItemId: run.evidenceItemId };
+        if (run.evidenceItemId)
+          return { status: "existing" as const, evidenceItemId: run.evidenceItemId };
         if (run.status !== "done") return { status: "not_finished" as const };
 
         const created = await create(tx as unknown as Database);
@@ -203,7 +221,11 @@ export function createProjectRunsRepository(db: Database) {
           .update(projectRuns)
           .set({ evidenceItemId: created.id, updatedAt: new Date() })
           .where(eq(projectRuns.id, runId));
-        return { status: "created" as const, evidenceItemId: created.id, commitmentId: run.commitmentId };
+        return {
+          status: "created" as const,
+          evidenceItemId: created.id,
+          commitmentId: run.commitmentId,
+        };
       });
     },
 
@@ -215,7 +237,7 @@ export function createProjectRunsRepository(db: Database) {
     async reviseOpenStep(
       userId: string,
       stepId: string,
-      patch: { instruction: string; verify?: string | null },
+      patch: { instruction: string; verify?: string | null }
     ): Promise<ProjectStep | null> {
       const [step] = await db
         .select({ id: projectSteps.id, status: projectSteps.status })
@@ -287,7 +309,7 @@ export function createProjectRunsRepository(db: Database) {
     async replaceSteps(
       userId: string,
       runId: string,
-      steps: Array<Omit<NewProjectStep, "id" | "runId" | "createdAt" | "updatedAt">>,
+      steps: Array<Omit<NewProjectStep, "id" | "runId" | "createdAt" | "updatedAt">>
     ): Promise<{ kept: ProjectStep[]; added: ProjectStep[] } | null> {
       return db.transaction(async (tx) => {
         const [run] = await tx
@@ -338,7 +360,7 @@ export function createProjectRunsRepository(db: Database) {
     async setWorkspace(
       userId: string,
       runId: string,
-      workspace: { workspaceKind: string; workspaceRef: string; repoUrl: string | null },
+      workspace: { workspaceKind: string; workspaceRef: string; repoUrl: string | null }
     ): Promise<void> {
       await db
         .update(projectRuns)

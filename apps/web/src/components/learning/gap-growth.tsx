@@ -74,7 +74,11 @@ export function GapGrowth({ gapTitle, gapDetail }: { gapTitle: string; gapDetail
           disabled={pending}
           className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/15"
         >
-          {pending ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <Hammer className="size-3.5" aria-hidden="true" />}
+          {pending ? (
+            <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+          ) : (
+            <Hammer className="size-3.5" aria-hidden="true" />
+          )}
           Turn this gap into a project
         </button>
       ) : (
@@ -121,7 +125,12 @@ export function GapGrowth({ gapTitle, gapDetail }: { gapTitle: string; gapDetail
                       <Check className="size-3.5" aria-hidden="true" /> Committed
                     </span>
                   ) : (
-                    <Button size="sm" className="shrink-0" disabled={pending} onClick={() => commit(s)}>
+                    <Button
+                      size="sm"
+                      className="shrink-0"
+                      disabled={pending}
+                      onClick={() => commit(s)}
+                    >
                       Commit
                     </Button>
                   )}
@@ -172,7 +181,11 @@ function TutorialPlayer({ query }: { query: string }) {
               onClick={() => setExpanded((e) => !e)}
               className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
             >
-              {expanded ? <Minimize2 className="size-3" aria-hidden="true" /> : <Maximize2 className="size-3" aria-hidden="true" />}
+              {expanded ? (
+                <Minimize2 className="size-3" aria-hidden="true" />
+              ) : (
+                <Maximize2 className="size-3" aria-hidden="true" />
+              )}
               {expanded ? "Smaller" : "Expand"}
             </button>
             <a
@@ -216,6 +229,10 @@ export function CommitmentsList({ commitments }: { commitments: CommitmentView[]
   function complete(id: string) {
     startTransition(async () => {
       const res = await completeCommitmentAction({ id, whatIBuilt: built });
+      if (res.runId) {
+        router.push(`/dashboard/learning/projects/${res.runId}`);
+        return;
+      }
       setNote(res.message);
       if (res.ok) {
         setCompletingId(null);
@@ -240,7 +257,9 @@ export function CommitmentsList({ commitments }: { commitments: CommitmentView[]
           Your commitments
         </h3>
       </div>
-      {note ? <p className="rounded-md border border-primary/30 bg-primary/10 p-2 text-sm">{note}</p> : null}
+      {note ? (
+        <p className="rounded-md border border-primary/30 bg-primary/10 p-2 text-sm">{note}</p>
+      ) : null}
       <div className="space-y-2">
         {inProgress.map((c) => (
           <div key={c.id} className="rounded-xl border border-border/60 bg-card p-4">
@@ -275,7 +294,10 @@ export function CommitmentsList({ commitments }: { commitments: CommitmentView[]
             </div>
             {completingId === c.id ? (
               <div className="mt-3 space-y-2 border-t border-border/60 pt-3">
-                <label className="text-xs font-medium text-muted-foreground" htmlFor={`built-${c.id}`}>
+                <label
+                  className="text-xs font-medium text-muted-foreground"
+                  htmlFor={`built-${c.id}`}
+                >
                   What did you actually build or learn? (your words — this goes on the resume)
                 </label>
                 <textarea

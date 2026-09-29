@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import {
   createCareerProfilesRepository,
   createLearningCommitmentsRepository,
+  createProjectRunsRepository,
 } from "@careeros/database";
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
@@ -32,9 +33,17 @@ const PATH = "/dashboard/learning";
 export async function generateBlueprintAction(): Promise<BlueprintResult> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
-  const rate = await consumeRateLimit({ key: `blueprint:${user.id}`, limit: 8, windowMs: 60 * 60 * 1000 });
+  const rate = await consumeRateLimit({
+    key: `blueprint:${user.id}`,
+    limit: 8,
+    windowMs: 60 * 60 * 1000,
+  });
   if (!rate.allowed) {
-    return { ok: false, message: "A few blueprints in an hour is plenty — sit with this one and pick your next cert or project." };
+    return {
+      ok: false,
+      message:
+        "A few blueprints in an hour is plenty — sit with this one and pick your next cert or project.",
+    };
   }
   return generateBlueprint(user.id);
 }
@@ -46,9 +55,17 @@ export async function suggestForGapAction(input: {
 }): Promise<SuggestResult> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
-  const rate = await consumeRateLimit({ key: `gap-suggest:${user.id}`, limit: 15, windowMs: 60 * 60 * 1000 });
+  const rate = await consumeRateLimit({
+    key: `gap-suggest:${user.id}`,
+    limit: 15,
+    windowMs: 60 * 60 * 1000,
+  });
   if (!rate.allowed) {
-    return { ok: false, message: "That's a lot of project ideas in one hour — pick one and build it. More suggestions unlock shortly." };
+    return {
+      ok: false,
+      message:
+        "That's a lot of project ideas in one hour — pick one and build it. More suggestions unlock shortly.",
+    };
   }
   return suggestProjectsForGap(user.id, input);
 }
@@ -156,6 +173,7 @@ export async function commitToProjectAction(input: {
         const planned = await planProjectRun(user.id, {
           title: input.title.trim(),
           detail: input.detail?.trim() ?? null,
+          commitmentId: row.id,
         });
         if (planned.ok) {
           runId = planned.plan.runId;
@@ -187,26 +205,16 @@ export async function commitToProjectAction(input: {
  * Honesty rule: no completion without real specifics — we never auto-write
  * achievements the user didn't describe.
  */
-export async function completeCommitmentAction(input: {
-  id: string;
-  whatIBuilt: string;
-}): Promise<{
+export async function completeCommitmentAction(input: { id: string; whatIBuilt: string }): Promise<{
   ok: boolean;
   message: string;
+  /** A hands-on commitment must be finished from its project workspace. */
+  runId?: string;
   /** Present when the completion earned momentum, so the UI can show the gain. */
   momentum?: { value: number; delta: number; band: string };
 }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
-
-  const built = input.whatIBuilt.trim();
-  if (built.length < 20) {
-    return {
-      ok: false,
-      message:
-        "Tell me what you actually built or learned (a sentence or two, real specifics) — that's what goes on the resume, in your words.",
-    };
-  }
 
   try {
     const db = getDatabase();
@@ -214,6 +222,26 @@ export async function completeCommitmentAction(input: {
     const commitment = await commitments.getForUser(user.id, input.id);
     if (!commitment) return { ok: false, message: "Commitment not found." };
     if (commitment.status === "completed") return { ok: true, message: "Already completed." };
+
+    // A hands-on project already has its own verified finish path. Completing it here would
+    // bypass its steps, artifacts and review screen, then create a second evidence record.
+    const run = await createProjectRunsRepository(db).getForCommitment(user.id, commitment.id);
+    if (run) {
+      return {
+        ok: false,
+        message: "Finish this from its project workspace so the steps and proof stay together.",
+        runId: run.id,
+      };
+    }
+
+    const built = input.whatIBuilt.trim();
+    if (built.length < 20) {
+      return {
+        ok: false,
+        message:
+          "Tell me what you actually built or learned (a sentence or two, real specifics) — that's what goes on the resume, in your words.",
+      };
+    }
 
     const { admitEvidence } = await import("@/lib/identity/admit");
     const candidate = {
@@ -228,7 +256,11 @@ export async function completeCommitmentAction(input: {
     };
     const evidence = await db.transaction(async (tx) => {
       const admitted = await admitEvidence(user.id, candidate, { db: tx });
-      await createLearningCommitmentsRepository(tx).completeForUser(user.id, commitment.id, admitted.insertedId);
+      await createLearningCommitmentsRepository(tx).completeForUser(
+        user.id,
+        commitment.id,
+        admitted.insertedId
+      );
       return admitted.row;
     });
 
@@ -265,9 +297,10 @@ export async function completeCommitmentAction(input: {
     });
     return {
       ok: true,
-      message: evidence.reviewStatus === "pending"
-        ? "Completed and saved for review. Open Your evidence to decide whether this work is already recorded."
-        : "Saved to Your evidence for future drafts. Existing documents have not been changed.",
+      message:
+        evidence.reviewStatus === "pending"
+          ? "Completed and saved for review. Open Your evidence to decide whether this work is already recorded."
+          : "Saved to Your evidence for future drafts. Existing documents have not been changed.",
       momentum: { value: motion.momentum, delta: motion.delta, band: motion.band },
     };
   } catch (error) {

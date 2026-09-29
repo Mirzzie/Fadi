@@ -124,7 +124,8 @@ const REF_ROUTES: Record<string, (id: string) => string> = {
   job: (id) => `/dashboard/jobs?job=${id}`,
   application: (id) => `/dashboard/applications?application=${id}`,
   document: (id) => `/dashboard/documents/${id}`,
-  project: (id) => `/dashboard/learning?project=${id}`,
+  project: (id) => `/dashboard/learning/projects/${id}`,
+  project_run: (id) => `/dashboard/learning/projects/${id}`,
   evidence: () => "/dashboard/evidence",
   portfolio: () => "/dashboard/portfolio",
 };

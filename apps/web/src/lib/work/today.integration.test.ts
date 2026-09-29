@@ -17,7 +17,14 @@ vi.mock("@/lib/guidance/setup", () => ({
     completed: 0,
     total: 0,
     percent: 0,
-    nextStep: { id: "x", title: "Setup step", description: "", href: "/dashboard", cta: "Go", done: false },
+    nextStep: {
+      id: "x",
+      title: "Setup step",
+      description: "",
+      href: "/dashboard",
+      cta: "Go",
+      done: false,
+    },
     allDone: false,
     exploreNiche: { suggested: false, href: "/dashboard/niche-finder" },
   }),
@@ -78,6 +85,24 @@ suite("Today", () => {
 
     await work.remove(userId, first.id);
     await work.remove(userId, second.id);
+  });
+
+  it("opens a project reference at its real workspace", async () => {
+    const goal = await work.create(userId, { kind: "goal", title: "Build evidence" });
+    await work.create(userId, {
+      kind: "step",
+      title: "Finish the SIEM lab",
+      parentId: goal.id,
+      refs: [{ type: "project_run", id: "8f172d39-d870-40ac-bbd7-2be1091fec14" }],
+    });
+    await work.setActiveGoal(userId, goal.id);
+
+    const today = await getToday(userId, "Mirzad", "prepare");
+    expect(today.action?.href).toBe(
+      "/dashboard/learning/projects/8f172d39-d870-40ac-bbd7-2be1091fec14"
+    );
+
+    await work.remove(userId, goal.id);
   });
 
   it("falls back to the computed step when a goal has no work under it", async () => {
