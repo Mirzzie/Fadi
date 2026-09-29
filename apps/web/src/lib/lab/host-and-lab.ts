@@ -261,3 +261,100 @@ export function toolchainViolations(text: string, template: TemplateKey): string
   }
   return found;
 }
+
+// ── Folders a plan writes into ────────────────────────────────────────────────
+//
+// A plan told the owner to run `… | Out-File C:\LabSetup\02_ADDS_Install.log` in a fresh
+// Windows Server lab. C:\LabSetup did not exist, no step created it, and PowerShell answered
+// "Could not find a part of the path" on the step's own first command (29 Sep 2026). The
+// planner is asked to create folders; this makes sure it happened, by repairing the plan
+// rather than rejecting it: the first step that writes into a missing folder is given the
+// command that creates it.
+
+type StepText = { instruction: string; verify?: string | null };
+
+// Folders a fresh machine already has. Anything else a plan writes into, it must create.
+const WINDOWS_ROOTS = ["users", "windows", "program files", "program files (x86)", "programdata"];
+const LINUX_ROOTS = [
+  "tmp",
+  "etc",
+  "var",
+  "root",
+  "opt",
+  "usr",
+  "home",
+  "srv",
+  "run",
+  "mnt",
+  "media",
+  "dev",
+  "proc",
+  "sys",
+];
+
+const WIN_WRITE =
+  /(?:Out-File|Set-Content|Add-Content|Export-Csv|Export-Clixml|Tee-Object|Start-Transcript|Copy-Item\s+\S+|>>?)\s+(?:-(?:FilePath|Path|LiteralPath|Destination)\s+)?["']?([A-Za-z]:\\[^\s"'|;]+)/gi;
+const WIN_CREATE =
+  /(?:New-Item\b[^\n]*?-ItemType\s+Directory[^\n]*?(?:-Path\s+)?|\bmkdir\s+|\bmd\s+)["']?([A-Za-z]:\\[^\s"'|;]+)/gi;
+const LINUX_WRITE = /(?:>>?|\btee(?:\s+-a)?)\s+["']?(\/[^\s"'|;&]+)/g;
+const LINUX_CREATE = /\bmkdir\s+(?:-p\s+)?["']?(\/[^\s"'|;&]+)/g;
+
+function parentOf(path: string, os: LabOs): string | null {
+  const sep = os === "windows" ? "\\" : "/";
+  const at = path.lastIndexOf(sep);
+  if (at <= (os === "windows" ? 2 : 0)) return null; // a file at the root: nothing to create
+  return path.slice(0, at);
+}
+
+function isBuiltIn(dir: string, os: LabOs): boolean {
+  const top =
+    os === "windows" ? dir.slice(3).split("\\")[0]?.toLowerCase() : dir.slice(1).split("/")[0];
+  return Boolean(top) && (os === "windows" ? WINDOWS_ROOTS : LINUX_ROOTS).includes(top!);
+}
+
+/** The first step (0-based) that writes into each folder no step before it created. */
+export function missingFolders(steps: StepText[], os: LabOs): Array<{ step: number; dir: string }> {
+  const norm = (p: string) =>
+    os === "windows" ? p.toLowerCase().replace(/\\+$/, "") : p.replace(/\/+$/, "");
+  const sep = os === "windows" ? "\\" : "/";
+  const created: string[] = [];
+  const missing: Array<{ step: number; dir: string }> = [];
+  steps.forEach((step, index) => {
+    const text = `${step.instruction}\n${step.verify ?? ""}`;
+    for (const m of text.matchAll(os === "windows" ? WIN_CREATE : LINUX_CREATE))
+      created.push(norm(m[1]!));
+    for (const m of text.matchAll(os === "windows" ? WIN_WRITE : LINUX_WRITE)) {
+      const dir = parentOf(m[1]!, os);
+      if (!dir || isBuiltIn(dir, os)) continue;
+      const wanted = norm(dir);
+      // Creating C:\LabSetup\logs with -Force (or mkdir -p) makes C:\LabSetup too.
+      const made = created.some(
+        (c) =>
+          c === wanted || c.startsWith(wanted + sep.toLowerCase()) || c.startsWith(wanted + sep)
+      );
+      if (!made && !missing.some((m) => norm(m.dir) === wanted)) missing.push({ step: index, dir });
+    }
+  });
+  return missing;
+}
+
+/** The plan with each missing folder created at the start of the first step that needs it. */
+export function withFoldersCreated<T extends StepText>(steps: T[], os: LabOs): T[] {
+  const missing = missingFolders(steps, os);
+  if (missing.length === 0) return steps;
+  return steps.map((step, index) => {
+    const here = missing.filter((m) => m.step === index);
+    if (here.length === 0) return step;
+    const create = here
+      .map((m) =>
+        os === "windows"
+          ? `New-Item -ItemType Directory -Force -Path "${m.dir}" | Out-Null`
+          : `mkdir -p ${m.dir}`
+      )
+      .join("\n");
+    return {
+      ...step,
+      instruction: `First create the folder it writes into:\n${create}\n\n${step.instruction}`,
+    };
+  });
+}

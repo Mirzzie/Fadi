@@ -78,3 +78,27 @@ exited lab still holds 10.5 GB. Proposed: keep one clean installed base disk per
 version and clone it for new projects (minutes, no download), and offer "remove this lab —
 frees N GB, keeps the image" in the finish review and for labs idle 14 days, with approval.
 Claude will build this unless you want it.
+
+## Later on 29 September: what the owner hit in the Active Directory lab
+
+Walking the "Build and Secure a Test Active Directory Forest" project in the Windows Server
+2025 lab surfaced four defects. All fixed by Claude; worth knowing before you touch the planner
+or the lab.
+
+1. **Invented login.** Step 1 said "log in with the supplied Administrator credentials". dockur
+   creates exactly one account, `Docker` / `admin`, and nothing said so. Now set explicitly in
+   the Windows templates (`signIn`), told to the planner, shown in the lab panel (`46e9808`).
+2. **Writing into a folder nothing created.** Step 2 ran `… | Out-File C:\LabSetup\02_ADDS_Install.log`
+   on a fresh VM; PowerShell failed with "Could not find a part of the path". New:
+   `missingFolders()` / `withFoldersCreated()` in `lib/lab/host-and-lab.ts` repair every plan
+   (Windows `New-Item -ItemType Directory -Force`, Linux `mkdir -p`) at the first step that
+   writes into a missing folder; the prompt asks for it too. The owner's saved plan was
+   repaired in place.
+3. **Re-plan thrown away for one long step.** A step's instruction reached 1,201 characters and
+   the 1,200 schema ceiling rejected the whole plan ("Fadi couldn't produce a usable plan").
+   Ceilings raised (instruction 4,000, verify 1,500); the prompt asks for brevity instead.
+4. **Flagship research ran out of tokens** on Groq `gpt-oss-120b` (reasoning spends budget):
+   `DocGenerate.structured()` now takes `{ maxTokens }`; flagships ask for 8,000.
+
+Open, not yet built (see "An open lab problem" above): every Windows project re-downloads the
+8.2 GB ISO and reinstalls; finished labs are never cleaned up.

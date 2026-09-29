@@ -9,6 +9,7 @@ import { AiRateLimitError, getUserDocGenerate } from "@/lib/ai/user-generate";
 import { placeLab, type Resource } from "@/lib/lab/capability";
 import { labContainerForRun, type TemplateKey } from "./templates";
 import {
+  withFoldersCreated,
   hostOsOf,
   labOsOf,
   osViolations,
@@ -39,10 +40,13 @@ const planSchema = z.object({
   steps: z
     .array(
       z.object({
-        title: z.string().min(1).max(120),
-        instruction: z.string().min(1).max(1200),
-        verify: z.string().max(500).optional().default(""),
-        produces: z.string().max(300).optional().default(""),
+        // Generous ceilings. A re-plan failed outright because ONE step's instruction ran to
+        // 1,201 characters (29 Sep 2026) — build/break/fix steps carry more — and a length
+        // limit should never throw away an otherwise good plan. The prompt asks for brevity.
+        title: z.string().min(1).max(160),
+        instruction: z.string().min(1).max(4000),
+        verify: z.string().max(1500).optional().default(""),
+        produces: z.string().max(800).optional().default(""),
       })
     )
     // One, not three: a re-plan of a project with most steps finished needs only what is left,
@@ -61,6 +65,8 @@ Write steps that person can actually execute tonight. Rules:
 - Assume competence but not familiarity: they can use a terminal, they have not done THIS before.
 - Shape it as a response to the problem in the project description: build it, then TEST OR BREAK it the way an attacker, a user or a failure would, then fix what that finds. At least one step must try to break or bypass what was built and record what happened — findings and fixes are the evidence hiring managers look for, far more than a clean install.
 - Where a real choice is made (a design, a control, a tool), say what the options were so the person can record the decision and its trade-off.
+- Before any step writes a file, that step or an earlier one creates its folder (PowerShell: New-Item -ItemType Directory -Force -Path "C:\\LabSetup"; Linux: mkdir -p). A fresh machine has none of your folders.
+- Keep each instruction under about 900 characters: the commands, and one line on why.
 - 3 to 8 steps. A plan longer than that is a course, and it will not be finished.
 - Never invent details about their environment beyond what you are told.`;
 
@@ -241,6 +247,9 @@ export async function planProjectRun(
         };
       }
     }
+
+    // Folders it writes into exist before it writes (see withFoldersCreated).
+    if (labOs) parsed.steps = withFoldersCreated(parsed.steps, labOs);
 
     const rows = parsed.steps.map((s, i) => ({
       ordinal: i + 1,
