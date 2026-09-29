@@ -38,7 +38,12 @@ export function completionReview(title: string, steps: ReviewStep[]): Completion
       return {
         ordinal: step.ordinal,
         title: step.title,
-        proof: kind === "verified" ? "checked" : kind === "evidenced" ? "result recorded" : "self-reported",
+        proof:
+          kind === "verified"
+            ? "checked"
+            : kind === "evidenced"
+              ? "result recorded"
+              : "self-reported",
         result: readableResult(step.artifact),
       };
     });
@@ -67,4 +72,40 @@ function readableResult(artifact: string | null | undefined): string | null {
     return text.slice(text.lastIndexOf(" → ") + 3).trim() || null;
   }
   return text;
+}
+
+/**
+ * WHAT A SAVED PROJECT CAN BECOME, ON ONE SCREEN.
+ *
+ * Saving used to end in three exits — open Evidence, go to Interview, draft a post — each
+ * a different part of the app the person had to know to visit. The record is now the one
+ * fact, and everything else is offered beside it as a proposal they accept or skip here.
+ *
+ * A record the evidence gate held for review (it may be work already recorded) is not a
+ * settled fact yet, so nothing is built on it until the person decides.
+ */
+export type PackageItem = {
+  key: "record" | "portfolio" | "story" | "post";
+  state: "done" | "ready" | "waiting";
+};
+
+export function completionPackage(input: {
+  recordStatus: "saved" | "needs-review";
+  onPortfolio: boolean;
+  storyAdded: boolean;
+}): PackageItem[] {
+  if (input.recordStatus === "needs-review") {
+    return [
+      { key: "record", state: "waiting" },
+      { key: "portfolio", state: "waiting" },
+      { key: "story", state: "waiting" },
+      { key: "post", state: "waiting" },
+    ];
+  }
+  return [
+    { key: "record", state: "done" },
+    { key: "portfolio", state: input.onPortfolio ? "done" : "ready" },
+    { key: "story", state: input.storyAdded ? "done" : "ready" },
+    { key: "post", state: "ready" },
+  ];
 }

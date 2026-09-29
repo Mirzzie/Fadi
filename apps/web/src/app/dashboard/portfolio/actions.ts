@@ -365,7 +365,14 @@ export async function seedFromEvidence(): Promise<Result<{ added: number }>> {
  * edits (images, blurbs, order, publish state) are preserved. Evidence is the
  * source of truth; this keeps the projection current as career data grows.
  */
-export async function syncFromEvidence(): Promise<Result<{ added: number; nearMatches: number }>> {
+/**
+ * @param input.evidenceItemId sync only this record — how a finished project offers itself to
+ *   the portfolio without sweeping in everything else waiting there. Same dedupe, same
+ *   dismissals.
+ */
+export async function syncFromEvidence(
+  input: { evidenceItemId?: string } = {}
+): Promise<Result<{ added: number; nearMatches: number }>> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
 
@@ -387,7 +394,9 @@ export async function syncFromEvidence(): Promise<Result<{ added: number; nearMa
     rows.push(artifact);
     artifactsByFact.set(artifact.factId, rows);
   }
-  const seeded = seedItemsFromEvidence(evidence).map((record) => {
+  const seeded = seedItemsFromEvidence(
+    input.evidenceItemId ? evidence.filter((item) => item.id === input.evidenceItemId) : evidence
+  ).map((record) => {
     const factId = evidence.find((item) => item.id === record.evidenceItemId)?.factId;
     const media = artifactsByFact.get(factId ?? record.evidenceItemId) ?? [];
     const visual = media.filter((item) => item.kind === "image" || item.kind === "video");

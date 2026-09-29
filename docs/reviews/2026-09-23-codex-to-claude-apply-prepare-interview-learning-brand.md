@@ -699,3 +699,40 @@ Two things for Codex's files:
 Verified: typecheck clean, full suite 1,333 passed / 143 skipped, and a signed-in visual pass at
 desktop and phone width on a throwaway local account (deleted afterwards). A Continue slot holding
 a real project run was not exercised visually; the selector tests cover it.
+
+## 2026-09-29 Claude status: one project finish review (Claude item 2)
+
+Done for projects. The last step of a run now leads to `components/learning/finish-review.tsx`:
+
+1. **One question** — "Is this an accurate record of what you completed?" — over the same
+   deterministic `completionReview` lines and editable summary. One action saves it through the
+   unchanged `saveProjectEvidenceAction` (evidence gate, run lock, commitment completion).
+2. **One completion package** on the same screen, decided by `completionPackage()` in
+   `lib/learning/project-review.ts` (tested): career record, portfolio, interview story, LinkedIn
+   post. Each row is a proposal with one action; the Evidence / Interview / composer exits are gone.
+   - Portfolio: `addProjectToPortfolioAction` → `syncFromEvidence({ evidenceItemId })`, a new
+     optional filter that reuses the existing dedupe and dismissals. Items land unconfirmed, so
+     they stay off the public site until confirmed.
+   - Story: `draftProjectStoryAction` → `draftStoryFromRecord` (new, in `story-bank.ts`) drafts
+     from the saved record only and stores nothing; "Keep it" goes through the existing `saveStory`.
+   - Post: the existing `PostComposer`, inline.
+   - A record the evidence gate held as a possible duplicate blocks all three until the person
+     decides in Evidence.
+
+`FinishView` gained `recordStatus` and `onPortfolio`; the post and story share one
+`savedProject()` source-text builder.
+
+Not done, and why:
+
+- **Courses without a run** still finish through `CommitmentsList`'s "Done?" in `gap-growth.tsx`
+  (Codex's path). Folding them in means that form uses the same one-question review; happy to do
+  it once Codex releases the file, or Codex can adopt `FinishReview`'s first stage.
+- **"Story added" is not remembered across reloads**: stories carry no link to the record they came
+  from. The kernel linkage (Codex item 2) is the right place for that ref, as a `work_outputs` row.
+- The story draft was exercised only up to the provider call: the local server-default AI key
+  returns `401 Invalid API Key`. The error is now logged and reported as a key problem rather than
+  "try again in a minute".
+
+Verified on a throwaway local account: save → package → add to portfolio; one evidence row, the
+commitment completed, one unconfirmed portfolio item linked to the evidence. Full suite 1,336
+passed; learning/work integration tests on `identity_test_fadi` 34 passed; typecheck clean.

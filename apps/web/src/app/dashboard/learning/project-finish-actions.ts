@@ -12,6 +12,7 @@ import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
 import { publish } from "@/lib/events/bus";
 import { completionReview, type CompletionReview } from "@/lib/learning/project-review";
+import type { StoryDraft } from "@/lib/interview/story-bank";
 import { logger } from "@/lib/observability/logger";
 import { recordForwardMotion } from "@/lib/resilience/service";
 
@@ -26,8 +27,28 @@ import { recordForwardMotion } from "@/lib/resilience/service";
 export type FinishView = {
   finished: boolean;
   savedEvidenceId: string | null;
+  /** Null until saved. "needs-review" when the evidence gate held it as a possible duplicate. */
+  recordStatus: RecordStatus | null;
+  onPortfolio: boolean;
   review: CompletionReview;
 };
+
+type RecordStatus = "saved" | "needs-review";
+
+async function recordStatusOf(userId: string, evidenceItemId: string): Promise<RecordStatus> {
+  const { createEvidenceRepository } = await import("@careeros/database");
+  const saved = await createEvidenceRepository(getDatabase()).getForUser(userId, evidenceItemId);
+  return saved?.reviewStatus === "pending" ? "needs-review" : "saved";
+}
+
+async function isOnPortfolio(userId: string, evidenceItemId: string): Promise<boolean> {
+  const { createPortfolioRepository } = await import("@careeros/database");
+  const repo = createPortfolioRepository(getDatabase());
+  const [site] = await repo.listSitesForUser(userId);
+  if (!site) return false;
+  const items = await repo.listItemsForUser(userId, site.id);
+  return items.some((item) => item.evidenceItemId === evidenceItemId);
+}
 
 export async function projectFinishAction(input: {
   runId: string;
@@ -41,11 +62,20 @@ export async function projectFinishAction(input: {
   await runs.settle(user.id, id.data);
   const project = await runs.getWithSteps(user.id, id.data);
   if (!project) return { ok: false, message: "That project is unavailable." };
+  const savedEvidenceId = project.run.evidenceItemId ?? null;
+  const [recordStatus, onPortfolio] = savedEvidenceId
+    ? await Promise.all([
+        recordStatusOf(user.id, savedEvidenceId),
+        isOnPortfolio(user.id, savedEvidenceId),
+      ])
+    : [null, false];
   return {
     ok: true,
     view: {
       finished: project.run.status === "done",
-      savedEvidenceId: project.run.evidenceItemId ?? null,
+      savedEvidenceId,
+      recordStatus,
+      onPortfolio,
       review: completionReview(project.run.title, project.steps),
     },
   };
@@ -54,7 +84,12 @@ export async function projectFinishAction(input: {
 export async function saveProjectEvidenceAction(input: {
   runId: string;
   summary: string;
-}): Promise<{ ok: boolean; message: string; evidenceItemId?: string }> {
+}): Promise<{
+  ok: boolean;
+  message: string;
+  evidenceItemId?: string;
+  recordStatus?: RecordStatus;
+}> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
   const parsed = z
@@ -70,7 +105,12 @@ export async function saveProjectEvidenceAction(input: {
     const project = await runs.getWithSteps(user.id, parsed.data.runId);
     if (!project) return { ok: false, message: "That project is unavailable." };
     if (project.run.evidenceItemId) {
-      return { ok: true, message: "Already saved.", evidenceItemId: project.run.evidenceItemId };
+      return {
+        ok: true,
+        message: "Already saved.",
+        evidenceItemId: project.run.evidenceItemId,
+        recordStatus: await recordStatusOf(user.id, project.run.evidenceItemId),
+      };
     }
 
     const commitment = project.run.commitmentId
@@ -104,19 +144,32 @@ export async function saveProjectEvidenceAction(input: {
       return { id: admitted.insertedId };
     });
 
-    if (result.status === "not_found") return { ok: false, message: "That project is unavailable." };
+    if (result.status === "not_found")
+      return { ok: false, message: "That project is unavailable." };
     if (result.status === "not_finished") {
-      return { ok: false, message: "Finish every step first — reopened steps count as unfinished." };
+      return {
+        ok: false,
+        message: "Finish every step first — reopened steps count as unfinished.",
+      };
     }
     if (result.status === "existing") {
-      return { ok: true, message: "Already saved.", evidenceItemId: result.evidenceItemId };
+      return {
+        ok: true,
+        message: "Already saved.",
+        evidenceItemId: result.evidenceItemId,
+        recordStatus: await recordStatusOf(user.id, result.evidenceItemId),
+      };
     }
     if (result.status !== "created") return { ok: false, message: "That project is unavailable." };
 
     // Downstream effects stay outside the transaction: if they fail, the evidence is still saved.
     if (commitment && commitment.status !== "completed") {
       await recordForwardMotion(user.id, "skill_closed", {
-        metadata: { commitmentId: commitment.id, evidenceItemId: result.evidenceItemId, runId: project.run.id },
+        metadata: {
+          commitmentId: commitment.id,
+          evidenceItemId: result.evidenceItemId,
+          runId: project.run.id,
+        },
       }).catch(() => null);
     }
     await publish("evidence.changed", {
@@ -131,11 +184,16 @@ export async function saveProjectEvidenceAction(input: {
       runId: project.run.id,
       evidenceId: result.evidenceItemId,
     });
-    const { createEvidenceRepository } = await import("@careeros/database");
-    const saved = await createEvidenceRepository(db).getForUser(user.id, result.evidenceItemId);
-    return { ok: true, message: saved?.reviewStatus === "pending"
-      ? "Saved for review. Open Your evidence to decide whether this is work already recorded."
-      : "Saved to your evidence.", evidenceItemId: result.evidenceItemId };
+    const recordStatus = await recordStatusOf(user.id, result.evidenceItemId);
+    return {
+      ok: true,
+      message:
+        recordStatus === "needs-review"
+          ? "Saved for review. It may be work you already recorded."
+          : "Saved to your career record.",
+      evidenceItemId: result.evidenceItemId,
+      recordStatus,
+    };
   } catch (error) {
     logger.error("learning.project_evidence_failed", {
       userId: user.id,
@@ -143,6 +201,81 @@ export async function saveProjectEvidenceAction(input: {
     });
     return { ok: false, message: "Couldn't save it. Nothing was changed — try again." };
   }
+}
+
+/**
+ * The saved record of a finished project, and the step results behind it — the only text a
+ * post or a story about it may draw on. Refuses until the record is settled.
+ */
+async function savedProject(userId: string, runId: string) {
+  const db = getDatabase();
+  const project = await createProjectRunsRepository(db).getWithSteps(userId, runId);
+  if (!project?.run.evidenceItemId) {
+    return { ok: false as const, message: "Save the project to your career record first." };
+  }
+  const { createEvidenceRepository } = await import("@careeros/database");
+  const repo = createEvidenceRepository(db);
+  const saved = await repo.getForUser(userId, project.run.evidenceItemId);
+  if (saved?.reviewStatus === "pending") {
+    return {
+      ok: false as const,
+      message: "Decide on this project's possible match in Your evidence first.",
+    };
+  }
+  const evidence = saved ? await repo.getCanonicalForFact(userId, saved.factId ?? saved.id) : null;
+  if (!evidence)
+    return { ok: false as const, message: "The saved record for this project was removed." };
+
+  const review = completionReview(project.run.title, project.steps);
+  const shown = review.lines.filter((line) => line.proof !== "self-reported");
+  const corpus = [
+    evidence.title,
+    evidence.detail,
+    evidence.metrics ?? "",
+    ...shown.map((line) =>
+      line.proof === "checked"
+        ? `${line.title} (checked in the lab: ${line.result ?? "passed"})`
+        : `${line.title}: ${line.result ?? ""}`
+    ),
+  ].join("\n");
+  return { ok: true as const, project, evidenceItemId: project.run.evidenceItemId, corpus, shown };
+}
+
+/** Draft an interview story from the saved record. Nothing is stored until the person saves it. */
+export async function draftProjectStoryAction(input: {
+  runId: string;
+}): Promise<{ ok: true; draft: StoryDraft } | { ok: false; message: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  const id = z.string().uuid().safeParse(input.runId);
+  if (!id.success) return { ok: false, message: "Unknown project." };
+
+  const saved = await savedProject(user.id, id.data);
+  if (!saved.ok) return saved;
+  const { draftStoryFromRecord } = await import("@/lib/interview/story-bank");
+  return draftStoryFromRecord(user.id, { title: saved.project.run.title, record: saved.corpus });
+}
+
+/** Put this one project on the portfolio — unconfirmed, like every automatic addition. */
+export async function addProjectToPortfolioAction(input: {
+  runId: string;
+}): Promise<{ ok: boolean; message: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  const id = z.string().uuid().safeParse(input.runId);
+  if (!id.success) return { ok: false, message: "Unknown project." };
+
+  const saved = await savedProject(user.id, id.data);
+  if (!saved.ok) return saved;
+  const { syncFromEvidence } = await import("@/app/dashboard/portfolio/actions");
+  const result = await syncFromEvidence({ evidenceItemId: saved.evidenceItemId });
+  if (!result.ok) return { ok: false, message: result.message };
+  if (result.added > 0) {
+    return { ok: true, message: "Added. It stays private until you confirm it in Portfolio." };
+  }
+  return result.nearMatches > 0 || (await isOnPortfolio(user.id, saved.evidenceItemId))
+    ? { ok: true, message: "Already on your portfolio." }
+    : { ok: false, message: "You removed this from your portfolio before, so it stays off." };
 }
 
 export type PostDraft = {
@@ -173,34 +306,14 @@ export async function draftProjectPostAction(input: {
   const id = z.string().uuid().safeParse(input.runId);
   if (!id.success) return { ok: false, message: "Unknown project." };
 
-  const db = getDatabase();
-  const project = await createProjectRunsRepository(db).getWithSteps(user.id, id.data);
-  if (!project?.run.evidenceItemId) {
-    return { ok: false, message: "Save the project as evidence first — the post is drafted from it." };
-  }
-  const { createEvidenceRepository } = await import("@careeros/database");
-  const repo = createEvidenceRepository(db);
-  const saved = await repo.getForUser(user.id, project.run.evidenceItemId);
-  if (saved?.reviewStatus === "pending") return { ok: false, message: "Review this project's possible match in Your evidence before drafting a post." };
-  const evidence = saved ? await repo.getCanonicalForFact(user.id, saved.factId ?? saved.id) : null;
-  if (!evidence) return { ok: false, message: "The saved evidence for this project was removed." };
-
-  const review = completionReview(project.run.title, project.steps);
-  const shown = review.lines.filter((line) => line.proof !== "self-reported");
-  const corpus = [
-    evidence.title,
-    evidence.detail,
-    evidence.metrics ?? "",
-    ...shown.map((line) =>
-      line.proof === "checked"
-        ? `${line.title} (checked in the lab: ${line.result ?? "passed"})`
-        : `${line.title}: ${line.result ?? ""}`
-    ),
-  ].join("\n");
+  const saved = await savedProject(user.id, id.data);
+  if (!saved.ok) return saved;
+  const { project, corpus, shown } = saved;
 
   const { getUserDocGenerate, AiRateLimitError } = await import("@/lib/ai/user-generate");
   const generate = await getUserDocGenerate(user.id);
-  if (!generate) return { ok: false, message: "Drafting needs an AI provider — add one in Settings → AI." };
+  if (!generate)
+    return { ok: false, message: "Drafting needs an AI provider — add one in Settings → AI." };
 
   const { truthCheck } = await import("@/lib/documents/truth-gate");
   const { findAiTells } = await import("@/lib/documents/humanize");
@@ -211,7 +324,12 @@ export async function draftProjectPostAction(input: {
   const schema = z.object({ post: z.string().min(40).max(1_600) });
 
   try {
-    const first = await generate.structured(POST_SYSTEM, `Saved evidence and results:\n${corpus}`, schema, "project_post");
+    const first = await generate.structured(
+      POST_SYSTEM,
+      `Saved evidence and results:\n${corpus}`,
+      schema,
+      "project_post"
+    );
     let text = first.post.trim();
     let warnings = problems(text);
     if (warnings.length > 0) {
@@ -243,8 +361,14 @@ export async function draftProjectPostAction(input: {
     if (error instanceof AiRateLimitError) return { ok: false, message: error.message };
     const detail = error instanceof Error ? error.message : String(error);
     if (/\b429\b|rate.?limit/i.test(detail)) {
-      return { ok: false, message: "Your AI provider is rate-limiting. Wait a minute and try again." };
+      return {
+        ok: false,
+        message: "Your AI provider is rate-limiting. Wait a minute and try again.",
+      };
     }
-    return { ok: false, message: "Couldn't draft a post just now. Your evidence is saved — try again later." };
+    return {
+      ok: false,
+      message: "Couldn't draft a post just now. Your evidence is saved — try again later.",
+    };
   }
 }

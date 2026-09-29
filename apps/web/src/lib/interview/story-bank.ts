@@ -6,6 +6,7 @@ import {
   normCompetency,
   pickBestStory,
   toStoryView,
+  type StarStory,
   type StoryView,
 } from "./story-format";
 
@@ -225,6 +226,73 @@ export async function storyFromMockAnswer(
     origin: "practice",
   });
   return { ok: true, story: toStoryView(row) };
+}
+
+const RECORD_TO_STORY_SYSTEM = `You turn ONE finished practice project from the candidate's career record into a STAR+Reflection interview story.
+
+Hard rules:
+- Use ONLY the record and step results provided. Never invent achievements, metrics, employers, clients, production use, dates or outcomes.
+- It was a self-directed project in their own lab. Say so in the situation; never present it as work for an employer.
+- action is what THEY did, naming the real tools. result is what the record shows they produced or confirmed.
+- reflection only if the record states a lesson or difficulty; otherwise leave it empty rather than inventing one.
+- competencies are lowercase tags this story could answer (for example: learning, ownership, troubleshooting).
+- Keep each field tight and concrete. Never pad.`;
+
+export type StoryDraft = StarStory;
+
+/**
+ * Draft — do not save — a story from one saved career record. The person reads it and
+ * decides; saving goes through the ordinary story save, so a draft they skip leaves nothing.
+ */
+export async function draftStoryFromRecord(
+  userId: string,
+  input: { title: string; record: string }
+): Promise<{ ok: true; draft: StoryDraft } | { ok: false; message: string }> {
+  const { getUserDocGenerate } = await import("@/lib/ai/user-generate");
+  const generate = await getUserDocGenerate(userId);
+  if (!generate) {
+    return {
+      ok: false,
+      message: "Drafting a story needs an AI provider — add one in Settings → AI.",
+    };
+  }
+  try {
+    const s = await generate.structured(
+      RECORD_TO_STORY_SYSTEM,
+      `Project: ${input.title}\n\nCareer record and step results:\n${input.record.slice(0, 6000)}`,
+      ONE_STORY_SCHEMA,
+      "interview_story_from_record"
+    );
+    if (!s.title.trim() || !s.action.trim()) {
+      return { ok: false, message: "The record is too thin for a story yet." };
+    }
+    return {
+      ok: true,
+      draft: {
+        title: s.title.trim(),
+        competencies: s.competencies.map(normCompetency).filter(Boolean).slice(0, 6),
+        situation: s.situation.trim(),
+        task: s.task.trim(),
+        action: s.action.trim(),
+        result: s.result.trim(),
+        reflection: s.reflection.trim(),
+      },
+    };
+  } catch (error) {
+    const { logger } = await import("@/lib/observability/logger");
+    logger.warn("interview.story_from_record_failed", {
+      userId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    // Waiting does not fix a rejected key, so do not suggest it.
+    if (/\b(401|403)\b|invalid api key|unauthori[sz]ed/i.test(String(error))) {
+      return {
+        ok: false,
+        message: "Your AI provider rejected its key. Check it in Settings → AI.",
+      };
+    }
+    return { ok: false, message: "Couldn't draft a story just now. Try again in a minute." };
+  }
 }
 
 /** List a user's stories as views. */

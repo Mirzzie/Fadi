@@ -19,17 +19,12 @@ import {
   type StepView,
 } from "@/app/dashboard/learning/lab-actions";
 import {
-  projectFinishAction,
-  saveProjectEvidenceAction,
-  type FinishView,
-} from "@/app/dashboard/learning/project-finish-actions";
-import {
   helpWithStepAction,
   acceptRevisedStepAction,
   proposeStepCheckAction,
   type StepHelp,
 } from "@/app/dashboard/learning/step-help-actions";
-import { PostComposer } from "@/components/learning/post-composer";
+import { FinishReview } from "@/components/learning/finish-review";
 import { CommandBlock, StepText } from "@/components/learning/step-text";
 import { PendingAction } from "@/components/os/pending-action-card";
 import { announceActionsChanged, usePendingActions } from "@/components/os/pending-actions";
@@ -56,7 +51,10 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
   // Background refresh is a plain async call, never inside startTransition: otherwise every
   // poll flips `pending` and every button flashes ("buttons refresh for no reason").
   const refresh = useCallback(async () => {
-    const [result, observed] = await Promise.all([listProjectRuns(), projectRuntimeAction({ runId })]);
+    const [result, observed] = await Promise.all([
+      listProjectRuns(),
+      projectRuntimeAction({ runId }),
+    ]);
     setRun(result.ok ? (result.runs.find((candidate) => candidate.id === runId) ?? null) : null);
     setRuntime(observed.ok ? observed.runtime : null);
   }, [runId]);
@@ -84,7 +82,10 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
     return (
       <div className="py-16 text-center">
         <p className="font-semibold">This project isn&apos;t available.</p>
-        <Link href="/dashboard/learning/projects" className="mt-2 inline-block text-sm text-primary hover:underline">
+        <Link
+          href="/dashboard/learning/projects"
+          className="mt-2 inline-block text-sm text-primary hover:underline"
+        >
           Back to projects
         </Link>
       </div>
@@ -95,7 +96,10 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
     if (!current) return;
     setMessage(null);
     startTransition(async () => {
-      const result = await completeStepAction({ stepId: current.id, artifact: artifact.trim() || null });
+      const result = await completeStepAction({
+        stepId: current.id,
+        artifact: artifact.trim() || null,
+      });
       if (!result.ok) return setMessage("Couldn't save that. Nothing changed.");
       setArtifact("");
       await refresh();
@@ -136,7 +140,9 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
         </Link>
-        <h1 className="min-w-0 flex-1 font-heading text-xl font-semibold sm:text-2xl">{run.title}</h1>
+        <h1 className="min-w-0 flex-1 font-heading text-xl font-semibold sm:text-2xl">
+          {run.title}
+        </h1>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <span className="tabular-nums">
             {current ? `Step ${current.ordinal} of ${total}` : "All steps done"}
@@ -168,9 +174,9 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
               onRevised={refresh}
               canCheck={Boolean(
                 run.labShell &&
-                  run.target.kind === "local-docker" &&
-                  runtime &&
-                  !["stopped", "failed", "queued", "stopping"].includes(runtime.phase)
+                run.target.kind === "local-docker" &&
+                runtime &&
+                !["stopped", "failed", "queued", "stopping"].includes(runtime.phase)
               )}
               onCheckProposed={() => {
                 announceActionsChanged();
@@ -178,7 +184,7 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
               }}
             />
           ) : (
-            <FinishPanel runId={runId} stepsKey={run.steps.map((s) => s.status).join()} />
+            <FinishReview runId={runId} stepsKey={run.steps.map((s) => s.status).join()} />
           )}
 
           <StepList
@@ -214,7 +220,10 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
                 <p className="text-sm font-semibold">
                   {run.labLabel}{" "}
                   <span className="font-normal text-muted-foreground">
-                    · {run.target.kind === "local-docker" ? "on this computer" : `on ${run.target.label}`}
+                    ·{" "}
+                    {run.target.kind === "local-docker"
+                      ? "on this computer"
+                      : `on ${run.target.label}`}
                   </span>
                 </p>
                 <p className="text-xs text-muted-foreground">
@@ -241,15 +250,27 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
                   Run on this computer instead
                 </Button>
               ) : !runtime ? (
-                <Button size="sm" disabled={pending || Boolean(approval)} onClick={() => proposeLab("prepare")}>
+                <Button
+                  size="sm"
+                  disabled={pending || Boolean(approval)}
+                  onClick={() => proposeLab("prepare")}
+                >
                   Start lab
                 </Button>
               ) : runtime.phase === "stopped" ? (
-                <Button size="sm" disabled={pending || Boolean(approval)} onClick={() => proposeLab("resume")}>
+                <Button
+                  size="sm"
+                  disabled={pending || Boolean(approval)}
+                  onClick={() => proposeLab("resume")}
+                >
                   Resume
                 </Button>
               ) : runtime.phase === "failed" ? (
-                <Button size="sm" disabled={pending || Boolean(approval)} onClick={() => proposeLab("restart")}>
+                <Button
+                  size="sm"
+                  disabled={pending || Boolean(approval)}
+                  onClick={() => proposeLab("restart")}
+                >
                   Start again
                 </Button>
               ) : runtime.phase !== "queued" ? (
@@ -265,7 +286,9 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
             </div>
 
             {labMessage ? (
-              <p className="border-b border-border/70 px-4 py-2 text-xs text-muted-foreground">{labMessage}</p>
+              <p className="border-b border-border/70 px-4 py-2 text-xs text-muted-foreground">
+                {labMessage}
+              </p>
             ) : null}
             {approval ? (
               <div className="p-4">
@@ -280,7 +303,9 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
               </div>
             ) : runtime && run.labShell && runtime.phase !== "stopped" ? (
               <div className="border-b border-border/70 p-4">
-                <p className="mb-2 text-xs text-muted-foreground">Open a terminal on your computer and run:</p>
+                <p className="mb-2 text-xs text-muted-foreground">
+                  Open a terminal on your computer and run:
+                </p>
                 <CommandBlock code={run.labShell} lang="terminal" />
               </div>
             ) : null}
@@ -370,7 +395,10 @@ function CurrentStep({
       <p className="text-xs font-medium text-primary">Step {step.ordinal}</p>
       <h2 className="mt-0.5 text-lg font-semibold">{step.title}</h2>
 
-      <StepText text={step.instruction} className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground" />
+      <StepText
+        text={step.instruction}
+        className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground"
+      />
 
       {step.verify ? (
         <div className="mt-4 rounded-lg bg-emerald-500/5 px-3 py-2.5 ring-1 ring-emerald-500/25">
@@ -383,12 +411,20 @@ function CurrentStep({
         <input
           value={artifact}
           onChange={(event) => setArtifact(event.target.value)}
-          placeholder={step.produces ? `Result (optional): ${step.produces}` : "Result (optional): a path, output or link"}
+          placeholder={
+            step.produces
+              ? `Result (optional): ${step.produces}`
+              : "Result (optional): a path, output or link"
+          }
           aria-label="Result of this step"
           className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm"
         />
         <Button onClick={onComplete} disabled={pending}>
-          {pending ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Check aria-hidden="true" />}
+          {pending ? (
+            <Loader2 className="animate-spin" aria-hidden="true" />
+          ) : (
+            <Check aria-hidden="true" />
+          )}
           Done, next step
         </Button>
         {canCheck ? (
@@ -413,7 +449,12 @@ function CurrentStep({
       {checkNote ? <p className="mt-2 text-xs text-muted-foreground">{checkNote}</p> : null}
 
       {stuck ? (
-        <StuckPanel runId={runId} step={step} onClose={() => setStuck(false)} onRevised={onRevised} />
+        <StuckPanel
+          runId={runId}
+          step={step}
+          onClose={() => setStuck(false)}
+          onRevised={onRevised}
+        />
       ) : (
         <button
           type="button"
@@ -493,7 +534,10 @@ function StuckPanel({
       ) : (
         <>
           <p className="text-sm font-medium">{help.whatHappened}</p>
-          <StepText text={help.fix} className="space-y-3 text-sm leading-relaxed text-muted-foreground" />
+          <StepText
+            text={help.fix}
+            className="space-y-3 text-sm leading-relaxed text-muted-foreground"
+          />
           <div className="flex flex-wrap items-center gap-2">
             {help.stepWasWrong && help.revisedInstruction ? (
               <Button size="sm" disabled={busy} onClick={accept}>
@@ -543,13 +587,19 @@ function StepList({
             >
               {done ? <Check className="size-3.5" aria-hidden="true" /> : step.ordinal}
             </span>
-            <span className={`min-w-0 flex-1 truncate ${isCurrent ? "font-medium" : done ? "text-muted-foreground" : ""}`}>
+            <span
+              className={`min-w-0 flex-1 truncate ${isCurrent ? "font-medium" : done ? "text-muted-foreground" : ""}`}
+            >
               {step.title}
             </span>
             {done ? (
               <>
                 <span className="hidden text-xs text-muted-foreground sm:inline">
-                  {step.completion === "verified" ? "checked" : step.artifact ? "result saved" : "no result"}
+                  {step.completion === "verified"
+                    ? "checked"
+                    : step.artifact
+                      ? "result saved"
+                      : "no result"}
                 </span>
                 <button
                   type="button"
@@ -589,7 +639,9 @@ function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => Prom
 
   return (
     <div className="flex flex-wrap items-center gap-2 px-1 text-xs">
-      <span>Replan the steps you haven&apos;t finished? Finished steps and their results stay.</span>
+      <span>
+        Replan the steps you haven&apos;t finished? Finished steps and their results stay.
+      </span>
       <Button
         size="sm"
         variant="outline"
@@ -611,115 +663,5 @@ function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => Prom
       </Button>
       {note ? <span className="text-amber-600">{note}</span> : null}
     </div>
-  );
-}
-
-/**
- * The finish line: read what the project can honestly say, then save it as evidence once.
- * One primary action. Everything else — a post, a résumé line, an interview story — is optional
- * and stays available afterwards, so nobody has to click through suggestions to be done.
- */
-function FinishPanel({ runId, stepsKey }: { runId: string; stepsKey: string }) {
-  const [view, setView] = useState<FinishView | null>(null);
-  const [summary, setSummary] = useState("");
-  const [note, setNote] = useState<string | null>(null);
-  const [busy, start] = useTransition();
-
-  useEffect(() => {
-    let alive = true;
-    void projectFinishAction({ runId }).then((result) => {
-      if (!alive || !result.ok) return;
-      setView(result.view);
-      setSummary((current) => current || result.view.review.summary);
-    });
-    return () => {
-      alive = false;
-    };
-  }, [runId, stepsKey]);
-
-  if (!view) {
-    return (
-      <p className="flex items-center gap-2 rounded-2xl border border-border bg-card p-5 text-sm text-muted-foreground">
-        <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Checking the project…
-      </p>
-    );
-  }
-
-  if (view.savedEvidenceId) {
-    return (
-      <section className="rounded-2xl border border-primary/30 bg-card p-5">
-        <p className="text-xs font-medium text-primary">Project complete</p>
-        <h2 className="mt-0.5 text-lg font-semibold">Saved to your evidence</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          It now counts toward your résumé and the documents Fadi drafts. You can edit it in Evidence.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button nativeButton={false} variant="outline" size="sm" render={<Link href="/dashboard/evidence" />}>
-            Open evidence
-          </Button>
-          <Button nativeButton={false} variant="ghost" size="sm" render={<Link href="/dashboard/interview" />}>
-            Practise telling it
-          </Button>
-        </div>
-        <div className="mt-4">
-          <PostComposer runId={runId} />
-        </div>
-      </section>
-    );
-  }
-
-  const { review } = view;
-  return (
-    <section className="rounded-2xl border border-primary/30 bg-card p-5">
-      <p className="text-xs font-medium text-primary">Project complete</p>
-      <h2 className="mt-0.5 text-lg font-semibold">Review what you built</h2>
-
-      <ul className="mt-3 space-y-1 text-sm">
-        {review.lines.map((line) => (
-          <li key={line.ordinal} className="flex gap-2">
-            <span className="w-28 shrink-0 text-xs leading-5 text-muted-foreground">{line.proof}</span>
-            <span className="min-w-0">
-              {line.title}
-              {line.result ? <span className="text-muted-foreground"> — {line.result}</span> : null}
-            </span>
-          </li>
-        ))}
-      </ul>
-
-      <label htmlFor="finish-summary" className="mt-4 block text-sm font-medium">
-        In your words
-      </label>
-      <textarea
-        id="finish-summary"
-        value={summary}
-        onChange={(event) => setSummary(event.target.value)}
-        rows={6}
-        className="mt-1 w-full rounded-md border border-border bg-background p-3 text-sm"
-      />
-      {review.shownCount === 0 ? (
-        <p className="mt-1 text-xs text-muted-foreground">
-          No step recorded a result, so add what you actually did before saving.
-        </p>
-      ) : null}
-
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Button
-          disabled={busy || summary.trim().length < 20}
-          onClick={() =>
-            start(async () => {
-              const result = await saveProjectEvidenceAction({ runId, summary });
-              setNote(result.ok ? null : result.message);
-              if (result.ok && result.evidenceItemId) {
-                setView({ ...view, savedEvidenceId: result.evidenceItemId });
-              }
-            })
-          }
-        >
-          {busy ? <Loader2 className="animate-spin" aria-hidden="true" /> : <Check aria-hidden="true" />}
-          Save as evidence
-        </Button>
-      </div>
-      {note ? <p className="mt-2 text-xs text-destructive">{note}</p> : null}
-    </section>
   );
 }
