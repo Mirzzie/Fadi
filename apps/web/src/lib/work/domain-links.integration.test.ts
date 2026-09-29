@@ -77,11 +77,10 @@ suite("Domain links into the work kernel", () => {
     const { linkProjectRunToWork } = await import("./domain-links");
     const goal = await work.activeGoal(userId);
     expect(goal).toBeDefined();
-    const { run } = await createProjectRunsRepository(db).createWithSteps(
-      userId,
-      { title: "Threat-model an API" },
-      [{ ordinal: 1, title: "Map trust boundaries", instruction: "Draw the data flow." }]
-    );
+    const runs = createProjectRunsRepository(db);
+    const { run, steps } = await runs.createWithSteps(userId, { title: "Threat-model an API" }, [
+      { ordinal: 1, title: "Map trust boundaries", instruction: "Draw the data flow." },
+    ]);
 
     const first = await linkProjectRunToWork(db, userId, run);
     const repeated = await linkProjectRunToWork(db, userId, run);
@@ -93,5 +92,17 @@ suite("Domain links into the work kernel", () => {
     expect(
       await work.listOutputs(userId, { workItemId: first!.id, kind: "project_run" })
     ).toHaveLength(1);
+
+    await runs.setStepStatus(userId, steps[0].id, { status: "done" });
+    expect((await work.get(userId, first!.id))?.status).toBe("done");
+
+    await runs.setStepStatus(userId, steps[0].id, { status: "pending" });
+    expect((await work.get(userId, first!.id))?.status).toBe("active");
+
+    await runs.abandon(userId, run.id);
+    expect((await work.get(userId, first!.id))?.status).toBe("dropped");
+
+    expect(await runs.remove(userId, run.id)).toBe(true);
+    expect(await work.get(userId, first!.id)).toBeUndefined();
   });
 });

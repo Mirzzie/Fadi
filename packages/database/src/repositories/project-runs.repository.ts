@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, ne } from "drizzle-orm";
 
-import type { Database } from "../client";
+import type { Database, DbOrTx } from "../client";
 import {
   projectRuns,
   projectSteps,
@@ -8,12 +8,13 @@ import {
   type ProjectRun,
   type ProjectStep,
 } from "../schema/index";
+import { createWorkItemsRepository } from "./work-items.repository";
 
 /**
  * Decide whether a run is finished from its steps. Done means every step done, from a nonempty
  * set; a skipped step is not a met requirement; reopening reopens. Abandoned runs are left alone.
  */
-async function settleRun(db: Database, runId: string, status: string): Promise<void> {
+async function settleRun(db: DbOrTx, runId: string, status: string): Promise<void> {
   if (status === "abandoned") return;
   const steps = await db
     .select({ status: projectSteps.status })
@@ -30,6 +31,22 @@ async function settleRun(db: Database, runId: string, status: string): Promise<v
       .update(projectRuns)
       .set({ status: "running", completedAt: null, updatedAt: new Date() })
       .where(eq(projectRuns.id, runId));
+  }
+}
+
+/** Keep Today's project action aligned with the project record that owns its truth. */
+async function settleProjectWork(
+  db: DbOrTx,
+  userId: string,
+  runId: string,
+  runStatus: string
+): Promise<void> {
+  const work = createWorkItemsRepository(db);
+  const linked = await work.listForRef(userId, { type: "project_run", id: runId });
+  const target = runStatus === "done" ? "done" : runStatus === "abandoned" ? "dropped" : "active";
+
+  for (const item of linked) {
+    if (item.status !== target) await work.setStatus(userId, item.id, target);
   }
 }
 
@@ -168,7 +185,15 @@ export function createProjectRunsRepository(db: Database) {
         // retries all see one answer. Done means every step done, from a nonempty set; a skipped
         // step is not a met requirement. Reopening a step reopens the run and leaves any saved
         // evidence alone.
-        if (run) await settleRun(tx as unknown as Database, step.runId, run.status);
+        if (run) {
+          await settleRun(tx, step.runId, run.status);
+          const [settled] = await tx
+            .select({ status: projectRuns.status })
+            .from(projectRuns)
+            .where(eq(projectRuns.id, step.runId))
+            .limit(1);
+          if (settled) await settleProjectWork(tx, userId, step.runId, settled.status);
+        }
         return updated ?? null;
       });
     },
@@ -184,7 +209,15 @@ export function createProjectRunsRepository(db: Database) {
           .from(projectRuns)
           .where(and(eq(projectRuns.id, runId), eq(projectRuns.userId, userId)))
           .for("update");
-        if (run) await settleRun(tx as unknown as Database, runId, run.status);
+        if (run) {
+          await settleRun(tx, runId, run.status);
+          const [settled] = await tx
+            .select({ status: projectRuns.status })
+            .from(projectRuns)
+            .where(eq(projectRuns.id, runId))
+            .limit(1);
+          if (settled) await settleProjectWork(tx, userId, runId, settled.status);
+        }
       });
     },
 
@@ -266,10 +299,14 @@ export function createProjectRunsRepository(db: Database) {
      * wasn't for me" stays visible instead of becoming a gap nobody can explain later.
      */
     async abandon(userId: string, runId: string): Promise<void> {
-      await db
-        .update(projectRuns)
-        .set({ status: "abandoned", updatedAt: new Date() })
-        .where(and(eq(projectRuns.userId, userId), eq(projectRuns.id, runId)));
+      await db.transaction(async (tx) => {
+        const rows = await tx
+          .update(projectRuns)
+          .set({ status: "abandoned", completedAt: null, updatedAt: new Date() })
+          .where(and(eq(projectRuns.userId, userId), eq(projectRuns.id, runId)))
+          .returning({ id: projectRuns.id });
+        if (rows.length > 0) await settleProjectWork(tx, userId, runId, "abandoned");
+      });
     },
 
     /**
@@ -280,11 +317,17 @@ export function createProjectRunsRepository(db: Database) {
      * than the person whose account it is.
      */
     async remove(userId: string, runId: string): Promise<boolean> {
-      const rows = await db
-        .delete(projectRuns)
-        .where(and(eq(projectRuns.userId, userId), eq(projectRuns.id, runId)))
-        .returning({ id: projectRuns.id });
-      return rows.length > 0;
+      return db.transaction(async (tx) => {
+        const work = createWorkItemsRepository(tx);
+        const linked = await work.listForRef(userId, { type: "project_run", id: runId });
+        const rows = await tx
+          .delete(projectRuns)
+          .where(and(eq(projectRuns.userId, userId), eq(projectRuns.id, runId)))
+          .returning({ id: projectRuns.id });
+        if (rows.length === 0) return false;
+        for (const item of linked) await work.remove(userId, item.id);
+        return true;
+      });
     },
 
     /** Where this project's work lives. Set once at commit; changed if the person moves it. */
@@ -342,7 +385,13 @@ export function createProjectRunsRepository(db: Database) {
           .update(projectRuns)
           .set({ updatedAt: new Date() })
           .where(eq(projectRuns.id, runId));
-        await settleRun(tx as unknown as Database, runId, run.status);
+        await settleRun(tx, runId, run.status);
+        const [settled] = await tx
+          .select({ status: projectRuns.status })
+          .from(projectRuns)
+          .where(eq(projectRuns.id, runId))
+          .limit(1);
+        if (settled) await settleProjectWork(tx, userId, runId, settled.status);
         return { kept, added };
       });
     },
@@ -369,14 +418,18 @@ export function createProjectRunsRepository(db: Database) {
     },
 
     async setRunStatus(userId: string, runId: string, status: string): Promise<void> {
-      await db
-        .update(projectRuns)
-        .set({
-          status,
-          completedAt: status === "done" ? new Date() : null,
-          updatedAt: new Date(),
-        })
-        .where(and(eq(projectRuns.userId, userId), eq(projectRuns.id, runId)));
+      await db.transaction(async (tx) => {
+        const rows = await tx
+          .update(projectRuns)
+          .set({
+            status,
+            completedAt: status === "done" ? new Date() : null,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(projectRuns.userId, userId), eq(projectRuns.id, runId)))
+          .returning({ id: projectRuns.id });
+        if (rows.length > 0) await settleProjectWork(tx, userId, runId, status);
+      });
     },
   };
 }
