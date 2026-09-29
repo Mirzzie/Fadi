@@ -559,3 +559,65 @@ The redesign is successful when these journeys are possible:
 Claude should finish the claimed Phase 1 boundary. Codex can take the three P0 correctness repairs and the Practice/Interview simplification after Phase 1's navigation and work-item contracts stop moving. The Realtime client and brand publisher should start only after the shared work-scoped interaction gateway is stable; otherwise they will become two more disconnected Fadi implementations.
 
 The main instruction is restraint: do not add another dashboard, planner, persona, sync control or assistant surface. Connect the ones that already exist through the work kernel and remove the choices the system can make reliably.
+
+## 2026-09-29 implementation follow-up: application workspace
+
+The screenshot exposed a data-flow defect as well as a hierarchy defect. The page loaded the
+application row, but every fit, document and interview tool received the shared job-board row.
+A description pasted into the application could therefore exist in the database while the
+workspace said it was missing. An edited application title, company or URL was ignored too.
+
+This follow-up makes the saved application context authoritative, with the discovered job as a
+field-by-field fallback. One tested resolver now supplies the workspace, document generators and
+interview route.
+
+The workspace now renders by lifecycle stage:
+
+1. With no job description, the only task is to paste and save it.
+2. While interested, fit is the primary decision.
+3. Once applied or interviewing, preparation for this exact role becomes primary.
+4. Once finished, the outcome is primary.
+5. Documents remain visible, while scoring, red-pen review, company research and early interview
+   practice sit under one **More tools** disclosure.
+
+Automatic preparation now creates a resume and cover letter. The cold email remains optional.
+The value-proposition document is no longer offered here. The redundant embedded chat, the
+accordion wrapper, and the job-level evidence-selection panel were deleted rather than hidden.
+
+### Interview truth and next contract
+
+The role-specific wiring is now correct: launching voice practice from a workspace uses the saved
+application title, employer and description. The current experience is still turn-based answer
+practice. It records a complete answer, uploads it, transcribes it, scores it, and waits for the
+person to advance. It is not yet a face-to-face live interview.
+
+Do not relabel it as live until one continuous WebRTC conversation supplies all of these:
+
+- visible **listening**, **thinking** and **speaking** states;
+- semantic end-of-turn detection so a thoughtful pause is not treated as a finished answer;
+- barge-in, so the person can interrupt Fadi and Fadi immediately stops speaking;
+- one interviewer persona selected from the interview stage, without another user-facing selector;
+- questions and follow-ups grounded in the exact posting, selected career evidence and prior turns;
+- a live transcript the person can correct after the session;
+- no audio retention by default, with explicit consent if audio is saved;
+- structured feedback after the interview rather than coaching that breaks the simulation mid-answer.
+
+OpenAI's current VAD contract places turn detection at
+`session.audio.input.turn_detection`. `semantic_vad` with low eagerness is designed to let the
+speaker take time, and `interrupt_response: true` supports interruption
+([official VAD guide](https://developers.openai.com/api/docs/guides/realtime-vad)).
+The existing broker still calls `/v1/realtime/sessions`, uses the older top-level VAD shape, and
+has no browser client. Treat it as unfinished infrastructure, not a working interview surface.
+
+Changed implementation paths:
+
+- `apps/web/src/lib/applications/job-context.ts`
+- `apps/web/src/app/dashboard/applications/[jobId]/workspace/page.tsx`
+- `apps/web/src/app/dashboard/applications/[jobId]/workspace/actions.ts`
+- `apps/web/src/app/dashboard/interview/page.tsx`
+- `apps/web/src/components/workspace/job-context-card.tsx`
+- `apps/web/src/components/workspace/workspace-doc-actions.tsx`
+
+Verification: 1,326 tests passed, 140 skipped; full database and web typecheck passed; targeted lint
+and formatting passed. The unauthenticated route compiled and returned HTTP 200. A logged-in visual
+pass remains necessary because no browser session was available to the verifier.

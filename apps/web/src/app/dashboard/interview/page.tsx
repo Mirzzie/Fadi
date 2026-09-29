@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { MockInterview, type PracticeJob } from "@/components/interview/mock-interview";
 import { StoryBank } from "@/components/interview/story-bank";
+import { resolveApplicationJobContext } from "@/lib/applications/job-context";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDashboardProfileSummary } from "@/lib/career-report/data";
 import { listStories } from "@/lib/interview/story-bank";
@@ -54,9 +55,13 @@ export default async function InterviewPage({
 /** The posting to practise for, or null when it is missing or belongs to somebody else. */
 async function practiceJobFor(userId: string, jobId: string): Promise<PracticeJob | null> {
   if (!/^[0-9a-f-]{36}$/i.test(jobId)) return null;
-  const { createJobsRepository } = await import("@careeros/database");
+  const { createApplicationsRepository, createJobsRepository } = await import("@careeros/database");
   const { getDatabase } = await import("@/lib/database/client");
-  const job = await createJobsRepository(getDatabase()).findById(jobId);
-  if (!job || (job.ownerUserId && job.ownerUserId !== userId)) return null;
-  return { title: job.title, company: job.company, description: job.description ?? null };
+  const db = getDatabase();
+  const [job, applications] = await Promise.all([
+    createJobsRepository(db).findByIdForUser(userId, jobId),
+    createApplicationsRepository(db).listForUserByJobIds(userId, [jobId]),
+  ]);
+  if (!job) return null;
+  return resolveApplicationJobContext(job, applications[0]);
 }

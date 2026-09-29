@@ -63,7 +63,7 @@ export function InterviewPrepPanel({
         </div>
         <div className="flex items-center gap-2">
           {jobId ? (
-            // Practise out loud against THIS posting — same job, same description, spoken answers.
+            // Practise answers by voice against THIS posting — same job, same description, spoken answers.
             <Button
               size="sm"
               variant="outline"
@@ -71,7 +71,7 @@ export function InterviewPrepPanel({
               render={<Link href={`/dashboard/interview?jobId=${jobId}`} />}
             >
               <Mic className="size-3.5" aria-hidden="true" />
-              Practise out loud
+              Practise answers by voice
             </Button>
           ) : null}
           <Button

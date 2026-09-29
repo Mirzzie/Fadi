@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 
 import {
   createApplicationsRepository,
@@ -8,6 +9,7 @@ import {
   createDocumentsRepository,
   createJobsRepository,
 } from "@careeros/database";
+import { resolveApplicationJobContext } from "@/lib/applications/job-context";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { AiRateLimitError, getUserDocGenerate } from "@/lib/ai/user-generate";
 import { generateCareerDocument, NoHistoryError, type DocKind } from "@/lib/documents/generate";
@@ -16,6 +18,59 @@ import { checkPostingLiveness, type PostingLiveness } from "@/lib/jobs/liveness"
 import { logger } from "@/lib/observability/logger";
 
 type Result = { ok: boolean; message: string; id?: string };
+
+const jobDescriptionSchema = z.string().trim().min(50).max(50_000);
+
+/** Save one authoritative posting copy for every tool in this application workspace. */
+export async function saveWorkspaceJobDescriptionAction(
+  jobId: string,
+  rawDescription: string
+): Promise<Result> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+
+  const parsed = jobDescriptionSchema.safeParse(rawDescription);
+  if (!parsed.success) {
+    return { ok: false, message: "Paste at least 50 characters from the job posting." };
+  }
+
+  try {
+    const db = getDatabase();
+    const job = await createJobsRepository(db).findByIdForUser(user.id, jobId);
+    if (!job) return { ok: false, message: "Job not found." };
+
+    const applications = createApplicationsRepository(db);
+    const existing = (await applications.listForUserByJobIds(user.id, [jobId]))[0];
+    if (existing) {
+      await applications.updateForUser(user.id, existing.id, {
+        jobDescription: parsed.data,
+      });
+    } else {
+      const activeTrack = await createCareerProfilesRepository(db)
+        .getActiveForUser(user.id)
+        .catch(() => null);
+      await applications.createForUser(user.id, {
+        jobId,
+        company: job.company,
+        title: job.title,
+        url: job.url,
+        jobDescription: parsed.data,
+        careerProfileId: activeTrack?.id ?? null,
+        status: "interested",
+      });
+    }
+
+    revalidatePath(`/dashboard/applications/${jobId}/workspace`);
+    return { ok: true, message: "Job description saved." };
+  } catch (error) {
+    logger.error("workspace.save_job_description_failed", {
+      userId: user.id,
+      jobId,
+      error: error instanceof Error ? error.message : "unknown",
+    });
+    return { ok: false, message: "Fadi couldn't save the job description." };
+  }
+}
 
 /**
  * Is this posting still open? Saves the user from pouring effort into a role
@@ -66,6 +121,11 @@ export async function generateJobDocumentAction(jobId: string, kind: DocKind): P
     // Ensure an application row exists (don't clobber an existing status).
     const apps = createApplicationsRepository(db);
     const existing = (await apps.listForUserByJobIds(user.id, [jobId]))[0];
+    const context = resolveApplicationJobContext(job, existing);
+    if (!context.description) {
+      return { ok: false, message: "Add the job description before drafting documents." };
+    }
+
     const activeTrack = existing
       ? null
       : await createCareerProfilesRepository(db)
@@ -75,9 +135,10 @@ export async function generateJobDocumentAction(jobId: string, kind: DocKind): P
       existing ??
       (await apps.createForUser(user.id, {
         jobId,
-        company: job.company,
-        title: job.title,
-        url: job.url,
+        company: context.company,
+        title: context.title,
+        url: context.url,
+        jobDescription: context.description,
         careerProfileId: activeTrack?.id ?? null,
         status: "interested",
       }));
@@ -91,9 +152,9 @@ export async function generateJobDocumentAction(jobId: string, kind: DocKind): P
       user.id,
       {
         kind,
-        jobTitle: job.title,
-        company: job.company,
-        jobDescription: job.description,
+        jobTitle: context.title,
+        company: context.company,
+        jobDescription: context.description,
         jobId,
         applicationId: application.id,
       },
@@ -119,14 +180,14 @@ export async function generateJobDocumentAction(jobId: string, kind: DocKind): P
   }
 }
 
-// The full packet Fadi prepares when auto-prep is on (the four DocKinds).
-const AUTO_PREP_KINDS: DocKind[] = ["resume", "cover_letter", "email", "value_proposition"];
+// Auto-prep creates the two documents normally required for an application.
+const AUTO_PREP_KINDS: DocKind[] = ["resume", "cover_letter"];
 
 type AutoPrepResult = { ok: boolean; message: string; created: number };
 
 /**
- * Auto-prepare the full application packet for a job — CV, cover letter, cold
- * email, value proposition — in one go. Idempotent: only generates the kinds
+ * Auto-prepare the normal application documents for a job: resume and cover
+ * letter. Idempotent: only generates the kinds
  * that don't already have a document for this job, so re-running (or a manual
  * draft the user already made) is never clobbered. Triggered by the workspace
  * when the user has opted into auto-prep; manual stays the default.
@@ -160,13 +221,23 @@ export async function autoPrepJobAction(jobId: string): Promise<AutoPrepResult> 
     // Ensure an application row exists (don't clobber an existing status).
     const apps = createApplicationsRepository(db);
     const existingApp = (await apps.listForUserByJobIds(user.id, [jobId]))[0];
+    const context = resolveApplicationJobContext(job, existingApp);
+    if (!context.description) {
+      return {
+        ok: false,
+        message: "Add the job description before Fadi prepares documents.",
+        created: 0,
+      };
+    }
+
     const application =
       existingApp ??
       (await apps.createForUser(user.id, {
         jobId,
-        company: job.company,
-        title: job.title,
-        url: job.url,
+        company: context.company,
+        title: context.title,
+        url: context.url,
+        jobDescription: context.description,
         status: "interested",
       }));
 
@@ -177,9 +248,9 @@ export async function autoPrepJobAction(jobId: string): Promise<AutoPrepResult> 
           user.id,
           {
             kind,
-            jobTitle: job.title,
-            company: job.company,
-            jobDescription: job.description,
+            jobTitle: context.title,
+            company: context.company,
+            jobDescription: context.description,
             jobId,
             applicationId: application.id,
           },
