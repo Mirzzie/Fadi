@@ -13,6 +13,7 @@ import { z } from "zod";
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
+import { syncApplicationWork } from "@/lib/applications/sync-work";
 import { applyIntentFilter, parseJobPrompt, type JobSearchIntent } from "@/lib/jobs/ai-search";
 import { surfForJobs } from "@/lib/jobs/web-surfer";
 import { isSafeFetchUrl } from "@/lib/security/url-guard";
@@ -239,13 +240,14 @@ export async function updateApplicationStatusAction(
       };
     }
 
-    await applicationsRepository.upsertStatusForUser(user.id, {
+    const application = await applicationsRepository.upsertStatusForUser(user.id, {
       jobId: job.id,
       company: job.company,
       title: job.title,
       url: job.url,
       status: parsedStatus.data,
     });
+    await syncApplicationWork(user.id, application);
 
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/jobs");

@@ -3,7 +3,8 @@ import "server-only";
 import { createApplicationsRepository } from "@careeros/database";
 
 import { getDatabase } from "@/lib/database/client";
-import type { ConsequentialResult, FadiTool, FadiToolContext, FadiToolResult } from "./types";
+import { syncApplicationWork } from "@/lib/applications/sync-work";
+import type { ConsequentialResult, FadiTool, FadiToolContext } from "./types";
 
 /**
  * Fadi ACTS: add a role to the user's application tracker. Approval-gated by the
@@ -45,6 +46,7 @@ export const trackApplication: FadiTool = {
       jobDescription: jobDescription || null,
       status: "interested",
     });
+    await syncApplicationWork(ctx.userId, app);
 
     return {
       outcome: "performed",

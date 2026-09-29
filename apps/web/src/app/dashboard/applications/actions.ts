@@ -4,6 +4,7 @@ import { z } from "zod";
 import { createApplicationsRepository } from "@careeros/database";
 import { revalidatePath } from "next/cache";
 
+import { syncApplicationWork } from "@/lib/applications/sync-work";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
@@ -89,6 +90,7 @@ export async function markApplicationApplied(input: {
       url: input.url ?? null,
       status: "applied",
     });
+    await syncApplicationWork(user.id, application);
 
     let momentum: { value: number; delta: number; band: string; message: string } | undefined;
     if (!alreadyApplied && application.appliedAt) {

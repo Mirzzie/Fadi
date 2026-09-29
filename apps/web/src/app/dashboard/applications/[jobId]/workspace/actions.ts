@@ -10,6 +10,7 @@ import {
   createJobsRepository,
 } from "@careeros/database";
 import { resolveApplicationJobContext } from "@/lib/applications/job-context";
+import { syncApplicationWork } from "@/lib/applications/sync-work";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { AiRateLimitError, getUserDocGenerate } from "@/lib/ai/user-generate";
 import { generateCareerDocument, NoHistoryError, type DocKind } from "@/lib/documents/generate";
@@ -41,24 +42,25 @@ export async function saveWorkspaceJobDescriptionAction(
 
     const applications = createApplicationsRepository(db);
     const existing = (await applications.listForUserByJobIds(user.id, [jobId]))[0];
-    if (existing) {
-      await applications.updateForUser(user.id, existing.id, {
-        jobDescription: parsed.data,
-      });
-    } else {
-      const activeTrack = await createCareerProfilesRepository(db)
-        .getActiveForUser(user.id)
-        .catch(() => null);
-      await applications.createForUser(user.id, {
-        jobId,
-        company: job.company,
-        title: job.title,
-        url: job.url,
-        jobDescription: parsed.data,
-        careerProfileId: activeTrack?.id ?? null,
-        status: "interested",
-      });
-    }
+    const activeTrack = existing
+      ? null
+      : await createCareerProfilesRepository(db)
+          .getActiveForUser(user.id)
+          .catch(() => null);
+    const application = existing
+      ? await applications.updateForUser(user.id, existing.id, {
+          jobDescription: parsed.data,
+        })
+      : await applications.createForUser(user.id, {
+          jobId,
+          company: job.company,
+          title: job.title,
+          url: job.url,
+          jobDescription: parsed.data,
+          careerProfileId: activeTrack?.id ?? null,
+          status: "interested",
+        });
+    if (application) await syncApplicationWork(user.id, application);
 
     revalidatePath(`/dashboard/applications/${jobId}/workspace`);
     return { ok: true, message: "Job description saved." };
@@ -142,6 +144,7 @@ export async function generateJobDocumentAction(jobId: string, kind: DocKind): P
         careerProfileId: activeTrack?.id ?? null,
         status: "interested",
       }));
+    await syncApplicationWork(user.id, application);
 
     const generate = await getUserDocGenerate(user.id);
     if (!generate) {
@@ -240,6 +243,7 @@ export async function autoPrepJobAction(jobId: string): Promise<AutoPrepResult> 
         jobDescription: context.description,
         status: "interested",
       }));
+    await syncApplicationWork(user.id, application);
 
     let created = 0;
     for (const kind of todo) {

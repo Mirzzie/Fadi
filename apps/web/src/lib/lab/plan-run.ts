@@ -17,6 +17,7 @@ import {
 } from "./host-and-lab";
 import { specForProject, templateForProject } from "@/lib/lab/spec-from-project";
 import { logger } from "@/lib/observability/logger";
+import { linkProjectRunToWork } from "@/lib/work/domain-links";
 
 /**
  * TURN A SUGGESTION INTO STEPS SOMEONE CAN ACTUALLY FOLLOW.
@@ -169,7 +170,8 @@ export async function planProjectRun(
     ? [
         "ALREADY COMPLETED — these steps stay as they are. Do not repeat them; plan only the remaining work, continuing from here (1 to 8 steps):",
         ...input.completedSteps.map(
-          (step, index) => `${index + 1}. ${step.title}${step.result ? ` (result: ${step.result})` : ""}`
+          (step, index) =>
+            `${index + 1}. ${step.title}${step.result ? ` (result: ${step.result})` : ""}`
         ),
       ].join("\n")
     : "";
@@ -276,6 +278,19 @@ export async function planProjectRun(
       },
       rows
     );
+
+    // The run is the domain record; the kernel keeps only its id and why it matters. Linking is
+    // best-effort until the durable outbox owns cross-domain hand-offs: a failed link must not
+    // make a successfully-created project look failed and create a duplicate on retry.
+    try {
+      await linkProjectRunToWork(db, userId, run);
+    } catch (error) {
+      logger.warn("lab.run_work_link_failed", {
+        userId,
+        runId: run.id,
+        error: error instanceof Error ? error.message : "unknown",
+      });
+    }
 
     logger.info("lab.run_planned", {
       userId,

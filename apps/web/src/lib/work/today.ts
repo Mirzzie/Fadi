@@ -122,7 +122,8 @@ function toAction(item: WorkItem): TodayAction {
 
 const REF_ROUTES: Record<string, (id: string) => string> = {
   job: (id) => `/dashboard/jobs?job=${id}`,
-  application: (id) => `/dashboard/applications?application=${id}`,
+  application: () => "/dashboard/applications",
+  application_workspace: (id) => `/dashboard/applications/${id}/workspace`,
   document: (id) => `/dashboard/documents/${id}`,
   project: (id) => `/dashboard/learning/projects/${id}`,
   project_run: (id) => `/dashboard/learning/projects/${id}`,
