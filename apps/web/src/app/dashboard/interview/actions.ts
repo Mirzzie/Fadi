@@ -13,6 +13,8 @@ import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
 import { finishInterviewSessionWork, linkInterviewSessionToWork } from "@/lib/work/domain-links";
+import { kickOutbox } from "@/lib/outbox";
+import { enqueueOutbox } from "@/lib/outbox/topics";
 import {
   generateStoriesFromEvidence,
   storyFromMockAnswer,
@@ -163,8 +165,18 @@ export async function finishMockInterviewSession(input: {
       );
       if (!session) return false;
       await finishInterviewSessionWork(tx, user.id, input.sessionId, input.status);
+      if (input.status === "completed") {
+        await enqueueOutbox(
+          tx,
+          user.id,
+          "interview.completed",
+          { sessionId: input.sessionId },
+          input.sessionId
+        );
+      }
       return true;
     });
+    if (finished) kickOutbox();
     revalidatePath("/dashboard");
     return { ok: finished };
   } catch (error) {
@@ -182,10 +194,27 @@ export async function scoreMockAnswer(input: {
   question: string;
   answer: string;
   role?: string;
+  /** The session and question this answer belongs to, so its review outlives the page. */
+  sessionId?: string | null;
+  questionIndex?: number;
 }): Promise<{ ok: true; score: AnswerScore } | { ok: false; message: string }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
-  return scoreInterviewAnswer(user.id, input);
+  const result = await scoreInterviewAnswer(user.id, input);
+  if (
+    result.ok &&
+    input.sessionId &&
+    UUID.test(input.sessionId) &&
+    input.questionIndex !== undefined
+  ) {
+    await createInterviewSessionsRepository(getDatabase())
+      .recordReview(user.id, input.sessionId, input.questionIndex, {
+        scores: result.score.scores,
+        improvements: result.score.improvements.slice(0, 3),
+      })
+      .catch(() => false); // the review is still shown; only the later practice task misses it
+  }
+  return result;
 }
 
 /** Save a practiced mock answer into the story bank as a reusable STAR+R story. */

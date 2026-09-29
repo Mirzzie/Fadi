@@ -5,6 +5,7 @@ import { cookies } from "next/headers";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { TodayView } from "@/components/today/today-view";
+import { kickOutbox } from "@/lib/outbox";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDashboardProfileSummary } from "@/lib/career-report/data";
 import { getToday } from "@/lib/work/today";
@@ -37,6 +38,8 @@ export default async function TodayPage() {
     (await cookies()).get(MODE_COOKIE)?.value === "prepare" ? "prepare" : "apply";
   const firstName = profileSummary?.fullName?.trim().split(/\s+/)[0] || "there";
 
+  // Deliver any follow-up that is due — a retry after a failure waits for someone to come back.
+  kickOutbox();
   const today = await getToday(user.id, firstName, mode);
 
   // The digest lands in Fadi's chat once per finding; the next background pass runs after the

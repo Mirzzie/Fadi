@@ -2103,3 +2103,40 @@ export const mcpConnections = pgTable(
 
 export type McpConnection = typeof mcpConnections.$inferSelect;
 export type NewMcpConnection = typeof mcpConnections.$inferInsert;
+
+// ── Transactional outbox ──────────────────────────────────────────────────────
+// Cross-domain consequences of a write — a finished project reaching the work kernel, an
+// application outcome becoming a practice task — used to run in-process after the commit, where
+// a crash or a failing subscriber lost them for good. The producer now inserts one row here in
+// the SAME transaction as its own write, and one idempotent worker (apps/web lib/outbox) delivers
+// it, retrying with backoff. `dedupe_key` makes enqueueing idempotent too: the same fact queued
+// twice is one event.
+export const outboxEvents = pgTable(
+  "outbox_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    topic: text("topic").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull().default({}),
+    dedupeKey: text("dedupe_key").notNull(),
+    // pending → done, or failed once the attempts are spent.
+    status: text("status").notNull().default("pending"),
+    attempts: integer("attempts").notNull().default(0),
+    availableAt: timestamp("available_at", { withTimezone: true }).notNull().defaultNow(),
+    lockedUntil: timestamp("locked_until", { withTimezone: true }),
+    lastError: text("last_error"),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("outbox_events_dedupe_key_idx").on(table.dedupeKey),
+    index("outbox_events_due_idx").on(table.status, table.availableAt),
+    index("outbox_events_user_status_idx").on(table.userId, table.status),
+    check("outbox_events_status_check", sql`${table.status} in ('pending', 'done', 'failed')`),
+  ]
+);
+
+export type OutboxEvent = typeof outboxEvents.$inferSelect;
+export type NewOutboxEvent = typeof outboxEvents.$inferInsert;

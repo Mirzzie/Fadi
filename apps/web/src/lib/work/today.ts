@@ -1,6 +1,7 @@
 import "server-only";
 
 import {
+  createOutboxRepository,
   createAgentRunsRepository,
   createCareerProfilesRepository,
   createEvidenceRepository,
@@ -153,6 +154,14 @@ function hrefForRefs(refs: WorkItem["refs"]): string {
   return "/dashboard";
 }
 
+/** What a queued follow-up is, in the person's terms. */
+const HANDOFF_LABEL: Record<string, string> = {
+  "learning.completed": "Adding a finished project to your plan",
+  "application.changed": "Updating an application in your plan",
+  "application.outcome": "Turning a rejection into a next step",
+  "interview.completed": "Turning a practice interview into a next step",
+};
+
 export async function getToday(
   userId: string,
   firstName: string,
@@ -174,17 +183,27 @@ export async function getToday(
     ? await createWorkItemsRepository(db).listOutputs(userId, { kind: "document" })
     : [];
 
-  const [steps, receipts, lastRun, direction, pendingReview, labRequests, setup, findings] =
-    await Promise.all([
-      activeGoal ? work.nextActions(userId, { goalId: activeGoal.id, limit: 4 }) : [],
-      work.listExecutions(userId, { limit: 4 }),
-      createAgentRunsRepository(db).getLastFinishedRunForUser(userId),
-      createCareerProfilesRepository(db).getActiveForUser(userId),
-      createEvidenceRepository(db).countPendingReview(userId),
-      createLabActionRequestsRepository(db).listPending(userId),
-      getSetupState(userId, mode),
-      createAgentRunsRepository(db).listUnseenForUser(userId, 3),
-    ]);
+  const [
+    steps,
+    receipts,
+    lastRun,
+    direction,
+    pendingReview,
+    labRequests,
+    setup,
+    findings,
+    handoffs,
+  ] = await Promise.all([
+    activeGoal ? work.nextActions(userId, { goalId: activeGoal.id, limit: 4 }) : [],
+    work.listExecutions(userId, { limit: 4 }),
+    createAgentRunsRepository(db).getLastFinishedRunForUser(userId),
+    createCareerProfilesRepository(db).getActiveForUser(userId),
+    createEvidenceRepository(db).countPendingReview(userId),
+    createLabActionRequestsRepository(db).listPending(userId),
+    getSetupState(userId, mode),
+    createAgentRunsRepository(db).listUnseenForUser(userId, 3),
+    createOutboxRepository(db).listUnsettled(userId, 5),
+  ]);
 
   const goal: TodayGoal = activeGoal
     ? {
@@ -280,14 +299,28 @@ export async function getToday(
     action,
     // At most three, and never a repeat of the primary action.
     alsoOpen: workActions.slice(1, 4),
-    receipts: receipts.map((row) => ({
-      id: row.id,
-      action: row.action,
-      status: row.status,
-      receipt: row.receipt,
-      error: row.error,
-      atLabel: ago(row.finishedAt ?? row.startedAt),
-    })),
+    receipts: [
+      // A follow-up that has failed at least once is shown, so a retry is never silent. One
+      // still on its first try is simply in progress and not worth a line.
+      ...handoffs
+        .filter((row) => row.status === "failed" || row.attempts > 0)
+        .map((row) => ({
+          id: row.id,
+          action: HANDOFF_LABEL[row.topic] ?? "Follow-up",
+          status: row.status === "failed" ? "failed" : "retrying",
+          receipt: "",
+          error: row.status === "failed" ? "Fadi gave up after several tries." : null,
+          atLabel: ago(row.createdAt),
+        })),
+      ...receipts.map((row) => ({
+        id: row.id,
+        action: row.action,
+        status: row.status,
+        receipt: row.receipt,
+        error: row.error,
+        atLabel: ago(row.finishedAt ?? row.startedAt),
+      })),
+    ],
     lastPassLabel: lastRun?.finishedAt ? ago(new Date(lastRun.finishedAt)) : null,
     suggestions: findings.slice(0, 3).map((finding) => ({
       label: finding.kind === "expired_saved_role" ? "Heads up" : "Fadi found",

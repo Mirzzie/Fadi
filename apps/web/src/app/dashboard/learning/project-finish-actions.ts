@@ -10,7 +10,8 @@ import {
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
-import { publish } from "@/lib/events/bus";
+import { kickOutbox } from "@/lib/outbox";
+import { enqueueOutbox } from "@/lib/outbox/topics";
 import {
   completionReview,
   type CompletionReview,
@@ -145,6 +146,19 @@ export async function saveProjectEvidenceAction(input: {
           admitted.insertedId
         );
       }
+      // Same transaction: the work kernel and the portfolio hear about this record exactly
+      // when it exists, even if the process dies before the response.
+      await enqueueOutbox(
+        tx,
+        user.id,
+        "learning.completed",
+        {
+          evidenceItemId: admitted.insertedId,
+          runId: project.run.id,
+          commitmentId: commitment?.id ?? null,
+        },
+        admitted.insertedId
+      );
       return { id: admitted.insertedId };
     });
 
@@ -176,11 +190,7 @@ export async function saveProjectEvidenceAction(input: {
         },
       }).catch(() => null);
     }
-    await publish("evidence.changed", {
-      userId: user.id,
-      reason: "learning_completed",
-      evidenceItemId: result.evidenceItemId,
-    });
+    kickOutbox();
     revalidatePath("/dashboard/learning");
     revalidatePath("/dashboard/evidence");
     logger.info("learning.project_evidence_saved", {

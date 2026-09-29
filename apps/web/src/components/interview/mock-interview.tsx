@@ -157,6 +157,8 @@ export function MockInterview({
         question: questions[idx].question,
         answer,
         role: config.role,
+        sessionId,
+        questionIndex: idx,
       });
       if (ownTurn !== turn.current) return;
       if (!res.ok) return setError(res.message);

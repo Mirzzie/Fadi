@@ -9,8 +9,9 @@ import {
 } from "@careeros/database";
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
+import { kickOutbox } from "@/lib/outbox";
+import { enqueueOutbox } from "@/lib/outbox/topics";
 import { getDatabase } from "@/lib/database/client";
-import { publish } from "@/lib/events/bus";
 import { generateBlueprint, type BlueprintResult } from "@/lib/learning/blueprint";
 import { toCommitmentView, type CommitmentView } from "@/lib/learning/commitments-view";
 import { suggestProjectsForGap, type SuggestResult } from "@/lib/learning/suggest";
@@ -261,6 +262,13 @@ export async function completeCommitmentAction(input: { id: string; whatIBuilt: 
         commitment.id,
         admitted.insertedId
       );
+      await enqueueOutbox(
+        tx,
+        user.id,
+        "learning.completed",
+        { evidenceItemId: admitted.insertedId, commitmentId: commitment.id },
+        admitted.insertedId
+      );
       return admitted.row;
     });
 
@@ -280,13 +288,9 @@ export async function completeCommitmentAction(input: { id: string; whatIBuilt: 
       metadata: { commitmentId: commitment.id, evidenceItemId: evidence.id, gap: commitment.gap },
     });
 
-    // The career record grew — tell whoever cares (portfolio, and later the
-    // résumé projection) rather than importing them from here.
-    await publish("evidence.changed", {
-      userId: user.id,
-      reason: "learning_completed",
-      evidenceItemId: evidence.id,
-    });
+    // The career record grew. Whoever cares (portfolio, Today, report staleness) hears it
+    // through the outbox row written with the record, delivered from here on.
+    kickOutbox();
     revalidatePath(PATH);
     revalidatePath("/dashboard/evidence");
     logger.info("learning.commitment_completed", {

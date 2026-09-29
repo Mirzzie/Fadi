@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 
 import { syncApplicationWork } from "@/lib/applications/sync-work";
 import { getCurrentAuthUser } from "@/lib/auth/session";
+import { kickOutbox } from "@/lib/outbox";
+import { enqueueOutbox } from "@/lib/outbox/topics";
 import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
 import {
@@ -447,6 +449,21 @@ export async function submitRejectionAutopsy(input: {
 
   try {
     const motion = await completeRejectionAutopsy(user.id, input.applicationId, input.reflection);
+    // What this "no" should change about what comes next: one suggested task on Today.
+    await enqueueOutbox(
+      getDatabase(),
+      user.id,
+      "application.outcome",
+      {
+        applicationId: input.applicationId,
+        outcome: "rejected",
+        stage: input.reflection.stage ?? null,
+        nextAction: input.reflection.nextAction ?? null,
+        sharperNext: motion.insight.sharperNextApplication[0] ?? null,
+      },
+      `${input.applicationId}:rejected`
+    );
+    kickOutbox();
     revalidatePath(workspacePath(input.jobId));
     return {
       ok: true,

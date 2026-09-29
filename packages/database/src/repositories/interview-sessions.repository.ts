@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, or } from "drizzle-orm";
+import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
 
 import type { DbOrTx } from "../client";
 import {
@@ -115,6 +115,34 @@ export function createInterviewSessionsRepository(db: DbOrTx) {
         .where(eq(interviewSessions.userId, userId))
         .orderBy(desc(interviewSessions.startedAt))
         .limit(limit);
+    },
+
+    /**
+     * Keep the review of one answered question on the session — the scores and the
+     * improvements, never the transcript — so a finished session can say what to practise next.
+     */
+    async recordReview(
+      userId: string,
+      id: string,
+      questionIndex: number,
+      review: { scores: Record<string, number> | null; improvements: string[] }
+    ): Promise<boolean> {
+      if (!Number.isInteger(questionIndex) || questionIndex < 0) return false;
+      const rows = await db
+        .update(interviewSessions)
+        .set({
+          questions: sql`jsonb_set(${interviewSessions.questions}, ${`{${questionIndex},review}`}::text[], ${JSON.stringify(review)}::jsonb, false)`,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(interviewSessions.userId, userId),
+            eq(interviewSessions.id, id),
+            sql`jsonb_array_length(${interviewSessions.questions}) > ${questionIndex}`
+          )
+        )
+        .returning({ id: interviewSessions.id });
+      return rows.length > 0;
     },
 
     async finishForUser(

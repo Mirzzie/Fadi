@@ -420,6 +420,7 @@ const RECEIPT_TONE: Record<string, string> = {
   refused: "text-muted-foreground",
   needs_input: "text-foreground",
   running: "text-muted-foreground",
+  retrying: "text-muted-foreground",
 };
 
 /** What the status means, said plainly. An empty string means the receipt speaks for itself. */
@@ -427,6 +428,7 @@ const RECEIPT_NOTE: Record<string, string> = {
   running: "still running",
   needs_input: "waiting on you",
   refused: "did not run",
+  retrying: "didn't go through yet; Fadi will try again",
 };
 
 function WhatFadiDid({ today }: { today: Today }) {

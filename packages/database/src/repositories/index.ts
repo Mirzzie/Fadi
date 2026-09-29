@@ -12,6 +12,7 @@ export * from "./evidence-artifacts.repository";
 export * from "./github-connections.repository";
 export * from "./interview-stories.repository";
 export * from "./interview-sessions.repository";
+export * from "./outbox.repository";
 export * from "./jobs.repository";
 export * from "./lab-action-requests.repository";
 export * from "./lab-permissions.repository";
