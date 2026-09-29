@@ -11,6 +11,7 @@ import {
   subscribeFadiVoiceProblem,
 } from "@/lib/voice/fadi-speech";
 import { parseVoiceCommand, VOICE_HELP, type VoiceCommand } from "@/lib/voice/commands";
+import { resolveVoiceSessionPhase } from "@/lib/voice/session-state";
 import { speakable } from "@/lib/voice/speakable";
 import {
   openThingAction,
@@ -70,7 +71,9 @@ export function useVoiceMode() {
   const hasSpoken = useRef(false);
   const lastSaid = useRef("");
   const onRef = useRef(false);
-  onRef.current = on;
+  useEffect(() => {
+    onRef.current = on;
+  }, [on]);
 
   // Set once the recogniser below exists. `say` is declared first because the handler needs it,
   // so it reaches the microphone through this rather than through a variable that is not yet
@@ -239,7 +242,15 @@ export function useVoiceMode() {
   });
 
   const listening = voiceState === "recording";
-  stopListeningRef.current = stop;
+  const phase = resolveVoiceSessionPhase({
+    recorder: voiceState,
+    speaking: speaking || awaitingSpeech,
+    thinking: busy,
+    error: Boolean(voiceProblem),
+  });
+  useEffect(() => {
+    stopListeningRef.current = stop;
+  }, [stop]);
 
   // The loop: whenever it is on and nothing else is happening, listen again. This is what makes
   // it hands-free — after the first press, the person never has to find a control.
@@ -258,8 +269,14 @@ export function useVoiceMode() {
   }, [on, busy, listening, speaking, awaitingSpeech, voiceState, start]);
 
   useEffect(() => {
-    setState(busy ? "thinking" : listening ? "listening" : "idle");
-  }, [busy, listening, setState]);
+    setState(
+      phase === "thinking" || phase === "transcribing" || phase === "requesting"
+        ? "thinking"
+        : phase === "listening"
+          ? "listening"
+          : "idle"
+    );
+  }, [phase, setState]);
 
   // Speech has finished when it started and then stopped.
   useEffect(() => {
@@ -303,7 +320,7 @@ export function useVoiceMode() {
     speakNow("I'm listening. Say 'what's on today', or ask me for help.");
   }, [speakNow, stop]);
 
-  return { on, busy, listening, heard, said, voiceProblem, toggle };
+  return { on, busy, listening, phase, heard, said, voiceProblem, toggle };
 }
 
 /** Fadi's own answer to a plain question, as text, so the loop can speak it. */

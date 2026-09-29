@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { FadiChat } from "@/components/fadi/fadi-chat";
 import { cn } from "@/lib/utils";
+import { VOICE_SESSION_LABEL } from "@/lib/voice/session-state";
 import { FadiCore } from "./fadi-core";
 import { useFadi, type FadiState } from "./fadi-presence";
 import { useVoiceMode } from "./use-voice-mode";
@@ -36,6 +37,16 @@ export function FadiOrb() {
     clearFocus,
   } = useFadi();
   const voice = useVoiceMode();
+  const voiceDisplayState: FadiState =
+    voice.phase === "speaking"
+      ? "speaking"
+      : voice.phase === "listening"
+        ? "listening"
+        : voice.phase === "thinking" ||
+            voice.phase === "transcribing" ||
+            voice.phase === "requesting"
+          ? "thinking"
+          : "idle";
 
   return (
     <>
@@ -86,6 +97,12 @@ export function FadiOrb() {
           </div>
         ) : null}
 
+        {voice.on ? (
+          <p role="status" className="rounded-full bg-popover/90 px-2.5 py-1 text-xs shadow">
+            {VOICE_SESSION_LABEL[voice.phase]}
+          </p>
+        ) : null}
+
         <div className="flex items-center gap-2">
           {/* Reading rather than listening: the same conversation, in text. */}
           <button
@@ -106,7 +123,7 @@ export function FadiOrb() {
             title={voice.on ? "Stop listening" : "Talk to Fadi, hands free"}
             className="relative grid place-items-center rounded-full"
           >
-            <OrbButton state={voice.on ? "listening" : displayState} />
+            <OrbButton state={voice.on ? voiceDisplayState : displayState} />
             <span
               className={cn(
                 "pointer-events-none absolute -bottom-1 grid size-6 place-items-center rounded-full border shadow-md transition-colors",

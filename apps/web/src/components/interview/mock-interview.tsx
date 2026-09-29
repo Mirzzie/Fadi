@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { BookmarkPlus, Check, ChevronRight, Mic, Square, Volume2, Wand2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -8,8 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { speakFadi, stopFadiSpeech } from "@/lib/voice/fadi-speech";
+import { primeFadiVoice, stopFadiSpeech } from "@/lib/voice/fadi-speech";
+import {
+  INTERVIEW_THOUGHTFUL_PAUSE_MS,
+  resolveVoiceSessionPhase,
+  VOICE_SESSION_LABEL,
+} from "@/lib/voice/session-state";
 import { useGroqVoice } from "@/lib/voice/use-groq-voice";
+import { useSpeechOutput } from "@/lib/voice/use-speech-output";
 import type { AnswerScore, MockQuestion } from "@/lib/interview/mock";
 import {
   finishMockInterviewSession,
@@ -80,12 +86,20 @@ export function MockInterview({
   const [score, setScore] = useState<AnswerScore | null>(null);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState<string | null>(null);
-  const [readAloud, setReadAloud] = useState(false);
+  const [voiceConversation, setVoiceConversation] = useState(true);
+  const [awaitingQuestionSpeech, setAwaitingQuestionSpeech] = useState(false);
   const turn = useRef(0);
+  const listenAfterSpeech = useRef(false);
+  const questionSpeechStarted = useRef(false);
   const [pending, startTransition] = useTransition();
+  const { state: speechState, speak: speakOutput } = useSpeechOutput();
 
   const voice = useGroqVoice({
-    autoStop: false,
+    autoStop: voiceConversation,
+    // A short dictation pause is 1.4 seconds. An interview answer needs room to think:
+    // four seconds ends a turn without cutting off a deliberate pause.
+    silenceMs: INTERVIEW_THOUGHTFUL_PAUSE_MS,
+    noSpeechMs: 10_000,
     maxMs: 180_000,
     onError: setError,
     onTranscript: (text) => {
@@ -94,15 +108,74 @@ export function MockInterview({
       setSaveState("idle");
     },
   });
+  const { start: startVoice, cancel: cancelVoice } = voice;
   const captureBusy = ["requesting", "recording", "transcribing"].includes(voice.state);
+  const phase = resolveVoiceSessionPhase({
+    recorder: voice.state,
+    speaking: speechState === "speaking" || awaitingQuestionSpeech,
+    thinking: pending && Boolean(answer.trim()),
+    ready: Boolean(answer.trim()) && !score,
+    error: Boolean(error),
+  });
+  const turnBusy = captureBusy || phase === "speaking";
+
+  const speakQuestion = useCallback(
+    (question: string, thenListen: boolean) => {
+      setError(null);
+      cancelVoice();
+      listenAfterSpeech.current = thenListen;
+      questionSpeechStarted.current = false;
+      setAwaitingQuestionSpeech(true);
+      speakOutput(question);
+    },
+    [cancelVoice, speakOutput]
+  );
 
   useEffect(() => {
-    if (readAloud && questions) void speakFadi(questions[idx].question);
-    return () => stopFadiSpeech();
-  }, [readAloud, idx, questions]);
+    if (!voiceConversation || !questions) return;
+    const timer = setTimeout(() => speakQuestion(questions[idx].question, true), 0);
+    return () => clearTimeout(timer);
+  }, [idx, questions, speakQuestion, voiceConversation]);
+
+  useEffect(() => {
+    if (speechState === "speaking") {
+      questionSpeechStarted.current = true;
+      return;
+    }
+    if (!questionSpeechStarted.current) return;
+    questionSpeechStarted.current = false;
+    setAwaitingQuestionSpeech(false);
+    if (!listenAfterSpeech.current) return;
+    listenAfterSpeech.current = false;
+    const timer = setTimeout(() => void startVoice(), 350);
+    return () => clearTimeout(timer);
+  }, [speechState, startVoice]);
+
+  // If this machine has no usable voice, the interview must still continue. Waiting forever
+  // would make the screen look frozen, so the microphone opens after a visible grace period.
+  useEffect(() => {
+    if (!awaitingQuestionSpeech) return;
+    const timer = setTimeout(() => {
+      if (!listenAfterSpeech.current) return;
+      listenAfterSpeech.current = false;
+      setAwaitingQuestionSpeech(false);
+      void startVoice();
+    }, 8_000);
+    return () => clearTimeout(timer);
+  }, [awaitingQuestionSpeech, startVoice]);
+
+  useEffect(
+    () => () => {
+      listenAfterSpeech.current = false;
+      stopFadiSpeech();
+    },
+    []
+  );
 
   function finishInterview(status: "completed" | "abandoned") {
     turn.current += 1;
+    listenAfterSpeech.current = false;
+    setAwaitingQuestionSpeech(false);
     voice.cancel();
     stopFadiSpeech();
     const finishing = sessionId;
@@ -118,11 +191,22 @@ export function MockInterview({
 
   function recordAnswer() {
     setError(null);
+    listenAfterSpeech.current = false;
+    setAwaitingQuestionSpeech(false);
+    stopFadiSpeech();
+    void voice.start();
+  }
+
+  function interruptAndAnswer() {
+    listenAfterSpeech.current = false;
+    questionSpeechStarted.current = false;
+    setAwaitingQuestionSpeech(false);
     stopFadiSpeech();
     void voice.start();
   }
 
   function start() {
+    if (voiceConversation) primeFadiVoice();
     const ownTurn = ++turn.current;
     voice.cancel();
     stopFadiSpeech();
@@ -190,6 +274,8 @@ export function MockInterview({
   function next() {
     if (!questions || captureBusy) return;
     turn.current += 1;
+    listenAfterSpeech.current = false;
+    setAwaitingQuestionSpeech(false);
     voice.cancel();
     stopFadiSpeech();
     setError(null);
@@ -274,13 +360,20 @@ export function MockInterview({
         <Field label="Job description (optional)">
           <Textarea rows={3} value={jd} onChange={(event) => setJd(event.target.value)} />
         </Field>
-        <label className="flex items-center gap-2 text-sm text-muted-foreground">
+        <label className="flex items-start gap-2 rounded-lg border border-border/60 p-3 text-sm">
           <input
             type="checkbox"
-            checked={readAloud}
-            onChange={(event) => setReadAloud(event.target.checked)}
+            className="mt-0.5"
+            checked={voiceConversation}
+            onChange={(event) => setVoiceConversation(event.target.checked)}
           />
-          Read questions aloud
+          <span>
+            <span className="block font-medium text-foreground">Voice conversation</span>
+            <span className="text-xs text-muted-foreground">
+              Fadi asks aloud and listens automatically. A four-second pause ends your answer; you
+              can still finish or interrupt manually.
+            </span>
+          </span>
         </label>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         <Button size="sm" onClick={start} disabled={pending || !config.role.trim()}>
@@ -319,9 +412,9 @@ export function MockInterview({
         size="sm"
         variant="ghost"
         disabled={captureBusy}
-        onClick={() => void speakFadi(q.question)}
+        onClick={() => speakQuestion(q.question, voiceConversation)}
       >
-        <Volume2 className="size-4" aria-hidden="true" /> Hear question
+        <Volume2 className="size-4" aria-hidden="true" /> Ask again
       </Button>
 
       <div className="space-y-3 rounded-xl border border-border bg-background/40 p-4">
@@ -331,7 +424,11 @@ export function MockInterview({
           </label>
           {voice.isSupported ? (
             <div className="flex flex-wrap items-center gap-2">
-              {voice.state === "recording" ? (
+              {phase === "speaking" ? (
+                <Button size="sm" onClick={interruptAndAnswer}>
+                  <Mic className="size-3.5" aria-hidden="true" /> Interrupt and answer
+                </Button>
+              ) : voice.state === "recording" ? (
                 <Button size="sm" onClick={voice.stop}>
                   <Square className="size-3.5" aria-hidden="true" /> Finish answer
                 </Button>
@@ -341,31 +438,27 @@ export function MockInterview({
                   {answer ? "Add more by voice" : "Record answer"}
                 </Button>
               ) : null}
-              {captureBusy ? (
+              {captureBusy && voice.state !== "recording" ? (
                 <Button size="sm" variant="ghost" onClick={voice.cancel}>
-                  {voice.state === "recording" ? "Discard recording" : "Cancel"}
+                  Cancel
                 </Button>
               ) : null}
             </div>
           ) : null}
         </div>
-        {voice.state === "recording" ? (
+        {phase === "listening" ? (
           <p role="status" className="text-sm text-primary">
-            Recording · {Math.floor(voice.elapsedMs / 60000)}:
+            Listening · {Math.floor(voice.elapsedMs / 60000)}:
             {String(Math.floor(voice.elapsedMs / 1000) % 60).padStart(2, "0")} / 3:00. Pauses are
-            fine; press Finish answer when ready.
+            fine; four seconds of quiet ends the answer, or press Finish answer.
           </p>
-        ) : voice.state === "requesting" ? (
+        ) : phase !== "idle" ? (
           <p role="status" className="text-sm text-muted-foreground">
-            Waiting for microphone permission…
-          </p>
-        ) : voice.state === "transcribing" ? (
-          <p role="status" className="text-sm text-muted-foreground">
-            Transcribing your answer…
+            {VOICE_SESSION_LABEL[phase]}…
           </p>
         ) : (
           <p className="text-xs text-muted-foreground">
-            Type or record up to 3 minutes at a time. Review the transcript before getting feedback.
+            Type or speak for up to 3 minutes. Review the transcript before getting feedback.
           </p>
         )}
         <Textarea
@@ -385,15 +478,11 @@ export function MockInterview({
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
       <div className="flex flex-wrap gap-2">
-        <Button
-          size="sm"
-          onClick={scoreCurrent}
-          disabled={pending || captureBusy || !answer.trim()}
-        >
+        <Button size="sm" onClick={scoreCurrent} disabled={pending || turnBusy || !answer.trim()}>
           Get feedback
         </Button>
         {idx < questions.length - 1 ? (
-          <Button size="sm" variant="outline" onClick={next} disabled={pending || captureBusy}>
+          <Button size="sm" variant="outline" onClick={next} disabled={pending || turnBusy}>
             Next question <ChevronRight className="size-4" aria-hidden="true" />
           </Button>
         ) : (
@@ -401,7 +490,7 @@ export function MockInterview({
             size="sm"
             variant="outline"
             onClick={() => finishInterview("completed")}
-            disabled={pending || captureBusy}
+            disabled={pending || turnBusy}
           >
             <Check className="size-4" aria-hidden="true" /> Finish interview
           </Button>

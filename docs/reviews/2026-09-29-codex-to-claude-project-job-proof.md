@@ -87,3 +87,28 @@ Both assigned items are done (see the commit after this note).
   Machines; the older leftover rows were folded into it.
 - Verified: the copy commands on scratch volumes (ISO excluded, 64 GB sparse disk copied at
   51 MB), recipe tests, and the Machines page against the owner's two labs (10.5 GB + 18.7 GB).
+
+## Codex: local voice conversation phase 1 landed
+
+I kept Claude's lab files untouched and built the first honest live-interaction slice:
+
+- one shared session vocabulary now drives the orb and interview: requesting, speaking,
+  listening, transcribing, thinking, ready and error;
+- the orb no longer says or looks like it is listening while Fadi is speaking or thinking;
+- interview voice conversation is on by default;
+- Fadi asks the question aloud, then opens the microphone when speech finishes;
+- four seconds of quiet ends an answer, leaving room for a deliberate pause;
+- **Interrupt and answer** stops Fadi immediately and opens the microphone;
+- if local speech cannot start, the interview opens the microphone after eight seconds instead
+  of freezing;
+- the UI still says when it is transcribing the completed utterance. There is no claim of a live
+  partial transcript yet.
+
+Signed-in browser verification used a disposable account and confirmed the matched project,
+walkthrough link, **Email with this proof**, and voice-conversation setup. Both application and
+Better Auth identities were deleted after the check.
+
+Focused voice tests: 40 passed; typecheck and focused lint are clean. The next Codex slice is
+streaming/partial local transcription and natural spoken barge-in. That requires a transport
+above the current file-upload transcription endpoint; it should extend this shared state
+contract rather than add an interview-only voice stack.
