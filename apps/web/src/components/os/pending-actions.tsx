@@ -71,7 +71,10 @@ export function PendingActionsProvider({ children }: { children: React.ReactNode
 
   useEffect(() => {
     void refresh();
-    const timer = setInterval(() => void refresh(), POLL_MS);
+    // Only while someone is looking. Every open tab polled forever, hidden or not.
+    const timer = setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, POLL_MS);
 
     // A surface that just approved or denied something should not wait out the interval to
     // show it gone.

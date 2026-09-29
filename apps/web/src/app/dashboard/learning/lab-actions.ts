@@ -317,53 +317,97 @@ export async function listProjectRuns(): Promise<{ ok: boolean; runs: RunView[] 
   const resourcesById = new Map(
     (await createLabResourcesRepository(getDatabase()).listForUser(user.id)).map((r) => [r.id, r])
   );
-  const out: RunView[] = [];
-  for (const r of runs.filter((x) => x.status !== "abandoned")) {
-    const detail = await repo.getWithSteps(user.id, r.id);
-    if (!detail) continue;
-    const honesty = runHonesty(detail.steps);
-    const template = templateForProject({ title: r.title, detail: r.detail });
-    out.push({
-      id: r.id,
-      title: r.title,
-      detail: r.detail,
-      resourceId: r.resourceId,
-      resourceLabel: r.resourceLabel,
-      status: r.status,
-      commitmentId: r.commitmentId ?? null,
-      steps: detail.steps.map((s) => ({
-        id: s.id,
-        ordinal: s.ordinal,
-        title: s.title,
-        instruction: s.instruction,
-        verify: s.verify,
-        produces: s.produces,
-        status: s.status,
-        artifact: s.artifact,
-        // One rule, one place: lib/lab/completion.ts decides what counts as showable,
-        // because this is the judgement Fadi later repeats to an employer.
-        completion: completionOf(s),
-      })),
-      doneCount: honesty.done,
-      evidencedCount: honesty.evidenced,
-      labTemplate: template,
-      labLabel: template ? LAB_TEMPLATES[template].label : null,
-      labSignIn: template ? (LAB_TEMPLATES[template].signIn ?? null) : null,
-      target: (() => {
-        const resource = r.resourceId ? resourcesById.get(r.resourceId) : undefined;
-        const resolved = resolveTarget(
-          r,
-          resource ? { id: resource.id, label: resource.label, endpoint: resource.endpoint } : null
-        );
-        return { kind: resolved.kind, label: resolved.label };
-      })(),
-      labShell:
-        template && LAB_TEMPLATES[template].toolchain.shell !== "powershell"
-          ? `docker exec -it ${labContainerForRun(r.id)} ${LAB_TEMPLATES[template].toolchain.shell}`
-          : null,
-    });
-  }
+  // In parallel: the list used to load each project's steps one after another.
+  const out = (
+    await Promise.all(
+      runs
+        .filter((x) => x.status !== "abandoned")
+        .map(async (r) => {
+          const detail = await repo.getWithSteps(user.id, r.id);
+          return detail ? toRunView(detail.run, detail.steps, resourcesById, resolveTarget) : null;
+        })
+    )
+  ).filter((view): view is RunView => Boolean(view));
   return { ok: true, runs: out };
+}
+
+type RunRow = Awaited<
+  ReturnType<ReturnType<typeof import("@careeros/database").createProjectRunsRepository>["getWithSteps"]>
+> & {};
+type Resources = Map<
+  string,
+  NonNullable<Awaited<ReturnType<ReturnType<typeof createLabResourcesRepository>["get"]>>>
+>;
+
+/** A project as the page shows it. One builder, for the list and for a single project. */
+function toRunView(
+  r: NonNullable<RunRow>["run"],
+  steps: NonNullable<RunRow>["steps"],
+  resourcesById: Resources,
+  resolveTarget: typeof import("@/lib/lab/target").resolveTarget
+): RunView {
+  const honesty = runHonesty(steps);
+  const template = templateForProject({ title: r.title, detail: r.detail });
+  const resource = r.resourceId ? resourcesById.get(r.resourceId) : undefined;
+  const resolved = resolveTarget(
+    r,
+    resource ? { id: resource.id, label: resource.label, endpoint: resource.endpoint } : null
+  );
+  return {
+    id: r.id,
+    title: r.title,
+    detail: r.detail,
+    resourceId: r.resourceId,
+    resourceLabel: r.resourceLabel,
+    status: r.status,
+    commitmentId: r.commitmentId ?? null,
+    steps: steps.map((s) => ({
+      id: s.id,
+      ordinal: s.ordinal,
+      title: s.title,
+      instruction: s.instruction,
+      verify: s.verify,
+      produces: s.produces,
+      status: s.status,
+      artifact: s.artifact,
+      // One rule, one place: lib/lab/completion.ts decides what counts as showable,
+      // because this is the judgement Fadi later repeats to an employer.
+      completion: completionOf(s),
+    })),
+    doneCount: honesty.done,
+    evidencedCount: honesty.evidenced,
+    labTemplate: template,
+    labLabel: template ? LAB_TEMPLATES[template].label : null,
+    labSignIn: template ? (LAB_TEMPLATES[template].signIn ?? null) : null,
+    target: { kind: resolved.kind, label: resolved.label },
+    labShell:
+      template && LAB_TEMPLATES[template].toolchain.shell !== "powershell"
+        ? `docker exec -it ${labContainerForRun(r.id)} ${LAB_TEMPLATES[template].toolchain.shell}`
+        : null,
+  };
+}
+
+/**
+ * One project, for the project page's poll. It used to call listProjectRuns every 8 seconds —
+ * every project with every step — to show one of them (438 calls in one session, 29 Sep 2026).
+ */
+export async function getProjectRunAction(input: {
+  runId: string;
+}): Promise<{ ok: boolean; run: RunView | null }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, run: null };
+  const id = z.string().uuid().safeParse(input.runId);
+  if (!id.success) return { ok: false, run: null };
+  const { createProjectRunsRepository } = await import("@careeros/database");
+  const db = getDatabase();
+  const detail = await createProjectRunsRepository(db).getWithSteps(user.id, id.data);
+  if (!detail) return { ok: true, run: null };
+  const resource = detail.run.resourceId
+    ? await createLabResourcesRepository(db).get(user.id, detail.run.resourceId)
+    : null;
+  const { resolveTarget } = await import("@/lib/lab/target");
+  const resources: Resources = new Map(resource ? [[resource.id, resource]] : []);
+  return { ok: true, run: toRunView(detail.run, detail.steps, resources, resolveTarget) };
 }
 
 /** The one place a project's lab target is decided — see lib/lab/target.ts. */

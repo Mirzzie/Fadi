@@ -6,7 +6,7 @@ import { ArrowLeft, Check, ExternalLink, LifeBuoy, Loader2, RotateCcw } from "lu
 
 import {
   completeStepAction,
-  listProjectRuns,
+  getProjectRunAction,
   projectRuntimeAction,
   proposeProjectLabAction,
   proposeProjectLabResumeAction,
@@ -53,10 +53,10 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
   // poll flips `pending` and every button flashes ("buttons refresh for no reason").
   const refresh = useCallback(async () => {
     const [result, observed] = await Promise.all([
-      listProjectRuns(),
+      getProjectRunAction({ runId }),
       projectRuntimeAction({ runId }),
     ]);
-    setRun(result.ok ? (result.runs.find((candidate) => candidate.id === runId) ?? null) : null);
+    setRun(result.ok ? result.run : null);
     setRuntime(observed.ok ? observed.runtime : null);
   }, [runId]);
 
