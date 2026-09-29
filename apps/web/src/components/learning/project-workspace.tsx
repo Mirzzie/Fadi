@@ -11,6 +11,7 @@ import {
   proposeProjectLabAction,
   proposeProjectLabResumeAction,
   proposeProjectLabStopAction,
+  proposeSaveBaseAction,
   reopenStepAction,
   replanProjectAction,
   runOnThisComputerAction,
@@ -245,6 +246,9 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
                     </code>{" "}
                     (a local administrator; lab only)
                   </p>
+                ) : null}
+                {run.labSignIn && runtime?.phase === "stopped" ? (
+                  <SaveBaseLink runId={runId} />
                 ) : null}
               </div>
               {run.target.kind === "unconnected" ? (
@@ -676,5 +680,33 @@ function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => Prom
       </Button>
       {note ? <span className="text-amber-600">{note}</span> : null}
     </div>
+  );
+}
+
+/**
+ * Keep this Windows install for the next lab. Offered only while the lab is paused: a copy
+ * taken while Windows writes to its disk is a broken disk. The action says why when it cannot.
+ */
+function SaveBaseLink({ runId }: { runId: string }) {
+  const [note, setNote] = useState<string | null>(null);
+  const [busy, start] = useTransition();
+  return (
+    <p className="text-xs text-muted-foreground">
+      <button
+        type="button"
+        disabled={busy}
+        className="text-primary hover:underline disabled:opacity-60"
+        onClick={() =>
+          start(async () => {
+            const result = await proposeSaveBaseAction({ runId });
+            setNote(result.message ?? null);
+            if (result.ok) announceActionsChanged();
+          })
+        }
+      >
+        {busy ? "Checking…" : "Keep this install as the base for new Windows labs"}
+      </button>{" "}
+      {note ?? "— the next one skips the 8 GB download and the hour of Setup."}
+    </p>
   );
 }

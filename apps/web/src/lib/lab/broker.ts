@@ -13,7 +13,18 @@ import {
 
 import { composeDockerfile, validateImageSpec } from "./image";
 import { formatMemory } from "./sizes";
-import { isTemplateKey, LAB_TEMPLATES, renderTemplate, type TemplateKey } from "./templates";
+import {
+  baseVolumeFor,
+  DISK_COPY_TIMEOUT_MS,
+  isTemplateKey,
+  LAB_TEMPLATES,
+  renderTemplate,
+  saveBaseArgs,
+  seedFromBaseArgs,
+  storageVolumeFor,
+  supportsBase,
+  type TemplateKey,
+} from "./templates";
 import {
   cidrLabel,
   guessKind,
@@ -92,7 +103,13 @@ export const CAPABILITY_IDS = [
 
 export type Capability = (typeof CAPABILITY_IDS)[number];
 
-type Command = { id: string; cmd: string; args: string[] };
+type Command = {
+  id: string;
+  cmd: string;
+  args: string[];
+  /** A fixed, recipe-set ceiling for steps known to be slow (disk copies). Never from input. */
+  timeoutMs?: number;
+};
 
 /**
  * A filesystem step.
@@ -444,6 +461,8 @@ export const RECIPE_IDS = [
   "container.start",
   "container.stop",
   "container.remove",
+  "lab.saveBase",
+  "lab.remove",
   "lab.check",
   "file.write",
   "dir.create",
@@ -679,7 +698,10 @@ export const RECIPES: Record<RecipeId, Recipe> = {
       const name = str(raw.name);
       if (!template || !isTemplateKey(template)) return null;
       if (!name || !NAME_RE.test(name)) return null;
-      return { template, name };
+      // Start from the saved installed base: decided by the caller from what exists, and
+      // only honoured for a template that has one.
+      const fromBase = raw.fromBase === true && supportsBase(template as TemplateKey);
+      return { template, name, fromBase };
     },
     summary: (p) => {
       const t = LAB_TEMPLATES[String(p.template) as TemplateKey];
@@ -696,17 +718,33 @@ export const RECIPES: Record<RecipeId, Recipe> = {
         " of memory and about " +
         t.diskGb +
         "GB of disk." +
-        (t.caveat ? " " + t.caveat : "")
+        (p.fromBase
+          ? " It starts from your saved, already-installed " +
+            t.label +
+            " — no download and no Windows Setup; the copy takes a few minutes."
+          : t.caveat
+            ? " " + t.caveat
+            : "")
       );
     },
     reversal: (p) => "Stop and remove it: docker rm -f " + NAME_PREFIX + String(p.name),
-    render: (p) => [
-      {
-        id: "start",
-        cmd: "docker",
-        args: renderTemplate(String(p.template) as TemplateKey, NAME_PREFIX + String(p.name)),
-      },
-    ],
+    render: (p) => {
+      const template = String(p.template) as TemplateKey;
+      const container = NAME_PREFIX + String(p.name);
+      return [
+        ...(p.fromBase
+          ? [
+              {
+                id: "seed",
+                cmd: "docker",
+                args: seedFromBaseArgs(template, container),
+                timeoutMs: DISK_COPY_TIMEOUT_MS,
+              },
+            ]
+          : []),
+        { id: "start", cmd: "docker", args: renderTemplate(template, container) },
+      ];
+    },
   },
 
   /**
@@ -939,13 +977,20 @@ export const RECIPES: Record<RecipeId, Recipe> = {
       const expect = typeof raw.expect === "string" ? raw.expect.trim() : "";
       const shell = raw.shell === "bash" ? "bash" : "sh";
       if (!name || !NAME_RE.test(name)) return null;
-      if (!command || command.length > 600 || command.includes("\0") || command.includes(CHECK_MARKER)) return null;
+      if (
+        !command ||
+        command.length > 600 ||
+        command.includes("\0") ||
+        command.includes(CHECK_MARKER)
+      )
+        return null;
       if (!expect || expect.length > 200) return null;
       return { name, command, expect, shell };
     },
     summary: (p) =>
       `Run a check inside ${NAME_PREFIX}${p.name}: ${p.command} — it passes if the output contains "${p.expect}".`,
-    reversal: () => "A check is meant to only read. If the command changes something, it changes it inside the lab only.",
+    reversal: () =>
+      "A check is meant to only read. If the command changes something, it changes it inside the lab only.",
     render: (p) => [
       {
         id: "check",
@@ -992,6 +1037,86 @@ export const RECIPES: Record<RecipeId, Recipe> = {
       "Not reversible — the container is recreated from the image, without its contents.",
     render: (p) => [
       { id: "remove", cmd: "docker", args: ["rm", "-f", NAME_PREFIX + String(p.name)] },
+    ],
+  },
+
+  /**
+   * Keep an installed Windows lab as the base new labs of its kind start from. Copies only;
+   * the lab itself is untouched, and the base can be deleted again.
+   */
+  "lab.saveBase": {
+    blast: "container",
+    reversibility: "reversible",
+    confirmToken: (p) => baseVolumeFor(String(p.template) as TemplateKey),
+    ownWorkOnly: true,
+    validate: (raw) => {
+      const template = str(raw.template);
+      const name = str(raw.name);
+      if (!template || !isTemplateKey(template) || !supportsBase(template)) return null;
+      if (!name || !NAME_RE.test(name)) return null;
+      return { template, name };
+    },
+    summary: (p) => {
+      const t = LAB_TEMPLATES[String(p.template) as TemplateKey];
+      return (
+        "Copy " +
+        NAME_PREFIX +
+        p.name +
+        "'s installed " +
+        t.label +
+        " into " +
+        baseVolumeFor(String(p.template) as TemplateKey) +
+        ". New " +
+        t.label +
+        " labs then start from it: no 8 GB download, no hour of Windows Setup." +
+        " It copies the machine as it is now — anything installed in it comes along — and the lab itself is not changed."
+      );
+    },
+    reversal: (p) =>
+      "Delete the base: docker volume rm " + baseVolumeFor(String(p.template) as TemplateKey),
+    render: (p) => [
+      {
+        id: "save-base",
+        cmd: "docker",
+        args: saveBaseArgs(String(p.template) as TemplateKey, NAME_PREFIX + String(p.name)),
+        timeoutMs: DISK_COPY_TIMEOUT_MS,
+      },
+    ],
+  },
+
+  /**
+   * Remove a lab and its disk, to get the space back. The image stays, and so does any base,
+   * so the next lab of its kind does not download anything.
+   */
+  "lab.remove": {
+    blast: "container",
+    reversibility: "irreversible",
+    confirmToken: (p) => NAME_PREFIX + String(p.name),
+    ownWorkOnly: true,
+    validate: (raw) => {
+      const name = str(raw.name);
+      if (!name || !NAME_RE.test(name)) return null;
+      // Whether a container still exists is observed by the caller; removing one that is
+      // already gone would fail the whole request.
+      return { name, container: raw.container === true };
+    },
+    summary: (p) =>
+      "Remove the lab " +
+      NAME_PREFIX +
+      p.name +
+      " and its disk, " +
+      storageVolumeFor(NAME_PREFIX + String(p.name)) +
+      ". Everything inside the machine is deleted. The image and any saved base stay, so a new lab does not download again.",
+    reversal: () => "Not reversible — the machine and everything on its disk are gone.",
+    render: (p) => [
+      ...(p.container
+        ? [{ id: "remove", cmd: "docker", args: ["rm", "-f", NAME_PREFIX + String(p.name)] }]
+        : []),
+      {
+        id: "remove-disk",
+        cmd: "docker",
+        args: ["volume", "rm", storageVolumeFor(NAME_PREFIX + String(p.name))],
+      },
     ],
   },
 };
@@ -1050,7 +1175,7 @@ function isRecipe(value: string): value is RecipeId {
 async function hydrateRecipeParams(
   userId: string,
   recipe: RecipeId,
-  params: RecipeParams,
+  params: RecipeParams
 ): Promise<RecipeParams | null> {
   if (recipe !== "vmware.start" && recipe !== "vmware.suspend") return params;
 
@@ -1429,7 +1554,10 @@ async function runBuildStep(userId: string, step: BuildStep): Promise<StepResult
 }
 
 async function runCommand(c: Command): Promise<StepResult> {
-  const { stdout } = await run(c.cmd, c.args, { timeout: 60_000, maxBuffer: 512 * 1024 });
+  const { stdout } = await run(c.cmd, c.args, {
+    timeout: c.timeoutMs ?? 60_000,
+    maxBuffer: 512 * 1024,
+  });
   return { text: (stdout.split("\n")[0] ?? "").trim() };
 }
 
@@ -1545,7 +1673,10 @@ export async function approveAndRun(input: {
     }
     const claimed = await requests.approve(input.userId, input.requestId);
     if (!claimed) {
-      return { ok: false, message: "That request is no longer waiting — it has already been answered." };
+      return {
+        ok: false,
+        message: "That request is no longer waiting — it has already been answered.",
+      };
     }
 
     const spec = CAPABILITIES[capability];
@@ -1567,7 +1698,10 @@ export async function approveAndRun(input: {
       decision: "allowed",
       detail: "You allowed this for " + spec.defaultMinutes + " minutes.",
     });
-    return { ok: true, output: "Allowed. Fadi can do this for the next " + spec.defaultMinutes + " minutes." };
+    return {
+      ok: true,
+      output: "Allowed. Fadi can do this for the next " + spec.defaultMinutes + " minutes.",
+    };
   }
 
   // RE-CHECK THE EFFECT BEFORE SPENDING THE APPROVAL.
@@ -1735,10 +1869,16 @@ export async function approveAndRun(input: {
       await createProjectRunsRepository(db).setStepStatus(input.userId, row.stepId, {
         status: "done",
         completion: "verified",
-        artifact: `Checked in the lab: ${String(params.command)} → ${verdict.excerpt}`.slice(0, 1_000),
+        artifact: `Checked in the lab: ${String(params.command)} → ${verdict.excerpt}`.slice(
+          0,
+          1_000
+        ),
       });
     }
-    await requests.finish(input.userId, row.id, { status: "executed", detail: detail.slice(0, 400) });
+    await requests.finish(input.userId, row.id, {
+      status: "executed",
+      detail: detail.slice(0, 400),
+    });
     await audit.record({
       userId: input.userId,
       actor: "user",

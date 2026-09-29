@@ -42,11 +42,18 @@ export async function containerState(name: string): Promise<{
   oomKilled: boolean;
   /** Volumes attached, named or anonymous. Both outlive `docker rm` without -v. */
   volumes: number;
+  /** When it last started or stopped — how long a lab has been sitting idle. */
+  lastActiveAt: Date | null;
 } | null> {
   try {
     const { stdout } = await run(
       "docker",
-      ["inspect", "--format", '{"State":{{json .State}},"Mounts":{{json .Mounts}}}', `fadi-${name}`],
+      [
+        "inspect",
+        "--format",
+        '{"State":{{json .State}},"Mounts":{{json .Mounts}}}',
+        `fadi-${name}`,
+      ],
       { timeout: 2500, maxBuffer: 64 * 1024 }
     );
     const parsed = JSON.parse(stdout.trim()) as {
@@ -61,6 +68,7 @@ export async function containerState(name: string): Promise<{
       error: typeof state.Error === "string" ? state.Error : "",
       oomKilled: state.OOMKilled === true,
       volumes: (parsed.Mounts ?? []).filter((mount) => mount.Type === "volume").length,
+      lastActiveAt: latest(state.StartedAt, state.FinishedAt),
     };
   } catch {
     return null;
@@ -76,21 +84,24 @@ export async function containerState(name: string): Promise<{
  * without an out-of-memory kill is the same stop after its grace period ran out. Those are
  * stops. Only an out-of-memory kill or the program itself exiting with an error is a failure.
  */
-export function classifyExit(state: {
-  exitCode: number;
-  oomKilled: boolean;
-  error: string;
-}): { phase: "stopped" | "failed"; detail: string } {
+export function classifyExit(state: { exitCode: number; oomKilled: boolean; error: string }): {
+  phase: "stopped" | "failed";
+  detail: string;
+} {
   // Docker's own error first: a runtime that recorded one did not simply stop.
   if (state.error.trim()) return { phase: "failed", detail: state.error.trim() };
   if (state.oomKilled) {
     return {
       phase: "failed",
-      detail: "The lab ran out of memory and was stopped. Close other apps or labs, then start it again.",
+      detail:
+        "The lab ran out of memory and was stopped. Close other apps or labs, then start it again.",
     };
   }
   if (state.exitCode === 0) {
-    return { phase: "stopped", detail: "The lab is stopped. Its disk is kept — resume to carry on." };
+    return {
+      phase: "stopped",
+      detail: "The lab is stopped. Its disk is kept — resume to carry on.",
+    };
   }
   // A signal says how it ended, not who or what ended it — so the code is stated, not a cause.
   if (state.exitCode === 143 || state.exitCode === 137) {
@@ -394,4 +405,74 @@ export async function observeProjectRuntime(
       ),
     ],
   };
+}
+
+/** The later of Docker's two timestamps; its zero value ("0001-01-01…") means never. */
+function latest(...values: unknown[]): Date | null {
+  const times = values
+    .filter((v): v is string => typeof v === "string" && !v.startsWith("0001"))
+    .map((v) => new Date(v).getTime())
+    .filter(Number.isFinite);
+  return times.length ? new Date(Math.max(...times)) : null;
+}
+
+/**
+ * Space a volume really takes on disk, in bytes — not its apparent size. A Windows lab's 64 GB
+ * sparse disk reports 64 GB to `docker system df` while using 10–18 GB; `du` counts blocks.
+ * Read-only, no network, one fixed argv. Null when it cannot be measured.
+ */
+export async function volumeUsageBytes(name: string): Promise<number | null> {
+  const { DISK_HELPER_IMAGE } = await import("./templates");
+  try {
+    const { stdout } = await run(
+      "docker",
+      [
+        "run",
+        "--rm",
+        "--network",
+        "none",
+        "-v",
+        name + ":/v:ro",
+        DISK_HELPER_IMAGE,
+        "du",
+        "-sk",
+        "/v",
+      ],
+      { timeout: 30_000, maxBuffer: 16 * 1024 }
+    );
+    const kb = Number(stdout.trim().split(/\s+/)[0]);
+    return Number.isFinite(kb) ? kb * 1024 : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Has Windows finished installing in this lab? dockur writes `windows.boot` once Setup is done
+ * and the machine has booted from its own disk; until then the disk is half an install and not
+ * worth keeping as a base.
+ */
+export async function windowsInstalled(volume: string): Promise<boolean> {
+  const { DISK_HELPER_IMAGE } = await import("./templates");
+  try {
+    await run(
+      "docker",
+      [
+        "run",
+        "--rm",
+        "--network",
+        "none",
+        "-v",
+        volume + ":/v:ro",
+        DISK_HELPER_IMAGE,
+        "test",
+        "-f",
+        "/v/windows.boot",
+      ],
+      { timeout: 30_000, maxBuffer: 16 * 1024 }
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }

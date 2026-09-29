@@ -347,3 +347,71 @@ export function labNameForRun(runId: string): string {
 export function labContainerForRun(runId: string): string {
   return "fadi-" + labNameForRun(runId);
 }
+
+// ── Installed bases and lab disks ─────────────────────────────────────────────
+//
+// Every Windows project used to get a fresh volume, download the 8.2 GB evaluation ISO again
+// and spend an hour in Windows Setup — measured on the owner's machine, two labs, two
+// downloads. dockur keeps an installed machine as plain files in /storage (data.img plus a
+// few windows.* files), so a finished install can be copied: saved once as a base, then
+// copied into each new lab's volume before it starts. The copy boots straight to the desktop.
+//
+// Copies run in a pinned helper with no network and only named volumes mounted — the same
+// narrow permission the labs themselves use, never a host path. GNU cp keeps the 64 GB sparse
+// disk sparse, so a copy costs what is actually written (10–18 GB here), not 64 GB.
+
+/** Pinned helper for disk copies and measurements. */
+export const DISK_HELPER_IMAGE = "debian:bookworm-slim";
+
+/** A copy of a Windows disk takes minutes; the broker's usual minute is not enough. */
+export const DISK_COPY_TIMEOUT_MS = 30 * 60 * 1000;
+
+/** Templates whose installed state is worth keeping as a base: the VM ones. */
+export function supportsBase(key: TemplateKey): boolean {
+  const t = LAB_TEMPLATES[key];
+  return t.needsVirtualisation && t.persistentPath === "/storage";
+}
+
+/** One base per template, shared by every project that uses it. */
+export function baseVolumeFor(key: TemplateKey): string {
+  return "fadi-base-" + key;
+}
+
+/** A lab's own disk, as renderTemplate names it. */
+export function storageVolumeFor(containerName: string): string {
+  return containerName + "-storage";
+}
+
+// The installer and the network identity stay behind: the ISO is only needed to install,
+// setup.img is the unattended-answer disk, and windows.mac would give two labs one MAC.
+const SAVE_BASE =
+  "find /from -maxdepth 1 -type f ! -name '*.iso' ! -name setup.img ! -name windows.mac " +
+  "-exec cp -a --sparse=always {} /to/ ';'";
+const SEED_FROM_BASE = "cp -a --sparse=always /from/. /to/";
+
+function helperArgs(from: string, to: string, script: string): string[] {
+  return [
+    "run",
+    "--rm",
+    "--network",
+    "none",
+    "-v",
+    from + ":/from:ro",
+    "-v",
+    to + ":/to",
+    DISK_HELPER_IMAGE,
+    "sh",
+    "-c",
+    script,
+  ];
+}
+
+/** Copy a lab's installed machine into the template's base. */
+export function saveBaseArgs(key: TemplateKey, containerName: string): string[] {
+  return helperArgs(storageVolumeFor(containerName), baseVolumeFor(key), SAVE_BASE);
+}
+
+/** Give a new lab its disk from the base, before it first starts. */
+export function seedFromBaseArgs(key: TemplateKey, containerName: string): string[] {
+  return helperArgs(baseVolumeFor(key), storageVolumeFor(containerName), SEED_FROM_BASE);
+}

@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { ComputerLabs } from "@/components/learning/computer-labs";
+import { LabDisks } from "@/components/learning/lab-disks";
 import { LearningNavigation } from "@/components/learning/learning-navigation";
 import { MachineRegistration } from "@/components/learning/lab-fit";
 import { MachineAccess } from "@/components/learning/machine-access";
@@ -41,10 +42,13 @@ export default async function LearningMachinesPage() {
               <Laptop className="size-5 text-primary" aria-hidden="true" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold">This computer</p>
-                <p className="text-xs text-muted-foreground">Labs run here in Docker, after you approve them.</p>
+                <p className="text-xs text-muted-foreground">
+                  Labs run here in Docker, after you approve them.
+                </p>
               </div>
             </div>
             <ComputerLabs />
+            <LabDisks />
           </div>
           <MachineInventory />
         </section>

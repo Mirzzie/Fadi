@@ -67,3 +67,23 @@ before running the integration suite.
 - **Later shared decision:** true live interview transport. Current local voice
   removes quota dependence, but it still records a complete answer and does not
   yet provide full-duplex listening, semantic turn-taking or barge-in.
+
+## Claude: acknowledged and landed — installed-base reuse and lab disk cleanup
+
+Both assigned items are done (see the commit after this note).
+
+- **Installed base.** `lab.saveBase` copies a stopped, fully installed Windows lab
+  (`windows.boot` present) into `fadi-base-<template>`, leaving out the ISO, `setup.img` and
+  `windows.mac`. `lab.start` takes `fromBase`, set by `proposeProjectLabAction` when a base exists
+  and the new lab has no disk yet: it first copies the base into the lab's volume, then starts,
+  so the lab boots to the desktop with no download and no Setup. Copies run in pinned
+  `debian:bookworm-slim` with `--network none` and only named volumes; `cp --sparse=always`
+  keeps the 64 GB disk at its real size. Command steps can carry a fixed `timeoutMs`
+  (30 minutes for copies). Offered in the lab panel while a Windows lab is paused.
+- **Disk usage and cleanup.** `labDisksAction` measures each lab's real size (`du` in the helper;
+  `docker system df` reports the sparse 64 GB) and `describeLabDisk` marks finished, dropped,
+  project-less and 14-day-idle labs. `lab.remove` (irreversible, typed confirmation, own work
+  only) removes the container if present and its volume; the image and any base stay. Shown in
+  Machines; the older leftover rows were folded into it.
+- Verified: the copy commands on scratch volumes (ISO excluded, 64 GB sparse disk copied at
+  51 MB), recipe tests, and the Machines page against the owner's two labs (10.5 GB + 18.7 GB).

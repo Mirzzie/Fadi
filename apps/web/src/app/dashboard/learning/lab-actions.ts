@@ -464,10 +464,19 @@ export async function proposeProjectLabAction(input: { runId: string }): Promise
   }
 
   const currentStep = project.steps.find((step) => step.status === "pending") ?? null;
+  // A saved, installed base means this lab can start from a copy instead of downloading and
+  // installing Windows again — but only for a lab that has no disk of its own yet.
+  const { supportsBase, baseVolumeFor, storageVolumeFor } = await import("@/lib/lab/templates");
+  const { volumeExists } = await import("@/lib/lab/runtime-observer");
+  const labName = labNameForRun(project.run.id);
+  const fromBase =
+    supportsBase(template) &&
+    (await volumeExists(baseVolumeFor(template))) &&
+    !(await volumeExists(storageVolumeFor("fadi-" + labName)));
   const proposal = await proposeAction({
     userId: user.id,
     recipe: "lab.start",
-    params: { template, name: labNameForRun(project.run.id) },
+    params: { template, name: labName, fromBase },
     actor: "user",
     origin: "dashboard:project_lab",
     runId: project.run.id,
@@ -968,4 +977,151 @@ export async function runOnThisComputerAction(input: {
     detail: `Moved "${project.run.title}" from ${target.label} to this computer.`,
   });
   return { ok: true, message: "This project now runs on this computer." };
+}
+
+export type LabDisksView = {
+  labs: import("@/lib/lab/disks").LabDiskView[];
+  bases: Array<{ template: string; label: string; bytes: number | null }>;
+  totalBytes: number;
+};
+
+/**
+ * Every lab Fadi created on this computer, what it really takes on disk, and whether it is
+ * worth removing. Measured on request, not polled: each size is a short `du` in a helper.
+ */
+export async function labDisksAction(): Promise<{ ok: boolean; view?: LabDisksView }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false };
+  const { createLabActionRequestsRepository, createProjectRunsRepository } =
+    await import("@careeros/database");
+  const { containerState, volumeExists, volumeUsageBytes } =
+    await import("@/lib/lab/runtime-observer");
+  const { describeLabDisk } = await import("@/lib/lab/disks");
+  const { baseVolumeFor, labNameForRun, storageVolumeFor, supportsBase } =
+    await import("@/lib/lab/templates");
+  const db = getDatabase();
+  const requests = createLabActionRequestsRepository(db);
+  const names = new Set([
+    ...(await requests.createdNames(user.id, "lab.start")),
+    ...(await requests.createdNames(user.id, "container.run")),
+  ]);
+  const runs = await createProjectRunsRepository(db).listForUser(user.id);
+  const runByLab = new Map(runs.map((run) => [labNameForRun(run.id), run]));
+
+  const labs = (
+    await Promise.all(
+      [...names].map(async (name) => {
+        const volume = storageVolumeFor("fadi-" + name);
+        const [state, hasDisk] = await Promise.all([containerState(name), volumeExists(volume)]);
+        if (!state && !hasDisk) return null;
+        const run = runByLab.get(name) ?? null;
+        return describeLabDisk({
+          name,
+          projectTitle: run?.title ?? null,
+          projectStatus: run?.status ?? null,
+          running: Boolean(state?.running),
+          container: Boolean(state),
+          lastActiveAt: state?.lastActiveAt ?? null,
+          bytes: hasDisk ? await volumeUsageBytes(volume) : null,
+        });
+      })
+    )
+  ).filter((lab): lab is NonNullable<typeof lab> => Boolean(lab));
+
+  const bases = (
+    await Promise.all(
+      (Object.keys(LAB_TEMPLATES) as Array<keyof typeof LAB_TEMPLATES>)
+        .filter((key) => supportsBase(key as never))
+        .map(async (key) => {
+          const volume = baseVolumeFor(key as never);
+          if (!(await volumeExists(volume))) return null;
+          return {
+            template: key,
+            label: LAB_TEMPLATES[key].label,
+            bytes: await volumeUsageBytes(volume),
+          };
+        })
+    )
+  ).filter((base): base is NonNullable<typeof base> => Boolean(base));
+
+  const totalBytes = [...labs, ...bases].reduce((sum, item) => sum + (item.bytes ?? 0), 0);
+  return { ok: true, view: { labs, bases, totalBytes } };
+}
+
+/**
+ * Keep this project's installed Windows as the base new labs of its kind start from. Only once
+ * Windows has finished installing, only while the lab is stopped (a disk copied mid-write is
+ * a corrupt disk), and only when there is no base yet.
+ */
+export async function proposeSaveBaseAction(input: {
+  runId: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  const id = z.string().uuid().safeParse(input.runId);
+  if (!id.success) return { ok: false, message: "Unknown project." };
+  const { createProjectRunsRepository } = await import("@careeros/database");
+  const project = await createProjectRunsRepository(getDatabase()).getWithSteps(user.id, id.data);
+  if (!project) return { ok: false, message: "That project is unavailable." };
+
+  const { baseVolumeFor, labNameForRun, storageVolumeFor, supportsBase } =
+    await import("@/lib/lab/templates");
+  const template = templateForProject({ title: project.run.title, detail: project.run.detail });
+  if (!template || !supportsBase(template)) {
+    return { ok: false, message: "Only Windows labs keep an installed base." };
+  }
+  const { containerState, volumeExists, windowsInstalled } =
+    await import("@/lib/lab/runtime-observer");
+  const name = labNameForRun(project.run.id);
+  if (await volumeExists(baseVolumeFor(template))) {
+    return {
+      ok: false,
+      message: `There is already a saved ${LAB_TEMPLATES[template].label} base.`,
+    };
+  }
+  if ((await containerState(name))?.running) {
+    return {
+      ok: false,
+      message: "Pause the lab first — a disk copied while Windows writes to it is a broken disk.",
+    };
+  }
+  if (!(await windowsInstalled(storageVolumeFor("fadi-" + name)))) {
+    return { ok: false, message: "Windows hasn't finished installing in this lab yet." };
+  }
+  const { proposeAction } = await import("@/lib/lab/broker");
+  const proposal = await proposeAction({
+    userId: user.id,
+    recipe: "lab.saveBase",
+    params: { template, name },
+    actor: "user",
+    origin: "dashboard:project_lab",
+    runId: project.run.id,
+  });
+  return proposal.ok
+    ? { ok: true, message: "Waiting for your approval. The copy takes a few minutes." }
+    : { ok: false, message: proposal.message };
+}
+
+/** Remove a stopped lab and its disk. Irreversible, so the broker asks for its name. */
+export async function proposeRemoveLabAction(input: {
+  name: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  // Revalidated now, not trusted from the page.
+  const current = await labDisksAction();
+  const lab = current.view?.labs.find((item) => item.name === input.name);
+  if (!lab) return { ok: false, message: "That lab is already gone." };
+  if (lab.blocked === "running") return { ok: false, message: "Pause the lab first." };
+  const { proposeAction } = await import("@/lib/lab/broker");
+  const proposal = await proposeAction({
+    userId: user.id,
+    recipe: "lab.remove",
+    params: { name: lab.name, container: lab.container },
+    actor: "user",
+    origin: "dashboard:machines",
+  });
+  return proposal.ok
+    ? { ok: true, message: "Waiting for your approval." }
+    : { ok: false, message: proposal.message };
 }
