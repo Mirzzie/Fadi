@@ -233,6 +233,19 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
                       ? runtimeMessage(runtime)
                       : "Not started"}
                 </p>
+                {run.labSignIn ? (
+                  <p className="text-xs text-muted-foreground">
+                    Sign in as{" "}
+                    <code className="rounded bg-muted px-1 text-foreground">
+                      {run.labSignIn.user}
+                    </code>{" "}
+                    · password{" "}
+                    <code className="rounded bg-muted px-1 text-foreground">
+                      {run.labSignIn.password}
+                    </code>{" "}
+                    (a local administrator; lab only)
+                  </p>
+                ) : null}
               </div>
               {run.target.kind === "unconnected" ? (
                 <Button

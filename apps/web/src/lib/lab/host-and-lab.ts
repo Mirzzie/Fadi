@@ -87,16 +87,16 @@ export function placementBriefing(input: {
     lines.push(
       `THE WORK HAPPENS INSIDE THE WINDOWS LAB, NOT ON THEIR ${host.toUpperCase()} COMPUTER.`,
       `Windows steps — .msi installers, PowerShell, C:\\ paths, Server Manager — belong inside the lab and must say so: "in the lab machine, ...".`,
-      `Anything they do on their own ${host} computer is limited to opening a browser, approving what Fadi asks for, and running the commands Fadi proposes. Never tell them to install Windows software on ${host}.`,
+      `Anything they do on their own ${host} computer is limited to opening a browser, approving what Fadi asks for, and running the commands Fadi proposes. Never tell them to install Windows software on ${host}.`
     );
   } else if (labOs === "linux" && input.hostOs !== "linux") {
     lines.push(
       `THE WORK HAPPENS INSIDE THE LINUX LAB, NOT ON THEIR ${host.toUpperCase()} COMPUTER.`,
-      `Linux steps — apt, systemctl, /etc paths — belong inside the lab and must say so: "in the lab machine, ...".`,
+      `Linux steps — apt, systemctl, /etc paths — belong inside the lab and must say so: "in the lab machine, ...".`
     );
   } else {
     lines.push(
-      `The lab runs the same family as their computer, but it is a SEPARATE, DISPOSABLE machine.`,
+      `The lab runs the same family as their computer, but it is a SEPARATE, DISPOSABLE machine.`
     );
   }
 
@@ -108,7 +108,7 @@ export function placementBriefing(input: {
   // the person's own computer with sudo — the exact damage a disposable lab exists to
   // prevent.
   lines.push(
-    `ALL hands-on steps — installing packages, editing config, starting services, running tests — happen INSIDE the lab machine and must say so ("in the lab machine, run ..."). Their own ${host} computer is used only to open the lab and approve what Fadi asks for. Never tell them to install software, use sudo, or edit system files on their own computer.`,
+    `ALL hands-on steps — installing packages, editing config, starting services, running tests — happen INSIDE the lab machine and must say so ("in the lab machine, run ..."). Their own ${host} computer is used only to open the lab and approve what Fadi asks for. Never tell them to install software, use sudo, or edit system files on their own computer.`
   );
 
   // WHICH DISTRIBUTION, AND HOW TO GET IN.
@@ -120,8 +120,13 @@ export function placementBriefing(input: {
   const tc = lab.toolchain;
   if (tc.shell === "powershell") {
     lines.push(
-      `The lab is ${tc.distro}. Use PowerShell and ${tc.packageManager} for installs. They reach it through the desktop viewer Fadi opens, not a terminal on their own computer.`,
+      `The lab is ${tc.distro}. Use PowerShell and ${tc.packageManager} for installs. They reach it through the desktop viewer Fadi opens, not a terminal on their own computer.`
     );
+    if (lab.signIn) {
+      lines.push(
+        `They sign in as "${lab.signIn.user}" with the password "${lab.signIn.password}" — a local administrator created when the lab installed, and shown in Fadi's lab panel. There is NO other account to be given: never say "the supplied Administrator credentials". Elevated steps say "open PowerShell as Administrator" (right-click, Run as administrator) under this account. Where a step needs a NEW password (a domain's Safe Mode password, a service account), the step itself tells them to choose one and write it down.`
+      );
+    }
   } else {
     lines.push(
       `The lab is ${tc.distro}. Install packages with \`${tc.packageManager === "apk" ? "apk add" : "apt-get install -y"}\`${
@@ -131,22 +136,22 @@ export function placementBriefing(input: {
       `The lab's shell is ${tc.shell}${tc.shell === "sh" ? " (bash is not installed — avoid bash-only syntax)" : ""}.`,
       input.containerName
         ? `Their first step must be opening a shell in the lab, with exactly: docker exec -it ${input.containerName} ${tc.shell}`
-        : `Their first step must be opening a shell in the lab with docker exec -it <lab-name> ${tc.shell}.`,
+        : `Their first step must be opening a shell in the lab with docker exec -it <lab-name> ${tc.shell}.`
     );
     if (tc.serviceManager === "none") {
       lines.push(
-        "The lab is a container with NO service manager: rc-service, systemctl and service do not exist. Start a background program by running it directly (for example `fail2ban-client start`, or `crond -b`) and check it with `ps`.",
+        "The lab is a container with NO service manager: rc-service, systemctl and service do not exist. Start a background program by running it directly (for example `fail2ban-client start`, or `crond -b`) and check it with `ps`."
       );
     }
     if (tc.mainService) {
       lines.push(
-        `${tc.mainService.name} is ALREADY RUNNING as the lab's main process. Never tell them to start it; apply config changes with \`${tc.mainService.reload}\`.`,
+        `${tc.mainService.name} is ALREADY RUNNING as the lab's main process. Never tell them to start it; apply config changes with \`${tc.mainService.reload}\`.`
       );
       if (tc.mainService.logs) lines.push(tc.mainService.logs);
     }
     if (!tc.firewall) {
       lines.push(
-        "The lab cannot change firewall rules (no iptables/nftables permission). Anything that works by blocking traffic — fail2ban bans, iptables rules — will not take effect; if the project needs it, have them verify detection (logs, fail2ban-client status/regex tests) and say plainly that enforcement is out of scope for this lab.",
+        "The lab cannot change firewall rules (no iptables/nftables permission). Anything that works by blocking traffic — fail2ban bans, iptables rules — will not take effect; if the project needs it, have them verify detection (logs, fail2ban-client status/regex tests) and say plainly that enforcement is out of scope for this lab."
       );
     }
   }
@@ -158,7 +163,7 @@ export function placementBriefing(input: {
   // inbound port 80 — and installed filebeat from a repository Ubuntu does not ship. A step
   // that cannot work is a dead end however well it is written.
   lines.push(
-    "The lab is local: it has no public domain name and cannot receive traffic from the internet. Use self-signed certificates (openssl or mkcert), localhost, or the lab's own address — never Let's Encrypt or a real domain. Use packages available in the distribution's default repositories, or state the exact commands to add the vendor repository first.",
+    "The lab is local: it has no public domain name and cannot receive traffic from the internet. Use self-signed certificates (openssl or mkcert), localhost, or the lab's own address — never Let's Encrypt or a real domain. Use packages available in the distribution's default repositories, or state the exact commands to add the vendor repository first."
   );
 
   // AND WHAT THE LAB IS NOT — always, not only when the two machines differ.
@@ -170,11 +175,11 @@ export function placementBriefing(input: {
   // pulls a plan toward Windows unless the instruction is explicit.
   if (labOs === "linux") {
     lines.push(
-      "Every command in this plan runs on Linux. Use Linux paths, package managers and shells. Do NOT write a C:\\ path, a .msi, msiexec, PowerShell, a Windows service, or any Windows UI step — not even for software whose usual install guide is written for Windows.",
+      "Every command in this plan runs on Linux. Use Linux paths, package managers and shells. Do NOT write a C:\\ path, a .msi, msiexec, PowerShell, a Windows service, or any Windows UI step — not even for software whose usual install guide is written for Windows."
     );
   } else {
     lines.push(
-      "Every command in this plan runs on Windows. Use Windows paths, PowerShell and Windows tooling. Do NOT write apt, systemctl, /etc paths or bash-only syntax.",
+      "Every command in this plan runs on Windows. Use Windows paths, PowerShell and Windows tooling. Do NOT write apt, systemctl, /etc paths or bash-only syntax."
     );
   }
 
@@ -182,13 +187,12 @@ export function placementBriefing(input: {
     // Worth stating rather than discovering: there is no macOS lab, and pretending
     // otherwise would produce steps nobody can run.
     lines.push(
-      "Fadi cannot provision macOS — Apple's licensing restricts it to Apple hardware — so a project needing macOS specifically has to be done on their own computer, and you should say that plainly.",
+      "Fadi cannot provision macOS — Apple's licensing restricts it to Apple hardware — so a project needing macOS specifically has to be done on their own computer, and you should say that plainly."
     );
   }
 
   return lines.join("\n");
 }
-
 
 /**
  * DOES THIS PLAN MATCH THE MACHINE IT RUNS ON?
@@ -225,7 +229,6 @@ export function osViolations(text: string, labOs: LabOs): string[] {
   return [...new Set(found)];
 }
 
-
 /**
  * DOES THIS PLAN MATCH THE DISTRIBUTION, not just the operating system?
  *
@@ -238,15 +241,22 @@ export function toolchainViolations(text: string, template: TemplateKey): string
   if (tc.shell === "powershell") return [];
   const found: string[] = [];
 
-  if (!tc.hasSudo && /(?:^|[\s;&|`(])sudo\s/m.test(text)) found.push("sudo, which is not installed in the lab");
+  if (!tc.hasSudo && /(?:^|[\s;&|`(])sudo\s/m.test(text))
+    found.push("sudo, which is not installed in the lab");
   if (tc.packageManager === "apk" && /\bapt(?:-get)?\s+(?:install|update|upgrade)\b/i.test(text)) {
     found.push("apt, which does not exist on Alpine");
   }
   if (tc.packageManager === "apt" && /\bapk\s+(?:add|update)\b/i.test(text)) {
     found.push("apk, which does not exist on Ubuntu");
   }
-  if (tc.shell === "sh" && /\bbash\s|#!\/bin\/bash/.test(text)) found.push("bash, which is not installed in the lab");
-  if (tc.serviceManager === "none" && /\b(?:rc-service|systemctl|rc-update)\s|\bservice\s+[\w.-]+\s+(?:start|restart|stop|reload)\b/.test(text)) {
+  if (tc.shell === "sh" && /\bbash\s|#!\/bin\/bash/.test(text))
+    found.push("bash, which is not installed in the lab");
+  if (
+    tc.serviceManager === "none" &&
+    /\b(?:rc-service|systemctl|rc-update)\s|\bservice\s+[\w.-]+\s+(?:start|restart|stop|reload)\b/.test(
+      text
+    )
+  ) {
     found.push("rc-service/systemctl/service, which do not exist in a container");
   }
   return found;

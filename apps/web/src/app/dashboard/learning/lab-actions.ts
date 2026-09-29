@@ -52,11 +52,7 @@ async function load(userId: string): Promise<LabResourceView[]> {
     virtualization: r.virtualization as Resource["virtualization"],
     alwaysOn: r.alwaysOn,
     notes: r.notes,
-    endpointKind: r.endpoint?.startsWith("vmware:")
-      ? "vmware"
-      : r.endpoint
-        ? "remote"
-        : null,
+    endpointKind: r.endpoint?.startsWith("vmware:") ? "vmware" : r.endpoint ? "remote" : null,
   }));
 }
 
@@ -67,15 +63,21 @@ export async function registerVmwareMachine(input: {
 }): Promise<{ ok: boolean; message?: string }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
-  const parsed = z.object({
-    label: z.string().trim().min(1).max(80),
-    path: z.string().trim().min(1).max(1000),
-  }).safeParse(input);
-  if (!parsed.success) return { ok: false, message: "Give the VM a name and select its .vmx file." };
+  const parsed = z
+    .object({
+      label: z.string().trim().min(1).max(80),
+      path: z.string().trim().min(1).max(1000),
+    })
+    .safeParse(input);
+  if (!parsed.success)
+    return { ok: false, message: "Give the VM a name and select its .vmx file." };
 
   const path = await import("node:path");
   const fs = await import("node:fs/promises");
-  if (!path.isAbsolute(parsed.data.path) || path.extname(parsed.data.path).toLowerCase() !== ".vmx") {
+  if (
+    !path.isAbsolute(parsed.data.path) ||
+    path.extname(parsed.data.path).toLowerCase() !== ".vmx"
+  ) {
     return { ok: false, message: "Use the absolute path to a VMware .vmx file." };
   }
   let resolved: string;
@@ -102,7 +104,10 @@ export async function registerVmwareMachine(input: {
     secretHint: null,
     lastSeenAt: null,
   });
-  return { ok: true, message: "VMware machine connected. Starting or suspending it still needs approval." };
+  return {
+    ok: true,
+    message: "VMware machine connected. Starting or suspending it still needs approval.",
+  };
 }
 
 export async function listLabResources(): Promise<{ ok: boolean; resources: LabResourceView[] }> {
@@ -153,7 +158,7 @@ export async function addLabResource(
  */
 async function recordRegistryChange(
   userId: string,
-  input: { capability: string; resourceId: string; detail: string },
+  input: { capability: string; resourceId: string; detail: string }
 ): Promise<void> {
   const { createLabActionsRepository } = await import("@careeros/database");
   await createLabActionsRepository(getDatabase()).record({
@@ -275,6 +280,8 @@ export type RunView = {
    */
   labTemplate: string | null;
   labLabel: string | null;
+  /** How to sign in to the lab machine, when it has a login (Windows labs). */
+  labSignIn: { user: string; password: string } | null;
   /** The exact command that opens a shell in this project's lab; null for desktop labs. */
   labShell: string | null;
   /** Where the lab runs, resolved from stored identity: "This computer", a VM, or unconnected. */
@@ -341,6 +348,7 @@ export async function listProjectRuns(): Promise<{ ok: boolean; runs: RunView[] 
       evidencedCount: honesty.evidenced,
       labTemplate: template,
       labLabel: template ? LAB_TEMPLATES[template].label : null,
+      labSignIn: template ? (LAB_TEMPLATES[template].signIn ?? null) : null,
       target: (() => {
         const resource = r.resourceId ? resourcesById.get(r.resourceId) : undefined;
         const resolved = resolveTarget(
@@ -371,7 +379,10 @@ async function targetFor(
     ? await createLabResourcesRepository(getDatabase()).get(userId, run.resourceId)
     : null;
   return {
-    target: resolveTarget(run, resource ? { id: resource.id, label: resource.label, endpoint: resource.endpoint } : null),
+    target: resolveTarget(
+      run,
+      resource ? { id: resource.id, label: resource.label, endpoint: resource.endpoint } : null
+    ),
     resource,
   };
 }
@@ -520,7 +531,11 @@ export async function proposeProjectLabStopAction(input: { runId: string }): Pro
       stepId: project.steps.find((step) => step.status === "pending")?.id ?? null,
     });
     return proposal.ok
-      ? { ok: true, requestId: proposal.requestId, message: "Suspend is waiting for your approval." }
+      ? {
+          ok: true,
+          requestId: proposal.requestId,
+          message: "Suspend is waiting for your approval.",
+        }
       : { ok: false, message: proposal.message };
   }
 

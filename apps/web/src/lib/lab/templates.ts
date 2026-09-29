@@ -51,6 +51,14 @@ export type LabTemplate = {
    */
   persistentPath?: string;
   /**
+   * How the person signs in to the machine, when it has a login. A plan said "log in with the
+   * supplied Administrator credentials" for a Windows lab that was never given any: dockur
+   * creates one local administrator, and nothing told the planner or the person its name.
+   * Set here, passed to the image, told to the planner and shown in the lab panel — one value.
+   * A fixed lab value, like the Postgres template's password: nothing real goes in the lab.
+   */
+  signIn?: { user: string; password: string };
+  /**
    * WHAT IS ACTUALLY INSIDE, measured from the image rather than assumed.
    *
    * A plan told the owner to run "sudo apt-get update" in a lab that was Alpine Linux —
@@ -91,11 +99,28 @@ export type LabTemplate = {
  */
 export const LAB_TEMPLATES: Record<string, LabTemplate> = {
   "windows-server-2025": {
-    toolchain: { distro: "Windows Server 2025", packageManager: "winget", hasSudo: false, shell: "powershell", serviceManager: "windows", firewall: true },
+    toolchain: {
+      distro: "Windows Server 2025",
+      packageManager: "winget",
+      hasSudo: false,
+      shell: "powershell",
+      serviceManager: "windows",
+      firewall: true,
+    },
     label: "Windows Server 2025",
     purpose: "Active Directory, Group Policy, PowerShell administration, domain services.",
     image: "dockurr/windows",
-    env: { VERSION: "2025", RAM_SIZE: "4G", CPU_CORES: "2", DISK_SIZE: "64G" },
+    // dockur's own defaults, set explicitly so the value is ours to state, not an accident:
+    // a lab installed before this line has exactly this account.
+    env: {
+      VERSION: "2025",
+      RAM_SIZE: "4G",
+      CPU_CORES: "2",
+      DISK_SIZE: "64G",
+      USERNAME: "Docker",
+      PASSWORD: "admin",
+    },
+    signIn: { user: "Docker", password: "admin" },
     ports: [
       { host: 8006, container: 8006, what: "the browser viewer, for the install and first boot" },
       { host: 3389, container: 3389, what: "Remote Desktop, once it is up" },
@@ -111,11 +136,28 @@ export const LAB_TEMPLATES: Record<string, LabTemplate> = {
   },
 
   "windows-11": {
-    toolchain: { distro: "Windows 11", packageManager: "winget", hasSudo: false, shell: "powershell", serviceManager: "windows", firewall: true },
+    toolchain: {
+      distro: "Windows 11",
+      packageManager: "winget",
+      hasSudo: false,
+      shell: "powershell",
+      serviceManager: "windows",
+      firewall: true,
+    },
     label: "Windows 11 Pro",
     purpose: "Endpoint work: policy, hardening, EDR, anything that needs a real desktop.",
     image: "dockurr/windows",
-    env: { VERSION: "11", RAM_SIZE: "4G", CPU_CORES: "2", DISK_SIZE: "64G" },
+    // dockur's own defaults, set explicitly so the value is ours to state, not an accident:
+    // a lab installed before this line has exactly this account.
+    env: {
+      VERSION: "11",
+      RAM_SIZE: "4G",
+      CPU_CORES: "2",
+      DISK_SIZE: "64G",
+      USERNAME: "Docker",
+      PASSWORD: "admin",
+    },
+    signIn: { user: "Docker", password: "admin" },
     ports: [
       { host: 8006, container: 8006, what: "the browser viewer, for the install and first boot" },
       { host: 3389, container: 3389, what: "Remote Desktop, once it is up" },
@@ -136,7 +178,14 @@ export const LAB_TEMPLATES: Record<string, LabTemplate> = {
    * hour. If a project can be done on Linux, it should be.
    */
   "linux-ubuntu": {
-    toolchain: { distro: "Ubuntu 24.04", packageManager: "apt", hasSudo: false, shell: "bash", serviceManager: "none", firewall: false },
+    toolchain: {
+      distro: "Ubuntu 24.04",
+      packageManager: "apt",
+      hasSudo: false,
+      shell: "bash",
+      serviceManager: "none",
+      firewall: false,
+    },
     label: "Ubuntu 24.04",
     purpose: "Services, scripting, containers, CI — most build projects want this.",
     image: "ubuntu:24.04",
@@ -282,7 +331,6 @@ export function specForTemplate(key: TemplateKey): {
     arch: ["x86_64"],
   };
 }
-
 
 /**
  * The name a project's lab is started under, as the parameter the recipe validates.
