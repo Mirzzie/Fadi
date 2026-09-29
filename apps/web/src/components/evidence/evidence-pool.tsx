@@ -1,14 +1,32 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ExternalLink, ImagePlus, Layers, Loader2, Pencil, Plus, Sparkles, Trash2, Wand2, X } from "lucide-react";
+import {
+  ExternalLink,
+  ImagePlus,
+  Layers,
+  Loader2,
+  MessageSquareQuote,
+  Pencil,
+  Plus,
+  Sparkles,
+  Trash2,
+  Wand2,
+  X,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { buildEvidencePool, deleteEvidence, removeEvidenceArtifact, saveEvidence } from "@/app/dashboard/evidence/actions";
+import {
+  buildEvidencePool,
+  deleteEvidence,
+  removeEvidenceArtifact,
+  saveEvidence,
+} from "@/app/dashboard/evidence/actions";
 import { RenderingsPanel } from "./renderings-panel";
 import { SameThingPanel } from "./same-thing-panel";
 import { HistoryCapture } from "@/components/evidence/history-capture";
@@ -58,7 +76,7 @@ export function EvidencePool({
             ? `${r.items.length} new records saved. ${r.pendingReview} ${r.pendingReview === 1 ? "import is" : "imports are"} waiting on your decision below.`
             : `${r.items.length} new records saved.`
         );
-        setReviewVersion(v => v + 1);
+        setReviewVersion((v) => v + 1);
         router.refresh();
       }
     });
@@ -96,10 +114,19 @@ export function EvidencePool({
           ) : (
             <> (set a direction to frame it)</>
           )}
-          . Switch directions and the <span className="text-foreground">same evidence re-ranks</span>{" "}
-          for that path — one truthful history, many career identities.
+          . Switch directions and the{" "}
+          <span className="text-foreground">same evidence re-ranks</span> for that path — one
+          truthful history, many career identities.
         </p>
       </header>
+
+      <Link
+        href="/dashboard/evidence/stories"
+        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+      >
+        <MessageSquareQuote className="size-3.5" aria-hidden="true" />
+        Interview stories from this record
+      </Link>
 
       {/* ONE DOOR. There used to be two verbs here — "Build from my history" (which read a CV
           saved on another screen) and "Add an item" — plus a third upload box below, and a CV
@@ -107,7 +134,12 @@ export function EvidencePool({
           so the buttons open it rather than doing a different thing. */}
       {ranked.length > 0 ? (
         <div className="flex flex-wrap gap-2">
-          <Button size="sm" variant="outline" onClick={() => setCapturing((v) => !v)} disabled={pending}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setCapturing((v) => !v)}
+            disabled={pending}
+          >
             <Wand2 className="size-4" aria-hidden="true" />
             Add more history
           </Button>
@@ -127,7 +159,11 @@ export function EvidencePool({
           }}
         />
       ) : null}
-      {notice ? <p role="status" className="text-sm text-muted-foreground">{notice}</p> : null}
+      {notice ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          {notice}
+        </p>
+      ) : null}
       {error ? (
         <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm">{error}</p>
       ) : null}
@@ -138,7 +174,14 @@ export function EvidencePool({
       <SameThingPanel key={reviewVersion} onChanged={() => router.refresh()} />
 
       {editing === "new" ? (
-        <EvidenceEditor onClose={() => setEditing(null)} onSaved={() => { setEditing(null); setReviewVersion(v => v + 1); router.refresh(); }} />
+        <EvidenceEditor
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            setReviewVersion((v) => v + 1);
+            router.refresh();
+          }}
+        />
       ) : null}
 
       {ranked.length === 0 && editing !== "new" ? (
@@ -148,7 +191,9 @@ export function EvidencePool({
                on file, the record was empty, and every other screen quietly had nothing to work
                with. Say that plainly, and make the fix one button. */
             <div className="rounded-lg border border-border/70 bg-muted/20 p-4">
-              <p className="text-sm font-medium">Your CV is saved — Fadi hasn&apos;t read it yet.</p>
+              <p className="text-sm font-medium">
+                Your CV is saved — Fadi hasn&apos;t read it yet.
+              </p>
               <p className="mt-1 text-xs text-muted-foreground">
                 Reading it turns it into records you can check and correct. Everything else —
                 documents, your portfolio, interview prep — works from those records, not from the
@@ -183,7 +228,11 @@ export function EvidencePool({
                 key={r.item.id}
                 item={r.item}
                 onClose={() => setEditing(null)}
-                onSaved={() => { setEditing(null); setReviewVersion(v => v + 1); router.refresh(); }}
+                onSaved={() => {
+                  setEditing(null);
+                  setReviewVersion((v) => v + 1);
+                  router.refresh();
+                }}
               />
             ) : (
               <EvidenceCard
@@ -195,7 +244,7 @@ export function EvidencePool({
                 onRemove={() => remove(r.item.id)}
                 onRemoveArtifact={removeArtifact}
               />
-            ),
+            )
           )}
         </ul>
       )}
@@ -224,9 +273,13 @@ function EvidenceCard({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary" className="text-[0.6rem] capitalize">{item.kind}</Badge>
+            <Badge variant="secondary" className="text-[0.6rem] capitalize">
+              {item.kind}
+            </Badge>
             <span className="font-medium">{item.title}</span>
-            {item.origin === "ai" ? <Sparkles className="size-3 text-muted-foreground" aria-hidden="true" /> : null}
+            {item.origin === "ai" ? (
+              <Sparkles className="size-3 text-muted-foreground" aria-hidden="true" />
+            ) : null}
           </div>
           {item.organization || item.period ? (
             <p className="mt-0.5 text-xs text-muted-foreground">
@@ -235,10 +288,22 @@ function EvidenceCard({
           ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <button type="button" onClick={onEdit} className="text-muted-foreground/70 hover:text-foreground" title="Edit" aria-label="Edit">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="text-muted-foreground/70 hover:text-foreground"
+            title="Edit"
+            aria-label="Edit"
+          >
             <Pencil className="size-3.5" aria-hidden="true" />
           </button>
-          <button type="button" onClick={onRemove} className="text-muted-foreground/60 hover:text-destructive" title="Remove" aria-label="Remove">
+          <button
+            type="button"
+            onClick={onRemove}
+            className="text-muted-foreground/60 hover:text-destructive"
+            title="Remove"
+            aria-label="Remove"
+          >
             <Trash2 className="size-3.5" aria-hidden="true" />
           </button>
         </div>
@@ -250,11 +315,25 @@ function EvidenceCard({
       {(item.artifacts ?? []).length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {(item.artifacts ?? []).map((artifact) => (
-            <span key={artifact.id} className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs">
-              <a href={artifact.url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-primary hover:underline">
-                {artifact.label || artifact.kind}<ExternalLink className="size-3" aria-hidden="true" />
+            <span
+              key={artifact.id}
+              className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs"
+            >
+              <a
+                href={artifact.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-primary hover:underline"
+              >
+                {artifact.label || artifact.kind}
+                <ExternalLink className="size-3" aria-hidden="true" />
               </a>
-              <button type="button" onClick={() => onRemoveArtifact(artifact.id)} className="text-muted-foreground hover:text-destructive" aria-label={"Remove " + (artifact.label || artifact.kind)}>
+              <button
+                type="button"
+                onClick={() => onRemoveArtifact(artifact.id)}
+                className="text-muted-foreground hover:text-destructive"
+                aria-label={"Remove " + (artifact.label || artifact.kind)}
+              >
                 <X className="size-3" aria-hidden="true" />
               </button>
             </span>
@@ -265,7 +344,12 @@ function EvidenceCard({
       {item.tags.length > 0 ? (
         <div className="mt-2 flex flex-wrap gap-1">
           {item.tags.map((t) => (
-            <span key={t} className="rounded bg-muted px-1.5 py-0.5 text-[0.65rem] text-muted-foreground">{t}</span>
+            <span
+              key={t}
+              className="rounded bg-muted px-1.5 py-0.5 text-[0.65rem] text-muted-foreground"
+            >
+              {t}
+            </span>
           ))}
         </div>
       ) : null}
@@ -274,7 +358,8 @@ function EvidenceCard({
       {hasTrack ? (
         score > 0 ? (
           <p className="mt-2 text-xs text-emerald-400">
-            Strong evidence for {trackRole}{matched.length ? ` (matches: ${matched.join(", ")})` : ""}
+            Strong evidence for {trackRole}
+            {matched.length ? ` (matches: ${matched.join(", ")})` : ""}
           </p>
         ) : (
           <p className="mt-2 text-xs text-muted-foreground">
@@ -324,8 +409,14 @@ function EvidenceEditor({
         period: form.period,
         detail: form.detail,
         metrics: form.metrics,
-        tags: form.tags.split(",").map((t) => t.trim()).filter(Boolean),
-        artifactUrls: form.artifactUrls.split("\n").map((url) => url.trim()).filter(Boolean),
+        tags: form.tags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
+        artifactUrls: form.artifactUrls
+          .split("\n")
+          .map((url) => url.trim())
+          .filter(Boolean),
       });
       if (!res.ok) return setError(res.message);
       onSaved();
@@ -340,7 +431,10 @@ function EvidenceEditor({
     setError(null);
     try {
       const urls = await Promise.all(files.map((file) => uploadPortfolioMedia(file)));
-      setForm((current) => ({ ...current, artifactUrls: [current.artifactUrls, ...urls].filter(Boolean).join("\n") }));
+      setForm((current) => ({
+        ...current,
+        artifactUrls: [current.artifactUrls, ...urls].filter(Boolean).join("\n"),
+      }));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Upload failed.");
     } finally {
@@ -359,33 +453,92 @@ function EvidenceEditor({
             onChange={(e) => setForm((f) => ({ ...f, kind: e.target.value }))}
             className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm capitalize"
           >
-            {KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
+            {KINDS.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
           </select>
         </label>
-        <Field label="Title"><Input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} autoFocus /></Field>
-        <Field label="Organization"><Input value={form.organization} onChange={(e) => setForm((f) => ({ ...f, organization: e.target.value }))} /></Field>
-        <Field label="Period"><Input value={form.period} onChange={(e) => setForm((f) => ({ ...f, period: e.target.value }))} placeholder="2021–2023" /></Field>
+        <Field label="Title">
+          <Input
+            value={form.title}
+            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+            autoFocus
+          />
+        </Field>
+        <Field label="Organization">
+          <Input
+            value={form.organization}
+            onChange={(e) => setForm((f) => ({ ...f, organization: e.target.value }))}
+          />
+        </Field>
+        <Field label="Period">
+          <Input
+            value={form.period}
+            onChange={(e) => setForm((f) => ({ ...f, period: e.target.value }))}
+            placeholder="2021–2023"
+          />
+        </Field>
       </div>
-      <Field label="What you did"><Textarea rows={2} value={form.detail} onChange={(e) => setForm((f) => ({ ...f, detail: e.target.value }))} /></Field>
-      <Field label="Real metrics / outcome (optional)"><Input value={form.metrics} onChange={(e) => setForm((f) => ({ ...f, metrics: e.target.value }))} /></Field>
+      <Field label="What you did">
+        <Textarea
+          rows={2}
+          value={form.detail}
+          onChange={(e) => setForm((f) => ({ ...f, detail: e.target.value }))}
+        />
+      </Field>
+      <Field label="Real metrics / outcome (optional)">
+        <Input
+          value={form.metrics}
+          onChange={(e) => setForm((f) => ({ ...f, metrics: e.target.value }))}
+        />
+      </Field>
       <Field label="Tags (skills/domains, comma-separated — these power per-track relevance)">
-        <Input value={form.tags} onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))} placeholder="e.g. patient care, triage, leadership" />
+        <Input
+          value={form.tags}
+          onChange={(e) => setForm((f) => ({ ...f, tags: e.target.value }))}
+          placeholder="e.g. patient care, triage, leadership"
+        />
       </Field>
       <Field label="Media or source links (optional, one URL per line)">
-        <Textarea rows={2} value={form.artifactUrls} onChange={(e) => setForm((f) => ({ ...f, artifactUrls: e.target.value }))} placeholder="Repository, write-up, screenshot or video URL" />
+        <Textarea
+          rows={2}
+          value={form.artifactUrls}
+          onChange={(e) => setForm((f) => ({ ...f, artifactUrls: e.target.value }))}
+          placeholder="Repository, write-up, screenshot or video URL"
+        />
       </Field>
       {mediaUploadConfigured() ? (
         <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-input px-3 py-2 text-xs hover:bg-muted">
-          {uploading ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
+          {uploading ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <ImagePlus className="size-4" />
+          )}
           {uploading ? "Uploading…" : "Upload images or video"}
-          <input type="file" accept="image/*,video/*" multiple className="sr-only" onChange={uploadMedia} disabled={uploading} />
+          <input
+            type="file"
+            accept="image/*,video/*"
+            multiple
+            className="sr-only"
+            onChange={uploadMedia}
+            disabled={uploading}
+          />
         </label>
       ) : null}
-      <p className="text-xs text-muted-foreground">Media strengthens a public project but is never required. It stays attached to this Evidence record when the portfolio changes.</p>
+      <p className="text-xs text-muted-foreground">
+        Media strengthens a public project but is never required. It stays attached to this Evidence
+        record when the portfolio changes.
+      </p>
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
       <div className="flex gap-2">
-        <Button size="sm" onClick={submit} disabled={pending || uploading || !form.title.trim()}>Save</Button>
-        <Button size="sm" variant="ghost" onClick={onClose} disabled={pending}>Cancel</Button>
+        <Button size="sm" onClick={submit} disabled={pending || uploading || !form.title.trim()}>
+          Save
+        </Button>
+        <Button size="sm" variant="ghost" onClick={onClose} disabled={pending}>
+          Cancel
+        </Button>
       </div>
     </div>
   );

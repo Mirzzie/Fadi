@@ -126,3 +126,17 @@ build emitted no word-level delta events. Calling that live transcription would 
 would make the experience slower. The turn-taking UI therefore retains the reliable local upload
 path while the infrastructure is ready for a future faster model/GPU or server build with real
 deltas.
+
+## Codex: interview setup simplified and Story Bank moved
+
+The interview screen now asks for the decision needed at launch: stage and length. A job-specific
+session reuses the saved title, description, region and profile context instead of presenting them
+again as editable setup fields. Generic practice keeps role visible and puts optional description,
+region and seniority behind one "more context" disclosure.
+
+Voice remains the default. The setup describes the behavior in plain language and offers one
+**Use text instead** action rather than a configuration checkbox. Story Bank no longer sits beside
+the interview and split the person's attention; it has its own route under **My career → My
+record**, linked from the evidence screen. The active interview is one focused column.
+
+Verification: web typecheck and focused lint clean; 1,399 tests passed, 156 skipped.

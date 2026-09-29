@@ -8,13 +8,11 @@ import {
   type PracticeJob,
   type PracticeSession,
 } from "@/components/interview/mock-interview";
-import { StoryBank } from "@/components/interview/story-bank";
 import { resolveApplicationJobContext } from "@/lib/applications/job-context";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDashboardProfileSummary } from "@/lib/career-report/data";
 import { getDatabase } from "@/lib/database/client";
 import type { MockQuestion } from "@/lib/interview/mock";
-import { listStories } from "@/lib/interview/story-bank";
 import { onboardingStatusOf } from "@/lib/onboarding/status";
 
 export const metadata: Metadata = { title: "Interview prep" };
@@ -28,11 +26,7 @@ export default async function InterviewPage({
   const user = await getCurrentAuthUser();
   if (!user) redirect("/auth/sign-in?next=/dashboard/interview");
 
-  const [stories, profile, params] = await Promise.all([
-    listStories(user.id),
-    getDashboardProfileSummary(user.id),
-    searchParams,
-  ]);
+  const [profile, params] = await Promise.all([getDashboardProfileSummary(user.id), searchParams]);
 
   // Session ownership is checked before stored questions reach the browser. Its job restores
   // the exact application context when Today sends the person back after a refresh.
@@ -48,22 +42,16 @@ export default async function InterviewPage({
 
   return (
     <AppShell>
-      {/* Practice and the stories it draws on, side by side on a wide screen. */}
-      <div className="mx-auto grid w-full max-w-[96rem] gap-2 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-start">
-        <div className="min-w-0 space-y-6 p-4 sm:p-6">
-          <MockInterview
-            job={job}
-            initialSession={initialSession}
-            defaults={{
-              role: profile?.targetRole ?? "",
-              country: profile?.locationPreference ?? "",
-              seniority: profile?.experienceLevel ?? "",
-            }}
-          />
-        </div>
-        <div className="min-w-0">
-          <StoryBank stories={stories} />
-        </div>
+      <div className="mx-auto w-full max-w-4xl p-4 sm:p-6">
+        <MockInterview
+          job={job}
+          initialSession={initialSession}
+          defaults={{
+            role: profile?.targetRole ?? "",
+            country: profile?.locationPreference ?? "",
+            seniority: profile?.experienceLevel ?? "",
+          }}
+        />
       </div>
     </AppShell>
   );

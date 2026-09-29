@@ -304,18 +304,20 @@ export function MockInterview({
             </p>
           ) : null}
         </div>
-        <Field label="Role">
-          <Input
-            value={config.role}
-            onChange={(event) =>
-              setConfig((previous) => ({
-                ...previous,
-                role: event.target.value,
-              }))
-            }
-            placeholder="e.g. IT Support Specialist"
-          />
-        </Field>
+        {!job ? (
+          <Field label="Role">
+            <Input
+              value={config.role}
+              onChange={(event) =>
+                setConfig((previous) => ({
+                  ...previous,
+                  role: event.target.value,
+                }))
+              }
+              placeholder="e.g. IT Support Specialist"
+            />
+          </Field>
+        ) : null}
         <div className="grid gap-3 sm:grid-cols-2">
           <ChoiceRow
             label="Interview stage"
@@ -333,52 +335,66 @@ export function MockInterview({
             onChange={setDurationMinutes}
           />
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Country / region">
-            <Input
-              value={config.country}
-              onChange={(event) =>
-                setConfig((previous) => ({
-                  ...previous,
-                  country: event.target.value,
-                }))
-              }
-            />
-          </Field>
-          <Field label="Seniority">
-            <Input
-              value={config.seniority}
-              onChange={(event) =>
-                setConfig((previous) => ({
-                  ...previous,
-                  seniority: event.target.value,
-                }))
-              }
-            />
-          </Field>
+        {!job ? (
+          <details className="rounded-lg border border-border/60 px-3 py-2">
+            <summary className="cursor-pointer text-sm text-muted-foreground">
+              Add a job description or more context
+            </summary>
+            <div className="mt-3 space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Country / region">
+                  <Input
+                    value={config.country}
+                    onChange={(event) =>
+                      setConfig((previous) => ({
+                        ...previous,
+                        country: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+                <Field label="Seniority">
+                  <Input
+                    value={config.seniority}
+                    onChange={(event) =>
+                      setConfig((previous) => ({
+                        ...previous,
+                        seniority: event.target.value,
+                      }))
+                    }
+                  />
+                </Field>
+              </div>
+              <Field label="Job description">
+                <Textarea rows={3} value={jd} onChange={(event) => setJd(event.target.value)} />
+              </Field>
+            </div>
+          </details>
+        ) : null}
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-muted/50 px-3 py-2.5 text-sm">
+          <div>
+            <p className="font-medium text-foreground">
+              {voiceConversation ? "Fadi will interview you aloud" : "Text practice"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {voiceConversation
+                ? "Fadi asks, listens after the question, and waits through a thoughtful pause."
+                : "Questions and answers stay on screen; your microphone remains off."}
+            </p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => setVoiceConversation((value) => !value)}
+          >
+            {voiceConversation ? "Use text instead" : "Use voice"}
+          </Button>
         </div>
-        <Field label="Job description (optional)">
-          <Textarea rows={3} value={jd} onChange={(event) => setJd(event.target.value)} />
-        </Field>
-        <label className="flex items-start gap-2 rounded-lg border border-border/60 p-3 text-sm">
-          <input
-            type="checkbox"
-            className="mt-0.5"
-            checked={voiceConversation}
-            onChange={(event) => setVoiceConversation(event.target.checked)}
-          />
-          <span>
-            <span className="block font-medium text-foreground">Voice conversation</span>
-            <span className="text-xs text-muted-foreground">
-              Fadi asks aloud and listens automatically. A four-second pause ends your answer; you
-              can still finish or interrupt manually.
-            </span>
-          </span>
-        </label>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
         <Button size="sm" onClick={start} disabled={pending || !config.role.trim()}>
           <Wand2 className="size-4" aria-hidden="true" />
-          {pending ? "Setting up…" : "Start practice"}
+          {pending ? "Setting up…" : "Start interview"}
         </Button>
       </section>
     );
