@@ -31,5 +31,35 @@ services:
     environment:
       SEARXNG_BASE_URL: http://localhost:${SEARXNG_HOST_PORT:-8888}/
 
+  # ── Fadi's voice, fully local and free ────────────────────────────────────────
+  # The orb used Groq's free cloud tier to hear (Whisper) and speak (Orpheus), and its daily
+  # limits ran out mid-conversation. These two run on this machine instead: no key, no quota,
+  # nothing leaves the laptop. The app already prefers them when these are set in
+  # apps/web/.env.local (the cloud stays as a fallback only):
+  #   FADI_STT_LOCAL_BASE=http://localhost:8000/v1
+  #   FADI_STT_LOCAL_MODEL=Systran/faster-whisper-small.en
+  #   FADI_TTS_LOCAL_BASE=http://localhost:8880/v1
+  #   FADI_TTS_LOCAL_VOICE=am_michael
+  # CPU images, so no GPU driver setup is needed; first start downloads the models once.
+
+  # Speech → text: faster-whisper behind an OpenAI-compatible /v1/audio/transcriptions.
+  speaches:
+    image: ghcr.io/speaches-ai/speaches:latest-cpu
+    container_name: careeros-speaches
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${STT_HOST_PORT:-8000}:8000"
+    volumes:
+      - careeros_hf_cache:/home/ubuntu/.cache/huggingface/hub
+
+  # Text → speech: Kokoro-82M behind an OpenAI-compatible /v1/audio/speech.
+  kokoro:
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:latest
+    container_name: careeros-kokoro
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${TTS_HOST_PORT:-8880}:8880"
+
 volumes:
   careeros_postgres_data:
+  careeros_hf_cache:
