@@ -19,7 +19,7 @@ This directory describes the product that exists now and the decisions guiding i
 | Data and identity | [PostgreSQL architecture](POSTGRES_FIRST_ARCHITECTURE.md), [data sources](DATA_SOURCES_AND_REALTIME_INTELLIGENCE.md) |
 | Portfolio | [Portfolio engine](PORTFOLIO_WEBSITE_ENGINE.md), [ADR 0008](adr/0008-github-portfolio-publishing.md), [ADR 0009](adr/0009-portfolio-hosting-and-static-export.md) |
 | Authentication and safety | [Authentication](AUTHENTICATION_ARCHITECTURE.md), [security](SECURITY_AND_COMPLIANCE.md), [agent guardrails](security/AGENT_GUARDRAILS.md) |
-| Operations | [Development](DEVELOPMENT_GUIDE.md), [local database](LOCAL_DEVELOPMENT_DATABASE.md), [deployment](INFRASTRUCTURE_AND_DEPLOYMENT.md), [production checklist](PRODUCTION_CHECKLIST.md), [acquisition readiness](ACQUISITION_READINESS.md), [MCP](MCP-CONNECT.md) |
+| Operations | [Development](DEVELOPMENT_GUIDE.md), [local database](LOCAL_DEVELOPMENT_DATABASE.md), [deployment](INFRASTRUCTURE_AND_DEPLOYMENT.md), [production checklist](PRODUCTION_CHECKLIST.md), [product quality and growth](PRODUCT_QUALITY_STANDARD.md), [MCP](MCP-CONNECT.md) |
 | Engineering process | [Contributing](CONTRIBUTING.md), [coding standards](CODING_STANDARDS.md), [Git workflow](GIT_WORKFLOW.md), [ADR index](ARCHITECTURE_DECISION_RECORDS.md) |
 
 ## Historical evidence retained on purpose
@@ -32,7 +32,7 @@ The two current collaboration notes are:
 - [Apply/Prepare, Practice, interview and brand review](reviews/2026-09-23-codex-to-claude-apply-prepare-interview-learning-brand.md)
 - [Independent validation of Claude Phase 1](reviews/2026-09-23-codex-validates-claude-phase-1.md)
 - [Lab-engine ownership and status](reviews/2026-09-30-claude-codex-lab-engine-plan.md)
-- [Acquisition-readiness handoff](reviews/2026-10-05-codex-to-claude-acquisition-readiness.md)
+- [Industry product-quality handoff](reviews/2026-10-05-codex-to-claude-product-quality.md)
 
 Once their decisions land in code or this canonical documentation, remove the notes.
 

@@ -1,19 +1,20 @@
-# Codex → Claude: acquisition standard and ownership
+# Codex → Claude: industry product quality and ownership
 
 **Date:** 5 October 2026
 
 **Audience:** Claude, Codex and the owner
 
-**Status:** Active coordination note; canonical standard is `docs/ACQUISITION_READINESS.md`
+**Status:** Active coordination note; canonical standard is `docs/PRODUCT_QUALITY_STANDARD.md`
 
-The owner's new bar is the right one: assess and build Fadi as though a serious technology
-company will acquire it. My conclusion is that the product thesis is acquirable, while the
-current product is not diligence-ready. Feature breadth is ahead of security, privacy,
-reliability, AI governance, supply-chain and commercial evidence.
+The owner clarified that acquisition is hypothetical. Fadi remains free and open source; the
+request is to apply the same engineering and product scrutiny an established technology company
+would. My conclusion is that the thesis is strong while the current product is an advanced alpha.
+Feature breadth is ahead of usability, core-loop reliability, security, privacy, AI governance,
+supply-chain and adoption evidence.
 
 I have written the standard, acceptance evidence and 90-day order in
-`docs/ACQUISITION_READINESS.md`. Please use that document when making architecture choices; do
-not add another acquisition roadmap.
+`docs/PRODUCT_QUALITY_STANDARD.md`. Please use that document when making architecture and product
+choices; do not add another quality roadmap.
 
 ## Current division
 
@@ -31,7 +32,7 @@ not add another acquisition roadmap.
 
 - X2 lab-plan evaluation set and scorer: implemented and validated.
 - X1 target plan validation, then X3 automatic proof, without editing Claude's active files.
-- Establish the acquisition quality gates and cross-review Claude's engine/A2A slices against
+- Establish the product quality gates and cross-review Claude's engine/A2A slices against
   security, reliability and evaluation requirements.
 
 ### Shared, sequential review

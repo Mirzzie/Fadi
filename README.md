@@ -4,16 +4,25 @@
 > and the local Postgres role is `careeros` — those are functional identifiers, not the
 > brand. The product is **Fadi**.
 
-**Fadi is an AI operating system for a person's career.** Instead of a folder of
+**Fadi is a free, open-source career workspace with an AI orchestrator.** Instead of a folder of
 disconnected tools (a job board here, a resume editor there, a spreadsheet to track
-applications), it is one always-present intelligent environment that helps someone decide
+applications), it is one connected, work-scoped intelligent environment that helps someone decide
 *where* to aim their career, *find* the right opportunities, *prepare* strong applications,
 get through the grind of a job search, and *understand* how the wider world affects their
 path.
 
-At the center is **Fadi** — an AI mentor (not a chatbot widget) present across the whole
-product. The brand promise: *a calm, honest, intelligent partner that helps you get hired
-without losing your mind* — for **any** career, not just tech.
+At the center is **Fadi** — an AI mentor designed to continue the person's active goal across
+the product instead of living in a separate chat widget. That continuity is partly implemented
+and remains a release goal. The brand promise is *a calm, honest, intelligent partner that helps
+you get hired without losing your mind*. The deepest current path is for people developing or presenting
+hands-on work in IT, cloud, security, DevOps and software. Broader careers are a direction for
+the project, not a finished claim.
+
+Fadi is under active development. The architecture aims at one continuous career loop, while
+job-source reliability, complete cross-feature handoffs, lab breadth and production hardening
+remain works in progress. See
+[`docs/PRODUCT_QUALITY_STANDARD.md`](docs/PRODUCT_QUALITY_STANDARD.md) for the current evidence
+and release bar.
 
 Its non-negotiable doctrine (see [`docs/FadiOS-Project-Context.md`](docs/FadiOS-Project-Context.md)):
 score the **process, never the outcome**; protect the user's mental health and locus of
