@@ -22,6 +22,7 @@ import {
   importResumeFileAction,
 } from "@/app/dashboard/documents/actions";
 import type { DocumentKind } from "@careeros/database";
+import { formatDay } from "@/lib/format/date";
 
 type DocView = { id: string; kind: string; title: string; updatedAt: string; preview: string };
 
@@ -39,20 +40,6 @@ const KIND_META: Record<string, { label: string; icon: LucideIcon }> = {
   value_proposition: { label: "Value proposition", icon: Sparkles },
   note: { label: "Note", icon: NotebookPen },
 };
-
-// Deterministic date format (explicit locale + UTC) so the server and client render the
-// SAME string — a bare toLocaleDateString() differs between the two (locale/timezone) and
-// caused a hydration mismatch. "3 Aug 2026" also avoids dd/mm vs mm/dd ambiguity.
-const UPDATED_FMT = new Intl.DateTimeFormat("en-GB", {
-  day: "numeric",
-  month: "short",
-  year: "numeric",
-  timeZone: "UTC",
-});
-function formatUpdated(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? "" : UPDATED_FMT.format(d);
-}
 
 export function DocumentsShell({ documents }: { documents: DocView[] }) {
   const router = useRouter();
@@ -191,7 +178,7 @@ export function DocumentsShell({ documents }: { documents: DocView[] }) {
                   </div>
                   <p className="mt-1.5 truncate font-heading text-sm font-semibold">{doc.title}</p>
                   <p className="mt-1 text-[0.7rem] text-muted-foreground">
-                    Updated {formatUpdated(doc.updatedAt)}
+                    Updated {formatDay(doc.updatedAt)}
                   </p>
                 </div>
               </button>
