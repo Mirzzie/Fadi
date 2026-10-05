@@ -37,7 +37,9 @@ const META: Record<Provider, { label: string; icon: React.ReactNode }> = {
  * LinkedIn paste / "Save to PDF" import on the Profile page.
  */
 export function ConnectedAccounts({ providers }: { providers: Provider[] }) {
-  const [linked, setLinked] = useState<Set<string> | null>(null);
+  // Better Auth 1.7 unlinks the stable account row, not every account for a provider.
+  // Keep that identity instead of reducing the response to a provider-name boolean.
+  const [linked, setLinked] = useState<Map<Provider, string> | null>(null);
   const [pending, setPending] = useState<Provider | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,12 +48,23 @@ export function ConnectedAccounts({ providers }: { providers: Provider[] }) {
     (async () => {
       try {
         const res = await authClient.listAccounts();
-        const items = (res?.data ?? []) as Array<{ providerId?: string; provider?: string }>;
+        const items = (res?.data ?? []) as Array<{
+          id: string;
+          providerId?: string;
+          provider?: string;
+        }>;
         if (!cancelled) {
-          setLinked(new Set(items.map((a) => a.providerId ?? a.provider ?? "").filter(Boolean)));
+          const accounts = new Map<Provider, string>();
+          for (const account of items) {
+            const provider = account.providerId ?? account.provider;
+            if ((provider === "google" || provider === "linkedin") && account.id) {
+              accounts.set(provider, account.id);
+            }
+          }
+          setLinked(accounts);
         }
       } catch {
-        if (!cancelled) setLinked(new Set()); // degrade to "Connect" rather than block
+        if (!cancelled) setLinked(new Map()); // degrade to "Connect" rather than block
       }
     })();
     return () => {
@@ -72,12 +85,14 @@ export function ConnectedAccounts({ providers }: { providers: Provider[] }) {
   }
 
   async function disconnect(provider: Provider) {
+    const accountId = linked?.get(provider);
+    if (!accountId) return;
     setPending(provider);
     setError(null);
     try {
-      await authClient.unlinkAccount({ providerId: provider });
+      await authClient.unlinkAccount({ accountId });
       setLinked((prev) => {
-        const next = new Set(prev);
+        const next = new Map(prev);
         next.delete(provider);
         return next;
       });

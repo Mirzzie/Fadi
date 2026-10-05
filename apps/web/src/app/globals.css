@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import "./shadcn-tailwind.css";
 
 /* The public portfolio renderer lives in a separate workspace package, which
    Tailwind's auto-source detection does NOT scan. Without this, classes used only

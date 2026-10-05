@@ -44,16 +44,18 @@ job result, understand the next action, finish a project once, or know what Fadi
 | Privacy               | Blocked for public release | Data classification and deletion intent are documented. There is no completed processing inventory, retention schedule, DPIA where required, subprocessor register, or tested export/deletion evidence for every store.                             |
 | Reliability           | Blocked                    | CI runs typecheck, lint, tests, migrations, build and route smoke tests. No production SLOs, telemetry coverage, capacity results, backup restore drill, RTO/RPO or incident runbooks are demonstrated.                                             |
 | AI governance         | Emerging                   | Model routing, structured outputs, consent and some domain evaluations exist. There is no complete model/prompt register, risk classification, adversarial evaluation gate, drift process or human-override evidence across every agent capability. |
-| Supply chain          | Blocked                    | Dependencies are locked, but several runtime images use mutable tags. There is no SBOM, signed provenance, image/dependency scan gate or licence inventory in the release evidence.                                                                 |
+| Supply chain          | Emerging                   | Direct critical/high JavaScript findings were remediated on 5 October 2026. Several runtime images still use mutable tags, and there is no SBOM, signed provenance, scan gate or licence inventory in release evidence.                              |
 | Accessibility         | Unknown                    | No WCAG 2.2 AA audit or automated/manual release gate is recorded.                                                                                                                                                                                  |
 | Open-source readiness | Emerging                   | Setup, contribution and coding documents exist. The project still needs release signing, a vulnerability policy, maintainer/governance rules, supported-version policy and reproducible release evidence.                                           |
 | Adoption evidence     | Unknown                    | There is no measured activation, task completion, retention, successful application, learning completion or contributor health baseline.                                                                                                            |
 
-On 5 October 2026 a clean install of the committed lockfile reported 28 production dependency
-findings: 1 critical, 17 high, 8 moderate and 2 low. The direct affected packages included Next.js
-and Better Auth. This blocks a public release until the direct upgrades are tested and the
-remaining reachable findings are triaged. It is a measured result, not a claim that every
-transitive advisory is exploitable in Fadi.
+On 5 October 2026 a clean install initially reported 28 production-mode dependency findings: 1
+critical, 17 high, 8 moderate and 2 low. The direct affected packages included Next.js and Better
+Auth. The same-day remediation upgraded the direct packages, removed the shadcn CLI from the app
+runtime and refreshed vulnerable transitives. The clean production-mode audit now reports 0
+critical, 0 high and 6 moderate findings in build/test tooling. Those remaining findings still
+need reachability review and upgrades; audit counts are not proof that every advisory was or was
+not exploitable in Fadi.
 
 ## Claims audit
 

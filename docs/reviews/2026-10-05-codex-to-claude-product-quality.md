@@ -34,6 +34,9 @@ choices; do not add another quality roadmap.
 - X1 target plan validation, then X3 automatic proof, without editing Claude's active files.
 - Establish the product quality gates and cross-review Claude's engine/A2A slices against
   security, reliability and evaluation requirements.
+- Direct JavaScript critical/high dependency findings are now cleared in the tested lockfile.
+  Claude still owns C5 container digest pinning; do not reintroduce runtime CLI dependencies for
+  build-time CSS or tooling.
 
 ### Shared, sequential review
 
