@@ -127,6 +127,18 @@ export interface ConsequentialTool extends ToolBase {
   /** What it attempts, named neutrally: the status says whether it happened. */
   readonly effect: string;
   execute(args: Record<string, unknown>, ctx: FadiToolContext): Promise<ConsequentialResult>;
+  /**
+   * Optional: work out exactly what a held change will touch, WITHOUT changing anything. A
+   * caller that must confirm first (voice) reads `readBack` to the person and later executes
+   * with `args` — which pin the record by id — so "confirm" acts on what was read back, not on
+   * whatever the name matches by then. `ok: false` is a question for the person; nothing is held.
+   */
+  prepare?(
+    args: Record<string, unknown>,
+    ctx: FadiToolContext
+  ): Promise<
+    { ok: true; readBack: string; args: Record<string, unknown> } | { ok: false; summary: string }
+  >;
 }
 
 /**

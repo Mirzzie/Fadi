@@ -16,6 +16,7 @@ import { getDashboardProfileSummary } from "@/lib/career-report/data";
 import { rankedEvidenceForActiveTrack } from "@/lib/evidence/pool";
 import { fetchCompanyAtsJobs } from "@/lib/data-sources/ats-boards";
 import { evaluateFit } from "@/lib/jobs/fit";
+import { CAREER_ACTION_TOOLS } from "./career-actions";
 import { createTrackTool } from "./create-track";
 import { generateDocument } from "./generate-document";
 import { getLaborMarket } from "./labor-market";
@@ -1188,6 +1189,8 @@ const openPageTool: FadiTool = {
 const TOOLS: FadiTool[] = [
   openPageTool,
   searchJobs,
+  // Ahead of the long tail: a routed turn is capped, and these answer the commonest asks.
+  ...CAREER_ACTION_TOOLS,
   getPerformance,
   getMomentumReflectionTool,
   getRejectionPatterns,

@@ -15,6 +15,7 @@ suite("finding what somebody named", () => {
   let resolveVoiceTarget: typeof import("./targets").resolveVoiceTarget;
   let userId: string;
   let deerfoot: string;
+  const stamp = Date.now();
 
   beforeAll(async () => {
     const { Pool } = await import("pg");
@@ -29,7 +30,6 @@ suite("finding what somebody named", () => {
     holder.db = drizzle(pool) as never;
 
     const jobs = createJobsRepository(holder.db as never);
-    const stamp = Date.now();
     deerfoot = (
       await jobs.upsertSeedJob({
         source: "reed",
@@ -44,7 +44,8 @@ suite("finding what somebody named", () => {
     await jobs.upsertSeedJob({
       source: "reed",
       externalId: `t-intercom-${stamp}`,
-      title: "Application Security Engineer",
+      // A word only this row has: the shared catalogue holds real AppSec roles too.
+      title: `Application Security Engineer ${stamp}`,
       company: "Intercom",
       location: "Dublin",
       description: "Security role.",
@@ -61,6 +62,11 @@ suite("finding what somebody named", () => {
 
   afterAll(async () => {
     if (userId) await pool.query("delete from users where id = $1", [userId]);
+    // Seeded into the PUBLIC catalogue: left behind, they showed up as real roles for everyone
+    // and made each later run's names ambiguous.
+    await pool?.query(
+      "delete from jobs where external_id like 't-deerfoot-%' or external_id like 't-intercom-%'"
+    );
     await pool?.end();
   });
 
@@ -70,7 +76,10 @@ suite("finding what somebody named", () => {
     expect(byCompany?.id).toBe(deerfoot);
     expect(byCompany?.href).toBe(`/dashboard/applications/${deerfoot}/workspace`);
 
-    const byTitle = await resolveVoiceTarget(userId, "the application security engineer role");
+    const byTitle = await resolveVoiceTarget(
+      userId,
+      `the application security engineer ${stamp} role`
+    );
     expect(byTitle?.label).toContain("Intercom");
   });
 

@@ -75,18 +75,49 @@ const CUES: [RegExp, string[]][] = [
   // offered only read tools and the model ran a fit check instead (found by voice, 5 Oct 2026).
   [
     /\b(?:i\s+)?applied\b|\blog\b.*\b(?:application|applied)|\btrack\b.*\b(?:application|role|job)|\bmark\b.*\bapplied/i,
-    ["track_application"],
+    ["track_application", "set_application_status"],
+  ],
+  // An application that is already tracked moving on. Same lesson: no cue, no tool.
+  [
+    /\b(?:got|have|landed)\b.*\b(?:interview|offer)\b|\brejected\b|turned (?:me )?down|\bwithdr[ae]w|\bstatus\b|\bmark\b.*\bas\b/i,
+    ["set_application_status"],
+  ],
+  [
+    /\b(?:save|keep|shortlist|unsave|bookmark)\b|\bsaved (?:roles?|jobs?)\b|\bnot interested\b|\bdrop\b.*\b(?:role|job)\b/i,
+    ["save_job", "unsave_job"],
+  ],
+  [
+    /\btoday\b|\bbrief me\b|\bwhat should i (?:do|work on)\b|\bwaiting (?:for|on) me\b|\bwhat'?s (?:on|waiting)\b/i,
+    ["today_brief"],
+  ],
+  [
+    /\bnext step\b|\bwhere was i\b|\bwhat'?s next\b|\bwhat now\b/i,
+    ["project_status", "today_brief"],
+  ],
+  [
+    /\badd\b.*\b(?:record|career|experience|achievement|certific|course|project)|\bi (?:passed|earned|completed|got certified|led|built|shipped)\b/i,
+    ["add_experience"],
+  ],
+  [
+    /\bflagships?\b|\bbig projects?\b|\bwhat should i build\b/i,
+    ["list_flagships", "take_on_flagship"],
   ],
   [
     /\b(?:draft|write|tailor|generate|make)\b.*\b(?:cv|r[ée]sum[ée]|cover letter|cold email)\b/i,
     ["generate_document"],
   ],
-  [/\b(?:new|add|create|switch to)\b.*\b(?:direction|track|career path)\b/i, ["create_career_track"]],
+  [
+    /\b(?:new|add|create|switch to)\b.*\b(?:direction|track|career path)\b/i,
+    ["create_career_track"],
+  ],
   [
     /\binterview|star\b|behavioural|behavioral|question/i,
     ["prep_interview", "mock_interview_questions", "answer_behavioral_question"],
   ],
-  [/\bcv\b|r[ée]sum[ée]|cover letter|document/i, ["get_relevant_evidence"]],
+  [
+    /\bcv\b|\bcvs\b|r[ée]sum[ée]|cover letter|document/i,
+    ["get_relevant_evidence", "list_documents", "read_document"],
+  ],
   [
     /\blab\b|machine|container|vm\b|docker/i,
     ["inspect_machine", "propose_lab_action", "lab_capacity"],

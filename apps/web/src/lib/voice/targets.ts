@@ -125,7 +125,21 @@ export async function resolveVoiceTarget(
     }
   }
 
-  let best: { target: VoiceTarget; value: number } | null = null;
+  return clearWinner(spoken, candidates);
+}
+
+/**
+ * The one candidate the spoken words clearly name, or null. Shared by everything that acts on a
+ * thing said out loud — a job to save, an application to move, a flagship to take on — so they
+ * all refuse the same way: below the bar, or when two match equally well, it is a question.
+ */
+export function clearWinner<T extends { label: string }>(
+  spoken: string,
+  candidates: T[],
+  /** For a change: two exact matches (two "SOC Analyst" roles) is still a question. */
+  options: { refuseExactTies?: boolean } = {}
+): T | null {
+  let best: { target: T; value: number } | null = null;
   let runnerUp = 0;
   for (const target of candidates) {
     const value = score(spoken, target.label);
@@ -140,6 +154,16 @@ export async function resolveVoiceTarget(
   // A clear winner, or nothing. Two things that match equally well is a question, not a choice
   // Fadi gets to make on someone's behalf.
   if (!best || best.value < 0.6) return null;
-  if (runnerUp >= best.value && best.value < 1) return null;
+  if (runnerUp >= best.value && (best.value < 1 || options.refuseExactTies)) return null;
   return best.target;
+}
+
+/** The nearest few, for asking "did you mean…" — only ones the words partly match. */
+export function closest<T extends { label: string }>(spoken: string, candidates: T[], n = 3): T[] {
+  return candidates
+    .map((target) => ({ target, value: score(spoken, target.label) }))
+    .filter((c) => c.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, n)
+    .map((c) => c.target);
 }

@@ -108,7 +108,7 @@ export async function runVoiceTurn(
     (tool) => tool.risk !== "external" && !NOT_BY_VOICE.has(tool.name)
   );
   const tools = toolsForTurn(all, { pathname: null, message: text }).map(toToolSpec);
-  const riskOf = new Map(all.map((tool) => [tool.name, tool.risk]));
+  const byName = new Map(all.map((tool) => [tool.name, tool]));
 
   const generate = (await getUserDocGenerate(userId)) ?? undefined;
   const ctx: FadiToolContext = { userId, surface: "agent", workItemId: null, generate };
@@ -119,9 +119,9 @@ export async function runVoiceTurn(
   const summaries: string[] = [];
   const executor = async (name: string, args: Record<string, unknown>) => {
     used.push(name);
-    const risk = riskOf.get(name);
-    if (!risk) return { summary: `"${name}" is not available by voice.`, isError: true };
-    if (risk === "read") {
+    const tool = byName.get(name);
+    if (!tool) return { summary: `"${name}" is not available by voice.`, isError: true };
+    if (tool.risk === "read") {
       const result = await executeFadiTool(name, args, ctx);
       summaries.push(result.summary);
       return result;
@@ -130,7 +130,29 @@ export async function runVoiceTurn(
     if (pending) {
       return { summary: "Only one change at a time by voice. Ask about the next one after this." };
     }
-    pending = { id: randomUUID(), tool: name, args, readBack: readBack(name, args), contextId };
+    // A tool that can say exactly what it will touch does so now, and its confirmation is pinned
+    // to that record: "save the Deerfoot role" is read back as the role found, by its full name,
+    // and a name that matches nothing (or two things) is asked about instead of held.
+    const prepared =
+      tool.risk === "write" && tool.prepare
+        ? await tool.prepare(args, ctx).catch(() => ({
+            ok: false as const,
+            summary: "I couldn't look that up just now. Try again in a moment.",
+          }))
+        : null;
+    if (prepared && !prepared.ok) {
+      summaries.push(prepared.summary);
+      return { summary: prepared.summary };
+    }
+    pending = prepared
+      ? {
+          id: randomUUID(),
+          tool: name,
+          args: prepared.args,
+          readBack: prepared.readBack,
+          contextId,
+        }
+      : { id: randomUUID(), tool: name, args, readBack: readBack(name, args), contextId };
     return {
       summary: `NOT DONE YET — waiting for the person's spoken confirmation. Planned: ${pending.readBack}.`,
     };

@@ -3,11 +3,27 @@ import { describe, expect, it } from "vitest";
 import { MAX_TOOLS_PER_TURN, toolsForTurn } from "./routing";
 
 const all = [
-  "search_jobs", "get_performance", "get_career_updates", "get_rejection_patterns",
-  "draft_referral_outreach", "answer_behavioral_question", "scan_company_jobs", "evaluate_fit",
-  "plan_project", "inspect_machine", "propose_lab_action", "lab_capacity", "start_lab_machine",
-  "build_lab_image", "project_status", "complete_project_step", "get_momentum_reflection",
-  "prep_interview", "mock_interview_questions", "score_interview_answer", "get_relevant_evidence",
+  "search_jobs",
+  "get_performance",
+  "get_career_updates",
+  "get_rejection_patterns",
+  "draft_referral_outreach",
+  "answer_behavioral_question",
+  "scan_company_jobs",
+  "evaluate_fit",
+  "plan_project",
+  "inspect_machine",
+  "propose_lab_action",
+  "lab_capacity",
+  "start_lab_machine",
+  "build_lab_image",
+  "project_status",
+  "complete_project_step",
+  "get_momentum_reflection",
+  "prep_interview",
+  "mock_interview_questions",
+  "score_interview_answer",
+  "get_relevant_evidence",
   "company_interview_brief",
 ].map((name) => ({ name }));
 
@@ -67,7 +83,8 @@ describe("changes said in plain words reach their tool", () => {
     "evaluate_fit",
     "get_career_updates",
   ].map((name) => ({ name }));
-  const names = (message: string) => toolsForTurn(all, { pathname: null, message }).map((t) => t.name);
+  const names = (message: string) =>
+    toolsForTurn(all, { pathname: null, message }).map((t) => t.name);
 
   it("offers track_application when someone says they applied", () => {
     expect(names("log that I applied to Stripe for a Junior Security Engineer role")).toContain(
@@ -83,5 +100,48 @@ describe("changes said in plain words reach their tool", () => {
 
   it("does not offer a change for a question", () => {
     expect(names("how is my job search going")).not.toContain("track_application");
+  });
+});
+
+describe("the everyday asks reach their tool", () => {
+  const all = [
+    "save_job",
+    "unsave_job",
+    "set_application_status",
+    "track_application",
+    "today_brief",
+    "project_status",
+    "list_documents",
+    "read_document",
+    "add_experience",
+    "list_flagships",
+    "take_on_flagship",
+    "get_career_updates",
+  ].map((name) => ({ name }));
+  const names = (message: string) =>
+    toolsForTurn(all, { pathname: null, message }).map((t) => t.name);
+
+  it.each([
+    ["save the Deerfoot role", "save_job"],
+    ["I'm not interested in the Acme job any more", "unsave_job"],
+    ["I got an interview with Stripe", "set_application_status"],
+    ["Acme rejected me", "set_application_status"],
+    ["mark the Deerfoot application as applied", "set_application_status"],
+    ["what should I do today", "today_brief"],
+    ["what's my next step", "project_status"],
+    ["which CVs have I made", "list_documents"],
+    ["read me my Stripe cover letter", "read_document"],
+    ["I passed Security+, add it to my record", "add_experience"],
+    ["what are my flagships", "list_flagships"],
+    ["take on the detection flagship", "take_on_flagship"],
+  ])("%s → %s", (message, tool) => {
+    expect(names(message)).toContain(tool);
+  });
+
+  it("does not offer changes for a plain question", () => {
+    const picked = names("how am I doing?");
+    expect(picked).not.toContain("save_job");
+    expect(picked).not.toContain("set_application_status");
+    expect(picked).not.toContain("add_experience");
   });
 });

@@ -119,3 +119,48 @@ Deferred: scopes; per-process KV locally (multi-instance needs Redis/Upstash).
   interviews over Buddy.
 
 Each side appends a dated status section here when a slice lands.
+
+## Status — 5 October 2026 (Fadi's Claude): capability 2 landed
+
+Nine tools, each calling the same code as the app's own button
+(`apps/web/src/lib/ai/tools/career-actions.ts`), so a change made by voice is scored, synced to the
+plan and receipted exactly as on screen. They are ordinary Fadi tools, so chat and MCP get them too.
+
+| Tool | Risk | Says / does |
+|---|---|---|
+| `today_brief` | read | goal, plan in flight and its next step, decisions waiting (same narration as the dashboard's voice) |
+| `save_job` / `unsave_job` | write | save or drop a role named by title/company; save is scored and guarded like the Save button |
+| `set_application_status` | write | applied / interviewing / offer / rejected / withdrawn; "I got an interview with Stripe" works |
+| `list_documents` / `read_document` | read | documents in the current direction; the opening words of one, markup stripped |
+| `add_experience` | write | through the evidence gate, so saying it twice is absorbed or held for review, never duplicated |
+| `list_flagships` / `take_on_flagship` | write (take on) | the researched flagships; taking one on creates the commitment and plans it, refused if already taken |
+
+**Read-back names the record, and confirm is pinned to it.** Write tools may now declare
+`prepare` (`types.ts`): it resolves the spoken name to one record *before* anything is held, the
+read-back uses that record's full name ("I can mark Junior Security Engineer at Stripe as
+interviewing. Shall I?"), and the held args carry its id — so "confirm" acts on what was read
+back. A name that matches nothing, or two things equally (exact ties included), is a question and
+nothing is held. Shared matcher: `clearWinner` / `closest` in `lib/voice/targets.ts`.
+
+Routing cues added for every phrasing above, and "what's my next step" now reaches
+`project_status` / `today_brief`. `commitToProject(userId, …)` moved out of the server-action file
+into `lib/learning/commit.ts` (a "use server" export taking a userId would be callable from any
+browser).
+
+**Evidence.** Live through `/api/a2a` on the dev server (throwaway user + token, deleted):
+status change held → `applied` unchanged → confirm → `interviewing`, one receipt
+(`surface: agent`), repeated confirm changed nothing; "save the Quillfjord role" → "I couldn't
+find a role called…", nothing held; a real role saved with its match score; Security+ added, said
+again → held for review, not duplicated; flagship listed, taken on (commitment + project), asked
+again → "You've already taken on…". Tests: 246 pass, including an integration file with the
+outcome, failure (no match, two matches, missing status) and authorisation cases (another user's
+application id → `needs_input`, record unchanged).
+
+Also fixed: `targets.integration.test.ts` left its seeded jobs in the public catalogue (six fake
+roles in the owner's Opportunities, now deleted) and depended on what real roles exist.
+
+**Not done / known limits.** A flagship planned on local llama3.2 got one step — the planner's
+quality on the 3B model, same as the button. The 3B model sometimes drops details (a period) —
+the read-back says exactly what will be stored. "The second one" still relies on the model
+reading conversation history; keeping result references per `contextId` is next with
+capability 3. Next for Fadi's Claude: 3 (spoken summaries), then 4 (scoped device tokens).
