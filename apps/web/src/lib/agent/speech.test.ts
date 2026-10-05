@@ -36,8 +36,6 @@ describe("readBack", () => {
   it("leaves out objects and empty values", () => {
     expect(
       readBack("generate_document", { kind: "resume", extra: { a: 1 }, note: "", jd: "null" })
-    ).toBe(
-      "generate document — kind: resume"
-    );
+    ).toBe("generate document — kind: resume");
   });
 });
