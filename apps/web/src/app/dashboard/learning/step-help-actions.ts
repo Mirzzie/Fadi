@@ -186,6 +186,7 @@ You get the step, its success condition, and the lab's facts.
 - command: a short, read-only shell command for this lab's shell (no installs, no edits, no service restarts, nothing interactive). Pipelines are fine. Use only tools the lab facts say exist.
 - expect: an exact piece of text that the command prints ONLY when the success condition is met (for example "syntax is ok", "Status: active", "HTTP/1.1 200"). Not a word that also appears on failure.
 - why: one plain sentence saying what the check proves.
+For a Windows lab the command is ONE line of PowerShell, run as the lab's local administrator over SSH (no GUI, no prompts): e.g. Get-WindowsFeature AD-Domain-Services | Select-Object -ExpandProperty InstallState, or Get-ADForest | Select-Object -ExpandProperty Name.
 If the success condition cannot be checked from inside the lab (it needs a browser, a person's judgement, or another machine), set command to "" and explain in why.`;
 
 /**
@@ -211,9 +212,6 @@ export async function proposeStepCheckAction(input: {
   if (!template) return { ok: false, message: "This project has no lab to check inside." };
   const { LAB_TEMPLATES, labNameForRun } = await import("@/lib/lab/templates");
   const shell = LAB_TEMPLATES[template].toolchain.shell;
-  if (shell === "powershell") {
-    return { ok: false, message: "Checking inside a Windows lab isn't supported yet — check it in the viewer." };
-  }
 
   const { createLabResourcesRepository } = await import("@careeros/database");
   const { resolveTarget, unconnectedMessage } = await import("@/lib/lab/target");
@@ -268,7 +266,7 @@ export async function proposeStepCheckAction(input: {
     const proposal = await proposeAction({
       userId: user.id,
       recipe: "lab.check",
-      params: { name, command: check.command, expect: check.expect, shell },
+      params: { name, command: check.command, expect: check.expect, shell, template },
       // The command was written by the model, even though a person asked for it.
       actor: "model",
       origin: "dashboard:step_check",

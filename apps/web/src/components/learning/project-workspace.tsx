@@ -174,7 +174,8 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
               onComplete={completeCurrent}
               onRevised={refresh}
               canCheck={Boolean(
-                run.labShell &&
+                // Linux labs check through docker exec; Windows labs over SSH (labSignIn).
+                (run.labShell || run.labSignIn) &&
                 run.target.kind === "local-docker" &&
                 runtime &&
                 !["stopped", "failed", "queued", "stopping"].includes(runtime.phase)

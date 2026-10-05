@@ -71,3 +71,76 @@ describe("removing a lab", () => {
     expect(RECIPES["lab.remove"].ownWorkOnly).toBe(true);
   });
 });
+
+describe("Windows checks", () => {
+  const key = "ssh-ed25519 " + "A".repeat(68) + " fadi-lab";
+
+  it("sets up SSH before a fresh Windows install, and not when starting from a base", () => {
+    const fresh = argvOf(
+      RECIPES["lab.start"].render(
+        RECIPES["lab.start"].validate({
+          template: "windows-server-2025",
+          name: "project-a",
+          sshKey: key,
+        })!
+      )
+    );
+    expect(fresh.map((s) => s.id)).toEqual(["prepare-checks", "start"]);
+    expect(fresh[0]!.args).toContain(key);
+    const fromBase = argvOf(
+      RECIPES["lab.start"].render(
+        RECIPES["lab.start"].validate({
+          template: "windows-server-2025",
+          name: "project-a",
+          sshKey: key,
+          fromBase: true,
+        })!
+      )
+    );
+    expect(fromBase.map((s) => s.id)).toEqual(["seed", "start"]);
+  });
+
+  it("refuses any key that is not Fadi's own ed25519 lab key, and any key for a Linux lab", () => {
+    for (const sshKey of [
+      "ssh-rsa AAAA fadi-lab",
+      key + "; rm -rf /",
+      key.replace("fadi-lab", "x"),
+    ]) {
+      const params = RECIPES["lab.start"].validate({
+        template: "windows-server-2025",
+        name: "project-a",
+        sshKey,
+      })!;
+      expect(params.sshKey).toBeNull();
+    }
+    expect(
+      RECIPES["lab.start"].validate({ template: "linux-ubuntu", name: "project-a", sshKey: key })!
+        .sshKey
+    ).toBeNull();
+  });
+
+  it("runs a Windows check over SSH on 127.0.0.1 as the lab account, not docker exec", () => {
+    const params = RECIPES["lab.check"].validate({
+      name: "project-a",
+      command: "Get-Service sshd",
+      expect: "Running",
+      shell: "powershell",
+      template: "windows-server-2025",
+    })!;
+    const [step] = RECIPES["lab.check"].render(params) as Array<{ cmd: string; args: string[] }>;
+    expect(step!.cmd).toBe("ssh");
+    expect(step!.args).toContain("Docker@127.0.0.1");
+    expect(step!.args.at(-1)).toMatch(/^Get-Service sshd; if \(\$\?\)/);
+  });
+
+  it("will not run a Windows check without knowing the lab", () => {
+    expect(
+      RECIPES["lab.check"].validate({
+        name: "project-a",
+        command: "x",
+        expect: "y",
+        shell: "powershell",
+      })
+    ).toBeNull();
+  });
+});

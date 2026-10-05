@@ -517,10 +517,15 @@ export async function proposeProjectLabAction(input: { runId: string }): Promise
     supportsBase(template) &&
     (await volumeExists(baseVolumeFor(template))) &&
     !(await volumeExists(storageVolumeFor("fadi-" + labName)));
+  // Windows labs get Fadi's public lab key at install, so their steps can be checked over SSH.
+  const sshKey =
+    LAB_TEMPLATES[template].toolchain.shell === "powershell"
+      ? (await (await import("@/lib/lab/lab-ssh")).ensureLabKey()).publicKey
+      : null;
   const proposal = await proposeAction({
     userId: user.id,
     recipe: "lab.start",
-    params: { template, name: labName, fromBase },
+    params: { template, name: labName, fromBase, sshKey },
     actor: "user",
     origin: "dashboard:project_lab",
     runId: project.run.id,

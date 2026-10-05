@@ -97,6 +97,9 @@ export type LabTemplate = {
  * than a free field: "the model picks the Windows version" and "the model picks what
  * dockur downloads and runs" are the same sentence.
  */
+/** Host port for a Windows lab's SSH; published on 127.0.0.1 only, like every lab port. */
+export const WINDOWS_SSH_PORT = 2222;
+
 export const LAB_TEMPLATES: Record<string, LabTemplate> = {
   "windows-server-2025": {
     toolchain: {
@@ -124,6 +127,7 @@ export const LAB_TEMPLATES: Record<string, LabTemplate> = {
     ports: [
       { host: 8006, container: 8006, what: "the browser viewer, for the install and first boot" },
       { host: 3389, container: 3389, what: "Remote Desktop, once it is up" },
+      { host: WINDOWS_SSH_PORT, container: 22, what: "SSH, so Fadi can run the checks you approve" },
     ],
     ramMb: 4096,
     diskGb: 40,
@@ -161,6 +165,7 @@ export const LAB_TEMPLATES: Record<string, LabTemplate> = {
     ports: [
       { host: 8006, container: 8006, what: "the browser viewer, for the install and first boot" },
       { host: 3389, container: 3389, what: "Remote Desktop, once it is up" },
+      { host: WINDOWS_SSH_PORT, container: 22, what: "SSH, so Fadi can run the checks you approve" },
     ],
     ramMb: 4096,
     diskGb: 40,
@@ -414,4 +419,82 @@ export function saveBaseArgs(key: TemplateKey, containerName: string): string[] 
 /** Give a new lab its disk from the base, before it first starts. */
 export function seedFromBaseArgs(key: TemplateKey, containerName: string): string[] {
   return helperArgs(baseVolumeFor(key), storageVolumeFor(containerName), SEED_FROM_BASE);
+}
+
+
+// ── Checks inside Windows labs ────────────────────────────────────────────────
+//
+// Fadi could not check a single Windows step: `lab.check` ran `docker exec` in dockur's Linux
+// wrapper, not in Windows. dockur runs C:\OEM\install.bat at the end of Setup and looks for the
+// OEM folder in /storage/oem — the lab's own volume — so before a fresh Windows lab first starts,
+// Fadi writes a small script there that turns on the built-in OpenSSH server, makes PowerShell
+// its shell, and authorises Fadi's lab key for the local administrator. Checks then run over SSH
+// on 127.0.0.1, after approval, exactly like the Linux ones run through docker exec.
+
+
+export const LAB_KEY_COMMENT = "fadi-lab";
+
+/** Where Fadi keeps its lab key: outside the repository, readable by this user only. */
+export function labKeyPath(): string {
+  const base =
+    process.env.FADI_LAB_KEY_DIR?.trim() ||
+    `${process.env.XDG_CONFIG_HOME?.trim() || `${process.env.HOME ?? ""}/.config`}/fadi/lab-ssh`;
+  return `${base}/id_ed25519`;
+}
+
+/** A public key Fadi may place in a lab: its own ed25519 key and nothing else. */
+export const LAB_PUBLIC_KEY_RE = /^ssh-ed25519 [A-Za-z0-9+/]{68} fadi-lab$/;
+
+const ENABLE_SSH_PS1 = [
+  "$ErrorActionPreference = 'Continue'",
+  "# Windows Server 2025 ships OpenSSH Server; older images may need the capability added.",
+  "if (-not (Get-Service sshd -ErrorAction SilentlyContinue)) {",
+  "  Add-WindowsCapability -Online -Name OpenSSH.Server~~~~0.0.1.0 | Out-Null",
+  "}",
+  "Set-Service -Name sshd -StartupType Automatic",
+  "Start-Service sshd",
+  "New-Item -Path 'HKLM:\\SOFTWARE\\OpenSSH' -Force | Out-Null",
+  "New-ItemProperty -Path 'HKLM:\\SOFTWARE\\OpenSSH' -Name DefaultShell -Value 'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe' -PropertyType String -Force | Out-Null",
+  "$keys = 'C:\\ProgramData\\ssh\\administrators_authorized_keys'",
+  "Get-Content 'C:\\OEM\\fadi.pub' | Set-Content -Path $keys -Encoding ascii",
+  "icacls $keys /inheritance:r /grant 'Administrators:F' /grant 'SYSTEM:F' | Out-Null",
+  "New-NetFirewallRule -Name fadi-sshd -DisplayName 'OpenSSH (Fadi lab checks)' -Enabled True -Direction Inbound -Protocol TCP -Action Allow -LocalPort 22 -ErrorAction SilentlyContinue | Out-Null",
+  "Restart-Service sshd",
+].join("\r\n");
+
+const INSTALL_BAT = [
+  "@echo off",
+  "powershell -NoProfile -ExecutionPolicy Bypass -File C:\\OEM\\enable-ssh.ps1",
+].join("\r\n");
+
+// The three files are passed as positional arguments, never spliced into the script text.
+const WRITE_OEM =
+  'mkdir -p /to/oem && printf "%s" "$1" > /to/oem/install.bat && ' +
+  'printf "%s" "$2" > /to/oem/enable-ssh.ps1 && printf "%s\\n" "$3" > /to/oem/fadi.pub';
+
+/** Write the SSH set-up into a fresh Windows lab's volume, before its first start. */
+export function prepareWindowsSshArgs(containerName: string, publicKey: string): string[] {
+  return [
+    "run", "--rm", "--network", "none",
+    "-v", storageVolumeFor(containerName) + ":/to",
+    DISK_HELPER_IMAGE, "sh", "-c", WRITE_OEM, "sh",
+    INSTALL_BAT, ENABLE_SSH_PS1, publicKey,
+  ];
+}
+
+/** Run a read-only PowerShell check inside a Windows lab, as its local administrator. */
+export function windowsCheckArgs(key: TemplateKey, command: string, marker: string): string[] {
+  const user = LAB_TEMPLATES[key].signIn?.user ?? "Docker";
+  return [
+    "-i", labKeyPath(),
+    "-p", String(WINDOWS_SSH_PORT),
+    "-o", "BatchMode=yes",
+    "-o", "ConnectTimeout=10",
+    "-o", "StrictHostKeyChecking=no",
+    "-o", "UserKnownHostsFile=/dev/null",
+    "-o", "LogLevel=ERROR",
+    user + "@127.0.0.1",
+    // $? rather than $LASTEXITCODE: cmdlets (Get-Service, Get-ADForest) never set the latter.
+    command + "; if ($?) { Write-Output \"" + marker + "=0\" } else { Write-Output \"" + marker + "=1\" }",
+  ];
 }

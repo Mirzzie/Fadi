@@ -17,13 +17,16 @@ import {
   baseVolumeFor,
   DISK_COPY_TIMEOUT_MS,
   isTemplateKey,
+  LAB_PUBLIC_KEY_RE,
   LAB_TEMPLATES,
+  prepareWindowsSshArgs,
   renderTemplate,
   saveBaseArgs,
   seedFromBaseArgs,
   storageVolumeFor,
   supportsBase,
   type TemplateKey,
+  windowsCheckArgs,
 } from "./templates";
 import {
   cidrLabel,
@@ -701,7 +704,15 @@ export const RECIPES: Record<RecipeId, Recipe> = {
       // Start from the saved installed base: decided by the caller from what exists, and
       // only honoured for a template that has one.
       const fromBase = raw.fromBase === true && supportsBase(template as TemplateKey);
-      return { template, name, fromBase };
+      // Fadi's own public lab key, for a fresh Windows install to authorise (see lab-ssh.ts).
+      // Exactly its shape, or nothing: this text is written into the lab.
+      const sshKey =
+        typeof raw.sshKey === "string" &&
+        LAB_PUBLIC_KEY_RE.test(raw.sshKey) &&
+        LAB_TEMPLATES[template as TemplateKey].toolchain.shell === "powershell"
+          ? raw.sshKey
+          : null;
+      return { template, name, fromBase, sshKey };
     },
     summary: (p) => {
       const t = LAB_TEMPLATES[String(p.template) as TemplateKey];
@@ -732,6 +743,17 @@ export const RECIPES: Record<RecipeId, Recipe> = {
       const template = String(p.template) as TemplateKey;
       const container = NAME_PREFIX + String(p.name);
       return [
+        // A fresh Windows install: set up SSH for checks before Setup runs. A lab started from
+        // a base already has it, from the install the base was saved from.
+        ...(p.sshKey && !p.fromBase
+          ? [
+              {
+                id: "prepare-checks",
+                cmd: "docker",
+                args: prepareWindowsSshArgs(container, String(p.sshKey)),
+              },
+            ]
+          : []),
         ...(p.fromBase
           ? [
               {
@@ -975,7 +997,10 @@ export const RECIPES: Record<RecipeId, Recipe> = {
       const name = str(raw.name);
       const command = typeof raw.command === "string" ? raw.command.trim() : "";
       const expect = typeof raw.expect === "string" ? raw.expect.trim() : "";
-      const shell = raw.shell === "bash" ? "bash" : "sh";
+      const shell = raw.shell === "bash" ? "bash" : raw.shell === "powershell" ? "powershell" : "sh";
+      const template = str(raw.template);
+      // A Windows check needs to know which lab template's account to sign in as.
+      if (shell === "powershell" && (!template || !isTemplateKey(template))) return null;
       if (!name || !NAME_RE.test(name)) return null;
       if (
         !command ||
@@ -985,24 +1010,31 @@ export const RECIPES: Record<RecipeId, Recipe> = {
       )
         return null;
       if (!expect || expect.length > 200) return null;
-      return { name, command, expect, shell };
+      return { name, command, expect, shell, ...(shell === "powershell" ? { template } : {}) };
     },
     summary: (p) =>
       `Run a check inside ${NAME_PREFIX}${p.name}: ${p.command} — it passes if the output contains "${p.expect}".`,
     reversal: () =>
       "A check is meant to only read. If the command changes something, it changes it inside the lab only.",
     render: (p) => [
-      {
-        id: "check",
-        cmd: "docker",
-        args: [
-          "exec",
-          NAME_PREFIX + String(p.name),
-          String(p.shell),
-          "-c",
-          `${String(p.command)}\necho "${CHECK_MARKER}=$?"`,
-        ],
-      },
+      p.shell === "powershell"
+        ? {
+            // Inside the Windows VM, over SSH on 127.0.0.1 — not in dockur's Linux wrapper.
+            id: "check",
+            cmd: "ssh",
+            args: windowsCheckArgs(String(p.template) as TemplateKey, String(p.command), CHECK_MARKER),
+          }
+        : {
+            id: "check",
+            cmd: "docker",
+            args: [
+              "exec",
+              NAME_PREFIX + String(p.name),
+              String(p.shell),
+              "-c",
+              `${String(p.command)}\necho "${CHECK_MARKER}=$?"`,
+            ],
+          },
     ],
   },
 
