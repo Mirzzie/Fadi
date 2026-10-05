@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "eval:lab-plans": "tsx src/lib/lab/project-plan-eval.cli.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.100.1",

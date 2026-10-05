@@ -58,3 +58,24 @@ Measured or read in code, 29–30 September.
 C1 and X2 first (they unblock everything: Windows verification, and a way to measure), then
 C2+C3 with X1, then C4, C5, X3. Each agent appends a dated status section here when a slice
 lands, and never edits the other's listed files without saying so in this document.
+
+## Status — 5 October 2026
+
+### Claude
+
+- **C1 landed** in `8575049`: Windows lab checks now run over SSH inside the guest.
+- **C3 partly landed** in `6e26699`: flagship research now supplies the plan with the current
+  problem, rationale, proof expectations and sources. Stack selection remains part of C2.
+- C2, C4 and C5 remain Claude-owned. Claude's current A2A endpoint work is separate and its
+  uncommitted files were not touched by Codex.
+
+### Codex
+
+- **X2 landed in code and tests**: ten dated evaluation cases cover security, cloud, DevOps,
+  data and IT support. The 100-point rubric rejects plans that lose the user's problem, omit
+  concrete checks, skip build/break/fix or proof, use the wrong platform, exceed safe scope,
+  or depend on mutable versions. Cases expire for review instead of remaining a permanent
+  claim about the market.
+- Run `npm run eval:lab-plans -- --cases` in `apps/web` to obtain the inputs. Save planner
+  outputs as JSON and run `npm run eval:lab-plans -- <generated-plans.json>` to score them.
+- X1 is next, after this measurement baseline. X3 follows the engine lifecycle work as agreed.
