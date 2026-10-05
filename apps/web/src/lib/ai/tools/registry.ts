@@ -43,16 +43,52 @@ const searchJobs: FadiTool = {
         description: 'Country and/or city, e.g. "Dublin, Ireland", "Berlin", "United States".',
       },
       keywords: { type: "string", description: "Role or skill keywords to focus the search." },
+      work_mode: {
+        type: "string",
+        enum: ["remote", "hybrid", "onsite"],
+        description: "Only roles with this way of working, when the user says so.",
+      },
+      employment_type: {
+        type: "string",
+        enum: ["full-time", "part-time", "contract", "freelance"],
+        description: "Only this kind of contract, when the user says so.",
+      },
+      visa_sponsorship: {
+        type: "boolean",
+        description: "True when the user needs visa sponsorship.",
+      },
       limit: { type: "number", description: "How many roles to return (default 6, max 12)." },
     },
   },
   async execute(args, ctx): Promise<FadiToolResult> {
     const parsed = parseLocation(typeof args.location === "string" ? args.location : undefined);
     const limit = Math.min(Math.max(Number(args.limit) || 6, 1), 12);
+    // Every detail the person said narrows the search. `keywords` was declared and then never
+    // passed on, so "data engineer jobs in Dublin" searched only Dublin (found 5 Oct 2026).
+    const keywords =
+      typeof args.keywords === "string"
+        ? args.keywords
+            .split(/[,;]|\s+and\s+/i)
+            .map((word) => word.trim())
+            .filter(Boolean)
+            .slice(0, 6)
+        : [];
+    const mode = ["remote", "hybrid", "onsite"].includes(String(args.work_mode))
+      ? [args.work_mode as "remote" | "hybrid" | "onsite"]
+      : [];
+    const type = ["full-time", "part-time", "contract", "freelance"].includes(
+      String(args.employment_type)
+    )
+      ? [args.employment_type as "full-time" | "part-time" | "contract" | "freelance"]
+      : [];
 
     const jobs = await getRecommendedJobsForUser(ctx.userId, limit, {
       country: parsed.country,
       city: parsed.city,
+      keywords,
+      modes: mode,
+      types: type,
+      visa: args.visa_sponsorship === true ? "sponsored" : "any",
     });
 
     const where = parsed.city

@@ -57,3 +57,31 @@ describe("toolsForTurn", () => {
     expect(picked.length).toBeLessThan(all.length / 2);
   });
 });
+
+describe("changes said in plain words reach their tool", () => {
+  const all = [
+    "track_application",
+    "generate_document",
+    "create_career_track",
+    "search_jobs",
+    "evaluate_fit",
+    "get_career_updates",
+  ].map((name) => ({ name }));
+  const names = (message: string) => toolsForTurn(all, { pathname: null, message }).map((t) => t.name);
+
+  it("offers track_application when someone says they applied", () => {
+    expect(names("log that I applied to Stripe for a Junior Security Engineer role")).toContain(
+      "track_application"
+    );
+    expect(names("mark the Deerfoot job as applied")).toContain("track_application");
+  });
+
+  it("offers generate_document and create_career_track for their phrasings", () => {
+    expect(names("draft a cover letter for the Stripe role")).toContain("generate_document");
+    expect(names("create a new direction for cloud security")).toContain("create_career_track");
+  });
+
+  it("does not offer a change for a question", () => {
+    expect(names("how is my job search going")).not.toContain("track_application");
+  });
+});

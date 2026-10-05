@@ -261,3 +261,108 @@ describe("retries and overlapping requests", () => {
     expect(released).toBe(1);
   });
 });
+
+describe("talking to Fadi's agent", () => {
+  const CHANGE = "33333333-3333-4333-8333-333333333333";
+
+  function voice() {
+    const k = kernel();
+    const held = new Map<string, import("./server").HeldChange>();
+    let confirmed = 0;
+    k.deps.converse = async (text, contextId) => {
+      if (/log|track|save/i.test(text)) {
+        held.set(CHANGE, {
+          id: CHANGE,
+          contextId: contextId ?? "ctx-1",
+          readBack: "track application — company: Stripe",
+          state: "waiting",
+          speech: "I'll log your Stripe application.",
+        });
+        return {
+          speech: "I'll log your Stripe application.",
+          contextId: contextId ?? "ctx-1",
+          pending: { id: CHANGE, readBack: "track application — company: Stripe" },
+        };
+      }
+      return {
+        speech: "Two junior security roles in Dublin fit you best.",
+        contextId: contextId ?? "ctx-1",
+        pending: null,
+      };
+    };
+    k.deps.heldChange = async (id) => held.get(id) ?? null;
+    k.deps.confirmChange = async (id) => {
+      confirmed++;
+      held.set(id, { ...held.get(id)!, state: "done", speech: "Logged Stripe as applied." });
+      return { ok: true, speech: "Logged Stripe as applied." };
+    };
+    k.deps.cancelChange = async (id) => {
+      held.set(id, {
+        ...held.get(id)!,
+        state: "cancelled",
+        speech: "Cancelled. Nothing was changed.",
+      });
+    };
+    const seen = new Set<string>();
+    k.deps.seen = async (id) => (seen.has(id) ? true : (seen.add(id), false));
+    return { ...k, held, confirmedCount: () => confirmed };
+  }
+
+  const reply = (text: string, messageId: string) => {
+    const message = send(text, CHANGE);
+    message.params.message.messageId = messageId;
+    return message;
+  };
+
+  it("answers a question as a message, keeping the conversation id", async () => {
+    const { deps } = voice();
+    const response = (await handleA2AMessage(
+      send("find junior security jobs in Dublin"),
+      deps
+    )) as {
+      result: { parts: { text: string }[]; contextId: string };
+    };
+    expect(response.result.parts[0]!.text).toMatch(/junior security roles/);
+    expect(response.result.contextId).toBe("ctx-1");
+  });
+
+  it("holds a change as a task waiting for confirmation, with what it will do", async () => {
+    const { deps, confirmedCount } = voice();
+    const response = await handleA2AMessage(send("log my Stripe application"), deps);
+    expect(stateOf(response)).toBe("TASK_STATE_INPUT_REQUIRED");
+    expect(said(response)).toMatch(/Say confirm to do it, or cancel\.$/);
+    expect(confirmedCount()).toBe(0);
+  });
+
+  it("does the change once on confirm, even when the confirm is retried", async () => {
+    const { deps, confirmedCount } = voice();
+    await handleA2AMessage(send("log my Stripe application"), deps);
+    const done = await handleA2AMessage(reply("confirm", "k1"), deps);
+    await handleA2AMessage(reply("confirm", "k1"), deps); // the same message again
+    await handleA2AMessage(reply("confirm", "k2"), deps); // a new confirm after it is done
+    expect(stateOf(done)).toBe("TASK_STATE_COMPLETED");
+    expect(confirmedCount()).toBe(1);
+  });
+
+  it("cancels, and asks again on anything that is not confirm or cancel", async () => {
+    const { deps, confirmedCount } = voice();
+    await handleA2AMessage(send("log my Stripe application"), deps);
+    const unclear = await handleA2AMessage(reply("maybe later on", "u1"), deps);
+    expect(stateOf(unclear)).toBe("TASK_STATE_INPUT_REQUIRED");
+    const cancelled = await handleA2AMessage(reply("cancel", "u2"), deps);
+    expect(stateOf(cancelled)).toBe("TASK_STATE_CANCELED");
+    expect(confirmedCount()).toBe(0);
+  });
+
+  it("reports a held change through GetTask, so a polling client hears the outcome", async () => {
+    const { deps } = voice();
+    await handleA2AMessage(send("log my Stripe application"), deps);
+    await handleA2AMessage(reply("confirm", "k1"), deps);
+    const polled = await handleA2AMessage(
+      { jsonrpc: "2.0", id: 9, method: "a2a.GetTask", params: { id: CHANGE } },
+      deps
+    );
+    expect(stateOf(polled)).toBe("TASK_STATE_COMPLETED");
+    expect(said(polled)).toBe("Logged Stripe as applied.");
+  });
+});

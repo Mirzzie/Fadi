@@ -1,6 +1,7 @@
 import { createWorkItemsRepository } from "@careeros/database";
 
 import {
+  type HeldChange,
   handleA2AMessage,
   A2A_VERSION,
   A2A_VERSION_NOT_SUPPORTED,
@@ -117,6 +118,65 @@ function depsFor(userId: string): A2ADeps {
       return async () => {
         await kv.deleteIfValue(key, token);
       };
+    },
+    converse: async (text, contextId) => {
+      const { runVoiceTurn } = await import("@/lib/agent/voice-turn");
+      const turn = await runVoiceTurn(userId, { text, contextId });
+      return {
+        speech: turn.speech,
+        contextId: turn.contextId,
+        pending: turn.pending ? { id: turn.pending.id, readBack: turn.pending.readBack } : null,
+      };
+    },
+    heldChange: async (id) => {
+      const { getPendingAction } = await import("@/lib/agent/voice-turn");
+      const { getKv } = await import("@/lib/kv/store");
+      const waiting = await getPendingAction(userId, id);
+      if (waiting) {
+        return {
+          id,
+          contextId: waiting.contextId,
+          readBack: waiting.readBack,
+          state: "waiting",
+          speech: `Fadi will ${waiting.readBack}.`,
+        };
+      }
+      // What became of it, so a client polling the task hears the outcome, not "not found".
+      const done = await getKv().get(`a2a:change:${userId}:${id}`);
+      return done ? (JSON.parse(done) as HeldChange) : null;
+    },
+    confirmChange: async (id) => {
+      const { confirmPendingAction, getPendingAction } = await import("@/lib/agent/voice-turn");
+      const { getKv } = await import("@/lib/kv/store");
+      const before = await getPendingAction(userId, id);
+      const result = await confirmPendingAction(userId, id);
+      if (before) {
+        const record: HeldChange = {
+          id,
+          contextId: before.contextId,
+          readBack: before.readBack,
+          state: result.ok ? "done" : "failed",
+          speech: result.speech,
+        };
+        await getKv().set(`a2a:change:${userId}:${id}`, JSON.stringify(record), 3600);
+      }
+      return result;
+    },
+    cancelChange: async (id) => {
+      const { cancelPendingAction, getPendingAction } = await import("@/lib/agent/voice-turn");
+      const { getKv } = await import("@/lib/kv/store");
+      const before = await getPendingAction(userId, id);
+      await cancelPendingAction(userId, id);
+      if (before) {
+        const record: HeldChange = {
+          id,
+          contextId: before.contextId,
+          readBack: before.readBack,
+          state: "cancelled",
+          speech: "Cancelled. Nothing was changed.",
+        };
+        await getKv().set(`a2a:change:${userId}:${id}`, JSON.stringify(record), 3600);
+      }
     },
     seen: async (messageId) => {
       const { getKv } = await import("@/lib/kv/store");

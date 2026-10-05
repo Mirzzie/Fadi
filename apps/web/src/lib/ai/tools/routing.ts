@@ -71,6 +71,17 @@ const BY_PLACE: [RegExp, string[]][] = [
 /** Words that make a tool obviously relevant however far from its screen the person is. */
 const CUES: [RegExp, string[]][] = [
   [/\bjobs?\b|vacanc|hiring|role|position|advert/i, ["search_jobs", "evaluate_fit"]],
+  // Changes said in plain words. None of these had a cue, so "log that I applied to Stripe"
+  // offered only read tools and the model ran a fit check instead (found by voice, 5 Oct 2026).
+  [
+    /\b(?:i\s+)?applied\b|\blog\b.*\b(?:application|applied)|\btrack\b.*\b(?:application|role|job)|\bmark\b.*\bapplied/i,
+    ["track_application"],
+  ],
+  [
+    /\b(?:draft|write|tailor|generate|make)\b.*\b(?:cv|r[ée]sum[ée]|cover letter|cold email)\b/i,
+    ["generate_document"],
+  ],
+  [/\b(?:new|add|create|switch to)\b.*\b(?:direction|track|career path)\b/i, ["create_career_track"]],
   [
     /\binterview|star\b|behavioural|behavioral|question/i,
     ["prep_interview", "mock_interview_questions", "answer_behavioral_question"],

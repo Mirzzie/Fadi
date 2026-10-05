@@ -81,6 +81,31 @@ export type A2ADeps = {
   seen?: (messageId: string) => Promise<boolean>;
   newId?: () => string;
   now?: () => Date;
+  /**
+   * Anything that is not a plan goes to Fadi's own agent (lib/agent/voice-turn.ts). Absent, the
+   * endpoint only handles plans, as it first did.
+   */
+  converse?: (
+    text: string,
+    contextId: string | null
+  ) => Promise<{
+    speech: string;
+    contextId: string;
+    pending: { id: string; readBack: string } | null;
+  }>;
+  /** A held change (or its outcome, for an hour), by task id. */
+  heldChange?: (id: string) => Promise<HeldChange | null>;
+  confirmChange?: (id: string) => Promise<{ ok: boolean; speech: string }>;
+  cancelChange?: (id: string) => Promise<void>;
+};
+
+/** A change Fadi's agent proposed by voice, waiting for "confirm" — or what became of it. */
+export type HeldChange = {
+  id: string;
+  contextId: string;
+  readBack: string;
+  state: "waiting" | "done" | "failed" | "cancelled";
+  speech: string;
 };
 
 export type JsonRpcId = string | number | null;
@@ -177,6 +202,75 @@ export function taskFor(
   };
 }
 
+const CONFIRM = /^(?:confirm|confirmed|yes|yes please|do it|go ahead|approve|ok|okay)$/;
+
+/** A held change as an A2A task: waiting on the person, or finished one way or another. */
+export function taskForChange(change: HeldChange, deps: A2ADeps): A2ATask {
+  const base = { id: change.id, contextId: change.contextId };
+  const state: A2AState =
+    change.state === "waiting"
+      ? "TASK_STATE_INPUT_REQUIRED"
+      : change.state === "done"
+        ? "TASK_STATE_COMPLETED"
+        : change.state === "failed"
+          ? "TASK_STATE_FAILED"
+          : "TASK_STATE_CANCELED";
+  const text =
+    change.state === "waiting"
+      ? `${change.speech} Say confirm to do it, or cancel.`
+      : change.speech;
+  return {
+    ...base,
+    status: {
+      state,
+      message: agentMessage(text, deps, base),
+      timestamp: (deps.now ? deps.now() : new Date()).toISOString(),
+    },
+    ...(state === "TASK_STATE_INPUT_REQUIRED"
+      ? {
+          artifacts: [
+            {
+              artifactId: `${change.id}-plan`,
+              name: "What Fadi will do",
+              parts: [{ text: change.readBack }],
+            },
+          ],
+        }
+      : {}),
+  };
+}
+
+/** "confirm" or "cancel" on a held change; anything else asks again. Acts once. */
+async function answerChange(change: HeldChange, command: string, deps: A2ADeps): Promise<A2ATask> {
+  if (change.state !== "waiting") return taskForChange(change, deps);
+  if (STOP.test(command) || /^(?:no|cancel it|never mind)$/.test(command)) {
+    await deps.cancelChange?.(change.id);
+    return taskForChange(
+      { ...change, state: "cancelled", speech: "Cancelled. Nothing was changed." },
+      deps
+    );
+  }
+  if (!CONFIRM.test(command)) {
+    return taskForChange({ ...change, speech: "Say confirm to do it, or cancel." }, deps);
+  }
+  const release = deps.claim ? await deps.claim(change.id) : undefined;
+  if (release === null) {
+    return taskForChange(
+      { ...change, speech: "Fadi is already doing that. Ask again in a moment." },
+      deps
+    );
+  }
+  try {
+    const result = await deps.confirmChange!(change.id);
+    return taskForChange(
+      { ...change, state: result.ok ? "done" : "failed", speech: result.speech },
+      deps
+    );
+  } finally {
+    await release?.();
+  }
+}
+
 function textOf(message: unknown): string | null {
   if (!message || typeof message !== "object") return null;
   const parts = (message as { parts?: unknown }).parts;
@@ -257,7 +351,20 @@ export async function handleA2AMessage(
   if (method === "a2a.GetTask" || method === "a2a.CancelTask") {
     const taskId = typeof params?.id === "string" ? params.id : "";
     const plan = UUID.test(taskId) ? await deps.plan(taskId) : null;
-    if (!plan) return fail(-32001, "Task not found");
+    if (!plan) {
+      const change = UUID.test(taskId) && deps.heldChange ? await deps.heldChange(taskId) : null;
+      if (!change) return fail(-32001, "Task not found");
+      if (method === "a2a.CancelTask" && change.state === "waiting") {
+        await deps.cancelChange?.(change.id);
+        return ok(
+          taskForChange(
+            { ...change, state: "cancelled", speech: "Cancelled. Nothing was changed." },
+            deps
+          )
+        );
+      }
+      return ok(taskForChange(change, deps));
+    }
     if (method === "a2a.CancelTask") {
       if (plan.status !== "done" && plan.status !== "dropped") await deps.stop(plan.id);
       return ok(taskFor((await deps.plan(plan.id)) ?? plan, deps));
@@ -277,11 +384,27 @@ export async function handleA2AMessage(
 
   if (typeof message.taskId === "string") {
     const plan = UUID.test(message.taskId) ? await deps.plan(message.taskId) : null;
-    if (!plan) return fail(-32001, "Task not found");
+    const change =
+      !plan && UUID.test(message.taskId) && deps.heldChange
+        ? await deps.heldChange(message.taskId)
+        : null;
+    if (!plan && !change) return fail(-32001, "Task not found");
     // The same message again (a retry): report where the task is, act on nothing.
     const messageId = (message as { messageId?: unknown }).messageId;
     if (typeof messageId === "string" && deps.seen && (await deps.seen(messageId))) {
-      return ok(taskFor(plan, deps));
+      return ok(plan ? taskFor(plan, deps) : taskForChange(change!, deps));
+    }
+    if (!plan) {
+      return ok(
+        await answerChange(
+          change!,
+          text
+            .toLowerCase()
+            .replace(/[.!?]+$/, "")
+            .trim(),
+          deps
+        )
+      );
     }
     return ok(
       await continueTask(
@@ -298,12 +421,36 @@ export async function handleA2AMessage(
   // A new line is an intent, resolved deterministically. No name, no task — and no guess.
   const intent = await deps.resolve(text);
   if (intent.kind === "none") {
-    return ok(
-      agentMessage(
-        "Fadi does not have a plan for that yet. Right now it can apply to a role you have saved, for example: apply to the Deerfoot role.",
-        deps
-      )
-    );
+    if (!deps.converse) {
+      return ok(
+        agentMessage(
+          "Fadi does not have a plan for that yet. Right now it can apply to a role you have saved, for example: apply to the Deerfoot role.",
+          deps
+        )
+      );
+    }
+    // Anything else is a conversation with Fadi's agent: questions answered, reads done, and at
+    // most one change held for the person to confirm.
+    const contextId =
+      typeof (message as { contextId?: unknown }).contextId === "string"
+        ? String((message as { contextId?: unknown }).contextId).slice(0, 100)
+        : null;
+    const turn = await deps.converse(text, contextId);
+    if (turn.pending) {
+      return ok(
+        taskForChange(
+          {
+            id: turn.pending.id,
+            contextId: turn.contextId,
+            readBack: turn.pending.readBack,
+            state: "waiting",
+            speech: turn.speech,
+          },
+          deps
+        )
+      );
+    }
+    return ok({ ...agentMessage(turn.speech, deps), contextId: turn.contextId });
   }
   const opened = await deps.open(intent.template, intent.refs);
   if (!opened.ok) return ok(agentMessage(opened.reason, deps));
