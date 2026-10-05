@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { authClient } from "@/lib/auth/client";
 import { Button } from "@/components/ui/button";
+import { formatDay } from "@/lib/format/date";
 
 type SessionRow = {
   id: string;
@@ -137,7 +138,7 @@ export function ActiveSessions() {
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {s.ipAddress ? `${s.ipAddress} · ` : ""}
-                          since {new Date(s.createdAt).toLocaleDateString()}
+                          since {formatDay(s.createdAt)}
                         </p>
                       </div>
                     </div>

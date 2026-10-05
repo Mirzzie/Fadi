@@ -9,6 +9,7 @@ import {
   startFlagshipAction,
 } from "@/app/dashboard/learning/flagship-actions";
 import { Button } from "@/components/ui/button";
+import { formatDay } from "@/lib/format/date";
 import type { Flagship } from "@/lib/learning/flagship-rules";
 
 /**
@@ -141,7 +142,7 @@ export function FlagshipProjects({
       </div>
       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
         <span>
-          Researched {refreshedAt ? new Date(refreshedAt).toLocaleDateString() : "recently"};
+          Researched {formatDay(refreshedAt) || "recently"};
           refreshed weekly so the problems stay current.
         </span>
         <button
