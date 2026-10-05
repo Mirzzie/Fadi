@@ -182,7 +182,12 @@ export async function planSteps(userId: string, planId: string): Promise<WorkIte
  * Returns `waiting` the moment the next step has no capability — that is the person's step, and
  * Fadi neither does it nor skips past it to something easier further down the list.
  */
-export async function advancePlan(userId: string, planId: string): Promise<StepOutcome> {
+export async function advancePlan(
+  userId: string,
+  planId: string,
+  // Who pressed: the receipt should say an agent (e.g. a voice client over A2A) did, not "chat".
+  surface: "chat" | "agent" = "chat"
+): Promise<StepOutcome> {
   const db = getDatabase();
   const work = createWorkItemsRepository(db);
 
@@ -215,7 +220,7 @@ export async function advancePlan(userId: string, planId: string): Promise<StepO
   await work.setStatus(userId, next.id, "active");
   const result = await executeFadiTool(capability, shape?.args?.(context) ?? {}, {
     userId,
-    surface: "chat",
+    surface,
     workItemId: next.id,
     // Steps that draft need the person's own provider, exactly as the chat route gives it.
     generate: (await getUserDocGenerate(userId)) ?? undefined,
