@@ -277,11 +277,16 @@ describe("talking to Fadi's agent", () => {
           readBack: "track application — company: Stripe",
           state: "waiting",
           speech: "I'll log your Stripe application.",
+          tool: "track_application",
         });
         return {
           speech: "I'll log your Stripe application.",
           contextId: contextId ?? "ctx-1",
-          pending: { id: CHANGE, readBack: "track application — company: Stripe" },
+          pending: {
+            id: CHANGE,
+            readBack: "track application — company: Stripe",
+            tool: "track_application",
+          },
         };
       }
       return {
@@ -332,6 +337,24 @@ describe("talking to Fadi's agent", () => {
     expect(stateOf(response)).toBe("TASK_STATE_INPUT_REQUIRED");
     expect(said(response)).toMatch(/Say confirm to do it, or cancel\.$/);
     expect(confirmedCount()).toBe(0);
+  });
+
+  it("marks a held change for machines, not only in words", async () => {
+    const { deps } = voice();
+    const held = (await handleA2AMessage(send("log my Stripe application"), deps)) as {
+      result: { metadata: Record<string, Record<string, unknown>> };
+    };
+    expect(held.result.metadata["fadi.heldChange"]).toEqual({
+      version: 1,
+      state: "waiting",
+      tool: "track_application",
+      readBack: "track application — company: Stripe",
+      replies: ["confirm", "cancel"],
+    });
+    const done = (await handleA2AMessage(reply("confirm", "m1"), deps)) as {
+      result: { metadata: Record<string, Record<string, unknown>> };
+    };
+    expect(done.result.metadata["fadi.heldChange"]).toMatchObject({ state: "done", replies: [] });
   });
 
   it("does the change once on confirm, even when the confirm is retried", async () => {

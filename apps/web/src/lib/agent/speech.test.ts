@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { readBack, toSpeech } from "./speech";
+import { count, firstSentence, outOf, readBack, spokenList, toSpeech } from "./speech";
 
 describe("toSpeech", () => {
   it("drops markup and links but keeps what was said", () => {
@@ -37,5 +37,29 @@ describe("readBack", () => {
     expect(
       readBack("generate_document", { kind: "resume", extra: { a: 1 }, note: "", jd: "null" })
     ).toBe("generate document — kind: resume");
+  });
+});
+
+describe("saying lists and numbers", () => {
+  it("joins a list the way it is said", () => {
+    expect(spokenList([])).toBe("");
+    expect(spokenList(["A"])).toBe("A");
+    expect(spokenList(["A", "B", "C"])).toBe("A, B and C");
+  });
+
+  it("never says role(s) or 3.5/5", () => {
+    expect(count(1, "role")).toBe("1 role");
+    expect(count(3, "role")).toBe("3 roles");
+    expect(outOf(3.5, 5)).toBe("3.5 out of 5");
+    expect(outOf(4.0, 5)).toBe("4 out of 5");
+    expect(outOf(3.46, 5)).toBe("3.5 out of 5");
+  });
+});
+
+describe("firstSentence", () => {
+  it("keeps only the first sentence", () => {
+    expect(firstSentence("It's quiet. No pressure.")).toBe("It's quiet.");
+    expect(firstSentence("No full stop")).toBe("No full stop");
+    expect(firstSentence("Version 2.5 is out. Next.")).toBe("Version 2.5 is out.");
   });
 });

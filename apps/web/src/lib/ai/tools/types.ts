@@ -39,6 +39,12 @@ export type ToolOutcome = "performed" | "needs_input" | "refused" | "failed";
 export interface FadiToolResult {
   /** Natural-language result for the model to speak/narrate. */
   summary: string;
+  /**
+   * The same result, written to be HEARD: whole sentences, the answer first, no lists, symbols
+   * or "role(s)". Voice (Buddy) says this instead of the summary when a tool sets it; it must
+   * come from the same data as the summary and claim nothing the summary does not.
+   */
+  spoken?: string;
   /** Structured payload for visual rendering (job cards, stat tiles, …). */
   data?: unknown;
   /** Render hint for the chat UI. */
@@ -108,6 +114,12 @@ interface ToolBase {
   readonly description: string;
   /** JSON Schema for the tool's arguments (OpenAI/Groq/Gemini tool format). */
   readonly parameters: Record<string, unknown>;
+  /**
+   * The argument that names an existing record of the person's ("job", "application"), when
+   * there is one. Lets a voice caller fill it from what the person picked by position ("the
+   * second one") instead of trusting the model's guess at a name.
+   */
+  readonly target?: string;
 }
 
 /** Answers a question. Nothing of the person's changes, so there is nothing to account for. */

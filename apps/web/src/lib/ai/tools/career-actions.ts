@@ -99,6 +99,7 @@ async function savedCandidates(userId: string): Promise<Named[]> {
 
 export const saveJobTool: ConsequentialTool = {
   name: "save_job",
+  target: "job",
   risk: "write",
   effect: "Save a role",
   description:
@@ -164,6 +165,7 @@ export const saveJobTool: ConsequentialTool = {
 
 export const unsaveJobTool: ConsequentialTool = {
   name: "unsave_job",
+  target: "job",
   risk: "write",
   effect: "Remove a saved role",
   description:
@@ -235,6 +237,7 @@ function statusOf(value: unknown): ApplicationStatus | null {
 
 export const setApplicationStatusTool: ConsequentialTool = {
   name: "set_application_status",
+  target: "application",
   risk: "write",
   effect: "Change an application's status",
   description:
@@ -390,6 +393,7 @@ export const listDocumentsTool: FadiTool = {
 
 export const readDocumentTool: FadiTool = {
   name: "read_document",
+  target: "document",
   risk: "read",
   description:
     "Read out the opening of one of the user's documents, found by name. Use for 'what does my Deerfoot cover letter say', 'read me my CV'.",
@@ -535,6 +539,7 @@ async function flagshipCandidates(userId: string) {
 
 export const takeOnFlagshipTool: ConsequentialTool = {
   name: "take_on_flagship",
+  target: "flagship",
   risk: "write",
   effect: "Take on a flagship project",
   description:

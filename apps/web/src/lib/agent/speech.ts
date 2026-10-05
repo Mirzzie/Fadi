@@ -47,3 +47,27 @@ export function readBack(tool: string, args: Record<string, unknown>): string {
     .join(", ");
   return details ? `${action} — ${details}` : action;
 }
+
+/** "A", "A and B", "A, B and C" — how a list is said rather than shown. */
+export function spokenList(items: string[]): string {
+  const said = items.map((item) => item.trim()).filter(Boolean);
+  if (said.length <= 1) return said[0] ?? "";
+  return `${said.slice(0, -1).join(", ")} and ${said[said.length - 1]}`;
+}
+
+/** "1 role", "3 roles" — never "role(s)". */
+export function count(n: number, noun: string, plural = `${noun}s`): string {
+  return `${n} ${n === 1 ? noun : plural}`;
+}
+
+/** A score as it is said: "3.5 out of 5", not "3.5/5". Whole numbers lose the ".0". */
+export function outOf(value: number, max: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)} out of ${max}`;
+}
+
+/** The first sentence of a message, for when the rest is detail a listener does not need. */
+export function firstSentence(text: string): string {
+  const match = text.trim().match(/^.*?[.!?](?=\s|$)/);
+  return (match ? match[0] : text).trim();
+}

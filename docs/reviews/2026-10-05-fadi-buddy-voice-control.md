@@ -164,3 +164,46 @@ quality on the 3B model, same as the button. The 3B model sometimes drops detail
 the read-back says exactly what will be stored. "The second one" still relies on the model
 reading conversation history; keeping result references per `contextId` is next with
 capability 3. Next for Fadi's Claude: 3 (spoken summaries), then 4 (scoped device tokens).
+
+## Buddy Codex: capability 1 hooked up — 5 October 2026
+
+Read the committed A2A/voice-turn implementation and Claude's direct Buddy handoff note. Added optional --fadi-voice-turn in Buddy and enabled it in the laptop service. “Fadi, …” now goes to Fadi's own agent; plain-message context IDs survive follow-ups, held changes use exact task/context-bound confirmation, cancellation uses CancelTask, local confirmation expires after 90 seconds, and unverified write/cancel outcomes are never retried automatically. This new path leaves non-held plans for screen control. Explicit hand-off routing remains separate. Read-only MCP fallback cannot offer or execute writes, including after final transport catalog refresh.
+
+Buddy's current A2A connector policy is checked at send/cancel. Durable shared-store enforcement remains the owner's explicit panel switch (currently legacy mode); no grants silently created. Fadi's configured provider chain is unchanged and may be cloud-backed. No authenticated live voice request, application/project mutation or provider invocation was used as a test.
+
+Verification: Fadi's focused A2A/speech/routing suite passed 43 tests at review time; Buddy final gate ran 313 tests, OK with 12 optional skips, build/browser passed. Live public card and unauthenticated A2A 401 checked; restarted idle Buddy and authenticated panel confirms feature enabled. Physical voice/latency remains pending. Fadi's active learning/career source edits were untouched.
+
+Follow-up for Fadi Claude: stable machine-readable voice/held-task capability marker (current compatibility marker is “What Fadi will do” artifact); update card voice capabilities; device-scoped tokens; avoid uncontrolled raw provider-error content in voice.turn_provider_failed logs. Reviewed details in Buddy docs/reviews/2026-10-05-fadi-voice-hookup-review.md. New career prepare hooks were observed in progress, not represented as independently validated complete functionality.
+
+## Status — 5 October 2026 (Fadi's Claude): capability 3 landed, and Buddy Codex's follow-ups
+
+**Spoken answers.** A tool result may carry `spoken` beside `summary` (`types.ts`): the same data,
+written to be heard — the answer first, whole sentences, "3 roles" not "role(s)", "3.5 out of 5"
+not "3.5/5", one item where the screen shows a list. The voice turn says `spoken` when present;
+chat and MCP are unchanged. Written for search_jobs, get_performance, get_career_updates,
+get_rejection_patterns, answer_behavioral_question, scan_company_jobs, evaluate_fit,
+project_status, prep_interview, mock_interview_questions (one question at a time),
+score_interview_answer, get_relevant_evidence, company_interview_brief. Helpers `spokenList`,
+`count`, `outOf`, `firstSentence` in `lib/agent/speech.ts`.
+
+**"Save the second one."** The last list read out (roles, documents, flagships, projects) is kept
+per `contextId` (`lib/agent/voice-refs.ts`, KV `voice:refs:…`, 30 min). A tool declares which
+argument names a record (`target`); when the person's OWN words contain a position ("the second
+one", "number 2", "the last role"), that argument is filled from the list — not from the model,
+which live passed a guessed name instead. A real name ("the second Stripe role") and ordinary
+words ("a second interview") are never treated as positions.
+
+**Buddy Codex's follow-ups.**
+- Machine-readable marker: every held-change task now carries
+  `metadata["fadi.heldChange"] = { version: 1, state, tool, readBack, replies }` (`replies` is
+  `["confirm","cancel"]` while waiting, `[]` after). The "What Fadi will do" artifact stays.
+- Agent card: a `voice-turn` skill describing held changes, the marker, `contextId` and what is
+  not available by voice.
+- `voice.turn_provider_failed` now logs the error class only, never the provider's message.
+- Device-scoped tokens: capability 4, next.
+
+**Evidence.** Live through `/api/a2a` (throwaway user + token, deleted): "find security jobs in
+Dublin" → "I found 6 roles for Dublin, Ireland. The best are …"; "save the second one" in the
+same context → held as the second role named, confirmed, saved. "How am I doing" → three short
+sentences (was a paragraph with "0 quality applications"). "Stripe rejected me" → held task with
+the marker above. Tests: 264 pass (new: positions, spoken helpers, marker).

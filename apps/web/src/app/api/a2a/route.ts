@@ -125,7 +125,9 @@ function depsFor(userId: string): A2ADeps {
       return {
         speech: turn.speech,
         contextId: turn.contextId,
-        pending: turn.pending ? { id: turn.pending.id, readBack: turn.pending.readBack } : null,
+        pending: turn.pending
+          ? { id: turn.pending.id, readBack: turn.pending.readBack, tool: turn.pending.tool }
+          : null,
       };
     },
     heldChange: async (id) => {
@@ -139,6 +141,7 @@ function depsFor(userId: string): A2ADeps {
           readBack: waiting.readBack,
           state: "waiting",
           speech: `Fadi will ${waiting.readBack}.`,
+          tool: waiting.tool,
         };
       }
       // What became of it, so a client polling the task hears the outcome, not "not found".
@@ -157,6 +160,7 @@ function depsFor(userId: string): A2ADeps {
           readBack: before.readBack,
           state: result.ok ? "done" : "failed",
           speech: result.speech,
+          tool: before.tool,
         };
         await getKv().set(`a2a:change:${userId}:${id}`, JSON.stringify(record), 3600);
       }
@@ -174,6 +178,7 @@ function depsFor(userId: string): A2ADeps {
           readBack: before.readBack,
           state: "cancelled",
           speech: "Cancelled. Nothing was changed.",
+          tool: before.tool,
         };
         await getKv().set(`a2a:change:${userId}:${id}`, JSON.stringify(record), 3600);
       }

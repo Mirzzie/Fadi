@@ -40,6 +40,20 @@ export async function GET(request: Request): Promise<Response> {
         tags: ["career", "applications"],
         examples: ["Apply to the Deerfoot role"],
       },
+      {
+        id: "voice-turn",
+        name: "Ask or tell Fadi anything",
+        description:
+          'Any other line is answered by Fadi\'s own agent, shaped to be spoken. Questions are answered from your data. A change is never made straight away: it comes back as an INPUT_REQUIRED task whose metadata["fadi.heldChange"] names the tool and the exact read-back; reply confirm or cancel on that taskId. Pass contextId to follow up ("save the second one"). Machine, lab and publishing actions are not available here.',
+        tags: ["career", "voice", "jobs", "applications", "documents", "learning"],
+        examples: [
+          "Find remote junior security roles in Dublin",
+          "Save the second one",
+          "I got an interview with Stripe",
+          "What should I do today?",
+          "Take on the phishing flagship",
+        ],
+      },
     ],
   });
 }

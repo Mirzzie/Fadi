@@ -14,6 +14,7 @@ import { getKv } from "@/lib/kv/store";
 import { logger } from "@/lib/observability/logger";
 
 import { readBack, toSpeech } from "./speech";
+import { positionSaid, refsFrom, withPositionsResolved, type VoiceRef } from "./voice-refs";
 
 /**
  * ONE SPOKEN TURN, ANSWERED BY FADI ITSELF.
@@ -43,6 +44,7 @@ const VOICE_STYLE = [
   "THIS ANSWER IS SPOKEN ALOUD by the person's voice assistant (Buddy), not read on a screen.",
   "Answer in at most three short sentences of plain speech: no markdown, lists, headings, URLs or emoji.",
   "Say numbers and job titles naturally. When you found several items, name the best one or two and say the rest are on their Opportunities page.",
+  "When the person picks an item by position ('the second one', 'the last one'), pass exactly those words as the tool argument; Fadi knows the order it read them out in.",
   "If a tool result says it is waiting for the person's confirmation, say exactly what you will do and ask them to say confirm or cancel. Never claim it is done.",
 ].join(" ");
 
@@ -65,6 +67,16 @@ type Turn = { role: "user" | "assistant"; content: string };
 
 const historyKey = (userId: string, contextId: string) => `voice:ctx:${userId}:${contextId}`;
 const pendingKey = (userId: string, id: string) => `voice:pending:${userId}:${id}`;
+const refsKey = (userId: string, contextId: string) => `voice:refs:${userId}:${contextId}`;
+
+async function readRefs(userId: string, contextId: string): Promise<VoiceRef[]> {
+  try {
+    const raw = await getKv().get(refsKey(userId, contextId));
+    return raw ? (JSON.parse(raw) as VoiceRef[]) : [];
+  } catch {
+    return [];
+  }
+}
 
 async function readHistory(userId: string, contextId: string): Promise<Turn[]> {
   try {
@@ -102,6 +114,9 @@ export async function runVoiceTurn(
   }
 
   const history = await readHistory(userId, contextId);
+  // The last list Fadi read out in this conversation, so "the second one" can be counted.
+  let refs = await readRefs(userId, contextId);
+  let refsChanged = false;
   const messages = buildFadiMessages(context, history, text, VOICE_STYLE);
 
   const all = (await getToolsForUser(userId)).filter(
@@ -117,13 +132,23 @@ export async function runVoiceTurn(
   const used: string[] = [];
   // What the tools said, for when the model runs them and then says nothing itself.
   const summaries: string[] = [];
-  const executor = async (name: string, args: Record<string, unknown>) => {
+  const executor = async (name: string, said: Record<string, unknown>) => {
     used.push(name);
     const tool = byName.get(name);
     if (!tool) return { summary: `"${name}" is not available by voice.`, isError: true };
+    const args = withPositionsResolved(said, refs);
+    // "Save the second one": the person's own words decide which item, not the model's guess.
+    const picked = tool.target ? positionSaid(text, refs) : null;
+    if (picked && tool.target) args[tool.target] = picked;
     if (tool.risk === "read") {
       const result = await executeFadiTool(name, args, ctx);
-      summaries.push(result.summary);
+      // Heard, not read: a tool's spoken version when it has one.
+      summaries.push(result.spoken ?? result.summary);
+      const listed = refsFrom(result.data);
+      if (listed) {
+        refs = listed;
+        refsChanged = true;
+      }
       return result;
     }
     // A change: hold it for the person's spoken confirmation instead of doing it.
@@ -171,7 +196,8 @@ export async function runVoiceTurn(
       logger.warn("voice.turn_provider_failed", {
         userId,
         provider: provider.id,
-        error: error instanceof Error ? error.message : "unknown",
+        // The class only: a provider's message can echo the prompt, which holds the person's words.
+        error: error instanceof Error ? error.name : "unknown",
       });
     }
   }
@@ -187,6 +213,9 @@ export async function runVoiceTurn(
   else if (summaries.length > 0) answer = summaries.join(" ");
   if (held) {
     await getKv().set(pendingKey(userId, held.id), JSON.stringify(held), PENDING_TTL_S);
+  }
+  if (refsChanged) {
+    await getKv().set(refsKey(userId, contextId), JSON.stringify(refs.slice(0, 12)), HISTORY_TTL_S);
   }
   const speech = toSpeech(answer);
   await writeHistory(userId, contextId, [
@@ -228,7 +257,7 @@ export async function confirmPendingAction(
     workItemId: null,
     generate,
   });
-  const speech = toSpeech(result.summary || "Done.");
+  const speech = toSpeech(result.spoken || result.summary || "Done.");
   const history = await readHistory(userId, action.contextId);
   await writeHistory(userId, action.contextId, [
     ...history,

@@ -41,6 +41,7 @@ export type A2ATask = {
   contextId?: string;
   status: { state: A2AState; message?: A2AMessage; timestamp: string };
   artifacts?: { artifactId: string; name: string; parts: A2APart[] }[];
+  metadata?: Record<string, unknown>;
 };
 
 /** What the protocol needs to know about a plan — ids and words, never career records. */
@@ -91,7 +92,7 @@ export type A2ADeps = {
   ) => Promise<{
     speech: string;
     contextId: string;
-    pending: { id: string; readBack: string } | null;
+    pending: { id: string; readBack: string; tool?: string } | null;
   }>;
   /** A held change (or its outcome, for an hour), by task id. */
   heldChange?: (id: string) => Promise<HeldChange | null>;
@@ -106,7 +107,15 @@ export type HeldChange = {
   readBack: string;
   state: "waiting" | "done" | "failed" | "cancelled";
   speech: string;
+  /** The Fadi tool it runs, when known. */
+  tool?: string;
 };
+
+/**
+ * Where a client finds that a task is a HELD CHANGE (not a plan), without parsing words or
+ * artifact names. Versioned, because Buddy keys its confirmation flow on it.
+ */
+export const HELD_CHANGE_METADATA = "fadi.heldChange";
 
 export type JsonRpcId = string | number | null;
 export type JsonRpcRequest = {
@@ -237,6 +246,16 @@ export function taskForChange(change: HeldChange, deps: A2ADeps): A2ATask {
           ],
         }
       : {}),
+    metadata: {
+      [HELD_CHANGE_METADATA]: {
+        version: 1,
+        state: change.state,
+        tool: change.tool ?? null,
+        readBack: change.readBack,
+        // What the client sends back on this taskId while it waits.
+        replies: change.state === "waiting" ? ["confirm", "cancel"] : [],
+      },
+    },
   };
 }
 
@@ -445,6 +464,7 @@ export async function handleA2AMessage(
             readBack: turn.pending.readBack,
             state: "waiting",
             speech: turn.speech,
+            tool: turn.pending.tool,
           },
           deps
         )

@@ -22,6 +22,7 @@ import { generateDocument } from "./generate-document";
 import { getLaborMarket } from "./labor-market";
 import { getWorldShifts } from "./world-shifts";
 import { trackApplication } from "./track-application";
+import { count, firstSentence, outOf, spokenList } from "@/lib/agent/speech";
 import { runWithReceipt } from "./receipts";
 import type { ConsequentialResult, FadiTool, FadiToolContext, FadiToolResult } from "./types";
 
@@ -99,6 +100,7 @@ const searchJobs: FadiTool = {
     if (jobs.length === 0) {
       return {
         summary: `No live roles came back for ${where} right now. Suggest a broader location or different keywords.`,
+        spoken: `I didn't find any live roles for ${where} right now. Try a wider area or different words.`,
         view: "jobs",
         data: { where, jobs: [] },
       };
@@ -119,6 +121,13 @@ const searchJobs: FadiTool = {
         .slice(0, 3)
         .map((j) => `${j.title} at ${j.company}`)
         .join("; ")}.`,
+      // In order, because "save the second one" is counted from what was said.
+      spoken:
+        `I found ${count(top.length, "role")} for ${where}. ` +
+        (top.length === 1
+          ? `It's ${top[0]!.title} at ${top[0]!.company}.`
+          : `The best are ${spokenList(top.slice(0, 3).map((j) => `${j.title} at ${j.company}`))}.`) +
+        (top.length > 3 ? " The rest are on your Opportunities page." : ""),
       view: "jobs",
       data: { where, jobs: top },
     };
@@ -135,6 +144,14 @@ const getPerformance: FadiTool = {
     const m = await getMomentumSummary(ctx.userId);
     return {
       summary: `Momentum ${m.momentum} (peak ${m.peakMomentum}), band "${m.band}". ${m.bandMessage} Cadence: ${m.cadenceMessage} ${m.qualityApplicationsThisPeriod} quality application(s) this period.${m.isResting ? " Currently resting — that's allowed." : ""}`,
+      // First sentences only: the full messages are written for the card, not the ear.
+      spoken: m.isResting
+        ? `You're resting at the moment, and that's allowed. ${firstSentence(m.bandMessage)}`
+        : `${firstSentence(m.bandMessage)} You've sent ${
+            m.qualityApplicationsThisPeriod === 0
+              ? "no quality applications"
+              : count(m.qualityApplicationsThisPeriod, "quality application")
+          } this period. ${firstSentence(m.cadenceMessage)}`,
       view: "performance",
       data: {
         momentum: m.momentum,
@@ -171,6 +188,10 @@ const getCareerUpdates: FadiTool = {
         top.length > 0
           ? `${top.length} matched role(s) waiting: ${top.map((j) => `${j.title} (${j.company})`).join("; ")}.`
           : "No fresh matched roles cleared the bar yet — I'm still watching your market.",
+      spoken:
+        top.length > 0
+          ? `${count(top.length, "new role")} matched you. The best are ${spokenList(top.slice(0, 3).map((j) => `${j.title} at ${j.company}`))}.`
+          : "Nothing new has cleared the bar yet. I'm still watching your market.",
       view: "updates",
       data: { jobs: top },
     };
@@ -198,6 +219,15 @@ const getRejectionPatterns: FadiTool = {
     const steps = insight.sharperNextApplication.map((s, i) => `${i + 1}. ${s}`).join(" ");
     return {
       summary: `${patternLine} Sharper next application: ${steps} ${insight.reframe}`.trim(),
+      // One pattern and one change is what a listener can act on; the full list is on screen.
+      spoken: [
+        insight.pattern
+          ? `Across your ${count(rejectionCount, "rejection")}, the pattern is ${insight.pattern.name}.`
+          : `Across your ${count(rejectionCount, "rejection")} there's no clear pattern yet.`,
+        insight.sharperNextApplication[0] ? `Next time: ${insight.sharperNextApplication[0]}` : "",
+      ]
+        .filter(Boolean)
+        .join(" "),
       view: "none",
       data: { rejectionCount, insight },
     };
@@ -297,6 +327,7 @@ const answerBehavioralTool: FadiTool = {
     if (!res.ok) return { summary: res.message ?? "Build your story bank first.", view: "none" };
     return {
       summary: `Best story for "${question}" — "${res.storyTitle}":\n\n${res.answer}\n\nDeliver it in your own words; don't recite. Want me to tighten any part?`,
+      spoken: `Use your ${res.storyTitle} story. ${res.answer}`,
       view: "none",
       data: { storyTitle: res.storyTitle, answer: res.answer },
     };
@@ -336,6 +367,7 @@ const scanCompanyJobsTool: FadiTool = {
       .join("\n");
     return {
       summary: `${res.jobs.length} open role(s) at ${company}, live from its ${res.provider} board:\n${lines}\n\nThese come straight from the employer's ATS, so they're current — a referral here is your highest-leverage next move.`,
+      spoken: `${company} has ${count(res.jobs.length, "open role")} on its own board, including ${spokenList(res.jobs.slice(0, 3).map((j) => j.title))}.`,
       view: "none",
       data: { company, provider: res.provider, jobs: res.jobs },
     };
@@ -375,6 +407,9 @@ const evaluateFitTool: FadiTool = {
         : "";
     return {
       summary: `Fit: ${e.overall.toFixed(1)}/5 — ${e.verdict.toUpperCase()}.\n${e.verdictReason}\n${reasons}${gaps}`,
+      spoken:
+        `It scores ${outOf(e.overall, 5)}, so my call is ${e.verdict}. ${e.verdictReason}` +
+        (e.gapsToClose[0] ? ` The main gap: ${e.gapsToClose[0]}.` : ""),
       view: "none",
       data: { overall: e.overall, verdict: e.verdict, dimensions: e.dimensions },
     };
@@ -884,7 +919,17 @@ const projectStatusTool: FadiTool = {
         nextStep: next?.title ?? null,
       });
     }
-    return { summary: lines.join("\n\n"), view: "none", data: { projects } };
+    const [first] = projects;
+    const firstRun = runs[0]!;
+    return {
+      summary: lines.join("\n\n"),
+      spoken: first
+        ? `${first.title}: ${first.nextStep ? `next is ${first.nextStep}.` : "every step is done, so it can be finished."}` +
+          (runs.length > 1 ? ` You have ${count(runs.length, "project")} going.` : "")
+        : `${firstRun.title} is in progress.`,
+      view: "none",
+      data: { projects },
+    };
   },
 };
 
@@ -968,6 +1013,9 @@ const prepInterviewTool: FadiTool = {
     const body = res.prep.questions.slice(0, 4).map(formatPrepQuestion).join("\n\n");
     return {
       summary: `Likely questions for this role, answered from your real experience:\n\n${body}\n\nDeliver them in your own words — they're your stories, shaped to this job.`,
+      spoken: res.prep.questions[0]
+        ? `I expect ${count(res.prep.questions.length, "question")}. The first is: ${res.prep.questions[0].question} Ask me how to answer it, or for the next one.`
+        : "I couldn't work out likely questions from that description.",
       view: "none",
       data: { questions: res.prep.questions },
     };
@@ -1007,6 +1055,10 @@ const mockQuestionsTool: FadiTool = {
     const list = res.questions.map((q, i) => `${i + 1}. ${q.question}`).join("\n");
     return {
       summary: `Mock interview for ${role || "your role"} — answer each out loud, then ask me to score it:\n${list}`,
+      // One question at a time: a listener can't hold eight.
+      spoken: res.questions[0]
+        ? `Here's your first question for ${role || "your role"}. ${res.questions[0].question} Answer it out loud and I'll score it.`
+        : "I couldn't make questions for that role.",
       view: "none",
       data: { role, questions: res.questions },
     };
@@ -1047,7 +1099,16 @@ const scoreAnswerTool: FadiTool = {
     const stronger = s.strongerVersion
       ? `\n\nStronger version (your content, tightened):\n${s.strongerVersion}`
       : "";
-    return { summary: `${head}${fixes}${stronger}`, view: "none", data: { score: s } };
+    return {
+      summary: `${head}${fixes}${stronger}`,
+      spoken:
+        (s.overall !== null
+          ? `That answer scores ${outOf(s.overall, 5)}.`
+          : "I couldn't score the content.") +
+        (s.improvements[0] ? ` The one thing to fix: ${s.improvements[0]}` : ""),
+      view: "none",
+      data: { score: s },
+    };
   },
 };
 
@@ -1074,6 +1135,10 @@ const relevantEvidenceTool: FadiTool = {
           `• ${r.item.title}${r.item.organization ? ` (${r.item.organization})` : ""}${r.item.metrics ? ` — ${r.item.metrics}` : ""}`
       )
       .join("\n");
+    const best = ranked.filter((r) => r.score > 0).slice(0, 3);
+    const spoken = best.length
+      ? `Your strongest evidence${track ? ` for ${track.role}` : ""} is ${spokenList(best.map((r) => r.item.title))}.`
+      : "Nothing in your record maps cleanly to this direction yet.";
     const head = track
       ? `Your strongest evidence for ${track.role}:`
       : "Your evidence (set a direction to rank it):";
@@ -1081,6 +1146,7 @@ const relevantEvidenceTool: FadiTool = {
       summary: top
         ? `${head}\n${top}`
         : `${head}\nNothing in your pool maps cleanly to this direction yet — add evidence or tags that fit it.`,
+      spoken,
       view: "none",
       data: { track, count: ranked.length },
     };
@@ -1108,7 +1174,17 @@ const companyBriefTool: FadiTool = {
       jobDescription: typeof args.jobDescription === "string" ? args.jobDescription : undefined,
     });
     if (!res.ok) return { summary: res.message, view: "none" };
-    return { summary: formatBrief(res.brief), view: "none", data: { brief: res.brief } };
+    return {
+      summary: formatBrief(res.brief),
+      spoken:
+        `${res.brief.whatTheyDo}` +
+        (res.brief.smartQuestions[0]
+          ? ` A good question to ask them: ${res.brief.smartQuestions[0]}`
+          : "") +
+        " Check their latest news before the interview.",
+      view: "none",
+      data: { brief: res.brief },
+    };
   },
 };
 
