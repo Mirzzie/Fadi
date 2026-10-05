@@ -110,3 +110,15 @@ describe("titles", () => {
     expect(one.title).toBe("Contain a takeover");
   });
 });
+
+describe("flagshipDetail for the planner", () => {
+  it("carries why now and what it proves after the work, never before the problem", () => {
+    const [one] = acceptFlagships([complete], research);
+    const parts = flagshipDetail(one).split("\n\n");
+    expect(parts).toHaveLength(3);
+    expect(parts[1]).toContain("Then: Replay a stolen token");
+    expect(parts[2]).toBe(
+      "Why now: Token theft drove this month's retail breaches.\nIt should demonstrate: Identity threat detection and response."
+    );
+  });
+});

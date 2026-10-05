@@ -124,7 +124,19 @@ export function acceptFlagships(
   return out;
 }
 
-/** The project description a flagship starts with: scenario first, then the work. */
+/**
+ * The project description a flagship starts with: the scenario first (the README's "The
+ * problem"), then the work, then why it matters now and what it proves — so the planner
+ * builds toward the business problem and the outcome, not just the tools named.
+ */
 export function flagshipDetail(flagship: Flagship): string {
-  return `${flagship.problem}\n\n${flagship.build} Then: ${flagship.breakIt}`;
+  const context = [
+    flagship.whyNow ? `Why now: ${flagship.whyNow}` : "",
+    flagship.demonstrates ? `It should demonstrate: ${flagship.demonstrates}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+  return [flagship.problem, `${flagship.build} Then: ${flagship.breakIt}`, context]
+    .filter(Boolean)
+    .join("\n\n");
 }
