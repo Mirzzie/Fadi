@@ -46,7 +46,11 @@ export function CaseStudyTemplate({
   const { figures, notes } = splitBullets(item.bullets ?? []);
 
   return (
+    // data-pf-template is what PortfolioChrome's palette is scoped to. Without it every
+    // --pf-* colour was undefined: inside Fadi the app's own dark styles hid that, but the
+    // static GitHub Pages copy rendered dark-on-dark text (found 7 Oct 2026).
     <main
+      data-pf-template="case"
       className="min-h-screen bg-[var(--pf-bg)] font-sans text-[var(--pf-ink)] antialiased"
     >
       <PortfolioChrome />
