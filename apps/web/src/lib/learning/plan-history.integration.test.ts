@@ -101,4 +101,15 @@ suite("earlier plans", () => {
     const [any] = await repo.listPlanVersions(userId, runId);
     expect(await repo.restorePlanVersion(otherId, runId, any!.id)).toBeNull();
   });
+
+  it("a fresh start clears steps and earlier plans, and touches nobody else's", async () => {
+    expect(await repo.resetProgress(otherId, runId)).toBe(false);
+    expect((await repo.getWithSteps(userId, runId))!.steps.length).toBeGreaterThan(0);
+
+    expect(await repo.resetProgress(userId, runId)).toBe(true);
+    const after = (await repo.getWithSteps(userId, runId))!;
+    expect(after.steps).toEqual([]);
+    expect(after.run.status).toBe("running");
+    expect(await repo.listPlanVersions(userId, runId)).toEqual([]);
+  });
 });

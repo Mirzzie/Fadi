@@ -13,10 +13,7 @@ import {
   proposeProjectLabStopAction,
   proposeSaveBaseAction,
   reopenStepAction,
-  labResetAvailabilityAction,
-  proposeLabResetAction,
   replanProjectAction,
-  resetProjectAction,
   runOnThisComputerAction,
   type ProjectRuntimeView,
   type RunView,
@@ -35,6 +32,10 @@ import { announceActionsChanged, usePendingActions } from "@/components/os/pendi
 import { Button } from "@/components/ui/button";
 import { reachableSurface, runtimeMessage } from "@/lib/lab/runtime-contract";
 import { ChecksSetup } from "@/components/learning/checks-setup";
+import {
+  proposeCleanSnapshotAction,
+  proposeFreshStartAction,
+} from "@/app/dashboard/learning/fresh-start-actions";
 import { LabScreenFrame } from "@/components/learning/lab-screen-frame";
 import { MachineChooser } from "@/components/learning/machine-chooser";
 import { MachineSettings } from "@/components/learning/machine-settings";
@@ -185,7 +186,9 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
                 : null
             }
           />
-          {current ? (
+          {run.steps.length === 0 ? (
+            <FreshStart runId={runId} onPlanned={refresh} />
+          ) : current ? (
             <CurrentStep
               key={current.id}
               runId={runId}
@@ -725,16 +728,8 @@ function StepList({
 function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => Promise<void> }) {
   const [asking, setAsking] = useState<null | "replan" | "reset">(null);
   const [note, setNote] = useState<string | null>(null);
+  const [needsSnapshot, setNeedsSnapshot] = useState(false);
   const [busy, start] = useTransition();
-  // Starting over can also give the lab a clean disk from the saved base — no download.
-  const [labReset, setLabReset] = useState<{ available: boolean; reason: string | null } | null>(
-    null
-  );
-  const [resetLab, setResetLab] = useState(true);
-  const askReset = () => {
-    setAsking("reset");
-    void labResetAvailabilityAction({ runId }).then(setLabReset);
-  };
 
   if (!asking) {
     return (
@@ -748,7 +743,7 @@ function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => Prom
         </button>
         <button
           type="button"
-          onClick={askReset}
+          onClick={() => setAsking("reset")}
           className="hover:text-foreground hover:underline"
         >
           Start the project over
@@ -759,26 +754,34 @@ function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => Prom
   }
 
   const reset = asking === "reset";
+  const done = (message: string) => {
+    setAsking(null);
+    setNeedsSnapshot(false);
+    setNote(message);
+    announceActionsChanged();
+  };
   return (
     <div className="flex flex-wrap items-center gap-2 px-1 text-xs">
-      <span>
+      <span className="w-full">
         {reset
-          ? "Start over from step one? Every step is planned again — finished ones too."
+          ? "Start the project over from nothing: its progress, steps and earlier plans are deleted, and its machine starts clean — Fadi's lab gets a fresh disk from your saved base (no download), your VMware machine returns to its clean start, and services lose their data. Then choose where it runs and plan it again."
           : "Replan the steps you haven't finished? Finished steps and their results stay."}
       </span>
-      {reset && labReset ? (
-        labReset.available ? (
-          <label className="flex w-full items-center gap-2 text-muted-foreground">
-            <input
-              type="checkbox"
-              checked={resetLab}
-              onChange={(event) => setResetLab(event.target.checked)}
-            />
-            Also give the lab a clean disk from your saved base — minutes, no download, no Setup.
-          </label>
-        ) : labReset.reason ? (
-          <span className="w-full text-muted-foreground">Lab: {labReset.reason}</span>
-        ) : null
+      {needsSnapshot ? (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={busy}
+          onClick={() =>
+            start(async () => {
+              const result = await proposeCleanSnapshotAction({ runId });
+              setNote(result.message);
+              announceActionsChanged();
+            })
+          }
+        >
+          Save clean start
+        </Button>
       ) : null}
       <Button
         size="sm"
@@ -786,28 +789,38 @@ function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => Prom
         disabled={busy}
         onClick={() =>
           start(async () => {
-            const res = reset
-              ? await resetProjectAction({ runId })
-              : await replanProjectAction({ runId });
-            if (!res.ok) return setNote(res.message ?? "Couldn't plan it again.");
-            let labNote = "";
-            if (reset && resetLab && labReset?.available) {
-              const proposed = await proposeLabResetAction({ runId });
-              labNote = ` ${proposed.message}`;
-              announceActionsChanged();
+            if (reset) {
+              const result = await proposeFreshStartAction({ runId });
+              if (!result.ok) {
+                setNeedsSnapshot(Boolean(result.needsSnapshot));
+                return setNote(result.message);
+              }
+              done(result.message);
+              await onReplanned();
+              return;
             }
+            const res = await replanProjectAction({ runId });
+            if (!res.ok) return setNote(res.message ?? "Couldn't plan it again.");
             setAsking(null);
-            setNote(reset ? `${res.message ?? ""}${labNote}`.trim() || null : null);
+            setNote(null);
             await onReplanned();
           })
         }
       >
-        {busy ? "Planning…" : reset ? "Start over" : "Replace"}
+        {busy ? (reset ? "Preparing…" : "Planning…") : reset ? "Start over from nothing" : "Replace"}
       </Button>
-      <Button size="sm" variant="ghost" disabled={busy} onClick={() => setAsking(null)}>
+      <Button
+        size="sm"
+        variant="ghost"
+        disabled={busy}
+        onClick={() => {
+          setAsking(null);
+          setNeedsSnapshot(false);
+        }}
+      >
         Cancel
       </Button>
-      {note ? <span className="text-amber-600">{note}</span> : null}
+      {note ? <span className="w-full text-amber-600">{note}</span> : null}
     </div>
   );
 }
@@ -846,3 +859,39 @@ const PLACE_LABEL: Record<string, string> = {
   browser: "In your browser",
   fadi: "Fadi does it",
 };
+
+/**
+ * A project with no steps — just started over. Planning waits for the person: choose where it
+ * runs and start it, so the plan is written against the fresh machine as observed.
+ */
+function FreshStart({ runId, onPlanned }: { runId: string; onPlanned: () => Promise<void> }) {
+  const [note, setNote] = useState<string | null>(null);
+  const [busy, start] = useTransition();
+  return (
+    <section className="rounded-2xl border border-primary/30 bg-card p-5">
+      <p className="text-xs font-medium text-primary">Fresh start</p>
+      <h2 className="mt-0.5 text-lg font-semibold">Nothing done yet</h2>
+      <p className="mt-2 text-sm text-muted-foreground">
+        Choose where this project runs (on the right), start the machine, then plan the steps —
+        Fadi looks at the running machine first, so the steps fit it.
+      </p>
+      <Button
+        className="mt-4"
+        size="sm"
+        disabled={busy}
+        onClick={() =>
+          start(async () => {
+            setNote(null);
+            const result = await replanProjectAction({ runId });
+            if (!result.ok) return setNote(result.message ?? "Couldn't plan it.");
+            await onPlanned();
+          })
+        }
+      >
+        {busy ? "Planning…" : "Plan the steps"}
+      </Button>
+      {note ? <p className="mt-2 text-xs text-amber-600">{note}</p> : null}
+    </section>
+  );
+}
+

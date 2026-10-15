@@ -1083,6 +1083,42 @@ describe("starting a lab over from its saved base", () => {
   });
 });
 
+describe("a project's fresh start", () => {
+  it("renders the environment reset for wherever the project runs, typed", async () => {
+    const { RECIPES, recipePolicy } = await import("./broker");
+    const recipe = RECIPES["project.reset"];
+    const docker = recipe.validate({ name: "project-df3e6d83", container: true, disk: true, stacks: ["wazuh"] })!;
+    const steps = recipe.render(docker) as Array<Record<string, unknown>>;
+    expect(steps.map((step) => step.id)).toEqual(["remove", "remove-disk", "stack-down-wazuh"]);
+    expect(steps[1]).toMatchObject({ args: ["volume", "rm", "fadi-project-df3e6d83-storage"] });
+    expect(steps[2]).toMatchObject({ compose: "down", project: "fadi-project-df3e6d83-wazuh" });
+    expect(recipePolicy(recipe, docker).confirm).toBe("type-name");
+
+    const vm = recipe.validate({
+      name: "project-df3e6d83",
+      stacks: [],
+      resourceId: "11111111-1111-4111-8111-111111111111",
+      vmxPath: "/home/me/vmware/ws/ws.vmx",
+    })!;
+    expect((recipe.render(vm) as Array<{ args: string[] }>)[0]!.args).toEqual([
+      "-T",
+      "ws",
+      "revertToSnapshot",
+      "/home/me/vmware/ws/ws.vmx",
+      "Fadi clean start",
+    ]);
+    expect(recipe.validate({ name: "x", stacks: ["kubernetes"] })).toBeNull();
+  });
+
+  it("only ever resets the lab of the project it belongs to", async () => {
+    const res = await propose_(
+      { name: "project-aaaaaaaa", container: true, disk: true, stacks: [] },
+      "project.reset"
+    );
+    expect(res.ok).toBe(false);
+  });
+});
+
 describe("lab stacks", () => {
   it("renders only the catalogue's files and compose commands, never caller input", async () => {
     const { RECIPES } = await import("./broker");

@@ -235,6 +235,40 @@ suite("a project on your own VMware machine", () => {
     expect(text).not.toMatch(/bridged/);
   }, 120_000);
 
+  it("a fresh start returns the machine to its clean start and clears the project", async () => {
+    const { proposeAction, approveAndRun } = await import("./broker");
+    const { hasCleanSnapshot } = await import("./vmware");
+    const { labNameForRun } = await import("./templates");
+    const snap = await proposeAction({
+      userId,
+      recipe: "vmware.snapshot",
+      params: { resourceId },
+      actor: "user",
+      origin: "test",
+      runId,
+    });
+    expect(snap.ok && snap.policy.confirm).toBe("click");
+    if (!snap.ok) return;
+    expect(await approveAndRun({ userId, requestId: snap.requestId })).toMatchObject({ ok: true });
+    expect(await hasCleanSnapshot(vmx)).toBe(true);
+
+    const reset = await proposeAction({
+      userId,
+      recipe: "project.reset",
+      params: { name: labNameForRun(runId), stacks: [], resourceId },
+      actor: "user",
+      origin: "test",
+      runId,
+    });
+    expect(reset.ok && reset.policy.confirm).toBe("type-name");
+    if (!reset.ok) return;
+    expect(
+      await approveAndRun({ userId, requestId: reset.requestId, confirmation: reset.confirmToken })
+    ).toMatchObject({ ok: true });
+    const runs = (await import("@careeros/database")).createProjectRunsRepository(holder.db as never);
+    expect((await runs.getWithSteps(userId, runId))!.steps).toEqual([]);
+  }, 300_000);
+
   it("refuses to resize a suspended machine, and moves it to the fast disk by copying", async () => {
     const { setMachineMemory } = await import("./vmware");
     // Suspended by the previous test: its memory was saved at the old size.

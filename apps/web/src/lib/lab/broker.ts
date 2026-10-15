@@ -14,6 +14,7 @@ import {
 import { composeDockerfile, validateImageSpec } from "./image";
 import { formatMemory } from "./sizes";
 import { describeChanges, validMachineChanges, type MachineChanges } from "./vmware-config";
+import { CLEAN_SNAPSHOT } from "./vmware-snapshot";
 import {
   baseVolumeFor,
   DISK_COPY_TIMEOUT_MS,
@@ -603,6 +604,8 @@ export const RECIPE_IDS = [
   "vmware.relink",
   "vmware.configure",
   "vmware.shutdown",
+  "vmware.snapshot",
+  "project.reset",
   "stack.start",
   "stack.stop",
   "stack.remove",
@@ -1002,6 +1005,104 @@ export const RECIPES: Record<RecipeId, Recipe> = {
         memoryMb: Number(p.memoryMb),
       },
     ],
+  },
+
+  /**
+   * Mark the machine's current state as the clean start a project reset returns to. Taken while
+   * the machine is in the state the person wants every fresh start to begin from.
+   */
+  "vmware.snapshot": {
+    blast: "vm",
+    reversibility: "reversible",
+    confirmToken: (p) => String(p.label ?? p.resourceId),
+    validate: (raw) => {
+      const resourceId = str(raw.resourceId);
+      if (!resourceId || !zUuid(resourceId)) return null;
+      return {
+        resourceId,
+        label: typeof raw.label === "string" ? raw.label : undefined,
+        vmxPath: typeof raw.vmxPath === "string" ? raw.vmxPath : undefined,
+      };
+    },
+    summary: (p) =>
+      `Save ${p.label ?? "your VMware machine"} as it is now as its "${CLEAN_SNAPSHOT}" snapshot. ` +
+      "Resetting a project on it returns the machine to exactly this state.",
+    reversal: () => `Delete the "${CLEAN_SNAPSHOT}" snapshot in VMware.`,
+    render: (p) => [
+      {
+        id: "vmware-snapshot",
+        cmd: "vmrun",
+        args: ["-T", "ws", "snapshot", String(p.vmxPath), CLEAN_SNAPSHOT],
+        timeoutMs: 180_000,
+      },
+    ],
+  },
+
+  /**
+   * RESET A PROJECT TO A FRESH START: its lab and its services as new, and (after this runs)
+   * its progress and earlier plans gone. The owner: "a reset should make the progress 0 with no
+   * previous data", and include the OS. Fadi's container lab loses its disk (the next start
+   * copies the saved base: no download, no Setup); the person's VMware machine returns to its
+   * clean-start snapshot; the services lose their stored data. Typed, because none of it returns.
+   */
+  "project.reset": {
+    blast: "vm",
+    reversibility: "irreversible",
+    confirmToken: (p) => NAME_PREFIX + String(p.name),
+    validate: (raw) => {
+      const name = str(raw.name);
+      if (!name || !NAME_RE.test(name)) return null;
+      const stacks = Array.isArray(raw.stacks) ? raw.stacks.map(String) : [];
+      if (!stacks.every(isStackKey)) return null;
+      const resourceId = str(raw.resourceId);
+      if (resourceId && !zUuid(resourceId)) return null;
+      return {
+        name,
+        container: raw.container === true,
+        disk: raw.disk === true,
+        stacks,
+        ...(resourceId ? { resourceId } : {}),
+        label: typeof raw.label === "string" ? raw.label : undefined,
+        vmxPath: typeof raw.vmxPath === "string" ? raw.vmxPath : undefined,
+      };
+    },
+    summary: (p) => {
+      const parts: string[] = [];
+      if (p.vmxPath) parts.push(`return ${p.label ?? "your VMware machine"} to its "${CLEAN_SNAPSHOT}" snapshot`);
+      if (p.container || p.disk) parts.push(`delete ${NAME_PREFIX}${p.name} and its disk (the next start copies your saved base — no download)`);
+      for (const key of (p.stacks as StackKey[]) ?? []) parts.push(`remove ${STACKS[key].label} and everything it stored`);
+      return (
+        `Reset this project to a fresh start: ${parts.join("; ") || "nothing is running"}. ` +
+        "Then its steps, progress and earlier plans are deleted; you choose where it runs and plan it again."
+      );
+    },
+    reversal: () => "Not reversible — the project starts again from nothing.",
+    render: (p) => {
+      const container = NAME_PREFIX + String(p.name);
+      return [
+        ...(p.vmxPath
+          ? [
+              {
+                id: "vmware-revert",
+                cmd: "vmrun",
+                args: ["-T", "ws", "revertToSnapshot", String(p.vmxPath), CLEAN_SNAPSHOT],
+                timeoutMs: 180_000,
+              },
+            ]
+          : []),
+        ...(p.container ? [{ id: "remove", cmd: "docker", args: ["rm", "-f", container] }] : []),
+        ...(p.disk
+          ? [{ id: "remove-disk", cmd: "docker", args: ["volume", "rm", storageVolumeFor(container)] }]
+          : []),
+        ...((p.stacks as StackKey[]) ?? []).map((key) => ({
+          id: `stack-down-${key}`,
+          compose: "down" as const,
+          stack: key,
+          project: stackProject(String(p.name), key),
+          file: "docker-compose.yml",
+        })),
+      ];
+    },
   },
 
   /** Shut the person's VMware machine down properly, as Windows' own Shut down would. */
@@ -1772,7 +1873,9 @@ async function hydrateRecipeParams(
       "vmware.relink",
       "vmware.configure",
       "vmware.shutdown",
+      "vmware.snapshot",
     ].includes(recipe) &&
+    !(recipe === "project.reset" && params.resourceId) &&
     !(recipe === "lab.check" && params.resourceId)
   ) {
     return params;
@@ -1887,6 +1990,14 @@ export async function proposeAction(input: {
   // A recipe that may only touch Fadi's own work checks that here, not at execution —
   // so the person is never shown a prompt for something Fadi was never going to be
   // allowed to do.
+  // A project reset deletes a lab: only ever the lab of the project it belongs to.
+  if (input.recipe === "project.reset") {
+    const { labNameForRun } = await import("./templates");
+    if (!input.runId || params.name !== labNameForRun(input.runId)) {
+      return { ok: false, message: "A project can only reset its own lab." };
+    }
+  }
+
   if (recipe.ownWorkOnly && !(input.recipe === "lab.check" && params.resourceId)) {
     const mine = [
       ...(await requests.createdNames(input.userId, "container.run")),
@@ -2659,6 +2770,12 @@ export async function approveAndRun(input: {
   // A CHECK CONTINUES THE STEP IT BELONGS TO — here, where it ran, not in whichever page
   // approved it. Approving from the global queue, another tab or after a reload all land on
   // the same step, because the step travels with the request.
+  // A project reset clears the project itself once its environment is fresh.
+  if (row.recipe === "project.reset" && row.runId) {
+    const { createProjectRunsRepository } = await import("@careeros/database");
+    await createProjectRunsRepository(db).resetProgress(input.userId, row.runId);
+  }
+
   if (row.recipe === "lab.check") {
     const verdict = checkVerdict(out.join("\n"), String(params.expect));
     const detail = verdict.passed

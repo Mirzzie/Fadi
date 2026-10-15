@@ -451,6 +451,29 @@ export function createProjectRunsRepository(db: Database) {
       });
     },
 
+    /**
+     * A FRESH START: the run's steps and earlier plans are deleted and it is running again with
+     * nothing done. Its title, description, placement and history of actions (receipts) stay.
+     */
+    async resetProgress(userId: string, runId: string): Promise<boolean> {
+      return db.transaction(async (tx) => {
+        const [run] = await tx
+          .select({ id: projectRuns.id })
+          .from(projectRuns)
+          .where(and(eq(projectRuns.userId, userId), eq(projectRuns.id, runId)))
+          .for("update");
+        if (!run) return false;
+        await tx.delete(projectSteps).where(eq(projectSteps.runId, runId));
+        await tx.delete(projectPlanVersions).where(eq(projectPlanVersions.runId, runId));
+        await tx
+          .update(projectRuns)
+          .set({ status: "running", completedAt: null, updatedAt: new Date() })
+          .where(eq(projectRuns.id, runId));
+        await settleProjectWork(tx, userId, runId, "running");
+        return true;
+      });
+    },
+
     /** Every earlier plan of this run, newest first. Owner-scoped. */
     async listPlanVersions(userId: string, runId: string): Promise<ProjectPlanVersion[]> {
       return db

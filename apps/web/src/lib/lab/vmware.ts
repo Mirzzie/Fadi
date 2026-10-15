@@ -19,6 +19,7 @@ import {
   type VmxScreen,
   type VmxSummary,
 } from "./vmware-config";
+import { CLEAN_SNAPSHOT } from "./vmware-snapshot";
 
 /**
  * THE PERSON'S OWN VMWARE MACHINES, as Fadi sees and uses them.
@@ -460,4 +461,22 @@ export async function applyMachineChanges(
   await backupVmx(vmxPath);
   await replaceTextFileAtomically(vmxPath, setVmxEntries(text, machineChangeEntries(changes)));
   return { ok: true, applied: describeChanges(changes) };
+}
+
+/** The snapshot a project reset returns a VMware machine to. */
+export { CLEAN_SNAPSHOT };
+
+export async function hasCleanSnapshot(vmxPath: string): Promise<boolean | null> {
+  try {
+    const { stdout } = await run("vmrun", ["-T", "ws", "listSnapshots", vmxPath], {
+      timeout: 15_000,
+      maxBuffer: 64 * 1024,
+    });
+    return stdout
+      .split("\n")
+      .map((line) => line.trim())
+      .includes(CLEAN_SNAPSHOT);
+  } catch {
+    return null;
+  }
 }
