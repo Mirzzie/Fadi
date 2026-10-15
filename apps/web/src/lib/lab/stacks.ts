@@ -46,7 +46,13 @@ export type StackDefinition = {
    * reaches the manager by name (traffic from Docker to this computer is firewalled); a VMware
    * machine reaches the ports published on the VMware network address.
    */
-  agent: { managerHost: string; windowsInstaller: string };
+  agent: {
+    managerHost: string;
+    windowsInstaller: string;
+    /** The agent's Windows service name — not "ossec", which a plan guessed (15 Oct 2026). */
+    windowsService: string;
+    windowsConfig: string;
+  };
 };
 
 export const STACKS: Record<StackKey, StackDefinition> = {
@@ -77,6 +83,8 @@ export const STACKS: Record<StackKey, StackDefinition> = {
     agent: {
       managerHost: "wazuh.manager",
       windowsInstaller: `https://packages.wazuh.com/4.x/windows/wazuh-agent-${WAZUH_VERSION}-1.msi`,
+      windowsService: "WazuhSvc",
+      windowsConfig: "C:\\Program Files (x86)\\ossec-agent\\ossec.conf",
     },
     images: {
       "wazuh/wazuh-manager:4.14.9": 2710,

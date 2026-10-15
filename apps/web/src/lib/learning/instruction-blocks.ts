@@ -61,13 +61,18 @@ export function parseInstruction(input: string): InstructionBlock[] {
       flushIndented();
       const body: string[] = [];
       i++;
-      while (i < lines.length && !/^\s*```\s*$/.test(lines[i])) {
+      // A line STARTING with ``` closes it. A model wrote "```The /qn flag installs…" — the
+      // closing fence and the next sentence on one line — and the sentence was copied into
+      // PowerShell as a command (15 Oct 2026). Whatever follows the fence is ordinary text.
+      while (i < lines.length && !/^\s*```/.test(lines[i])) {
         body.push(lines[i]);
         i++;
       }
       // An unclosed fence still becomes a code block rather than swallowing the rest of the
       // step as invisible text.
       blocks.push({ type: "code", code: dedent(body).trimEnd(), lang: fence[1] || null });
+      const after = i < lines.length ? lines[i].replace(/^\s*```/, "").trim() : "";
+      if (after) text.push(after);
       continue;
     }
 

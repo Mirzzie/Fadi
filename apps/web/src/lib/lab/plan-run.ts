@@ -66,6 +66,7 @@ Write steps that person can actually execute tonight. Rules:
 - Assume competence but not familiarity: they can use a terminal, they have not done THIS before.
 - Shape it as a response to the problem in the project description: build it, then TEST OR BREAK it the way an attacker, a user or a failure would, then fix what that finds. At least one step must try to break or bypass what was built and record what happened — findings and fixes are the evidence hiring managers look for, far more than a clean install.
 - Where a real choice is made (a design, a control, a tool), say what the options were so the person can record the decision and its trade-off.
+- Close every fenced code block on a line of its own (\`\`\`), then write any explanation on the next line — never on the same line as the fence.
 - Before any step writes a file, that step or an earlier one creates its folder (PowerShell: New-Item -ItemType Directory -Force -Path "C:\\LabSetup"; Linux: mkdir -p). A fresh machine has none of your folders.
 - Keep each instruction under about 900 characters: the commands, and one line on why.
 - 3 to 8 steps. A plan longer than that is a course, and it will not be finished.
@@ -215,9 +216,9 @@ export async function planProjectRun(
       const stack = STACKS[key];
       return [
         `SERVICE BESIDE THE LAB: ${stack.label}. ${stack.purpose}`,
-        `Fadi starts it from the project page; assume it is running. ${stack.open.label}: ${stack.open.url} on the person's own computer (sign in ${stack.open.user} / ${stack.open.password}).`,
+        `The person starts it with one click under "Services beside the machine" on the project page. The FIRST step that needs it must say to start it there and wait until its dashboard link appears — an agent installed before the manager runs cannot enrol. ${stack.open.label}: ${stack.open.url} on the person's own computer (sign in ${stack.open.user} / ${stack.open.password}).`,
         `The lab machine connects to it at ${machineLine ? vmNetworkAddress() : stack.agent.managerHost} on ports ${stack.agentPorts.join(" and ")} — for Wazuh, install the Wazuh agent ${stack.version} on the lab machine with WAZUH_MANAGER set to that address.`,
-        `The Windows agent installer is exactly ${stack.agent.windowsInstaller} — use that URL; it is not on GitHub.`,
+        `The Windows agent installer is exactly ${stack.agent.windowsInstaller} — use that URL; it is not on GitHub. On Windows the agent's service is ${stack.agent.windowsService} (never "ossec"), its configuration ${stack.agent.windowsConfig}; with WAZUH_MANAGER set it enrols on its own when the service starts (Start-Service ${stack.agent.windowsService}).`,
         "Never install this service, Docker or a hypervisor inside the lab machine.",
       ].join("\n");
     })

@@ -96,3 +96,21 @@ describe("inline marks", () => {
     expect(parts).toEqual([{ type: "text", value: "<script>alert(1)</script>" }]);
   });
 });
+
+describe("a closing fence with the next sentence on the same line", () => {
+  it("ends the command there and keeps the sentence as text (15 Oct 2026)", () => {
+    const blocks = parseInstruction(
+      [
+        "In the lab machine, execute:",
+        "```powershell",
+        '$msi = "C:\\LabWazuh\\wazuh-agent.msi"',
+        'Start-Process msiexec.exe -ArgumentList "/i `"$msi`" /qn" -Wait',
+        "```The `/qn` flag installs without UI.",
+      ].join("\n")
+    );
+    expect(blocks.map((b) => b.type)).toEqual(["text", "code", "text"]);
+    const code = blocks[1] as { type: "code"; code: string };
+    expect(code.code).not.toContain("flag installs");
+    expect(code.code.split("\n")).toHaveLength(2);
+  });
+});
