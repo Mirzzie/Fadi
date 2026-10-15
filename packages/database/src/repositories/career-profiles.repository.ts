@@ -197,6 +197,27 @@ export function createCareerProfilesRepository(db: Database) {
         .where(and(eq(careerProfiles.id, id), eq(careerProfiles.userId, userId)));
     },
 
+    /** Current flagships and the ideas beside them, together; optionally marks a research pass. */
+    async setFlagshipState(
+      userId: string,
+      id: string,
+      state: {
+        flagships: Record<string, unknown>[];
+        ideas: Record<string, unknown>[];
+        researched?: boolean;
+      }
+    ): Promise<void> {
+      await db
+        .update(careerProfiles)
+        .set({
+          flagshipProjects: state.flagships,
+          flagshipIdeas: state.ideas,
+          ...(state.researched ? { flagshipsRefreshedAt: new Date() } : {}),
+          updatedAt: new Date(),
+        })
+        .where(and(eq(careerProfiles.id, id), eq(careerProfiles.userId, userId)));
+    },
+
     async setRoleSynonyms(id: string, roleSynonyms: string[]): Promise<void> {
       await db
         .update(careerProfiles)

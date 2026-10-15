@@ -5,12 +5,14 @@ import { useState, useTransition } from "react";
 import { ExternalLink, Loader2, RefreshCw } from "lucide-react";
 
 import {
+  adoptFlagshipIdeaAction,
   refreshFlagshipsAction,
+  setFlagshipAsideAction,
   startFlagshipAction,
 } from "@/app/dashboard/learning/flagship-actions";
 import { Button } from "@/components/ui/button";
 import { formatDay } from "@/lib/format/date";
-import type { Flagship } from "@/lib/learning/flagship-rules";
+import { MAX_FLAGSHIPS, type Flagship, type FlagshipIdea } from "@/lib/learning/flagship-rules";
 
 /**
  * The two or three substantial projects for this direction, each answering a current business
@@ -19,10 +21,13 @@ import type { Flagship } from "@/lib/learning/flagship-rules";
  */
 export function FlagshipProjects({
   flagships,
+  ideas = [],
   refreshedAt,
   underWay,
 }: {
   flagships: Flagship[];
+  /** New ideas from research and earlier ones — kept, never dropped. */
+  ideas?: FlagshipIdea[];
   refreshedAt: string | null;
   /** Titles already committed to, so they read as under way rather than offered again. */
   underWay: string[];
@@ -38,6 +43,14 @@ export function FlagshipProjects({
       setNote(null);
       const result = await refreshFlagshipsAction();
       if (!result.ok) setNote(result.message ?? "Couldn't refresh just now.");
+      router.refresh();
+    });
+
+  const change = (action: () => Promise<{ ok: boolean; message?: string }>) =>
+    start(async () => {
+      setNote(null);
+      const result = await action();
+      if (!result.ok) setNote(result.message ?? "That didn't work.");
       router.refresh();
     });
 
@@ -128,22 +141,41 @@ export function FlagshipProjects({
                 {underWayNow ? (
                   <p className="text-xs font-medium text-primary">Under way</p>
                 ) : (
-                  <Button size="sm" disabled={busy} onClick={() => take(flagship.title)}>
-                    {starting === flagship.title ? (
-                      <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                    ) : null}
-                    {starting === flagship.title ? "Planning…" : "Take this on"}
-                  </Button>
+                  <div className="flex items-center gap-3">
+                    <Button size="sm" disabled={busy} onClick={() => take(flagship.title)}>
+                      {starting === flagship.title ? (
+                        <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
+                      ) : null}
+                      {starting === flagship.title ? "Planning…" : "Take this on"}
+                    </Button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        change(() => setFlagshipAsideAction({ title: flagship.title }))
+                      }
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      Set aside
+                    </button>
+                  </div>
                 )}
               </div>
             </article>
           );
         })}
       </div>
+      <FlagshipIdeas
+        ideas={ideas}
+        current={flagships}
+        busy={busy}
+        onAdopt={(title, replace) => change(() => adoptFlagshipIdeaAction({ title, replace }))}
+      />
       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
         <span>
-          Researched {formatDay(refreshedAt) || "recently"};
-          refreshed weekly so the problems stay current.
+          Your flagships stay until you change them. Research (last{" "}
+          {formatDay(refreshedAt) || "recently"}, weekly) only adds new ideas below — nothing is
+          lost.
         </span>
         <button
           type="button"
@@ -159,6 +191,111 @@ export function FlagshipProjects({
         </button>
         {note ? <span className="text-amber-500">{note}</span> : null}
       </div>
+    </div>
+  );
+}
+
+/**
+ * New ideas from research and earlier ones, kept beside the flagships — so a weekly refresh is
+ * an offer, never a loss.
+ */
+function FlagshipIdeas({
+  ideas,
+  current,
+  busy,
+  onAdopt,
+}: {
+  ideas: FlagshipIdea[];
+  current: Flagship[];
+  busy: boolean;
+  onAdopt: (title: string, replace: string | null) => void;
+}) {
+  const [open, setOpen] = useState<"new" | "earlier" | null>(null);
+  const [choosing, setChoosing] = useState<string | null>(null);
+  const fresh = ideas.filter((idea) => idea.state === "new");
+  const earlier = ideas.filter((idea) => idea.state === "earlier");
+  if (ideas.length === 0) return null;
+  const full = current.length >= MAX_FLAGSHIPS;
+  const shown = open === "new" ? fresh : open === "earlier" ? earlier : [];
+
+  const tab = (which: "new" | "earlier", label: string, count: number) =>
+    count > 0 ? (
+      <button
+        type="button"
+        onClick={() => setOpen(open === which ? null : which)}
+        className={`rounded-lg border px-3 py-1.5 text-xs ${
+          open === which
+            ? "border-primary/60 bg-primary/10 text-foreground"
+            : "border-border text-muted-foreground hover:text-foreground"
+        }`}
+      >
+        {label} ({count})
+      </button>
+    ) : null;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-2">
+        {tab("new", "New ideas from research", fresh.length)}
+        {tab("earlier", "Earlier ideas", earlier.length)}
+      </div>
+      {shown.length > 0 ? (
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {shown.map(({ flagship }) => (
+            <article
+              key={flagship.title}
+              className="rounded-xl border border-border bg-card/60 p-3"
+            >
+              <h4 className="text-sm font-semibold leading-snug">{flagship.title}</h4>
+              <p className="mt-0.5 text-xs text-muted-foreground">{flagship.scope}</p>
+              <p className="mt-2 text-xs">{flagship.problem}</p>
+              {choosing === flagship.title ? (
+                <div className="mt-3 space-y-1.5 text-xs">
+                  <p className="text-muted-foreground">Use it in place of:</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {current.map((f) => (
+                      <button
+                        key={f.title}
+                        type="button"
+                        disabled={busy}
+                        onClick={() => {
+                          setChoosing(null);
+                          onAdopt(flagship.title, f.title);
+                        }}
+                        className="rounded-md border border-border px-2 py-1 hover:border-primary/50"
+                      >
+                        {f.title}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setChoosing(null)}
+                      className="px-2 py-1 text-muted-foreground hover:text-foreground"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                  <p className="text-muted-foreground">
+                    The one it replaces stays under Earlier ideas.
+                  </p>
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="mt-3 h-7"
+                  disabled={busy}
+                  onClick={() =>
+                    full ? setChoosing(flagship.title) : onAdopt(flagship.title, null)
+                  }
+                >
+                  {full ? "Use instead of one…" : "Add to my flagships"}
+                </Button>
+              )}
+            </article>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

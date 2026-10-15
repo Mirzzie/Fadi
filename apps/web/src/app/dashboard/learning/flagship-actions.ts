@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { commitToProjectAction } from "@/app/dashboard/learning/actions";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { flagshipDetail } from "@/lib/learning/flagship-rules";
-import { getFlagships, refreshFlagships } from "@/lib/learning/flagships";
+import { changeFlagships, getFlagships, refreshFlagships } from "@/lib/learning/flagships";
 
 /** Research this month's problems again and re-propose the flagships for the active direction. */
 export async function refreshFlagshipsAction(): Promise<{ ok: boolean; message?: string }> {
@@ -38,4 +38,32 @@ export async function startFlagshipAction(input: {
     kind: "project",
     searchQuery: flagship.title,
   });
+}
+
+/** Make an idea one of the flagships — added if there is room, otherwise in place of one. */
+export async function adoptFlagshipIdeaAction(input: {
+  title: string;
+  replace: string | null;
+}): Promise<{ ok: boolean; message?: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  const result = await changeFlagships(user.id, {
+    adopt: String(input.title ?? "").slice(0, 200),
+    replace: input.replace ? String(input.replace).slice(0, 200) : null,
+  });
+  if (result.ok) revalidatePath("/dashboard/learning");
+  return result;
+}
+
+/** Set a flagship aside; it stays under earlier ideas. */
+export async function setFlagshipAsideAction(input: {
+  title: string;
+}): Promise<{ ok: boolean; message?: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  const result = await changeFlagships(user.id, {
+    setAside: String(input.title ?? "").slice(0, 200),
+  });
+  if (result.ok) revalidatePath("/dashboard/learning");
+  return result;
 }

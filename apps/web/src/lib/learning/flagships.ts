@@ -17,12 +17,16 @@ import { searchRecent } from "@/lib/research/recent";
 import {
   acceptFlagships,
   flagshipsAreStale,
+  mergeResearch,
   researchQueries,
   type Flagship,
+  type FlagshipIdea,
 } from "./flagship-rules";
 
 export type FlagshipsState = {
   flagships: Flagship[];
+  /** New ideas from research, and earlier ones the person can bring back. */
+  ideas: FlagshipIdea[];
   refreshedAt: string | null;
   stale: boolean;
   direction: string | null;
@@ -52,6 +56,7 @@ export async function getFlagships(userId: string): Promise<FlagshipsState> {
   const flagships = (track?.flagshipProjects ?? []) as unknown as Flagship[];
   return {
     flagships,
+    ideas: (track?.flagshipIdeas ?? []) as unknown as FlagshipIdea[],
     refreshedAt: track?.flagshipsRefreshedAt?.toISOString() ?? null,
     stale: flagshipsAreStale(track?.flagshipsRefreshedAt),
     direction: track?.targetRole ?? null,
@@ -153,11 +158,18 @@ Rules:
         message: "No proposal held up against the research this time. Try again shortly.",
       };
     }
-    await profiles.setFlagships(
-      userId,
-      track.id,
-      flagships as unknown as Record<string, unknown>[]
+    // Research ADDS ideas; the current flagships change only when the person changes them.
+    const merged = mergeResearch(
+      (track.flagshipProjects ?? []) as unknown as Flagship[],
+      (track.flagshipIdeas ?? []) as unknown as FlagshipIdea[],
+      flagships,
+      new Date().toISOString()
     );
+    await profiles.setFlagshipState(userId, track.id, {
+      flagships: merged.flagships as unknown as Record<string, unknown>[],
+      ideas: merged.ideas as unknown as Record<string, unknown>[],
+      researched: true,
+    });
     logger.info("learning.flagships_refreshed", {
       userId,
       direction: track.targetRole,
@@ -175,4 +187,28 @@ Rules:
       message: "Couldn't research flagship projects just now. Try again shortly.",
     };
   }
+}
+
+/** Change the current flagships by the person's own choice: adopt an idea, or set one aside. */
+export async function changeFlagships(
+  userId: string,
+  change: { adopt: string; replace: string | null } | { setAside: string }
+): Promise<{ ok: boolean; message?: string }> {
+  const { adoptIdea, setAside } = await import("./flagship-rules");
+  const profiles = createCareerProfilesRepository(getDatabase());
+  const track = await profiles.getActiveForUser(userId);
+  if (!track) return { ok: false, message: "Choose a career direction first." };
+  const current = (track.flagshipProjects ?? []) as unknown as Flagship[];
+  const ideas = (track.flagshipIdeas ?? []) as unknown as FlagshipIdea[];
+  const now = new Date().toISOString();
+  const next =
+    "adopt" in change
+      ? adoptIdea(current, ideas, change.adopt, change.replace, now)
+      : setAside(current, ideas, change.setAside, now);
+  if (!next) return { ok: false, message: "That idea isn't available any more." };
+  await profiles.setFlagshipState(userId, track.id, {
+    flagships: next.flagships as unknown as Record<string, unknown>[],
+    ideas: next.ideas as unknown as Record<string, unknown>[],
+  });
+  return { ok: true };
 }

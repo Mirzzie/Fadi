@@ -114,6 +114,7 @@ export function LearningShell({
         />
         <FlagshipProjects
           flagships={flagships?.flagships ?? []}
+          ideas={flagships?.ideas ?? []}
           refreshedAt={flagships?.refreshedAt ?? null}
           underWay={[...runs.map((run) => run.title), ...commitments.map((c) => c.title)]}
         />

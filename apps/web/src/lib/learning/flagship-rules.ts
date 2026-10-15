@@ -140,3 +140,83 @@ export function flagshipDetail(flagship: Flagship): string {
     .filter(Boolean)
     .join("\n\n");
 }
+
+/**
+ * KEEPING FLAGSHIPS STEADY.
+ *
+ * Weekly research used to REPLACE the flagships, so the three the person had been weighing were
+ * gone when they came back — and three new ones appeared, which breeds the fear of always
+ * missing a better one (owner, 15 Oct 2026). Now the current flagships change only when the
+ * person changes them. Research adds "new" ideas beside them; whatever leaves the current set
+ * becomes an "earlier" idea that can be brought back. Nothing is ever dropped silently.
+ */
+export type FlagshipIdea = { flagship: Flagship; state: "new" | "earlier"; at: string };
+
+export const MAX_FLAGSHIPS = 3;
+const MAX_IDEAS = 30;
+
+const key = (flagship: Pick<Flagship, "title">) => flagship.title.trim().toLowerCase();
+
+/** Fold a research pass in. The first pass fills the flagships; later passes only add ideas. */
+export function mergeResearch(
+  current: Flagship[],
+  ideas: FlagshipIdea[],
+  fresh: Flagship[],
+  now: string
+): { flagships: Flagship[]; ideas: FlagshipIdea[] } {
+  if (current.length === 0) {
+    const flagships = fresh.slice(0, MAX_FLAGSHIPS);
+    const seen = new Set(flagships.map(key));
+    return { flagships, ideas: ideas.filter((idea) => !seen.has(key(idea.flagship))) };
+  }
+  const seen = new Set([...current.map(key), ...ideas.map((idea) => key(idea.flagship))]);
+  const added: FlagshipIdea[] = fresh
+    .filter((flagship) => !seen.has(key(flagship)))
+    .map((flagship) => ({ flagship, state: "new", at: now }));
+  // Last pass's "new" ideas were seen: they are earlier ideas now.
+  const kept = ideas.map((idea) =>
+    idea.state === "new" ? { ...idea, state: "earlier" as const } : idea
+  );
+  return { flagships: current, ideas: [...added, ...kept].slice(0, MAX_IDEAS) };
+}
+
+/**
+ * Make an idea one of the flagships: added when there is room, otherwise in place of the one
+ * named — which becomes an earlier idea, never deleted.
+ */
+export function adoptIdea(
+  current: Flagship[],
+  ideas: FlagshipIdea[],
+  title: string,
+  replaceTitle: string | null,
+  now: string
+): { flagships: Flagship[]; ideas: FlagshipIdea[] } | null {
+  const idea = ideas.find((i) => key(i.flagship) === title.trim().toLowerCase());
+  if (!idea) return null;
+  const rest = ideas.filter((i) => i !== idea);
+  if (!replaceTitle) {
+    if (current.length >= MAX_FLAGSHIPS) return null;
+    return { flagships: [...current, idea.flagship], ideas: rest };
+  }
+  const out = current.find((f) => key(f) === replaceTitle.trim().toLowerCase());
+  if (!out) return null;
+  return {
+    flagships: current.map((f) => (f === out ? idea.flagship : f)),
+    ideas: [{ flagship: out, state: "earlier", at: now }, ...rest],
+  };
+}
+
+/** Set a flagship aside: it becomes an earlier idea. */
+export function setAside(
+  current: Flagship[],
+  ideas: FlagshipIdea[],
+  title: string,
+  now: string
+): { flagships: Flagship[]; ideas: FlagshipIdea[] } | null {
+  const out = current.find((f) => key(f) === title.trim().toLowerCase());
+  if (!out) return null;
+  return {
+    flagships: current.filter((f) => f !== out),
+    ideas: [{ flagship: out, state: "earlier" as const, at: now }, ...ideas].slice(0, MAX_IDEAS),
+  };
+}

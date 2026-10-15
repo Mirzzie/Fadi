@@ -233,6 +233,12 @@ export const careerProfiles = pgTable(
     // Refreshed on a clock so they follow what organisations are dealing with now.
     flagshipProjects: jsonb("flagship_projects").$type<Record<string, unknown>[]>(),
     flagshipsRefreshedAt: timestamp("flagships_refreshed_at", { withTimezone: true }),
+    /**
+     * Every flagship idea that is not one of the current flagships: fresh ones from the latest
+     * research ("new") and ones the person set aside or that earlier research offered
+     * ("earlier"). Research ADDS here; it never replaces the current flagships (15 Oct 2026).
+     */
+    flagshipIdeas: jsonb("flagship_ideas").$type<Record<string, unknown>[]>(),
     ...timestamps,
   },
   (table) => [

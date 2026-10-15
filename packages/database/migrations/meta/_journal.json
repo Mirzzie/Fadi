@@ -449,6 +449,13 @@
       "when": 1792075418378,
       "tag": "0063_lab_resource_guest_user",
       "breakpoints": true
+    },
+    {
+      "idx": 64,
+      "version": "7",
+      "when": 1792078162835,
+      "tag": "0064_career_profile_flagship_ideas",
+      "breakpoints": true
     }
   ]
 }
