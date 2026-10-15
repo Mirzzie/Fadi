@@ -307,3 +307,6 @@ disturbed), then typecheck and the full web suite against exactly what the lockf
 
 Next for Claude: V3 (disposable, isolated execution), then the VM operation journal, Wazuh
 per-project secrets/enrolment and VNC ticket lifecycle, as the table above orders them.
+- **Done (owner approved):** dev server stopped, `npm ci` from the lockfile, dev server restarted
+  (Next 16.3.8, Better Auth 1.7.7; `npm ls` clean). C15-09 reverted to `unlinkAccount({ accountId })`
+  — typecheck is now clean against the installed, locked versions.

@@ -102,7 +102,9 @@ export function ConnectedAccounts({ providers }: { providers: Provider[] }) {
     setPending(provider);
     setError(null);
     try {
-      await authClient.unlinkAccount({ providerId: provider, accountId });
+      // better-auth 1.7.7 (the locked version) takes the account id alone (Codex C15-09 was
+      // written against a stale 1.6.14 install; see docs/reviews/2026-10-15-codex-scan.md).
+      await authClient.unlinkAccount({ accountId });
       setLinked((prev) => {
         const next = new Map(prev);
         next.delete(provider);
