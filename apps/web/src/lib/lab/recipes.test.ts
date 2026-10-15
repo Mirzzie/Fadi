@@ -1100,6 +1100,23 @@ describe("lab stacks", () => {
     expect(steps.at(-1)).toMatchObject({ compose: "up", project: "fadi-project-df3e6d83-wazuh" });
   });
 
+  it("joins the project's own container lab to the stack's network, by validated name only", async () => {
+    const { RECIPES } = await import("./broker");
+    const recipe = RECIPES["stack.start"];
+    expect(
+      recipe.validate({ stack: "wazuh", name: "p", agentIp: "127.0.0.1", lab: "x; rm -rf /" })
+    ).toBeNull();
+    const params = recipe.validate({
+      stack: "wazuh",
+      name: "project-df3e6d83",
+      agentIp: "172.16.89.1",
+      lab: "project-df3e6d83",
+    })!;
+    const steps = recipe.render(params) as Array<Record<string, unknown>>;
+    expect(steps.at(-1)).toMatchObject({ compose: "join", lab: "project-df3e6d83" });
+    expect(recipe.summary(params)).toMatch(/reaches the manager as wazuh\.manager/);
+  });
+
   it("starting a stack is one click; removing its data is typed", async () => {
     const { RECIPES, recipePolicy } = await import("./broker");
     const start = RECIPES["stack.start"].validate({

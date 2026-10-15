@@ -41,6 +41,12 @@ export type StackDefinition = {
   dirs: string[];
   /** Its images and their size on disk once pulled, MB (measured), for the readiness check. */
   images: Record<string, number>;
+  /**
+   * How a lab machine joins it. A Fadi container lab joins the stack's own Docker network and
+   * reaches the manager by name (traffic from Docker to this computer is firewalled); a VMware
+   * machine reaches the ports published on the VMware network address.
+   */
+  agent: { managerHost: string; windowsInstaller: string };
 };
 
 export const STACKS: Record<StackKey, StackDefinition> = {
@@ -68,6 +74,10 @@ export const STACKS: Record<StackKey, StackDefinition> = {
       ),
     certs: "generate-indexer-certs.yml",
     dirs: ["config/wazuh_indexer_ssl_certs"],
+    agent: {
+      managerHost: "wazuh.manager",
+      windowsInstaller: `https://packages.wazuh.com/4.x/windows/wazuh-agent-${WAZUH_VERSION}-1.msi`,
+    },
     images: {
       "wazuh/wazuh-manager:4.14.9": 2710,
       "wazuh/wazuh-indexer:4.14.9": 2560,
@@ -94,6 +104,11 @@ export function stackFolder(project: string): string {
 /** The compose project name: one per project per stack, so two projects never share one. */
 export function stackProject(labName: string, key: StackKey): string {
   return `fadi-${labName}-${key}`;
+}
+
+/** The stack's Docker network, which Fadi's container labs join to reach it. */
+export function stackNetwork(project: string): string {
+  return `${project}_default`;
 }
 
 /** Which stacks a project's own words call for. Deliberately literal: no guessing. */

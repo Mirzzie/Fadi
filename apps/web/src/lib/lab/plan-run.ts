@@ -216,7 +216,8 @@ export async function planProjectRun(
       return [
         `SERVICE BESIDE THE LAB: ${stack.label}. ${stack.purpose}`,
         `Fadi starts it from the project page; assume it is running. ${stack.open.label}: ${stack.open.url} on the person's own computer (sign in ${stack.open.user} / ${stack.open.password}).`,
-        `The lab machine connects to it at ${vmNetworkAddress()} on ports ${stack.agentPorts.join(" and ")} — for Wazuh, install the Wazuh agent ${stack.version} on the lab machine with WAZUH_MANAGER set to that address.`,
+        `The lab machine connects to it at ${machineLine ? vmNetworkAddress() : stack.agent.managerHost} on ports ${stack.agentPorts.join(" and ")} — for Wazuh, install the Wazuh agent ${stack.version} on the lab machine with WAZUH_MANAGER set to that address.`,
+        `The Windows agent installer is exactly ${stack.agent.windowsInstaller} — use that URL; it is not on GitHub.`,
         "Never install this service, Docker or a hypervisor inside the lab machine.",
       ].join("\n");
     })

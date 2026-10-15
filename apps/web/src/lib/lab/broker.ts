@@ -51,6 +51,7 @@ import {
   isStackKey,
   STACKS,
   stackFolder,
+  stackNetwork,
   stackProject,
   type StackKey,
 } from "./stacks";
@@ -178,12 +179,14 @@ type ScreenStep = { id: string; screen: "enable"; resourceId: string; vmx: strin
  */
 type StackStep = {
   id: string;
-  compose: "files" | "certs" | "up" | "stop" | "down";
+  compose: "files" | "certs" | "up" | "stop" | "down" | "join";
   stack: StackKey;
   project: string;
   file: string;
   /** For "files": where agents connect, already validated. */
   agentIp?: string;
+  /** For "join": the project's own Fadi lab container, which joins the stack's network. */
+  lab?: string;
 };
 
 /**
@@ -259,6 +262,9 @@ const GUEST_USER_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 function composeArgs(step: StackStep, dir: string): string[] {
   const file = `${dir}/${step.file}`;
   if (step.compose === "files") return [];
+  if (step.compose === "join") {
+    return ["network", "connect", stackNetwork(step.project), NAME_PREFIX + String(step.lab)];
+  }
   if (step.compose === "certs") {
     return ["compose", "-f", file, "-p", `${step.project}-certs`, "run", "--rm", "generator"];
   }
@@ -1130,7 +1136,10 @@ export const RECIPES: Record<RecipeId, Recipe> = {
       if (!stack || !isStackKey(stack)) return null;
       if (!name || !NAME_RE.test(name)) return null;
       if (!agentIp || !IPV4_RE.test(agentIp)) return null;
-      return { stack, name, agentIp };
+      // The project's own container lab, when it has one, joins the stack's network.
+      const lab = str(raw.lab);
+      if (lab && !NAME_RE.test(lab)) return null;
+      return { stack, name, agentIp, ...(lab ? { lab } : {}) };
     },
     summary: (p) => {
       const stack = STACKS[String(p.stack) as StackKey];
@@ -1142,7 +1151,10 @@ export const RECIPES: Record<RecipeId, Recipe> = {
         `${stack.open.label}: ${stack.open.url} (this computer only), signed in as ` +
         `${stack.open.user} / ${stack.open.password} — the lab's default, reachable from nowhere ` +
         `else. Agents connect on ${p.agentIp}:${stack.agentPorts.join("/")}, the VMware ` +
-        "network on this computer, not your home network."
+        "network on this computer, not your home network." +
+        (p.lab
+          ? ` Your lab ${NAME_PREFIX}${p.lab} joins its network and reaches the manager as ${stack.agent.managerHost}.`
+          : "")
       );
     },
     reversal: (p) =>
@@ -1171,6 +1183,18 @@ export const RECIPES: Record<RecipeId, Recipe> = {
             ]
           : []),
         { id: "stack-up", compose: "up" as const, stack: key, project, file: "docker-compose.yml" },
+        ...(p.lab
+          ? [
+              {
+                id: "stack-join",
+                compose: "join" as const,
+                stack: key,
+                project,
+                file: "",
+                lab: String(p.lab),
+              },
+            ]
+          : []),
       ];
     },
   },
@@ -2162,6 +2186,18 @@ async function runStackStep(step: StackStep): Promise<StepResult> {
       await mkdir(path.join(dir, folder), { recursive: true });
     }
     return { text: `wrote ${Object.keys(files).length} files to ${dir}` };
+  }
+  if (step.compose === "join") {
+    try {
+      await run("docker", composeArgs(step, dir), { timeout: 30_000 });
+      return { text: `${NAME_PREFIX}${step.lab} joined the stack's network` };
+    } catch (error) {
+      const said = `${(error as { stderr?: string }).stderr ?? ""}`;
+      if (/already exists|already connected/i.test(said)) {
+        return { text: `${NAME_PREFIX}${step.lab} was already on the stack's network` };
+      }
+      throw new Error(commandFailure({ cmd: "docker" }, error));
+    }
   }
   // Pulling three images and starting an indexer is minutes, not seconds.
   const command = { cmd: "docker", args: composeArgs(step, dir), timeoutMs: 900_000 };

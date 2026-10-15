@@ -49,7 +49,9 @@ export async function projectServicesAction(input: {
   const { createLabActionRequestsRepository } = await import("@careeros/database");
   const requests = createLabActionRequestsRepository(getDatabase());
   const labName = labNameForRun(project.run.id);
-  const agentAddress = vmNetworkAddress();
+  // A Fadi container lab reaches the manager by name on the stack's network; a VMware machine
+  // on the VMware network address.
+  const onContainerLab = await containerLabOf(project.run);
 
   const services = await Promise.all(
     keys.map(async (key): Promise<ProjectService> => {
@@ -83,7 +85,7 @@ export async function projectServicesAction(input: {
         running: observed?.running ?? 0,
         total: observed?.total ?? stack.services.length,
         open: stack.open,
-        agentAddress,
+        agentAddress: onContainerLab ? stack.agent.managerHost : vmNetworkAddress(),
       };
     })
   );
@@ -122,7 +124,12 @@ export async function proposeServiceAction(input: {
     recipe: parsed.data.op === "start" ? "stack.start" : "stack.stop",
     params:
       parsed.data.op === "start"
-        ? { stack: parsed.data.stack, name, agentIp: vmNetworkAddress() }
+        ? {
+            stack: parsed.data.stack,
+            name,
+            agentIp: vmNetworkAddress(),
+            ...((await containerLabOf(project.run)) ? { lab: name } : {}),
+          }
         : { stack: parsed.data.stack, name },
     actor: "user",
     origin: "dashboard:project_lab",
@@ -132,4 +139,12 @@ export async function proposeServiceAction(input: {
   return proposal.ok
     ? { ok: true, message: "Waiting for your approval. Nothing has run yet." }
     : { ok: false, message: proposal.message };
+}
+
+/** Whether the project runs on Fadi's own container lab on this computer (not a VMware machine). */
+async function containerLabOf(run: { id: string; resourceId: string | null }): Promise<boolean> {
+  if (run.resourceId) return false;
+  const { labNameForRun } = await import("@/lib/lab/templates");
+  const { containerState } = await import("@/lib/lab/runtime-observer");
+  return Boolean(await containerState(labNameForRun(run.id)));
 }
