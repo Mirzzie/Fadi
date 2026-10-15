@@ -103,6 +103,21 @@ export function createLabResourcesRepository(db: Database) {
       return row ?? null;
     },
 
+    /**
+     * Point a registered VMware machine at its new settings file after Fadi moved it. Not part
+     * of `update` on purpose: the endpoint pins what every approval acts on, so it changes only
+     * through the move that verified the copy.
+     */
+    async moveVmwareEndpoint(userId: string, id: string, endpoint: string): Promise<LabResource | null> {
+      if (!endpoint.startsWith("vmware://local/")) return null;
+      const [row] = await db
+        .update(labResources)
+        .set({ endpoint, updatedAt: new Date() })
+        .where(and(eq(labResources.userId, userId), eq(labResources.id, id)))
+        .returning();
+      return row ?? null;
+    },
+
     async remove(userId: string, id: string): Promise<void> {
       await db
         .delete(labResources)

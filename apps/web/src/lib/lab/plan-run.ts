@@ -104,6 +104,8 @@ export async function planProjectRun(
     replaceRunId?: string;
     /** On a re-plan: steps already finished. They are kept, and the new plan continues from them. */
     completedSteps?: Array<{ title: string; result: string | null }>;
+    /** On a re-plan: start the project over — every step, finished or not, is replaced. */
+    startOver?: boolean;
   }
 ): Promise<{ ok: true; plan: PlannedRun } | { ok: false; message: string }> {
   const generate = await getUserDocGenerate(userId);
@@ -119,8 +121,14 @@ export async function planProjectRun(
   // Only machines Fadi can actually act on are placement candidates. Placing a project on a
   // registered-but-unconnected server produced plans for one machine and labs on another (A07).
   const { isConnected } = await import("./target");
-  const rows = (await createLabResourcesRepository(db).listForUser(userId)).filter((r) =>
-    isConnected({ id: r.id, label: r.label, endpoint: r.endpoint })
+  const { vmxPathOf } = await import("./vmware");
+  const rows = (await createLabResourcesRepository(db).listForUser(userId)).filter(
+    (r) =>
+      isConnected({ id: r.id, label: r.label, endpoint: r.endpoint }) &&
+      // A VMware VM IS a lab, not a host for one: asking whether a Windows Server VM can host
+      // a Windows Server lab said no, and refused the owner's re-plan (15 Oct 2026). A project
+      // placed on one is planned for it directly (machineLine below).
+      !vmxPathOf(r.endpoint)
   );
   const resources: Resource[] = rows.map((r) => ({
     id: r.id,
@@ -189,6 +197,17 @@ export async function planProjectRun(
     }
   }
 
+  // WHAT THIS COMPUTER CAN TAKE, measured, so the plan fits it (readiness.ts).
+  let resourcesLine = "";
+  if (input.replaceRunId && template) {
+    const placed = await createProjectRunsRepository(db).getWithSteps(userId, input.replaceRunId);
+    if (placed) {
+      const { readinessFor } = await import("./readiness-run");
+      const { readinessForPlanner } = await import("./readiness");
+      resourcesLine = readinessForPlanner(await readinessFor(userId, placed.run)).trim();
+    }
+  }
+
   // SERVICES BESIDE THE MACHINE (lab stacks): a SIEM is not installed inside the Windows lab.
   const { STACKS, stacksForProject, vmNetworkAddress } = await import("./stacks");
   const servicesLine = stacksForProject(input)
@@ -236,6 +255,7 @@ export async function planProjectRun(
         machineLine,
         hostLine,
         servicesLine,
+        resourcesLine,
         doneLine,
       ]
         .filter(Boolean)
@@ -267,6 +287,7 @@ export async function planProjectRun(
           machineLine,
           hostLine,
           servicesLine,
+          resourcesLine,
           doneLine,
           `Your previous plan used ${violations.join(", ")}, which cannot run on this ${labOs === "linux" ? "Linux" : "Windows"} machine. Write it again for the machine it actually runs on.`,
         ]
@@ -311,7 +332,9 @@ export async function planProjectRun(
     // only the steps. A wrong plan was otherwise a dead end: abandon the project and start
     // over, or follow instructions that do not match the machine they run on.
     if (input.replaceRunId) {
-      const replaced = await repo.replaceSteps(userId, input.replaceRunId, rows);
+      const replaced = await repo.replaceSteps(userId, input.replaceRunId, rows, {
+        keepDone: !input.startOver,
+      });
       if (!replaced) {
         return { ok: false, message: "That project is gone." };
       }

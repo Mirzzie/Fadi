@@ -185,7 +185,20 @@ type StackStep = {
   agentIp?: string;
 };
 
-type Step = Command | FileStep | NetStep | BuildStep | ScreenStep | StackStep;
+/**
+ * Changing a registered VMware machine itself — its memory, or moving it to the fast disk.
+ * Like ScreenStep, the path is shown, re-resolved from the person's record at execution and
+ * must match; and the machine must be off.
+ */
+type MachineStep = {
+  id: string;
+  machine: "memory" | "move";
+  resourceId: string;
+  vmx: string;
+  memoryMb?: number;
+};
+
+type Step = Command | FileStep | NetStep | BuildStep | ScreenStep | StackStep | MachineStep;
 
 function isBuildStep(step: Step): step is BuildStep {
   return "build" in step;
@@ -205,6 +218,10 @@ function isScreenStep(step: Step): step is ScreenStep {
 
 function isStackStep(step: Step): step is StackStep {
   return "compose" in step;
+}
+
+function isMachineStep(step: Step): step is MachineStep {
+  return "machine" in step;
 }
 
 function composeArgs(step: StackStep, dir: string): string[] {
@@ -234,6 +251,11 @@ function displayOf(step: Step): string[] {
   }
   if (isScreenStep(step)) {
     return ["turn on the screen (VNC, this computer only) in", step.vmx];
+  }
+  if (isMachineStep(step)) {
+    return step.machine === "memory"
+      ? ["set memsize =", String(step.memoryMb), "MB in", step.vmx]
+      : ["copy", step.vmx.slice(0, step.vmx.lastIndexOf("/")), "to the fast disk, then use the copy"];
   }
   if (isStackStep(step)) {
     if (step.compose === "files") {
@@ -527,6 +549,8 @@ export const RECIPE_IDS = [
   "lab.buildFile",
   "vmware.start",
   "vmware.suspend",
+  "vmware.memory",
+  "vmware.move",
   "stack.start",
   "stack.stop",
   "stack.remove",
@@ -891,6 +915,68 @@ export const RECIPES: Record<RecipeId, Recipe> = {
         // vmrun waits for power-on. A VM on a spinning disk took longer than the default 60s
         // (it creates its memory file first), was killed mid-start, and left its lock behind.
         timeoutMs: 180_000,
+      },
+    ],
+  },
+
+  /** Give the person's VMware machine more memory. Only while it is off; settings kept. */
+  "vmware.memory": {
+    blast: "vm",
+    reversibility: "reversible",
+    confirmToken: (p) => String(p.label ?? p.resourceId),
+    validate: (raw) => {
+      const resourceId = str(raw.resourceId);
+      const memoryMb = Number(raw.memoryMb);
+      if (!resourceId || !zUuid(resourceId)) return null;
+      if (![2048, 3072, 4096, 6144, 8192].includes(memoryMb)) return null;
+      return {
+        resourceId,
+        memoryMb,
+        label: typeof raw.label === "string" ? raw.label : undefined,
+        vmxPath: typeof raw.vmxPath === "string" ? raw.vmxPath : undefined,
+      };
+    },
+    summary: (p) =>
+      `Give ${p.label ?? "your VMware machine"} ${formatMemory(Number(p.memoryMb))} of memory. ` +
+      "It must be shut down; the current settings file is kept beside it as a dated .fadi copy.",
+    reversal: () => "Set it back the same way, or restore the dated .fadi copy of its settings.",
+    render: (p) => [
+      {
+        id: "vmware-memory",
+        machine: "memory" as const,
+        resourceId: String(p.resourceId),
+        vmx: String(p.vmxPath),
+        memoryMb: Number(p.memoryMb),
+      },
+    ],
+  },
+
+  /** Move the person's VMware machine to the fast disk — by copying; the original stays. */
+  "vmware.move": {
+    blast: "vm",
+    reversibility: "reversible",
+    confirmToken: (p) => String(p.label ?? p.resourceId),
+    validate: (raw) => {
+      const resourceId = str(raw.resourceId);
+      if (!resourceId || !zUuid(resourceId)) return null;
+      return {
+        resourceId,
+        label: typeof raw.label === "string" ? raw.label : undefined,
+        vmxPath: typeof raw.vmxPath === "string" ? raw.vmxPath : undefined,
+      };
+    },
+    summary: (p) =>
+      `Move ${p.label ?? "your VMware machine"} to this computer's fast disk (SSD). It is copied, ` +
+      "checked file by file, and VMware's library and Fadi then use the copy. The original stays " +
+      "on the old disk until you delete it. It must be shut down; a big machine takes minutes.",
+    reversal: () =>
+      "Point VMware back at the original (it is untouched) and delete the copy in ~/VMs.",
+    render: (p) => [
+      {
+        id: "vmware-move",
+        machine: "move" as const,
+        resourceId: String(p.resourceId),
+        vmx: String(p.vmxPath),
       },
     ],
   },
@@ -1435,7 +1521,9 @@ async function hydrateRecipeParams(
   recipe: RecipeId,
   params: RecipeParams
 ): Promise<RecipeParams | null> {
-  if (recipe !== "vmware.start" && recipe !== "vmware.suspend") return params;
+  if (!["vmware.start", "vmware.suspend", "vmware.memory", "vmware.move"].includes(recipe)) {
+    return params;
+  }
 
   const resourceId = String(params.resourceId ?? "");
   const resource = await createLabResourcesRepository(getDatabase()).get(userId, resourceId);
@@ -1920,6 +2008,30 @@ async function runStackStep(step: StackStep): Promise<StepResult> {
   }
 }
 
+/** Change or move a registered VMware machine, after resolving its path again. */
+async function runMachineStep(userId: string, step: MachineStep): Promise<StepResult> {
+  const resolved = await hydrateRecipeParams(userId, "vmware.memory", {
+    resourceId: step.resourceId,
+  });
+  if (!resolved || resolved.vmxPath !== step.vmx) {
+    throw new Error("That machine's settings file changed since you approved this.");
+  }
+  const vmware = await import("./vmware");
+  if (step.machine === "memory") {
+    const result = await vmware.setMachineMemory(step.vmx, Number(step.memoryMb));
+    if (!result.ok) throw new Error(result.message);
+    return { text: `memory set to ${step.memoryMb} MB; previous settings kept` };
+  }
+  const result = await vmware.moveMachineToFastDisk(step.vmx);
+  if (!result.ok) throw new Error(result.message);
+  await createLabResourcesRepository(getDatabase()).moveVmwareEndpoint(
+    userId,
+    step.resourceId,
+    `${vmware.VMWARE_ENDPOINT_PREFIX}${encodeURI(result.newVmxPath)}`
+  );
+  return { text: `moved to ${result.newVmxPath}; the original is untouched` };
+}
+
 /** Turn on a registered VMware machine's screen, after resolving its path again. */
 async function runScreenStep(userId: string, step: ScreenStep): Promise<StepResult> {
   const resolved = await hydrateRecipeParams(userId, "vmware.start", {
@@ -2158,6 +2270,8 @@ export async function approveAndRun(input: {
               ? await runScreenStep(input.userId, c)
               : isStackStep(c)
                 ? await runStackStep(c)
+                : isMachineStep(c)
+                  ? await runMachineStep(input.userId, c)
             : row.recipe === "lab.check"
               ? await runCheck(c)
               : await runCommand(c);

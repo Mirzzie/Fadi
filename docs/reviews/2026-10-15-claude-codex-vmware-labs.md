@@ -171,3 +171,24 @@ words (`vmrun` prints "Error: …" on stdout) or that Fadi stopped waiting and i
   WSL or a hypervisor inside it. `nestedVirtualisationViolations` sends such a plan back once,
   like the OS checks; the step that broke the lab (`winget install … Docker.DockerDesktop`) is
   the test case.
+
+## Status — 15 October 2026 (Claude): readiness before start; start over; move to SSD
+
+- **Re-plan was refused** ("Nothing you've registered can host this") once the owner's VMware
+  VM was registered: the host search asked whether a Windows Server VM can *host* a Windows
+  Server lab. VMware VMs are labs, not hosts, and are no longer host candidates.
+- **Readiness** (`readiness.ts`, pure; facts from `/proc/meminfo`, `findmnt` + `rotational`,
+  the VM's `.vmx`, VMware Tools, Compose, `docker image inspect`, Docker's free space): memory
+  for what isn't running yet (1.5 GB kept for the host), the VM's memory against its OS's need,
+  the VM on a spinning disk, Tools, service disk and downloads. Shown as "Before you start" in
+  the lab panel, and given to the planner on a re-plan. Owner's project, measured: needs 6.2 GB
+  of 7.9 GB free; VM on the HDD → warn, with a fix button.
+- **Fixes, one click each** (`vmware.memory`, `vmware.move`, re-resolved path, VM must be off):
+  memory from a fixed set (refused while suspended — the saved state is at the old size); move
+  copies to `~/VMs` with btrfs copy-on-write off, compares every file, marks the copy moved
+  (`uuid.action = "keep"`, so a background start is not stopped by VMware's question), points
+  VMware's library and Fadi at it, and leaves the original untouched. Live-tested on a
+  throwaway VM (move → starts in the background → resize → original intact).
+- **Start the project over** (`resetProjectAction`): plans first, then replaces every step,
+  finished ones too; machine and services stay. "Plan these steps again" still keeps finished
+  steps.

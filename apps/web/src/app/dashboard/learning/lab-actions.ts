@@ -793,6 +793,43 @@ export async function replanProjectAction(input: {
   return { ok: true, steps: planned.plan.steps };
 }
 
+/**
+ * Start a project over: a fresh plan from step one, every step replaced, finished ones too.
+ *
+ * The new plan is made BEFORE anything is removed, so a planner that fails leaves the project
+ * exactly as it was. The machine, its services and the project's history (receipts, evidence
+ * already admitted) stay; only the steps start again.
+ */
+export async function resetProjectAction(input: {
+  runId: string;
+}): Promise<{ ok: boolean; message?: string; steps?: number }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  if (!z.string().uuid().safeParse(input.runId).success) {
+    return { ok: false, message: "Unknown project." };
+  }
+  const { createProjectRunsRepository } = await import("@careeros/database");
+  const existing = await createProjectRunsRepository(getDatabase()).getWithSteps(
+    user.id,
+    input.runId
+  );
+  if (!existing) return { ok: false, message: "That project is gone." };
+
+  const { planProjectRun } = await import("@/lib/lab/plan-run");
+  const planned = await planProjectRun(user.id, {
+    title: existing.run.title,
+    detail: existing.run.detail,
+    replaceRunId: input.runId,
+    startOver: true,
+  });
+  if (!planned.ok) return { ok: false, message: planned.message };
+  return {
+    ok: true,
+    steps: planned.plan.steps,
+    message: `Started over with ${planned.plan.steps} new steps. Your machine and services are as they were.`,
+  };
+}
+
 /** Reopen a step — because "I marked that too early" needs a way back. */
 export async function reopenStepAction(input: { stepId: string }): Promise<{ ok: boolean }> {
   const user = await getCurrentAuthUser();

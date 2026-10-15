@@ -39,6 +39,8 @@ export type StackDefinition = {
   certs: string | null;
   /** Folders a container writes into, made first so they belong to this user, not root. */
   dirs: string[];
+  /** Its images and their size on disk once pulled, MB (measured), for the readiness check. */
+  images: Record<string, number>;
 };
 
 export const STACKS: Record<StackKey, StackDefinition> = {
@@ -66,6 +68,12 @@ export const STACKS: Record<StackKey, StackDefinition> = {
       ),
     certs: "generate-indexer-certs.yml",
     dirs: ["config/wazuh_indexer_ssl_certs"],
+    images: {
+      "wazuh/wazuh-manager:4.14.9": 2710,
+      "wazuh/wazuh-indexer:4.14.9": 2560,
+      "wazuh/wazuh-dashboard:4.14.9": 2100,
+      "wazuh/wazuh-certs-generator:0.0.4": 435,
+    },
   },
 };
 

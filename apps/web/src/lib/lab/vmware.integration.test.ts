@@ -209,6 +209,42 @@ suite("a project on your own VMware machine", () => {
     expect(runtime?.phaseDetail).toMatch(/suspended/);
   }, 120_000);
 
+  it("refuses to resize a suspended machine, and moves it to the fast disk by copying", async () => {
+    const { setMachineMemory } = await import("./vmware");
+    // Suspended by the previous test: its memory was saved at the old size.
+    const resized = await setMachineMemory(vmx, 4096);
+    expect(resized).toMatchObject({ ok: false });
+
+    const { proposeAction, approveAndRun } = await import("./broker");
+    const proposal = await proposeAction({
+      userId,
+      recipe: "vmware.move",
+      params: { resourceId },
+      actor: "user",
+      origin: "test",
+      runId,
+    });
+    expect(proposal.ok && proposal.policy.confirm).toBe("click");
+    if (!proposal.ok) return;
+    expect(await approveAndRun({ userId, requestId: proposal.requestId })).toMatchObject({
+      ok: true,
+    });
+    const moved = path.join(process.env.FADI_FAST_VM_DIR!, path.basename(dir), "probe.vmx");
+    expect(readFileSync(moved, "utf8")).toMatch(/uuid\.action = "keep"/);
+    expect(existsSync(vmx)).toBe(true); // the original is untouched
+    const { createLabResourcesRepository } = await import("@careeros/database");
+    const row = await createLabResourcesRepository(holder.db as never).get(userId, resourceId);
+    expect(decodeURI(row!.endpoint!)).toBe(`vmware://local${moved}`);
+    // And the moved machine starts in the background without VMware asking anything.
+    execFileSync("vmrun", ["-T", "ws", "start", moved, "nogui"], { timeout: 120_000 });
+    execFileSync("vmrun", ["-T", "ws", "stop", moved, "hard"], { timeout: 60_000 });
+    // Off and not suspended now: memory can change, with the old settings kept.
+    const sized = await setMachineMemory(moved, 3072);
+    expect(sized).toMatchObject({ ok: true });
+    expect(readFileSync(moved, "utf8")).toMatch(/memsize = "3072"/);
+    rmSync(path.dirname(moved), { recursive: true, force: true });
+  }, 300_000);
+
   it("refuses to change the settings of a running machine", async () => {
     const { enableScreen } = await import("./vmware");
     execFileSync("vmrun", ["-T", "ws", "start", vmx, "nogui"], { timeout: 60_000 });

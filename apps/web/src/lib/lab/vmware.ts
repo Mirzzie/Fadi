@@ -192,3 +192,129 @@ export async function enableScreen(input: {
   await writeFile(input.vmxPath, setVmxEntries(text, screenEntries(screen)), "utf8");
   return { ok: true, screen, changed: true };
 }
+
+/** Memory sizes Fadi may set: what a lab VM sensibly needs, nothing exotic. */
+export const MEMORY_CHOICES_MB = [2048, 3072, 4096, 6144, 8192] as const;
+
+async function backupVmx(vmxPath: string): Promise<string> {
+  const backup = `${vmxPath}.fadi-${Date.now()}`;
+  await copyFile(vmxPath, backup);
+  return backup;
+}
+
+async function refuseIfRunning(vmxPath: string): Promise<string | null> {
+  const running = await runningVmxPaths();
+  if (running === null) return "VMware's vmrun is not available.";
+  return running.has(vmxPath)
+    ? "The machine is running. Shut it down first — Fadi changes a machine only while it is off."
+    : null;
+}
+
+/** Give a machine more (or less) memory. Only while it is off; the old settings are kept. */
+export async function setMachineMemory(
+  vmxPath: string,
+  memoryMb: number
+): Promise<{ ok: true; backup: string } | { ok: false; message: string }> {
+  if (!(MEMORY_CHOICES_MB as readonly number[]).includes(memoryMb)) {
+    return { ok: false, message: "That memory size isn't one Fadi sets." };
+  }
+  const refusal = await refuseIfRunning(vmxPath);
+  if (refusal) return { ok: false, message: refusal };
+  const text = await readFile(vmxPath, "utf8");
+  // A suspended machine saved its memory at the old size; resizing it would break the resume.
+  if (parseVmx(text).get("checkpoint.vmstate")) {
+    return {
+      ok: false,
+      message:
+        "The machine is suspended. Start it and shut it down properly, then change its memory.",
+    };
+  }
+  const backup = await backupVmx(vmxPath);
+  await writeFile(vmxPath, setVmxEntries(text, { memsize: String(memoryMb) }), "utf8");
+  return { ok: true, backup };
+}
+
+/** Where moved machines go: a folder on this computer's own (fast) disk. */
+export function fastMachinesRoot(): string {
+  return process.env.FADI_FAST_VM_DIR || path.join(homedir(), "VMs");
+}
+
+/**
+ * Move a machine to the fast disk by COPYING it: the original stays where it was until the
+ * person deletes it, so a failed or interrupted move loses nothing.
+ *
+ * - The new folder has copy-on-write turned off first (btrfs `chattr +C`): VM disks on a
+ *   copy-on-write filesystem fragment and slow down — the opposite of the point.
+ * - Every file is compared by size after copying.
+ * - The copy is marked as MOVED (`uuid.action = "keep"`), or VMware asks "moved or copied?" on
+ *   its first start — a question nobody can answer when it starts in the background.
+ * - VMware's library is pointed at the copy, so Workstation opens the same machine.
+ */
+export async function moveMachineToFastDisk(
+  vmxPath: string,
+  inventoryPath = path.join(homedir(), ".vmware", "inventory.vmls")
+): Promise<{ ok: true; newVmxPath: string } | { ok: false; message: string }> {
+  const refusal = await refuseIfRunning(vmxPath);
+  if (refusal) return { ok: false, message: refusal };
+  const { cp, mkdir, readdir, statfs } = await import("node:fs/promises");
+
+  const source = path.dirname(vmxPath);
+  const target = path.join(fastMachinesRoot(), path.basename(source));
+  if (await stat(target).catch(() => null)) {
+    return { ok: false, message: `${target} already exists. Remove or rename it first.` };
+  }
+  const size = (await folderSize(source)) ?? 0;
+  await mkdir(fastMachinesRoot(), { recursive: true });
+  const free = await statfs(fastMachinesRoot());
+  if (free.bavail * free.bsize < size + 10 * 1024 ** 3) {
+    return {
+      ok: false,
+      message: `Not enough room on the fast disk: it needs ${Math.ceil(size / 1024 ** 3) + 10} GB free.`,
+    };
+  }
+
+  await mkdir(target);
+  try {
+    await run("chattr", ["+C", target], { timeout: 5000 });
+  } catch {
+    // Not btrfs, or not supported: nothing to turn off.
+  }
+  // Lock folders belong to a running VMware; a stopped machine has none worth copying.
+  await cp(source, target, {
+    recursive: true,
+    filter: (src) => !src.endsWith(".lck") && !src.includes(".lck/"),
+  });
+
+  for (const name of await readdir(source)) {
+    if (name.endsWith(".lck")) continue;
+    const [a, b] = await Promise.all([
+      stat(path.join(source, name)),
+      stat(path.join(target, name)).catch(() => null),
+    ]);
+    if (a.isFile() && (!b || b.size !== a.size)) {
+      return {
+        ok: false,
+        message: `The copy of ${name} is incomplete; the original is untouched.`,
+      };
+    }
+  }
+
+  const newVmxPath = path.join(target, path.basename(vmxPath));
+  const vmx = await readFile(newVmxPath, "utf8");
+  await writeFile(newVmxPath, setVmxEntries(vmx, { "uuid.action": "keep" }), "utf8");
+
+  try {
+    const inventory = await readFile(inventoryPath, "utf8");
+    if (inventory.includes(`"${vmxPath}"`)) {
+      await copyFile(inventoryPath, `${inventoryPath}.fadi-${Date.now()}`);
+      await writeFile(
+        inventoryPath,
+        inventory.replaceAll(`"${vmxPath}"`, `"${newVmxPath}"`),
+        "utf8"
+      );
+    }
+  } catch {
+    // No library to update; Workstation can open the moved .vmx directly.
+  }
+  return { ok: true, newVmxPath };
+}

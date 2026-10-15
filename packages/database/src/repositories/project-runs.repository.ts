@@ -352,8 +352,11 @@ export function createProjectRunsRepository(db: Database) {
     async replaceSteps(
       userId: string,
       runId: string,
-      steps: Array<Omit<NewProjectStep, "id" | "runId" | "createdAt" | "updatedAt">>
+      steps: Array<Omit<NewProjectStep, "id" | "runId" | "createdAt" | "updatedAt">>,
+      /** Start over: finished steps go too, and the new plan starts at step one. */
+      options: { keepDone?: boolean } = {}
     ): Promise<{ kept: ProjectStep[]; added: ProjectStep[] } | null> {
+      const keepDone = options.keepDone ?? true;
       return db.transaction(async (tx) => {
         const [run] = await tx
           .select({ id: projectRuns.id, status: projectRuns.status })
@@ -367,12 +370,16 @@ export function createProjectRunsRepository(db: Database) {
           .from(projectSteps)
           .where(eq(projectSteps.runId, runId))
           .orderBy(asc(projectSteps.ordinal));
-        const kept = existing.filter((step) => step.status === "done");
+        const kept = keepDone ? existing.filter((step) => step.status === "done") : [];
         const after = kept.reduce((max, step) => Math.max(max, step.ordinal), 0);
 
         await tx
           .delete(projectSteps)
-          .where(and(eq(projectSteps.runId, runId), ne(projectSteps.status, "done")));
+          .where(
+            keepDone
+              ? and(eq(projectSteps.runId, runId), ne(projectSteps.status, "done"))
+              : eq(projectSteps.runId, runId)
+          );
 
         const added = steps.length
           ? await tx

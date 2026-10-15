@@ -397,6 +397,7 @@ describe("the catalogue itself stays safe as it grows", () => {
         expect: "syntax is ok",
         stack: "wazuh",
         agentIp: "172.16.89.1",
+        memoryMb: 4096,
       });
       expect(params, `${id} should accept a legal parameter bag`).not.toBeNull();
 
@@ -981,6 +982,40 @@ describe("found by driving the hub: friction follows what is actually started", 
     if (res.ok) {
       expect(res.summary).not.toMatch(/\b0GB of memory/);
       expect(res.summary).toMatch(/128MB of memory/);
+    }
+  });
+});
+
+describe("changing your own VMware machine", () => {
+  it("sets memory and moves only the registered machine's file, from a fixed set of sizes", async () => {
+    getResource.mockResolvedValue({
+      id: "11111111-1111-4111-8111-111111111111",
+      label: "Windows Server 2025",
+      endpoint: "vmware://local/hdd/vms/ws2025/ws2025.vmx",
+    });
+    const memory = await propose_(
+      { resourceId: "11111111-1111-4111-8111-111111111111", memoryMb: 4096, vmxPath: "/tmp/x.vmx" },
+      "vmware.memory"
+    );
+    expect(memory.ok).toBe(true);
+    if (memory.ok) {
+      expect(memory.argv[0]).toEqual(["set memsize =", "4096", "MB in", "/hdd/vms/ws2025/ws2025.vmx"]);
+      expect(memory.policy.confirm).toBe("click");
+    }
+    const odd = await propose_(
+      { resourceId: "11111111-1111-4111-8111-111111111111", memoryMb: 65536 },
+      "vmware.memory"
+    );
+    expect(odd.ok).toBe(false);
+
+    const move = await propose_(
+      { resourceId: "11111111-1111-4111-8111-111111111111", vmxPath: "/tmp/x.vmx" },
+      "vmware.move"
+    );
+    expect(move.ok).toBe(true);
+    if (move.ok) {
+      expect(move.argv.flat()).not.toContain("/tmp/x.vmx");
+      expect(move.summary).toMatch(/original stays/);
     }
   });
 });

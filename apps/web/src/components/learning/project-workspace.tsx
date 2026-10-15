@@ -14,6 +14,7 @@ import {
   proposeSaveBaseAction,
   reopenStepAction,
   replanProjectAction,
+  resetProjectAction,
   runOnThisComputerAction,
   type ProjectRuntimeView,
   type RunView,
@@ -32,6 +33,7 @@ import { announceActionsChanged, usePendingActions } from "@/components/os/pendi
 import { Button } from "@/components/ui/button";
 import { reachableSurface, runtimeMessage } from "@/lib/lab/runtime-contract";
 import { MachineChooser } from "@/components/learning/machine-chooser";
+import { ProjectReadiness } from "@/components/learning/project-readiness";
 import { ProjectServices } from "@/components/learning/project-services";
 
 /**
@@ -317,6 +319,15 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
                 }}
               />
             ) : null}
+            <ProjectReadiness
+              runId={runId}
+              tick={tick}
+              onProposed={(text) => {
+                setLabMessage(text);
+                announceActionsChanged();
+                refreshApprovals();
+              }}
+            />
             <ProjectServices
               runId={runId}
               tick={tick}
@@ -662,26 +673,39 @@ function StepList({
 
 /** Behind a confirmation: unfinished steps are replaced; finished steps and their results are kept. */
 function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => Promise<void> }) {
-  const [asking, setAsking] = useState(false);
+  const [asking, setAsking] = useState<null | "replan" | "reset">(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, start] = useTransition();
 
   if (!asking) {
     return (
-      <button
-        type="button"
-        onClick={() => setAsking(true)}
-        className="px-1 text-xs text-muted-foreground hover:text-foreground hover:underline"
-      >
-        Plan these steps again
-      </button>
+      <div className="flex flex-wrap gap-4 px-1 text-xs text-muted-foreground">
+        <button
+          type="button"
+          onClick={() => setAsking("replan")}
+          className="hover:text-foreground hover:underline"
+        >
+          Plan these steps again
+        </button>
+        <button
+          type="button"
+          onClick={() => setAsking("reset")}
+          className="hover:text-foreground hover:underline"
+        >
+          Start the project over
+        </button>
+        {note ? <span className="text-foreground">{note}</span> : null}
+      </div>
     );
   }
 
+  const reset = asking === "reset";
   return (
     <div className="flex flex-wrap items-center gap-2 px-1 text-xs">
       <span>
-        Replan the steps you haven&apos;t finished? Finished steps and their results stay.
+        {reset
+          ? "Start over from step one? Every step is planned again — finished ones too. Your machine and services stay as they are."
+          : "Replan the steps you haven't finished? Finished steps and their results stay."}
       </span>
       <Button
         size="sm"
@@ -689,17 +713,19 @@ function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => Prom
         disabled={busy}
         onClick={() =>
           start(async () => {
-            const res = await replanProjectAction({ runId });
+            const res = reset
+              ? await resetProjectAction({ runId })
+              : await replanProjectAction({ runId });
             if (!res.ok) return setNote(res.message ?? "Couldn't plan it again.");
-            setAsking(false);
-            setNote(null);
+            setAsking(null);
+            setNote(reset ? (res.message ?? null) : null);
             await onReplanned();
           })
         }
       >
-        {busy ? "Planning…" : "Replace"}
+        {busy ? "Planning…" : reset ? "Start over" : "Replace"}
       </Button>
-      <Button size="sm" variant="ghost" disabled={busy} onClick={() => setAsking(false)}>
+      <Button size="sm" variant="ghost" disabled={busy} onClick={() => setAsking(null)}>
         Cancel
       </Button>
       {note ? <span className="text-amber-600">{note}</span> : null}
