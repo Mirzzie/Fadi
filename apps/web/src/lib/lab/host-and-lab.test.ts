@@ -259,3 +259,34 @@ describe("a container has no service manager", () => {
     expect(b).toMatch(/cannot change firewall rules/);
   });
 });
+
+describe("no hypervisor inside the lab", () => {
+  it("catches the step that left the Windows lab in a boot loop (15 Oct 2026)", async () => {
+    const { nestedVirtualisationViolations } = await import("./host-and-lab");
+    const step =
+      "In the lab PowerShell, execute winget install -e --id Docker.DockerDesktop to install Docker Desktop.";
+    expect(nestedVirtualisationViolations(step)).toContain(
+      "Docker Desktop (a hypervisor inside the lab)"
+    );
+    expect(
+      nestedVirtualisationViolations(
+        "Enable-WindowsOptionalFeature -Online -FeatureName VirtualMachinePlatform"
+      )
+    ).toContain("Hyper-V (a hypervisor inside the lab)");
+    expect(nestedVirtualisationViolations("wsl --install")).toContain(
+      "WSL (a hypervisor inside the lab)"
+    );
+    expect(nestedVirtualisationViolations("sudo apt-get install -y docker.io")).toContain(
+      "Docker inside the lab machine"
+    );
+  });
+
+  it("leaves the agent install and ordinary mentions alone", async () => {
+    const { nestedVirtualisationViolations } = await import("./host-and-lab");
+    expect(
+      nestedVirtualisationViolations(
+        "Download wazuh-agent-4.14.9-1.msi and run msiexec.exe /i wazuh-agent.msi /q WAZUH_MANAGER='172.16.89.1'. The manager runs in Docker beside the lab."
+      )
+    ).toEqual([]);
+  });
+});

@@ -12,6 +12,7 @@ import {
   withFoldersCreated,
   hostOsOf,
   labOsOf,
+  nestedVirtualisationViolations,
   osViolations,
   placementBriefing,
   toolchainViolations,
@@ -68,6 +69,7 @@ Write steps that person can actually execute tonight. Rules:
 - Before any step writes a file, that step or an earlier one creates its folder (PowerShell: New-Item -ItemType Directory -Force -Path "C:\\LabSetup"; Linux: mkdir -p). A fresh machine has none of your folders.
 - Keep each instruction under about 900 characters: the commands, and one line on why.
 - 3 to 8 steps. A plan longer than that is a course, and it will not be finished.
+- Never install Docker, Docker Desktop, WSL, Hyper-V or any hypervisor inside the lab machine. Services the project needs (a SIEM, a database) run BESIDE it and are listed as such; the machine connects to them.
 - Never invent details about their environment beyond what you are told.`;
 
 // Static checks catch known contradictions. They do not prove commands or packages work;
@@ -79,7 +81,11 @@ function planViolations(
   if (!template) return [];
   const text = steps.map((s) => `${s.title}\n${s.instruction}\n${s.verify ?? ""}`).join("\n");
   const os = labOsOf(template);
-  return [...(os ? osViolations(text, os) : []), ...toolchainViolations(text, template)];
+  return [
+    ...(os ? osViolations(text, os) : []),
+    ...toolchainViolations(text, template),
+    ...nestedVirtualisationViolations(text),
+  ];
 }
 
 export type PlannedRun = { runId: string; steps: number };
@@ -163,7 +169,43 @@ export async function planProjectRun(
     containerName: input.replaceRunId ? labContainerForRun(input.replaceRunId) : null,
   });
 
-  const hostLine = !template
+  // THE PERSON'S OWN VMWARE MACHINE, when the project runs on one: already installed, their own
+  // account, and no Fadi container or lab account to mention.
+  let machineLine = "";
+  if (input.replaceRunId && template) {
+    const placed = await createProjectRunsRepository(db).getWithSteps(userId, input.replaceRunId);
+    const resource = placed?.run.resourceId
+      ? await createLabResourcesRepository(db).get(userId, placed.run.resourceId)
+      : null;
+    const { readVmxSummary, vmxPathOf } = await import("./vmware");
+    const vmx = vmxPathOf(resource?.endpoint);
+    if (resource && vmx) {
+      const summary = await readVmxSummary(vmx);
+      const { vmNetworkAddress } = await import("./stacks");
+      machineLine = [
+        `THE LAB MACHINE IS THE PERSON'S OWN VMWARE VM "${resource.label}"${summary?.guestOs ? ` (${summary.guestOs})` : ""}, already installed. They sign in with their own administrator account; there is no Fadi lab account.`,
+        `It runs on their computer, which it reaches at ${vmNetworkAddress()}. Do not write steps that create, install or start the VM itself.`,
+      ].join("\n");
+    }
+  }
+
+  // SERVICES BESIDE THE MACHINE (lab stacks): a SIEM is not installed inside the Windows lab.
+  const { STACKS, stacksForProject, vmNetworkAddress } = await import("./stacks");
+  const servicesLine = stacksForProject(input)
+    .map((key) => {
+      const stack = STACKS[key];
+      return [
+        `SERVICE BESIDE THE LAB: ${stack.label}. ${stack.purpose}`,
+        `Fadi starts it from the project page; assume it is running. ${stack.open.label}: ${stack.open.url} on the person's own computer (sign in ${stack.open.user} / ${stack.open.password}).`,
+        `The lab machine connects to it at ${vmNetworkAddress()} on ports ${stack.agentPorts.join(" and ")} — for Wazuh, install the Wazuh agent ${stack.version} on the lab machine with WAZUH_MANAGER set to that address.`,
+        "Never install this service, Docker or a hypervisor inside the lab machine.",
+      ].join("\n");
+    })
+    .join("\n");
+
+  const hostLine = machineLine
+    ? ""
+    : !template
     ? "No local lab is required. Work in the hosted service or document workspace; do not invent a lab host."
     : host
       ? `Host: ${host.label} — ${host.kind}, ${host.arch}, ${
@@ -191,7 +233,9 @@ export async function planProjectRun(
         `Project: ${input.title}`,
         input.detail ? `Description: ${input.detail}` : "",
         placement,
+        machineLine,
         hostLine,
+        servicesLine,
         doneLine,
       ]
         .filter(Boolean)
@@ -220,7 +264,9 @@ export async function planProjectRun(
           `Project: ${input.title}`,
           input.detail ? `Description: ${input.detail}` : "",
           placement,
+          machineLine,
           hostLine,
+          servicesLine,
           doneLine,
           `Your previous plan used ${violations.join(", ")}, which cannot run on this ${labOs === "linux" ? "Linux" : "Windows"} machine. Write it again for the machine it actually runs on.`,
         ]

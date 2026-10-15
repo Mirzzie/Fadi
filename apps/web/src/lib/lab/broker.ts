@@ -45,6 +45,14 @@ import {
   type Policy,
   type Reversibility,
 } from "./policy";
+import {
+  IPV4_RE,
+  isStackKey,
+  STACKS,
+  stackFolder,
+  stackProject,
+  type StackKey,
+} from "./stacks";
 
 import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
@@ -159,7 +167,25 @@ type BuildStep = { id: string; build: string; tag: string };
  */
 type ScreenStep = { id: string; screen: "enable"; resourceId: string; vmx: string };
 
-type Step = Command | FileStep | NetStep | BuildStep | ScreenStep;
+/**
+ * A lab stack's files and Docker Compose (see stacks.ts).
+ *
+ * The stack lives in Fadi's own folder (`stackRoot()/<project>`), not the person's workspace:
+ * its files come only from the closed catalogue, written at execution from the stack key and
+ * the agent address, so nothing a caller or model says reaches the disk. `project` is a
+ * validated name; the folder is derived from it, never stored as a path.
+ */
+type StackStep = {
+  id: string;
+  compose: "files" | "certs" | "up" | "stop" | "down";
+  stack: StackKey;
+  project: string;
+  file: string;
+  /** For "files": where agents connect, already validated. */
+  agentIp?: string;
+};
+
+type Step = Command | FileStep | NetStep | BuildStep | ScreenStep | StackStep;
 
 function isBuildStep(step: Step): step is BuildStep {
   return "build" in step;
@@ -177,6 +203,22 @@ function isScreenStep(step: Step): step is ScreenStep {
   return "screen" in step;
 }
 
+function isStackStep(step: Step): step is StackStep {
+  return "compose" in step;
+}
+
+function composeArgs(step: StackStep, dir: string): string[] {
+  const file = `${dir}/${step.file}`;
+  if (step.compose === "files") return [];
+  if (step.compose === "certs") {
+    return ["compose", "-f", file, "-p", `${step.project}-certs`, "run", "--rm", "generator"];
+  }
+  const base = ["compose", "-f", file, "-p", step.project];
+  if (step.compose === "up") return [...base, "up", "-d"];
+  if (step.compose === "stop") return [...base, "stop"];
+  return [...base, "down", "-v"];
+}
+
 /** A short digest, so a display line changes when the CONTENT changes, not just its length. */
 function digest(text: string): string {
   return createHash("sha256").update(text).digest("hex").slice(0, 12);
@@ -192,6 +234,17 @@ function displayOf(step: Step): string[] {
   }
   if (isScreenStep(step)) {
     return ["turn on the screen (VNC, this computer only) in", step.vmx];
+  }
+  if (isStackStep(step)) {
+    if (step.compose === "files") {
+      return [
+        "write the",
+        STACKS[step.stack].label,
+        "files (agents on " + step.agentIp + ") to",
+        stackFolder(step.project),
+      ];
+    }
+    return ["docker", ...composeArgs(step, stackFolder(step.project))];
   }
   if (!isFileStep(step)) return [step.cmd, ...step.args];
   if (step.fs === "write") {
@@ -474,6 +527,9 @@ export const RECIPE_IDS = [
   "lab.buildFile",
   "vmware.start",
   "vmware.suspend",
+  "stack.start",
+  "stack.stop",
+  "stack.remove",
   "network.sweep",
   "network.identify",
   "container.run",
@@ -837,6 +893,124 @@ export const RECIPES: Record<RecipeId, Recipe> = {
         timeoutMs: 180_000,
       },
     ],
+  },
+
+  /**
+   * START A PROJECT'S LAB STACK — the services it runs beside its machine (stacks.ts, C2).
+   *
+   * Writes the stack's pinned files into the workspace, generates its certificates, and brings
+   * it up with Docker Compose. Ports listen on this computer and, for agents, on the VMware
+   * network address only. Reversible: stopping keeps everything; removing is its own action.
+   */
+  "stack.start": {
+    blast: "container",
+    reversibility: "reversible",
+    confirmToken: (p) => stackProject(String(p.name), String(p.stack) as StackKey),
+    validate: (raw) => {
+      const stack = str(raw.stack);
+      const name = str(raw.name);
+      const agentIp = str(raw.agentIp);
+      if (!stack || !isStackKey(stack)) return null;
+      if (!name || !NAME_RE.test(name)) return null;
+      if (!agentIp || !IPV4_RE.test(agentIp)) return null;
+      return { stack, name, agentIp };
+    },
+    summary: (p) => {
+      const stack = STACKS[String(p.stack) as StackKey];
+      return (
+        `Start ${stack.label} for this project. ${stack.purpose} It needs about ` +
+        `${formatMemory(stack.ramMb)} of memory and ${stack.diskGb}GB of disk; the first start ` +
+        "downloads the images. Its files go in " +
+        `${stackFolder(stackProject(String(p.name), String(p.stack) as StackKey))}. ` +
+        `${stack.open.label}: ${stack.open.url} (this computer only), signed in as ` +
+        `${stack.open.user} / ${stack.open.password} — the lab's default, reachable from nowhere ` +
+        `else. Agents connect on ${p.agentIp}:${stack.agentPorts.join("/")}, the VMware ` +
+        "network on this computer, not your home network."
+      );
+    },
+    reversal: (p) =>
+      `Stop it (data kept), or remove it: docker compose -p ${stackProject(String(p.name), String(p.stack) as StackKey)} down -v`,
+    render: (p) => {
+      const key = String(p.stack) as StackKey;
+      const project = stackProject(String(p.name), key);
+      return [
+        {
+          id: "stack-files",
+          compose: "files" as const,
+          stack: key,
+          project,
+          file: "",
+          agentIp: String(p.agentIp),
+        },
+        ...(STACKS[key].certs
+          ? [
+              {
+                id: "stack-certs",
+                compose: "certs" as const,
+                stack: key,
+                project,
+                file: STACKS[key].certs!,
+              },
+            ]
+          : []),
+        { id: "stack-up", compose: "up" as const, stack: key, project, file: "docker-compose.yml" },
+      ];
+    },
+  },
+
+  "stack.stop": {
+    blast: "container",
+    reversibility: "disruptive",
+    confirmToken: (p) => stackProject(String(p.name), String(p.stack) as StackKey),
+    ownWorkOnly: true,
+    validate: (raw) => {
+      const stack = str(raw.stack);
+      const name = str(raw.name);
+      return stack && isStackKey(stack) && name && NAME_RE.test(name) ? { stack, name } : null;
+    },
+    summary: (p) =>
+      `Stop ${STACKS[String(p.stack) as StackKey].label} for this project. Its data and settings stay.`,
+    reversal: () => "Start it again from the project.",
+    render: (p) => {
+      const key = String(p.stack) as StackKey;
+      return [
+        {
+          id: "stack-stop",
+          compose: "stop" as const,
+          stack: key,
+          project: stackProject(String(p.name), key),
+          file: "docker-compose.yml",
+        },
+      ];
+    },
+  },
+
+  "stack.remove": {
+    blast: "container",
+    reversibility: "irreversible",
+    confirmToken: (p) => stackProject(String(p.name), String(p.stack) as StackKey),
+    ownWorkOnly: true,
+    validate: (raw) => {
+      const stack = str(raw.stack);
+      const name = str(raw.name);
+      return stack && isStackKey(stack) && name && NAME_RE.test(name) ? { stack, name } : null;
+    },
+    summary: (p) =>
+      `Remove ${STACKS[String(p.stack) as StackKey].label} for this project and everything it stored ` +
+      "(alerts, agents, indexes). Its settings files stay.",
+    reversal: () => "Not reversible — the stack's stored data is deleted.",
+    render: (p) => {
+      const key = String(p.stack) as StackKey;
+      return [
+        {
+          id: "stack-down",
+          compose: "down" as const,
+          stack: key,
+          project: stackProject(String(p.name), key),
+          file: "docker-compose.yml",
+        },
+      ];
+    },
   },
 
   "vmware.suspend": {
@@ -1376,6 +1550,7 @@ export async function proposeAction(input: {
     const mine = [
       ...(await requests.createdNames(input.userId, "container.run")),
       ...(await requests.createdNames(input.userId, "lab.start")),
+      ...(await requests.createdNames(input.userId, "stack.start")),
     ];
     if (!mine.includes(String(params.name))) {
       await audit.record({
@@ -1714,6 +1889,37 @@ async function runFileStep(userId: string, step: FileStep): Promise<StepResult> 
   };
 }
 
+/** A stack's files, then Docker Compose in its folder. */
+async function runStackStep(step: StackStep): Promise<StepResult> {
+  const dir = stackFolder(step.project);
+  if (step.compose === "files") {
+    const { mkdir, writeFile } = await import("node:fs/promises");
+    const path = await import("node:path");
+    const files = STACKS[step.stack].files(String(step.agentIp));
+    for (const [relative, content] of Object.entries(files)) {
+      const target = path.join(dir, relative);
+      await mkdir(path.dirname(target), { recursive: true });
+      await writeFile(target, content, "utf8");
+    }
+    for (const folder of STACKS[step.stack].dirs) {
+      await mkdir(path.join(dir, folder), { recursive: true });
+    }
+    return { text: `wrote ${Object.keys(files).length} files to ${dir}` };
+  }
+  // Pulling three images and starting an indexer is minutes, not seconds.
+  const command = { cmd: "docker", args: composeArgs(step, dir), timeoutMs: 900_000 };
+  try {
+    const { stdout, stderr } = await run(command.cmd, command.args, {
+      timeout: command.timeoutMs,
+      maxBuffer: 4 * 1024 * 1024,
+    });
+    const lines = `${stdout}\n${stderr}`.trim().split("\n").filter(Boolean);
+    return { text: lines[lines.length - 1] ?? `docker compose ${step.compose}` };
+  } catch (error) {
+    throw new Error(commandFailure(command, error));
+  }
+}
+
 /** Turn on a registered VMware machine's screen, after resolving its path again. */
 async function runScreenStep(userId: string, step: ScreenStep): Promise<StepResult> {
   const resolved = await hydrateRecipeParams(userId, "vmware.start", {
@@ -1950,6 +2156,8 @@ export async function approveAndRun(input: {
             ? await runFileStep(input.userId, c)
             : isScreenStep(c)
               ? await runScreenStep(input.userId, c)
+              : isStackStep(c)
+                ? await runStackStep(c)
             : row.recipe === "lab.check"
               ? await runCheck(c)
               : await runCommand(c);

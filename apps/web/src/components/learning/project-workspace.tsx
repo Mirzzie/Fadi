@@ -32,6 +32,7 @@ import { announceActionsChanged, usePendingActions } from "@/components/os/pendi
 import { Button } from "@/components/ui/button";
 import { reachableSurface, runtimeMessage } from "@/lib/lab/runtime-contract";
 import { MachineChooser } from "@/components/learning/machine-chooser";
+import { ProjectServices } from "@/components/learning/project-services";
 
 /**
  * ONE PROJECT: the step you are on, and the machine you do it on. Nothing else earns a place.
@@ -47,6 +48,7 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
   const [artifact, setArtifact] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [labMessage, setLabMessage] = useState<string | null>(null);
+  const [tick, setTick] = useState(0);
   const [pending, startTransition] = useTransition();
   const { pending: approvals, refresh: refreshApprovals } = usePendingActions();
 
@@ -59,6 +61,7 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
     ]);
     setRun(result.ok ? result.run : null);
     setRuntime(observed.ok ? observed.runtime : null);
+    setTick((value) => value + 1);
   }, [runId]);
 
   useEffect(() => {
@@ -314,6 +317,15 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
                 }}
               />
             ) : null}
+            <ProjectServices
+              runId={runId}
+              tick={tick}
+              onProposed={(text) => {
+                setLabMessage(text);
+                announceActionsChanged();
+                refreshApprovals();
+              }}
+            />
             {labMessage ? (
               <p className="border-b border-border/70 px-4 py-2 text-xs text-muted-foreground">
                 {labMessage}

@@ -395,6 +395,8 @@ describe("the catalogue itself stays safe as it grows", () => {
         vmxPath: "/home/user/VMs/windows/windows.vmx",
         command: "nginx -t",
         expect: "syntax is ok",
+        stack: "wazuh",
+        agentIp: "172.16.89.1",
       });
       expect(params, `${id} should accept a legal parameter bag`).not.toBeNull();
 
@@ -982,3 +984,54 @@ describe("found by driving the hub: friction follows what is actually started", 
     }
   });
 });
+
+describe("lab stacks", () => {
+  it("renders only the catalogue's files and compose commands, never caller input", async () => {
+    const { RECIPES } = await import("./broker");
+    const recipe = RECIPES["stack.start"];
+    expect(recipe.validate({ stack: "kubernetes", name: "p", agentIp: "127.0.0.1" })).toBeNull();
+    expect(recipe.validate({ stack: "wazuh", name: "p", agentIp: "0.0.0.0; rm -rf /" })).toBeNull();
+    const params = recipe.validate({
+      stack: "wazuh",
+      name: "project-df3e6d83",
+      agentIp: "172.16.89.1",
+      image: "evil/image",
+    })!;
+    expect(params).toEqual({ stack: "wazuh", name: "project-df3e6d83", agentIp: "172.16.89.1" });
+
+    const steps = recipe.render(params) as Array<Record<string, unknown>>;
+    // Files are written at execution from the catalogue, never carried in the request.
+    expect(steps[0]).toEqual({
+      id: "stack-files",
+      compose: "files",
+      stack: "wazuh",
+      project: "fadi-project-df3e6d83-wazuh",
+      file: "",
+      agentIp: "172.16.89.1",
+    });
+    expect(JSON.stringify(steps)).not.toContain("evil");
+    const { STACKS } = await import("./stacks");
+    const compose = STACKS.wazuh.files("172.16.89.1")["docker-compose.yml"]!;
+    // Agents on the VMware network address; everything else on this computer only.
+    expect(compose).toContain('"172.16.89.1:1514:1514"');
+    expect(compose).toContain('"127.0.0.1:5443:5601"');
+    expect(compose).toContain('"127.0.0.1:9200:9200"');
+    expect(compose).not.toMatch(/^\s*- "?\d+:\d+/m);
+    expect(compose).not.toContain("privileged");
+    expect(compose).toContain("wazuh/wazuh-manager:4.14.9");
+    expect(steps.at(-1)).toMatchObject({ compose: "up", project: "fadi-project-df3e6d83-wazuh" });
+  });
+
+  it("starting a stack is one click; removing its data is typed", async () => {
+    const { RECIPES, recipePolicy } = await import("./broker");
+    const start = RECIPES["stack.start"].validate({
+      stack: "wazuh",
+      name: "p",
+      agentIp: "127.0.0.1",
+    })!;
+    expect(recipePolicy(RECIPES["stack.start"], start).confirm).toBe("click");
+    const remove = RECIPES["stack.remove"].validate({ stack: "wazuh", name: "p" })!;
+    expect(recipePolicy(RECIPES["stack.remove"], remove).confirm).toBe("type-name");
+  });
+});
+

@@ -143,3 +143,31 @@ ticket/Origin refusal, recipe path pinning, policy. 453 lab/learning/AI tests pa
 **Not yet:** "Open in VMware" button; images and fresh linked clones (V2); checks over SSH and
 snapshots before risky steps, private networks (V3); the Wazuh stack and re-plan (C2). The
 owner's own VMs have not been started by Fadi yet — the first real start is theirs to approve.
+
+## Status — 15 October 2026 (Claude): first VMware start fixed; C2 lab stacks (Wazuh)
+
+**The owner's first real start failed** with only "Command failed: vmrun … start … nogui".
+Timestamps: the screen step ran, then the start was killed at the 60s command limit (a 2 GB VM on
+the NTFS HDD creates its memory file before power-on), and the retry hit the half-started VM's
+lock. The same start run by hand succeeded; Windows came up (Tools running, 172.16.89.130). Fix
+(`61e2da4`): VM start/suspend get 180s, and a failed command now says why in the tool's own
+words (`vmrun` prints "Error: …" on stdout) or that Fadi stopped waiting and it may finish.
+
+**C2 — lab stacks, starting with Wazuh 4.14.9** (`lib/lab/stacks.ts`, `stacks/wazuh-files.ts`):
+- A closed catalogue. The files are upstream `wazuh-docker` v4.14.9 `single-node`, generated
+  into a module (GPLv2 attribution in its header). Changed only: indexer/API/dashboard ports on
+  127.0.0.1 (dashboard 5443), agent ports 1514/1515 and syslog on the VMware network address
+  (vmnet8, else vmnet1, else 127.0.0.1) — never the home network; indexer heap 512 MB;
+  `restart: unless-stopped`. Upstream's demo passwords are kept and stated in the approval.
+- Recipes `stack.start` (one click: files → certificates → `docker compose up -d`),
+  `stack.stop` (click), `stack.remove` (`down -v`, typed). A new `StackStep` writes the files at
+  execution from the catalogue into Fadi's own folder (`~/.local/share/fadi/stacks/<project>`),
+  not the workspace — no workspace is set for the owner, and nothing in these files comes from a
+  caller or model. Stop/remove are own-work-only.
+- The project's lab panel shows "Services beside the machine" with state (Compose + the
+  dashboard answering), Start/Stop, the dashboard link, sign-in and the agent address.
+- **Planner**: told which services run beside the lab and where agents connect, that the lab is
+  the owner's own VMware VM (their account, no Fadi lab account), and never to install Docker,
+  WSL or a hypervisor inside it. `nestedVirtualisationViolations` sends such a plan back once,
+  like the OS checks; the step that broke the lab (`winget install … Docker.DockerDesktop`) is
+  the test case.

@@ -230,6 +230,35 @@ export function osViolations(text: string, labOs: LabOs): string[] {
 }
 
 /**
+ * NO HYPERVISOR INSIDE THE LAB.
+ *
+ * A Wazuh project was planned as "install Docker Desktop in the Windows lab". Docker Desktop
+ * needs WSL 2, which needs Virtual Machine Platform — a hypervisor inside a VM inside a
+ * container — and after the reboot the lab never came back (15 Oct 2026). Services a project
+ * needs run beside the machine (lab stacks); the machine itself never hosts containers or VMs.
+ */
+export function nestedVirtualisationViolations(text: string): string[] {
+  const found: string[] = [];
+  if (/\bdocker\s*desktop\b|Docker\.DockerDesktop/i.test(text)) {
+    found.push("Docker Desktop (a hypervisor inside the lab)");
+  }
+  if (/\bwsl(?:\.exe)?\s+--install\b|Microsoft-Windows-Subsystem-Linux/i.test(text)) {
+    found.push("WSL (a hypervisor inside the lab)");
+  }
+  if (/VirtualMachinePlatform|Microsoft-Hyper-V|Install-WindowsFeature\s+(?:-Name\s+)?Hyper-V/i.test(text)) {
+    found.push("Hyper-V (a hypervisor inside the lab)");
+  }
+  if (
+    /\b(?:apt(?:-get)?|apk|dnf|yum)\s+(?:install|add)\b[^\n]*\bdocker(?:\.io|-ce)?\b|get\.docker\.com|winget\s+install[^\n]*docker/i.test(
+      text
+    )
+  ) {
+    found.push("Docker inside the lab machine");
+  }
+  return found;
+}
+
+/**
  * DOES THIS PLAN MATCH THE DISTRIBUTION, not just the operating system?
  *
  * osViolations catches Windows steps on Linux. It cannot catch "sudo apt-get update" on
