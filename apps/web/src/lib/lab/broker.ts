@@ -298,9 +298,13 @@ function displayOf(step: Step): string[] {
       ? ["set memsize =", String(step.memoryMb), "MB in", step.vmx]
       : step.machine === "configure"
         ? ["in", step.vmx, "set", JSON.stringify(step.changes ?? {})]
-      : step.machine === "relink"
-        ? ["use the copy of", step.vmx, "that VMware's library opens"]
-        : ["copy", step.vmx.slice(0, step.vmx.lastIndexOf("/")), "to the fast disk, then use the copy"];
+        : step.machine === "relink"
+          ? ["use the copy of", step.vmx, "that VMware's library opens"]
+          : [
+              "copy",
+              step.vmx.slice(0, step.vmx.lastIndexOf("/")),
+              "to the fast disk, then use the copy",
+            ];
   }
   if (isStackStep(step)) {
     if (step.compose === "files") {
@@ -1036,7 +1040,9 @@ export const RECIPES: Record<RecipeId, Recipe> = {
       const resourceId = str(raw.resourceId);
       if (!resourceId || !zUuid(resourceId)) return null;
       const changes = validMachineChanges(
-        typeof raw.changes === "object" && raw.changes ? (raw.changes as Record<string, unknown>) : {}
+        typeof raw.changes === "object" && raw.changes
+          ? (raw.changes as Record<string, unknown>)
+          : {}
       );
       if (Object.keys(changes).length === 0) return null;
       return {
@@ -1456,19 +1462,25 @@ export const RECIPES: Record<RecipeId, Recipe> = {
    */
   "lab.check": {
     blast: "container",
-    // Meant to read. Labelled "interrupts something" it told people a check would disturb
-    // their lab, which it is not written to do; the full command is shown either way.
-    reversibility: "reversible",
+    blastFor: (p) => (p.resourceId ? "vm" : "container"),
+    // The planner is asked for a read-only check, but this is still a model-authored shell
+    // command. Until checks use a closed declarative vocabulary, the broker cannot prove that
+    // promise. Classify the real authority rather than the intended command.
+    reversibility: "disruptive",
     confirmToken: (p) => NAME_PREFIX + String(p.name),
     ownWorkOnly: true,
     validate: (raw) => {
       const name = str(raw.name);
       const command = typeof raw.command === "string" ? raw.command.trim() : "";
       const expect = typeof raw.expect === "string" ? raw.expect.trim() : "";
-      const shell = raw.shell === "bash" ? "bash" : raw.shell === "powershell" ? "powershell" : "sh";
+      const shell =
+        raw.shell === "bash" ? "bash" : raw.shell === "powershell" ? "powershell" : "sh";
       const template = str(raw.template);
       const commandOk =
-        command && command.length <= 600 && !command.includes("\0") && !command.includes(CHECK_MARKER);
+        command &&
+        command.length <= 600 &&
+        !command.includes("\0") &&
+        !command.includes(CHECK_MARKER);
       // In the person's own VMware machine: named by its record, signed in as their account.
       const resourceId = str(raw.resourceId);
       if (resourceId) {
@@ -1513,23 +1525,27 @@ export const RECIPES: Record<RecipeId, Recipe> = {
             command: String(p.command),
           }
         : p.shell === "powershell"
-        ? {
-            // Inside the Windows VM, over SSH on 127.0.0.1 — not in dockur's Linux wrapper.
-            id: "check",
-            cmd: "ssh",
-            args: windowsCheckArgs(String(p.template) as TemplateKey, String(p.command), CHECK_MARKER),
-          }
-        : {
-            id: "check",
-            cmd: "docker",
-            args: [
-              "exec",
-              NAME_PREFIX + String(p.name),
-              String(p.shell),
-              "-c",
-              `${String(p.command)}\necho "${CHECK_MARKER}=$?"`,
-            ],
-          },
+          ? {
+              // Inside the Windows VM, over SSH on 127.0.0.1 — not in dockur's Linux wrapper.
+              id: "check",
+              cmd: "ssh",
+              args: windowsCheckArgs(
+                String(p.template) as TemplateKey,
+                String(p.command),
+                CHECK_MARKER
+              ),
+            }
+          : {
+              id: "check",
+              cmd: "docker",
+              args: [
+                "exec",
+                NAME_PREFIX + String(p.name),
+                String(p.shell),
+                "-c",
+                `${String(p.command)}\necho "${CHECK_MARKER}=$?"`,
+              ],
+            },
     ],
   },
 
@@ -2159,12 +2175,20 @@ export function commandFailure(c: { cmd: string; timeoutMs?: number }, error: un
   if (e?.killed || e?.signal === "SIGTERM") {
     return `${c.cmd} took longer than ${Math.round((c.timeoutMs ?? 60_000) / 1000)} seconds, so Fadi stopped waiting. It may still finish on its own.`;
   }
-  const said = `${e?.stdout ?? ""}\n${e?.stderr ?? ""}`
-    .split("\n")
-    .map((line) => line.trim())
-    .find((line) => /^error\b/i.test(line)) ??
-    `${e?.stderr ?? ""}`.split("\n").map((l) => l.trim()).find(Boolean);
-  return said ? `${c.cmd}: ${said.replace(/^error:\s*/i, "")}` : (error instanceof Error ? error.message : "failed");
+  const said =
+    `${e?.stdout ?? ""}\n${e?.stderr ?? ""}`
+      .split("\n")
+      .map((line) => line.trim())
+      .find((line) => /^error\b/i.test(line)) ??
+    `${e?.stderr ?? ""}`
+      .split("\n")
+      .map((l) => l.trim())
+      .find(Boolean);
+  return said
+    ? `${c.cmd}: ${said.replace(/^error:\s*/i, "")}`
+    : error instanceof Error
+      ? error.message
+      : "failed";
 }
 
 /**
@@ -2274,13 +2298,20 @@ async function runGuestCheck(userId: string, step: GuestCheckStep): Promise<Step
   }
   const { labKeyPath } = await import("./templates");
   const args = [
-    "-i", labKeyPath(),
-    "-p", "22",
-    "-o", "BatchMode=yes",
-    "-o", "ConnectTimeout=10",
-    "-o", "StrictHostKeyChecking=no",
-    "-o", "UserKnownHostsFile=/dev/null",
-    "-o", "LogLevel=ERROR",
+    "-i",
+    labKeyPath(),
+    "-p",
+    "22",
+    "-o",
+    "BatchMode=yes",
+    "-o",
+    "ConnectTimeout=10",
+    "-o",
+    "StrictHostKeyChecking=no",
+    "-o",
+    "UserKnownHostsFile=/dev/null",
+    "-o",
+    "LogLevel=ERROR",
     `${step.user}@${address}`,
     // $? rather than $LASTEXITCODE: cmdlets never set the latter.
     `${step.command}; if ($?) { Write-Output "${CHECK_MARKER}=0" } else { Write-Output "${CHECK_MARKER}=1" }`,
@@ -2583,11 +2614,11 @@ export async function approveAndRun(input: {
                 ? await runStackStep(c)
                 : isMachineStep(c)
                   ? await runMachineStep(input.userId, c)
-            : isGuestCheckStep(c)
-              ? await runGuestCheck(input.userId, c)
-            : row.recipe === "lab.check"
-              ? await runCheck(c)
-              : await runCommand(c);
+                  : isGuestCheckStep(c)
+                    ? await runGuestCheck(input.userId, c)
+                    : row.recipe === "lab.check"
+                      ? await runCheck(c)
+                      : await runCommand(c);
       out.push(result.text);
       if (result.discovered) discovered = result.discovered;
       await audit.record({
@@ -2684,7 +2715,9 @@ export function checkVerdict(
   const match = marker.exec(output);
   const exit = match ? Number(match[1]) : null;
   const body = output.replace(marker, "").trim();
-  const passed = body.toLowerCase().includes(expect.toLowerCase());
+  // Expected prose in an error is not success ("service is not running" contains "running").
+  // A missing marker is also not proof: every rendered check appends one.
+  const passed = exit === 0 && body.toLowerCase().includes(expect.toLowerCase());
   const at = body.toLowerCase().indexOf(expect.toLowerCase());
   const excerpt =
     at >= 0

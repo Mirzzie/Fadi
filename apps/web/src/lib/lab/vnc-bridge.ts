@@ -31,6 +31,8 @@ import { logger } from "@/lib/observability/logger";
 export const SCREEN_BRIDGE_PORT = Number(process.env.FADI_SCREEN_BRIDGE_PORT) || 6089;
 const TICKET_TTL_MS = 30 * 60_000;
 const MAX_CONNECTIONS = 8;
+const MAX_FRAME_PAYLOAD = 16 * 1024 * 1024;
+const VNC_CONNECT_TIMEOUT_MS = 10_000;
 
 type Ticket = { userId: string; vncPort: number; expiresAt: number };
 type BridgeState = {
@@ -111,6 +113,7 @@ function handleUpgrade(req: IncomingMessage, socket: Duplex) {
     .split(",")
     .map((p) => p.trim());
   const vnc = connect({ host: "127.0.0.1", port: ticket.vncPort });
+  vnc.setTimeout(VNC_CONNECT_TIMEOUT_MS, () => close());
   state.connections += 1;
   let closed = false;
   const close = () => {
@@ -122,6 +125,7 @@ function handleUpgrade(req: IncomingMessage, socket: Duplex) {
   };
 
   vnc.once("connect", () => {
+    vnc.setTimeout(0);
     socket.write(
       [
         "HTTP/1.1 101 Switching Protocols",
@@ -187,6 +191,7 @@ export type Frame = { opcode: number; payload: Buffer };
 export class FrameReader {
   private buffer = Buffer.alloc(0);
   private fragments: Buffer[] = [];
+  private fragmentBytes = 0;
   private fragmentOpcode = 0;
 
   push(chunk: Buffer): Frame[] {
@@ -207,7 +212,7 @@ export class FrameReader {
       } else if (length === 127) {
         if (this.buffer.length < 10) break;
         const big = this.buffer.readBigUInt64BE(2);
-        if (big > BigInt(16 * 1024 * 1024)) throw new Error("Frame too large.");
+        if (big > BigInt(MAX_FRAME_PAYLOAD)) throw new Error("Frame too large.");
         length = Number(big);
         offset = 10;
       }
@@ -220,16 +225,24 @@ export class FrameReader {
       if (opcode >= 0x8) {
         out.push({ opcode, payload });
       } else if (opcode === 0x0) {
+        if (this.fragments.length === 0) throw new Error("Unexpected continuation frame.");
+        this.fragmentBytes += payload.length;
+        if (this.fragmentBytes > MAX_FRAME_PAYLOAD)
+          throw new Error("Fragmented message too large.");
         this.fragments.push(payload);
         if (fin) {
           out.push({ opcode: this.fragmentOpcode, payload: Buffer.concat(this.fragments) });
           this.fragments = [];
+          this.fragmentBytes = 0;
         }
       } else if (fin) {
+        if (this.fragments.length > 0) throw new Error("Incomplete fragmented message.");
         out.push({ opcode, payload });
       } else {
+        if (this.fragments.length > 0) throw new Error("Incomplete fragmented message.");
         this.fragmentOpcode = opcode;
         this.fragments = [payload];
+        this.fragmentBytes = payload.length;
       }
     }
     return out;

@@ -62,6 +62,19 @@ describe("WebSocket framing", () => {
     expect(frames).toEqual([{ opcode: 0x2, payload: Buffer.from("abcd") }]);
   });
 
+  it("rejects invalid and unbounded fragmented messages", () => {
+    expect(() => new FrameReader().push(clientFrame(Buffer.from("orphan"), 0x0))).toThrow(
+      /continuation/i
+    );
+
+    const reader = new FrameReader();
+    reader.push(clientFrame(Buffer.alloc(65_535), 0x2, false));
+    for (let i = 0; i < 255; i += 1) {
+      reader.push(clientFrame(Buffer.alloc(65_535), 0x0, false));
+    }
+    expect(() => reader.push(clientFrame(Buffer.alloc(65_535), 0x0, false))).toThrow(/too large/i);
+  });
+
   it("refuses unmasked client frames", () => {
     expect(() => new FrameReader().push(Buffer.from([0x82, 0x01, 0x41]))).toThrow();
   });

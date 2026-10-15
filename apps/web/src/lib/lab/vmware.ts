@@ -1,7 +1,8 @@
 import "server-only";
 
 import { execFile } from "node:child_process";
-import { copyFile, readFile, stat, writeFile } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
+import { copyFile, open, readFile, rename, rm, stat } from "node:fs/promises";
 import { homedir, networkInterfaces } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -33,6 +34,38 @@ import {
 const run = promisify(execFile);
 
 export const VMWARE_ENDPOINT_PREFIX = "vmware://local";
+
+/**
+ * Replace a real machine configuration without ever truncating the live file in place.
+ * The temporary file is written and synced beside the target, then one same-filesystem rename
+ * publishes it. If writing, syncing or renaming fails, the previous file remains at its path.
+ */
+export async function replaceTextFileAtomically(filePath: string, content: string): Promise<void> {
+  const current = await stat(filePath);
+  const temporary = path.join(
+    path.dirname(filePath),
+    `.${path.basename(filePath)}.fadi-tmp-${process.pid}-${randomBytes(6).toString("hex")}`
+  );
+  let handle: Awaited<ReturnType<typeof open>> | null = null;
+  try {
+    handle = await open(temporary, "wx", current.mode);
+    await handle.writeFile(content, "utf8");
+    await handle.sync();
+    await handle.close();
+    handle = null;
+    await rename(temporary, filePath);
+    // Persist the directory entry where the platform supports directory fsync.
+    const directory = await open(path.dirname(filePath), "r").catch(() => null);
+    if (directory) {
+      await directory.sync().catch(() => undefined);
+      await directory.close();
+    }
+  } catch (error) {
+    await handle?.close().catch(() => undefined);
+    await rm(temporary, { force: true }).catch(() => undefined);
+    throw error;
+  }
+}
 
 /** The .vmx path a registered resource points at, or null. Same reading as the broker's. */
 export function vmxPathOf(endpoint: string | null | undefined): string | null {
@@ -189,7 +222,7 @@ export async function enableScreen(input: {
   };
   const backup = `${input.vmxPath}.before-fadi`;
   if (!(await stat(backup).catch(() => null))) await copyFile(input.vmxPath, backup);
-  await writeFile(input.vmxPath, setVmxEntries(text, screenEntries(screen)), "utf8");
+  await replaceTextFileAtomically(input.vmxPath, setVmxEntries(text, screenEntries(screen)));
   return { ok: true, screen, changed: true };
 }
 
@@ -230,7 +263,7 @@ export async function setMachineMemory(
     };
   }
   const backup = await backupVmx(vmxPath);
-  await writeFile(vmxPath, setVmxEntries(text, { memsize: String(memoryMb) }), "utf8");
+  await replaceTextFileAtomically(vmxPath, setVmxEntries(text, { memsize: String(memoryMb) }));
   return { ok: true, backup };
 }
 
@@ -308,16 +341,15 @@ export async function moveMachineToFastDisk(
 
   const newVmxPath = path.join(target, path.basename(vmxPath));
   const vmx = await readFile(newVmxPath, "utf8");
-  await writeFile(newVmxPath, setVmxEntries(vmx, { "uuid.action": "keep" }), "utf8");
+  await replaceTextFileAtomically(newVmxPath, setVmxEntries(vmx, { "uuid.action": "keep" }));
 
   try {
     const inventory = await readFile(inventoryPath, "utf8");
     if (inventory.includes(`"${vmxPath}"`)) {
       await copyFile(inventoryPath, `${inventoryPath}.fadi-${Date.now()}`);
-      await writeFile(
+      await replaceTextFileAtomically(
         inventoryPath,
-        inventory.replaceAll(`"${vmxPath}"`, `"${newVmxPath}"`),
-        "utf8"
+        inventory.replaceAll(`"${vmxPath}"`, `"${newVmxPath}"`)
       );
     }
   } catch {
@@ -411,9 +443,8 @@ export async function applyMachineChanges(
   vmxPath: string,
   raw: Record<string, unknown>
 ): Promise<{ ok: true; applied: string[] } | { ok: false; message: string }> {
-  const { describeChanges, machineChangeEntries, validMachineChanges } = await import(
-    "./vmware-config"
-  );
+  const { describeChanges, machineChangeEntries, validMachineChanges } =
+    await import("./vmware-config");
   const changes = validMachineChanges(raw);
   if (Object.keys(changes).length === 0) return { ok: false, message: "Nothing to change." };
   const refusal = await refuseIfRunning(vmxPath);
@@ -422,10 +453,11 @@ export async function applyMachineChanges(
   if ((changes.cpus || changes.memoryMb) && parseVmx(text).get("checkpoint.vmstate")) {
     return {
       ok: false,
-      message: "The machine is suspended. Start it and shut it down properly, then change its CPU or memory.",
+      message:
+        "The machine is suspended. Start it and shut it down properly, then change its CPU or memory.",
     };
   }
   await backupVmx(vmxPath);
-  await writeFile(vmxPath, setVmxEntries(text, machineChangeEntries(changes)), "utf8");
+  await replaceTextFileAtomically(vmxPath, setVmxEntries(text, machineChangeEntries(changes)));
   return { ok: true, applied: describeChanges(changes) };
 }

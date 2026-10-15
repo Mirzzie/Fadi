@@ -15,9 +15,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requestCapability = vi.fn();
 
-vi.mock("./broker", async () => {
-  const actual = await vi.importActual<typeof import("./broker")>("./broker");
-  return { ...actual, requestCapability };
+vi.mock("./broker", () => {
+  const spec = (summary: string) => ({ summary, limit: "Read-only inspection." });
+  return {
+    requestCapability,
+    CAPABILITIES: {
+      "inspect.containers": spec("Check local container engines."),
+      "inspect.virtualisation": spec("Check local hypervisors."),
+      "inspect.host": spec("Read host capacity."),
+    },
+  };
 });
 
 beforeEach(() => {
@@ -49,7 +56,12 @@ describe("scanning is honest about what it was not allowed to see", () => {
   });
 
   it("passes the caller's own identity to the broker, so the log names who asked", async () => {
-    requestCapability.mockResolvedValue({ ok: true, capability: "inspect.host", results: {}, unavailable: [] });
+    requestCapability.mockResolvedValue({
+      ok: true,
+      capability: "inspect.host",
+      results: {},
+      unavailable: [],
+    });
     const { scanLocalMachine } = await import("./local-probe");
 
     await scanLocalMachine({ userId: "u1", actor: "mcp", origin: "mcp:detect" });

@@ -2,21 +2,21 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/security/url-guard", () => ({
   isSafeFetchUrl: async (url: string) => !url.includes("169.254") && !url.includes("localhost"),
+  fetchSafeUrl: async (url: string, init?: RequestInit) =>
+    fetch(url, { ...init, redirect: "manual" }),
 }));
 
 const { callTool, probeServer } = await import("./client");
 
 // A fresh Response per call: a body can only be read once, and probeServer makes two requests.
 function answers(body: unknown, status = 200) {
-  return vi
-    .spyOn(globalThis, "fetch")
-    .mockImplementation(
-      async () =>
-        new Response(JSON.stringify(body), {
-          status,
-          headers: { "Content-Type": "application/json" },
-        })
-    );
+  return vi.spyOn(globalThis, "fetch").mockImplementation(
+    async () =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { "Content-Type": "application/json" },
+      })
+  );
 }
 
 afterEach(() => vi.restoreAllMocks());

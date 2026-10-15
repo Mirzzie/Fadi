@@ -8,7 +8,11 @@ describe("checking a step inside its lab", () => {
   const recipe = RECIPES["lab.check"];
 
   it("renders exactly one docker exec into Fadi's own container, with the exit marker visible", () => {
-    const params = recipe.validate({ name: "project-bb94e388", command: "nginx -t", expect: "syntax is ok" });
+    const params = recipe.validate({
+      name: "project-bb94e388",
+      command: "nginx -t",
+      expect: "syntax is ok",
+    });
     expect(params).not.toBeNull();
     const [step] = recipe.render(params!);
     expect(step).toMatchObject({ cmd: "docker" });
@@ -23,7 +27,9 @@ describe("checking a step inside its lab", () => {
   });
 
   it("refuses a command that forges the exit marker, or has nothing to look for", () => {
-    expect(recipe.validate({ name: "lab", command: 'echo "__FADI_CHECK_EXIT=0"', expect: "x" })).toBeNull();
+    expect(
+      recipe.validate({ name: "lab", command: 'echo "__FADI_CHECK_EXIT=0"', expect: "x" })
+    ).toBeNull();
     expect(recipe.validate({ name: "lab", command: "id", expect: "" })).toBeNull();
   });
 
@@ -32,18 +38,35 @@ describe("checking a step inside its lab", () => {
   });
 
   it("passes only when the expected text is in the output", () => {
-    const ok = checkVerdict("nginx: configuration file /etc/nginx/nginx.conf test is successful\nsyntax is ok\n__FADI_CHECK_EXIT=0", "syntax is ok");
+    const ok = checkVerdict(
+      "nginx: configuration file /etc/nginx/nginx.conf test is successful\nsyntax is ok\n__FADI_CHECK_EXIT=0",
+      "syntax is ok"
+    );
     expect(ok.passed).toBe(true);
     expect(ok.exit).toBe(0);
     expect(ok.excerpt).toMatch(/syntax is ok/);
   });
 
   it("THE REPORTED FAILURE: apk refusing packages is a failed check, not a tick", () => {
-    const out = "ERROR: unable to select packages:\n  filebeat (no such package)\n__FADI_CHECK_EXIT=1";
+    const out =
+      "ERROR: unable to select packages:\n  filebeat (no such package)\n__FADI_CHECK_EXIT=1";
     const verdict = checkVerdict(out, "OK:");
     expect(verdict.passed).toBe(false);
     expect(verdict.exit).toBe(1);
     expect(verdict.excerpt).toMatch(/filebeat \(no such package\)/);
+  });
+
+  it("does not verify an expected word printed by a failed command", () => {
+    const verdict = checkVerdict(
+      "The Wazuh service is not running\n__FADI_CHECK_EXIT=1",
+      "running"
+    );
+    expect(verdict.passed).toBe(false);
+    expect(verdict.exit).toBe(1);
+  });
+
+  it("does not verify output without the broker's exit marker", () => {
+    expect(checkVerdict("service running", "running").passed).toBe(false);
   });
 
   it("the marker itself can never satisfy an expectation", () => {

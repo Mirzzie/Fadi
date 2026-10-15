@@ -2,7 +2,7 @@ import "server-only";
 
 import { getKv } from "@/lib/kv/store";
 import { logger } from "@/lib/observability/logger";
-import { isSafeFetchUrl } from "@/lib/security/url-guard";
+import { fetchSafeUrl, isSafeFetchUrl } from "@/lib/security/url-guard";
 import { detectClosedSignal, type PostingLiveness } from "./liveness-detect";
 
 export type { LivenessState, PostingLiveness } from "./liveness-detect";
@@ -24,7 +24,7 @@ const MAX_BODY_BYTES = 24 * 1024; // enough to catch a banner/headline, not the 
  */
 export async function readBodyPrefix(
   body: ReadableStream<Uint8Array> | null,
-  maxBytes = MAX_BODY_BYTES,
+  maxBytes = MAX_BODY_BYTES
 ): Promise<string> {
   if (!body || maxBytes <= 0) return "";
   const reader = body.getReader();
@@ -37,7 +37,8 @@ export async function readBodyPrefix(
       const next = await reader.read();
       if (next.done) break;
       const remaining = maxBytes - read;
-      const chunk = next.value.byteLength > remaining ? next.value.subarray(0, remaining) : next.value;
+      const chunk =
+        next.value.byteLength > remaining ? next.value.subarray(0, remaining) : next.value;
       read += chunk.byteLength;
       text += decoder.decode(chunk, { stream: true });
       if (next.value.byteLength > remaining || read === maxBytes) {
@@ -94,14 +95,12 @@ export async function checkPostingLiveness(url: string): Promise<PostingLiveness
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
-    const res = await fetch(url, {
+    const res = await fetchSafeUrl(url, {
       method: "GET",
-      redirect: "follow",
       signal: controller.signal,
       headers: {
         // A plausible UA — many boards 403 a bare fetch, which we treat as unknown.
-        "User-Agent":
-          "Mozilla/5.0 (compatible; Fadi/1.0; +https://careeros.app) freshness-check",
+        "User-Agent": "Mozilla/5.0 (compatible; Fadi/1.0; +https://careeros.app) freshness-check",
         Accept: "text/html,application/xhtml+xml",
       },
     });

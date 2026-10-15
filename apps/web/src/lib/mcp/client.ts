@@ -1,6 +1,6 @@
 import "server-only";
 
-import { isSafeFetchUrl } from "@/lib/security/url-guard";
+import { fetchSafeUrl, isSafeFetchUrl } from "@/lib/security/url-guard";
 import { logger } from "@/lib/observability/logger";
 
 /**
@@ -33,15 +33,17 @@ export type McpProbe =
   | { ok: true; tools: McpTool[] }
   | { ok: false; status: "unreachable" | "refused"; detail: string };
 
-export type McpCall =
-  | { ok: true; text: string }
-  | { ok: false; detail: string };
+export type McpCall = { ok: true; text: string } | { ok: false; detail: string };
 
 /** Untrusted text on its way into a prompt: one line, capped, no control characters. */
 function clean(text: unknown, max = MAX_DESCRIPTION): string {
   if (typeof text !== "string") return "";
   // eslint-disable-next-line no-control-regex
-  return text.replace(/[\u0000-\u001f\u007f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, max);
+  return text
+    .replace(/[\u0000-\u001f\u007f]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, max);
 }
 
 async function rpc(
@@ -49,7 +51,9 @@ async function rpc(
   token: string | null,
   method: string,
   params: Record<string, unknown>
-): Promise<{ ok: true; result: unknown } | { ok: false; status: "unreachable" | "refused"; detail: string }> {
+): Promise<
+  { ok: true; result: unknown } | { ok: false; status: "unreachable" | "refused"; detail: string }
+> {
   if (!(await isSafeFetchUrl(url))) {
     return { ok: false, status: "refused", detail: "That address is not one Fadi may call." };
   }
@@ -57,7 +61,7 @@ async function rpc(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
-    const response = await fetch(url, {
+    const response = await fetchSafeUrl(url, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -72,12 +76,20 @@ async function rpc(
       return { ok: false, status: "refused", detail: "The server refused Fadi's credentials." };
     }
     if (!response.ok) {
-      return { ok: false, status: "unreachable", detail: `The server answered ${response.status}.` };
+      return {
+        ok: false,
+        status: "unreachable",
+        detail: `The server answered ${response.status}.`,
+      };
     }
 
     const body = (await response.json()) as { result?: unknown; error?: { message?: string } };
     if (body.error) {
-      return { ok: false, status: "refused", detail: clean(body.error.message) || "The server returned an error." };
+      return {
+        ok: false,
+        status: "refused",
+        detail: clean(body.error.message) || "The server returned an error.",
+      };
     }
     return { ok: true, result: body.result };
   } catch (error) {

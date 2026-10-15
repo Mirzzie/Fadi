@@ -3,7 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const cache = vi.hoisted(() => new Map<string, string>());
 
 vi.mock("server-only", () => ({}));
-vi.mock("@/lib/security/url-guard", () => ({ isSafeFetchUrl: async () => true }));
+vi.mock("@/lib/security/url-guard", () => ({
+  isSafeFetchUrl: async () => true,
+  fetchSafeUrl: async (url: string, init?: RequestInit) =>
+    fetch(url, { ...init, redirect: "manual" }),
+}));
 vi.mock("@/lib/observability/logger", () => ({
   logger: { info: vi.fn(), warn: vi.fn() },
 }));
@@ -49,7 +53,10 @@ describe("bounded liveness response reading", () => {
       status: 200,
     });
     const arrayBuffer = vi.spyOn(response, "arrayBuffer");
-    vi.stubGlobal("fetch", vi.fn(async () => response));
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => response)
+    );
     const { checkPostingLiveness } = await import("./liveness");
 
     const result = await checkPostingLiveness("https://jobs.example.test/1");

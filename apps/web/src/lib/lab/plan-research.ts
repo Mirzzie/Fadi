@@ -3,7 +3,7 @@ import "server-only";
 import { serverEnv } from "@/lib/env.server";
 import { htmlToText } from "@/lib/data-sources/sanitize";
 import { parseSearxng, type SearchHit } from "@/lib/jobs/web-search";
-import { isSafeFetchUrl } from "@/lib/security/url-guard";
+import { fetchSafeUrl, readTextBodyLimited } from "@/lib/security/url-guard";
 
 /**
  * A PROJECT IS PLANNED FROM TODAY'S INTERNET, NOT A MODEL'S MEMORY.
@@ -38,7 +38,7 @@ async function search(queries: string[], perQuery: number): Promise<SearchHit[]>
   const base = serverEnv.SEARXNG_URL.replace(/\/$/, "");
   const batches = await Promise.all(
     queries.map(async (query) => {
-      const url = `${base}/search?q=${encodeURIComponent(query)}&format=json&categories=general&time_range=year`;
+      const url = `${base}/search?q=${encodeURIComponent(query)}&format=json&categories=general`;
       try {
         const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
         return res.ok ? parseSearxng(await res.json()).slice(0, perQuery) : [];
@@ -70,15 +70,14 @@ export function rankSources(hits: SearchHit[], preferHosts: string[] = []): Sear
 }
 
 async function readPage(url: string, maxChars: number): Promise<string> {
-  if (!(await isSafeFetchUrl(url))) return "";
   try {
-    const res = await fetch(url, {
+    const res = await fetchSafeUrl(url, {
       signal: AbortSignal.timeout(10_000),
       headers: { "user-agent": "Mozilla/5.0 (Fadi plan research)" },
-      redirect: "follow",
     });
     if (!res.ok || !/text\/html|text\/plain/.test(res.headers.get("content-type") ?? "")) return "";
-    return relevantExcerpt(htmlToText(mainContent(await res.text()), 60_000), maxChars);
+    const html = await readTextBodyLimited(res, 1024 * 1024);
+    return relevantExcerpt(htmlToText(mainContent(html), 60_000), maxChars);
   } catch {
     return "";
   }
@@ -202,18 +201,15 @@ export async function brokenLinks(texts: string[], skipHosts: string[] = []): Pr
   });
   const results = await Promise.all(
     links.slice(0, 10).map(async (link) => {
-      if (!(await isSafeFetchUrl(link))) return null;
       try {
-        let res = await fetch(link, {
+        let res = await fetchSafeUrl(link, {
           method: "HEAD",
-          redirect: "follow",
           signal: AbortSignal.timeout(10_000),
         });
         // Some servers refuse HEAD; ask for one byte instead.
         if (res.status === 405 || res.status === 403) {
-          res = await fetch(link, {
+          res = await fetchSafeUrl(link, {
             headers: { range: "bytes=0-0" },
-            redirect: "follow",
             signal: AbortSignal.timeout(10_000),
           });
         }
