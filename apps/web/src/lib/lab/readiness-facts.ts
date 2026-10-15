@@ -43,6 +43,39 @@ export async function onSpinningDisk(target: string): Promise<boolean | null> {
   }
 }
 
+async function usesNat(vmxPath: string): Promise<boolean> {
+  try {
+    const text = await readFile(vmxPath, "utf8");
+    return /^ethernet0\.connectionType\s*=\s*"nat"/im.test(text);
+  } catch {
+    return false;
+  }
+}
+
+/** Does VMware's NAT DNS (the address its own nat.conf names) answer a lookup? */
+export async function natDnsAnswers(
+  natConf = "/etc/vmware/vmnet8/nat/nat.conf"
+): Promise<boolean | null> {
+  let gateway: string | undefined;
+  try {
+    gateway = (await readFile(natConf, "utf8")).match(/^\s*ip\s*=\s*([\d.]+)/m)?.[1];
+  } catch {
+    return null;
+  }
+  if (!gateway) return null;
+  const { Resolver } = await import("node:dns/promises");
+  const resolver = new Resolver({ timeout: 2500, tries: 1 });
+  resolver.setServers([gateway]);
+  try {
+    await resolver.resolve4("example.com");
+    return true;
+  } catch (error) {
+    // Only a timeout or refusal means "no DNS"; a missing name would still be an answer.
+    const code = (error as { code?: string }).code;
+    return code === "ENOTFOUND" || code === "ENODATA";
+  }
+}
+
 async function dockerFreeGb(): Promise<number | null> {
   try {
     const { stdout } = await run("docker", ["info", "--format", "{{.DockerRootDir}}"], {
@@ -96,6 +129,7 @@ export async function gatherReadinessFacts(input: {
       running: isRunning,
       onSpinningDisk: spinning,
       toolsRunning: isRunning ? (await guestToolsState(input.vmware.vmxPath)) === "running" : null,
+      natDnsWorks: summary && (await usesNat(input.vmware.vmxPath)) ? await natDnsAnswers() : null,
       libraryCopy: (await inLibrary(input.vmware.vmxPath))
         ? null
         : await libraryCopyOf(input.vmware.vmxPath),

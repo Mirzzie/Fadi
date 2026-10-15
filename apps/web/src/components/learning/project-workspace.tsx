@@ -32,6 +32,7 @@ import { PendingAction } from "@/components/os/pending-action-card";
 import { announceActionsChanged, usePendingActions } from "@/components/os/pending-actions";
 import { Button } from "@/components/ui/button";
 import { reachableSurface, runtimeMessage } from "@/lib/lab/runtime-contract";
+import { ChecksSetup } from "@/components/learning/checks-setup";
 import { LabScreenFrame } from "@/components/learning/lab-screen-frame";
 import { MachineChooser } from "@/components/learning/machine-chooser";
 import { PlanHistory } from "@/components/learning/plan-history";
@@ -193,9 +194,11 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
               onComplete={completeCurrent}
               onRevised={refresh}
               canCheck={Boolean(
-                // Linux labs check through docker exec; Windows labs over SSH (labSignIn).
-                (run.labShell || run.labSignIn) &&
-                run.target.kind === "local-docker" &&
+                // Linux labs check through docker exec; Windows labs over SSH (labSignIn); the
+                // person's own VMware machine over SSH once checks are set up (the action says so
+                // when they are not).
+                (run.target.kind === "vmware" ||
+                  ((run.labShell || run.labSignIn) && run.target.kind === "local-docker")) &&
                 runtime &&
                 !["stopped", "failed", "queued", "stopping"].includes(runtime.phase)
               )}
@@ -340,6 +343,7 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
                 }}
               />
             ) : null}
+            <ChecksSetup runId={runId} tick={tick} />
             <ProjectReadiness
               runId={runId}
               tick={tick}

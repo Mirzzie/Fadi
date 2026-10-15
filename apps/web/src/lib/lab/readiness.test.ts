@@ -88,4 +88,11 @@ describe("can this project run here", () => {
     expect(result.checks.map((c) => c.id)).toContain("vm-elsewhere");
     expect(result.checks.map((c) => c.id)).not.toContain("vm-disk");
   });
+
+  it("warns when VMware's NAT gives the machine no DNS — it cannot download anything", () => {
+    const result = assessReadiness(
+      facts({ machine: { ...server, memoryMb: 4096, onSpinningDisk: false, natDnsWorks: false } })
+    );
+    expect(result.checks.find((c) => c.id === "vm-dns")?.level).toBe("warn");
+  });
 });

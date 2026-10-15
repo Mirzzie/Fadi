@@ -223,24 +223,46 @@ export async function proposeStepCheckAction(input: {
     resource ? { id: resource.id, label: resource.label, endpoint: resource.endpoint } : null
   );
   if (target.kind === "unconnected") return { ok: false, message: unconnectedMessage(target) };
-  if (target.kind !== "local-docker") {
-    return { ok: false, message: "Checking inside a VMware machine isn't supported yet." };
-  }
 
+  // THE PERSON'S OWN VMWARE MACHINE: checked over SSH as the account set up for it.
+  let vmware: { resourceId: string; user: string } | null = null;
   const name = labNameForRun(project.run.id);
-  const { containerState } = await import("@/lib/lab/runtime-observer");
-  const state = await containerState(name);
-  if (!state?.running) return { ok: false, message: "Start the lab first — there is nothing running to check." };
+  let labFacts: string;
+  if (target.kind === "vmware" && resource) {
+    const { readVmxSummary, runningVmxPaths, vmxPathOf } = await import("@/lib/lab/vmware");
+    const vmx = vmxPathOf(resource.endpoint);
+    const summary = vmx ? await readVmxSummary(vmx) : null;
+    if (!summary || !summary.family.startsWith("windows")) {
+      return { ok: false, message: "Checks inside your own VMware machines work for Windows machines so far." };
+    }
+    if (!resource.guestUser) {
+      return {
+        ok: false,
+        message: "Set up checks for this machine first — “Set up checks” in the lab panel, once.",
+      };
+    }
+    if (!vmx || !(await runningVmxPaths())?.has(vmx)) {
+      return { ok: false, message: "Start the machine first — there is nothing running to check." };
+    }
+    vmware = { resourceId: resource.id, user: resource.guestUser };
+    labFacts = [
+      `The lab is the person's own VMware machine "${resource.label}" (${summary.guestOs}), Windows.`,
+      `The check runs as ONE line of PowerShell over SSH, signed in as ${resource.guestUser}, a local administrator.`,
+    ].join("\n");
+  } else {
+    const { containerState } = await import("@/lib/lab/runtime-observer");
+    const state = await containerState(name);
+    if (!state?.running) return { ok: false, message: "Start the lab first — there is nothing running to check." };
+    labFacts = placementBriefing({
+      hostOs: hostOsOf(process.platform),
+      template,
+      hostLabel: target.label,
+      containerName: `fadi-${name}`,
+    });
+  }
 
   const generate = await getUserDocGenerate(user.id);
   if (!generate) return { ok: false, message: "Fadi needs an AI provider for this — add one in Settings → AI." };
-
-  const labFacts = placementBriefing({
-    hostOs: hostOsOf(process.platform),
-    template,
-    hostLabel: target.label,
-    containerName: `fadi-${name}`,
-  });
 
   try {
     const check = await generate.structured(
@@ -266,7 +288,9 @@ export async function proposeStepCheckAction(input: {
     const proposal = await proposeAction({
       userId: user.id,
       recipe: "lab.check",
-      params: { name, command: check.command, expect: check.expect, shell, template },
+      params: vmware
+        ? { ...vmware, command: check.command, expect: check.expect, shell: "powershell" }
+        : { name, command: check.command, expect: check.expect, shell, template },
       // The command was written by the model, even though a person asked for it.
       actor: "model",
       origin: "dashboard:step_check",

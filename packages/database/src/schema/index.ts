@@ -1597,6 +1597,11 @@ export const labResources = pgTable(
     secretHint: text("secret_hint"),
     endpoint: text("endpoint"),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }),
+    /**
+     * The account Fadi signs in as to run approved checks inside the person's own VMware
+     * machine (with Fadi's lab key — never a password). Null until checks are set up.
+     */
+    guestUser: text("guest_user"),
     ...timestamps,
   },
   (table) => [index("lab_resources_user_idx").on(table.userId)]

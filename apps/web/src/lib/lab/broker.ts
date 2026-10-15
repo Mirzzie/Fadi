@@ -198,7 +198,29 @@ type MachineStep = {
   memoryMb?: number;
 };
 
-type Step = Command | FileStep | NetStep | BuildStep | ScreenStep | StackStep | MachineStep;
+/**
+ * A check inside the person's own VMware machine, over SSH with Fadi's lab key. The address is
+ * asked of VMware at execution (it changes with DHCP) and must be on VMware's own networks; the
+ * path is re-resolved from the person's record and must match.
+ */
+type GuestCheckStep = {
+  id: string;
+  guestCheck: true;
+  resourceId: string;
+  vmx: string;
+  user: string;
+  command: string;
+};
+
+type Step =
+  | Command
+  | FileStep
+  | NetStep
+  | BuildStep
+  | ScreenStep
+  | StackStep
+  | MachineStep
+  | GuestCheckStep;
 
 function isBuildStep(step: Step): step is BuildStep {
   return "build" in step;
@@ -223,6 +245,13 @@ function isStackStep(step: Step): step is StackStep {
 function isMachineStep(step: Step): step is MachineStep {
   return "machine" in step;
 }
+
+function isGuestCheckStep(step: Step): step is GuestCheckStep {
+  return "guestCheck" in step;
+}
+
+/** A Windows account name: letters, digits and . _ - only, so it can never carry an option. */
+const GUEST_USER_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
 function composeArgs(step: StackStep, dir: string): string[] {
   const file = `${dir}/${step.file}`;
@@ -251,6 +280,9 @@ function displayOf(step: Step): string[] {
   }
   if (isScreenStep(step)) {
     return ["turn on the screen (VNC, this computer only) in", step.vmx];
+  }
+  if (isGuestCheckStep(step)) {
+    return ["ssh", `${step.user}@<the machine's address from VMware>`, step.command];
   }
   if (isMachineStep(step)) {
     return step.machine === "memory"
@@ -1342,6 +1374,24 @@ export const RECIPES: Record<RecipeId, Recipe> = {
       const expect = typeof raw.expect === "string" ? raw.expect.trim() : "";
       const shell = raw.shell === "bash" ? "bash" : raw.shell === "powershell" ? "powershell" : "sh";
       const template = str(raw.template);
+      const commandOk =
+        command && command.length <= 600 && !command.includes("\0") && !command.includes(CHECK_MARKER);
+      // In the person's own VMware machine: named by its record, signed in as their account.
+      const resourceId = str(raw.resourceId);
+      if (resourceId) {
+        const user = str(raw.user);
+        if (!zUuid(resourceId) || !user || !GUEST_USER_RE.test(user)) return null;
+        if (!commandOk || !expect || expect.length > 200) return null;
+        return {
+          resourceId,
+          user,
+          command,
+          expect,
+          shell: "powershell",
+          label: typeof raw.label === "string" ? raw.label : undefined,
+          vmxPath: typeof raw.vmxPath === "string" ? raw.vmxPath : undefined,
+        };
+      }
       // A Windows check needs to know which lab template's account to sign in as.
       if (shell === "powershell" && (!template || !isTemplateKey(template))) return null;
       if (!name || !NAME_RE.test(name)) return null;
@@ -1356,11 +1406,20 @@ export const RECIPES: Record<RecipeId, Recipe> = {
       return { name, command, expect, shell, ...(shell === "powershell" ? { template } : {}) };
     },
     summary: (p) =>
-      `Run a check inside ${NAME_PREFIX}${p.name}: ${p.command} — it passes if the output contains "${p.expect}".`,
+      `Run a check inside ${p.resourceId ? (p.label ?? "your VMware machine") : NAME_PREFIX + p.name}: ${p.command} — it passes if the output contains "${p.expect}".`,
     reversal: () =>
       "A check is meant to only read. If the command changes something, it changes it inside the lab only.",
     render: (p) => [
-      p.shell === "powershell"
+      p.resourceId
+        ? {
+            id: "check",
+            guestCheck: true as const,
+            resourceId: String(p.resourceId),
+            vmx: String(p.vmxPath),
+            user: String(p.user),
+            command: String(p.command),
+          }
+        : p.shell === "powershell"
         ? {
             // Inside the Windows VM, over SSH on 127.0.0.1 — not in dockur's Linux wrapper.
             id: "check",
@@ -1555,7 +1614,8 @@ async function hydrateRecipeParams(
   if (
     !["vmware.start", "vmware.suspend", "vmware.memory", "vmware.move", "vmware.relink"].includes(
       recipe
-    )
+    ) &&
+    !(recipe === "lab.check" && params.resourceId)
   ) {
     return params;
   }
@@ -1669,7 +1729,7 @@ export async function proposeAction(input: {
   // A recipe that may only touch Fadi's own work checks that here, not at execution —
   // so the person is never shown a prompt for something Fadi was never going to be
   // allowed to do.
-  if (recipe.ownWorkOnly) {
+  if (recipe.ownWorkOnly && !(input.recipe === "lab.check" && params.resourceId)) {
     const mine = [
       ...(await requests.createdNames(input.userId, "container.run")),
       ...(await requests.createdNames(input.userId, "lab.start")),
@@ -2043,6 +2103,49 @@ async function runStackStep(step: StackStep): Promise<StepResult> {
   }
 }
 
+/** A check inside the person's VMware machine, over SSH to the address VMware reports. */
+async function runGuestCheck(userId: string, step: GuestCheckStep): Promise<StepResult> {
+  const resolved = await hydrateRecipeParams(userId, "vmware.memory", {
+    resourceId: step.resourceId,
+  });
+  if (!resolved || resolved.vmxPath !== step.vmx) {
+    throw new Error("That machine's settings file changed since you approved this.");
+  }
+  const { guestAddress } = await import("./vmware");
+  const address = await guestAddress(step.vmx);
+  if (!address) {
+    throw new Error(
+      "VMware can't tell the machine's address. It must be running with VMware Tools started."
+    );
+  }
+  const { labKeyPath } = await import("./templates");
+  const args = [
+    "-i", labKeyPath(),
+    "-p", "22",
+    "-o", "BatchMode=yes",
+    "-o", "ConnectTimeout=10",
+    "-o", "StrictHostKeyChecking=no",
+    "-o", "UserKnownHostsFile=/dev/null",
+    "-o", "LogLevel=ERROR",
+    `${step.user}@${address}`,
+    // $? rather than $LASTEXITCODE: cmdlets never set the latter.
+    `${step.command}; if ($?) { Write-Output "${CHECK_MARKER}=0" } else { Write-Output "${CHECK_MARKER}=1" }`,
+  ];
+  try {
+    const { stdout, stderr } = await run("ssh", args, { timeout: 30_000, maxBuffer: 256 * 1024 });
+    return { text: `${stdout}${stderr ? `\n${stderr}` : ""}`.slice(-8_000) };
+  } catch (error) {
+    const e = error as { stdout?: string; stderr?: string };
+    // A refused or failed sign-in is the common case before checks are set up: say so.
+    if (/Permission denied|Connection refused|timed out/i.test(`${e.stderr ?? ""}`)) {
+      throw new Error(
+        "Fadi couldn't sign in to the machine over SSH. Run “Set up checks” in the machine once, then check again."
+      );
+    }
+    return { text: `${e.stdout ?? ""}${e.stderr ? `\n${e.stderr}` : ""}`.slice(-8_000) };
+  }
+}
+
 /** Change or move a registered VMware machine, after resolving its path again. */
 async function runMachineStep(userId: string, step: MachineStep): Promise<StepResult> {
   const resolved = await hydrateRecipeParams(userId, "vmware.memory", {
@@ -2321,6 +2424,8 @@ export async function approveAndRun(input: {
                 ? await runStackStep(c)
                 : isMachineStep(c)
                   ? await runMachineStep(input.userId, c)
+            : isGuestCheckStep(c)
+              ? await runGuestCheck(input.userId, c)
             : row.recipe === "lab.check"
               ? await runCheck(c)
               : await runCommand(c);

@@ -398,6 +398,7 @@ describe("the catalogue itself stays safe as it grows", () => {
         stack: "wazuh",
         agentIp: "172.16.89.1",
         memoryMb: 4096,
+        user: "Administrator",
       });
       expect(params, `${id} should accept a legal parameter bag`).not.toBeNull();
 
@@ -1017,6 +1018,47 @@ describe("changing your own VMware machine", () => {
       expect(move.argv.flat()).not.toContain("/tmp/x.vmx");
       expect(move.summary).toMatch(/original stays/);
     }
+  });
+});
+
+describe("checks inside your own VMware machine", () => {
+  it("signs in as a plain account name and shows the command, never a caller's path", async () => {
+    getResource.mockResolvedValue({
+      id: "11111111-1111-4111-8111-111111111111",
+      label: "Windows Server 2025",
+      endpoint: "vmware://local/home/me/vmware/ws/ws.vmx",
+    });
+    const res = await propose_(
+      {
+        resourceId: "11111111-1111-4111-8111-111111111111",
+        user: "Administrator",
+        command: "Get-ChildItem C:\\LabWazuh",
+        expect: "LabWazuh",
+        vmxPath: "/tmp/other.vmx",
+      },
+      "lab.check"
+    );
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.argv[0]).toEqual([
+        "ssh",
+        "Administrator@<the machine's address from VMware>",
+        "Get-ChildItem C:\\LabWazuh",
+      ]);
+      expect(res.argv.flat()).not.toContain("/tmp/other.vmx");
+    }
+  });
+
+  it("refuses an account name that could carry an option", async () => {
+    const { RECIPES } = await import("./broker");
+    expect(
+      RECIPES["lab.check"].validate({
+        resourceId: "11111111-1111-4111-8111-111111111111",
+        user: "-oProxyCommand=evil",
+        command: "whoami",
+        expect: "x",
+      })
+    ).toBeNull();
   });
 });
 

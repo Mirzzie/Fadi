@@ -118,6 +118,16 @@ export function createLabResourcesRepository(db: Database) {
       return row ?? null;
     },
 
+    /** The account Fadi's lab key signs in as for checks in this VMware machine; null clears it. */
+    async setGuestUser(userId: string, id: string, guestUser: string | null): Promise<LabResource | null> {
+      const [row] = await db
+        .update(labResources)
+        .set({ guestUser, updatedAt: new Date() })
+        .where(and(eq(labResources.userId, userId), eq(labResources.id, id)))
+        .returning();
+      return row ?? null;
+    },
+
     async remove(userId: string, id: string): Promise<void> {
       await db
         .delete(labResources)

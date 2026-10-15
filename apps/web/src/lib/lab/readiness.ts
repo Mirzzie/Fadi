@@ -25,6 +25,8 @@ export type ReadinessFacts = {
         toolsRunning: boolean | null;
         /** VMware's library opens a DIFFERENT copy of this same machine (by hardware id). */
         libraryCopy?: string | null;
+        /** On VMware's NAT network, VMware's own DNS answers. Null when not on NAT or unknown. */
+        natDnsWorks?: boolean | null;
       }
     | { kind: "fresh"; label: string; memoryMb: number; running: boolean }
     | null;
@@ -120,6 +122,14 @@ export function assessReadiness(facts: ReadinessFacts): Readiness {
         level: "warn",
         text: `${machine.label} lives on a spinning disk (HDD): slow to start, slow to use.`,
         fix: "Move it to the SSD (Fadi can, while it is shut down).",
+      });
+    }
+    if (machine.natDnsWorks === false) {
+      checks.push({
+        id: "vm-dns",
+        level: "warn",
+        text: "VMware's network gives the machine no working DNS, so it can't download anything (packages, agents, updates).",
+        fix: "VMware's NAT is asking this computer's local-only resolver. Give it real DNS servers in /etc/vmware/vmnet8/nat/nat.conf ([dns] nameserver1 = 1.1.1.1) and restart vmware-networks.",
       });
     }
     if (machine.running && machine.toolsRunning === false) {

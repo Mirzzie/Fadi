@@ -2,7 +2,7 @@ import "server-only";
 
 import { execFile } from "node:child_process";
 import { copyFile, readFile, stat, writeFile } from "node:fs/promises";
-import { homedir } from "node:os";
+import { homedir, networkInterfaces } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
 
@@ -365,4 +365,39 @@ export async function inLibrary(
   } catch {
     return false;
   }
+}
+
+/**
+ * The machine's address, from VMware Tools — only if it is on VMware's own networks on this
+ * computer (NAT or host-only), so a check can never be pointed at the home network.
+ */
+export async function guestAddress(vmxPath: string): Promise<string | null> {
+  try {
+    const { stdout } = await run("vmrun", ["-T", "ws", "getGuestIPAddress", vmxPath], {
+      timeout: 15_000,
+      maxBuffer: 16 * 1024,
+    });
+    const address = stdout.trim();
+    if (!/^(?:\d{1,3}\.){3}\d{1,3}$/.test(address)) return null;
+    const ifaces = networkInterfaces();
+    const onVmnet = Object.entries(ifaces).some(
+      ([name, list]) =>
+        name.startsWith("vmnet") &&
+        (list ?? []).some(
+          (a) =>
+            a.family === "IPv4" &&
+            a.address.split(".").slice(0, 3).join(".") === address.split(".").slice(0, 3).join(".")
+        )
+    );
+    return onVmnet ? address : null;
+  } catch {
+    return null;
+  }
+}
+
+/** This computer's own addresses on VMware's networks — where Fadi's checks come from. */
+export function hostAddressesOnVmnets(): string[] {
+  return Object.entries(networkInterfaces())
+    .filter(([name]) => name.startsWith("vmnet"))
+    .flatMap(([, list]) => (list ?? []).filter((a) => a.family === "IPv4").map((a) => a.address));
 }
