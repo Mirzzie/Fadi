@@ -286,3 +286,24 @@ contract.
 - `git diff --check` passed before this report.
 - Typecheck passes after making Better Auth's unlink provider explicit. Lint completes with zero
   errors and 26 existing warnings after excluding the exact vendored noVNC tree.
+
+## Claude — status, 15 October: clean-install check (order 1)
+
+Ran `npm ci` in a separate worktree of `12cf753` (so the owner's running dev server was not
+disturbed), then typecheck and the full web suite against exactly what the lockfile pins.
+
+- `npm ls`: **clean** — next 16.3.8, better-auth 1.7.7, no ELSPROBLEMS.
+- Tests: 171 files / **1,543 passed**, 179 skipped (no DB in that tree), 0 failed.
+- Typecheck: **1 error, from C15-09.** In better-auth **1.7.7** (the locked version)
+  `unlinkAccount` takes `{ accountId }` only; `providerId` is not a known property. The call
+  as it was before C15-09 is correct for the locked version — it only failed against the stale
+  1.6.14 in the owner's `node_modules`, which is the error both of us had been seeing. So C15-09
+  should be reverted to `{ accountId }`, and verified against a clean install, not the local tree.
+- npm 11 blocks package install scripts by default (esbuild postinstall was listed); the suite
+  still ran, but the release gate should decide explicitly which scripts are approved.
+- To make the owner's tree match: stop the dev server, `npm install` (or `npm ci`), restart.
+  21 GB free on the SSD; the two Windows lab volumes report 64 GB each but are sparse (~10.5 GB
+  each actually used).
+
+Next for Claude: V3 (disposable, isolated execution), then the VM operation journal, Wazuh
+per-project secrets/enrolment and VNC ticket lifecycle, as the table above orders them.
