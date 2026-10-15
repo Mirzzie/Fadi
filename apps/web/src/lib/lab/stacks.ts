@@ -52,6 +52,8 @@ export type StackDefinition = {
     /** The agent's Windows service name — not "ossec", which a plan guessed (15 Oct 2026). */
     windowsService: string;
     windowsConfig: string;
+    /** The vendor's documentation site: research prefers it over blogs. */
+    docsHost: string;
   };
 };
 
@@ -84,6 +86,7 @@ export const STACKS: Record<StackKey, StackDefinition> = {
       managerHost: "wazuh.manager",
       windowsInstaller: `https://packages.wazuh.com/4.x/windows/wazuh-agent-${WAZUH_VERSION}-1.msi`,
       windowsService: "WazuhSvc",
+      docsHost: "documentation.wazuh.com",
       windowsConfig: "C:\\Program Files (x86)\\ossec-agent\\ossec.conf",
     },
     images: {

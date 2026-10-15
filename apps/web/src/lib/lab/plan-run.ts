@@ -7,7 +7,7 @@ import { createLabResourcesRepository, createProjectRunsRepository } from "@care
 import { getDatabase } from "@/lib/database/client";
 import { AiRateLimitError, getUserDocGenerate } from "@/lib/ai/user-generate";
 import { placeLab, type Resource } from "@/lib/lab/capability";
-import { labContainerForRun, type TemplateKey } from "./templates";
+import { LAB_TEMPLATES, labContainerForRun, type TemplateKey } from "./templates";
 import {
   withFoldersCreated,
   hostOsOf,
@@ -247,72 +247,95 @@ export async function planProjectRun(
       ].join("\n")
     : "";
 
-  try {
-    const parsed = await generate.structured(
-      SYSTEM,
-      [
-        `Project: ${input.title}`,
-        input.detail ? `Description: ${input.detail}` : "",
-        placement,
-        machineLine,
-        hostLine,
-        servicesLine,
-        resourcesLine,
-        doneLine,
-      ]
-        .filter(Boolean)
-        .join("\n"),
-      planSchema,
-      "project_plan"
-    );
+  // RESEARCH FIRST (plan-research.ts): today's documentation for the project and its tools,
+  // so commands, versions and links come from the internet rather than a model's memory.
+  const { STACKS: STACK_DEFS, stacksForProject: stackKeys } = await import("./stacks");
+  const projectStacks = stackKeys(input);
+  const { brokenLinks, researchForPlan, researchForPrompt } = await import("./plan-research");
+  const sources = template
+    ? await researchForPlan({
+        title: input.title,
+        detail: input.detail,
+        labLabel: template ? LAB_TEMPLATES[template].label : null,
+        tools: projectStacks.map(
+          (key) => `${STACK_DEFS[key].label.replace(/ SIEM$/, "")} agent ${template && labOsOf(template) === "windows" ? "Windows" : "Linux"}`
+        ),
+        preferHosts: projectStacks.map((key) => STACK_DEFS[key].agent.docsHost),
+      }).catch(() => [])
+    : [];
+  const researchLine = template ? researchForPrompt(sources) : "";
+  logger.info("lab.plan_research", { userId, sources: sources.length });
 
-    // CHECK THE PLAN AGAINST ITS OWN MACHINE.
+  const prompt = (extra = "") =>
+    [
+      `Project: ${input.title}`,
+      input.detail ? `Description: ${input.detail}` : "",
+      placement,
+      machineLine,
+      hostLine,
+      servicesLine,
+      resourcesLine,
+      researchLine,
+      doneLine,
+      extra,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+  // One bad answer from the provider (malformed or cut off) should not fail the plan: try once
+  // more before saying so. A rate limit is not retried here — it would only fail again.
+  const plan = async (extra = "") => {
+    try {
+      return await generate.structured(SYSTEM, prompt(extra), planSchema, "project_plan");
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      if (error instanceof AiRateLimitError || /\b429\b|rate limit|quota/i.test(detail)) throw error;
+      logger.warn("lab.plan_retry", { userId, error: detail.slice(0, 200) });
+      return generate.structured(SYSTEM, prompt(extra), planSchema, "project_plan");
+    }
+  };
+  const problemsOf = async (steps: z.infer<typeof planSchema>["steps"]) => [
+    ...planViolations(steps, template),
+    ...(
+      await brokenLinks(steps.flatMap((step) => [step.instruction, step.verify ?? ""]))
+    ).map((link) => `a link that does not exist (${link})`),
+  ];
+
+  try {
+    const parsed = await plan();
+
+    // CHECK THE PLAN AGAINST ITS OWN MACHINE, AND THE INTERNET.
     //
-    // The briefing above asks for the right OS; it does not guarantee it. A real re-plan
-    // with an explicit "do NOT write a C:\\ path, a .msi, msiexec or PowerShell" came back
-    // with C:\Logs and C:\Program Files anyway. So the output is checked, and a plan that
-    // contradicts its own machine is sent back once with the violation named rather than
-    // saved as something unfollowable.
-    // A project with no lab has no OS to contradict — the check is about a plan matching
-    // the machine it runs on, and there is no machine.
+    // The briefing asks for the right OS and real links; it does not guarantee them. A re-plan
+    // with an explicit "do NOT write a C:\\ path" came back with C:\Logs anyway, and a plan sent
+    // the owner to a Wazuh installer URL that 404s. So the output is checked, and a plan with a
+    // problem is sent back once with the problem named rather than saved as unfollowable.
     const labOs = template ? labOsOf(template) : null;
-    const violations = planViolations(parsed.steps, template);
+    const violations = await problemsOf(parsed.steps);
 
     if (violations.length > 0) {
       logger.warn("lab.plan_os_mismatch", { userId, labOs, violations: violations.join(", ") });
-      const retry = await generate.structured(
-        SYSTEM,
-        [
-          `Project: ${input.title}`,
-          input.detail ? `Description: ${input.detail}` : "",
-          placement,
-          machineLine,
-          hostLine,
-          servicesLine,
-          resourcesLine,
-          doneLine,
-          `Your previous plan used ${violations.join(", ")}, which cannot run on this ${labOs === "linux" ? "Linux" : "Windows"} machine. Write it again for the machine it actually runs on.`,
-        ]
-          .filter(Boolean)
-          .join("\n"),
-        planSchema,
-        "project_plan"
+      const retry = await plan(
+        `Your previous plan had these problems: ${violations.join("; ")}. Write it again for the machine it actually runs on, using only links from the documentation above.`
       );
-      const retryViolations = planViolations(retry.steps, template);
+      const retryViolations = await problemsOf(retry.steps);
       if (retryViolations.length === 0) {
         parsed.steps = retry.steps;
       } else {
         // Twice is enough. An unfollowable plan saved is worse than no plan: it looks like
         // work waiting to be done and is a dead end on step one.
         logger.warn("lab.plan_os_mismatch_persisted", { userId, labOs });
+        const links = retryViolations.filter((v) => v.startsWith("a link"));
         return {
           ok: false,
           message:
-            "Fadi kept writing " +
-            retryViolations.join(", ") +
-            " for a " +
-            (labOs === "linux" ? "Linux" : "Windows") +
-            " machine, so it hasn't saved the plan rather than give you steps that cannot run. Try again, or say in the project description which OS you want.",
+            links.length === retryViolations.length
+              ? `Fadi's plan kept pointing to ${links.join(", ")}, so it hasn't saved it rather than give you a step that fails. Try again in a moment.`
+              : "Fadi kept writing " +
+                retryViolations.join(", ") +
+                " for a " +
+                (labOs === "linux" ? "Linux" : "Windows") +
+                " machine, so it hasn't saved the plan rather than give you steps that cannot run. Try again, or say in the project description which OS you want.",
         };
       }
     }
