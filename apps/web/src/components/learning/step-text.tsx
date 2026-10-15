@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, Keyboard } from "lucide-react";
 
 import { parseInstruction, type InlinePart } from "@/lib/learning/instruction-blocks";
+import { typeIntoLab, useCanTypeIntoLab } from "@/lib/learning/lab-typing";
 
 /**
  * A step's text with its commands pulled out into blocks you can copy in one click.
@@ -20,7 +21,7 @@ export function StepText({ text, className }: { text: string; className?: string
           <p key={index} className="whitespace-pre-line">
             <Inline parts={block.parts} />
           </p>
-        ),
+        )
       )}
     </div>
   );
@@ -43,7 +44,7 @@ function Inline({ parts }: { parts: InlinePart[] }) {
           </strong>
         ) : (
           <span key={index}>{part.value}</span>
-        ),
+        )
       )}
     </>
   );
@@ -51,6 +52,14 @@ function Inline({ parts }: { parts: InlinePart[] }) {
 
 export function CommandBlock({ code, lang }: { code: string; lang: string | null }) {
   const [copied, setCopied] = useState(false);
+  const [typed, setTyped] = useState(false);
+  const canType = useCanTypeIntoLab();
+
+  function type() {
+    if (!typeIntoLab(code)) return;
+    setTyped(true);
+    setTimeout(() => setTyped(false), 1500);
+  }
 
   async function copy() {
     try {
@@ -68,22 +77,42 @@ export function CommandBlock({ code, lang }: { code: string; lang: string | null
         <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-400">
           {lang ?? "command"}
         </span>
-        <button
-          type="button"
-          onClick={copy}
-          className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-zinc-300 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
-          aria-label={copied ? "Copied" : "Copy command"}
-        >
-          {copied ? (
-            <>
-              <Check className="size-3 text-emerald-400" aria-hidden="true" /> Copied
-            </>
-          ) : (
-            <>
-              <Copy className="size-3" aria-hidden="true" /> Copy
-            </>
-          )}
-        </button>
+        <span className="flex items-center gap-1">
+          {canType ? (
+            <button
+              type="button"
+              onClick={type}
+              className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-zinc-300 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+              title="Types it into the machine's window that has focus. It does not press Enter."
+            >
+              {typed ? (
+                <>
+                  <Check className="size-3 text-emerald-400" aria-hidden="true" /> Typed
+                </>
+              ) : (
+                <>
+                  <Keyboard className="size-3" aria-hidden="true" /> Type into lab
+                </>
+              )}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={copy}
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-zinc-300 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+            aria-label={copied ? "Copied" : "Copy command"}
+          >
+            {copied ? (
+              <>
+                <Check className="size-3 text-emerald-400" aria-hidden="true" /> Copied
+              </>
+            ) : (
+              <>
+                <Copy className="size-3" aria-hidden="true" /> Copy
+              </>
+            )}
+          </button>
+        </span>
       </div>
       <pre className="overflow-x-auto px-3 py-2.5 font-mono text-[13px] leading-relaxed">
         <code>{code}</code>

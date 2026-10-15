@@ -10,7 +10,7 @@
       body {
         margin: 0;
         height: 100%;
-        background: #0b0d10;
+        background: #000;
         color: #a9b2b9;
         font: 13px/1.4 system-ui, sans-serif;
       }
@@ -27,14 +27,61 @@
         max-width: 32rem;
         padding: 0 1rem;
       }
-      #status[hidden] {
+      #status[hidden],
+      #tools[hidden],
+      #note[hidden] {
         display: none;
+      }
+      #tools {
+        position: absolute;
+        left: 8px;
+        top: 8px;
+        display: flex;
+        gap: 4px;
+        opacity: 0.4;
+        transition: opacity 0.15s;
+        z-index: 2;
+      }
+      #tools:hover,
+      #tools:focus-within {
+        opacity: 1;
+      }
+      #tools button {
+        font: 12px system-ui, sans-serif;
+        color: #e4e8ea;
+        background: rgba(0, 0, 0, 0.75);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 6px;
+        padding: 3px 8px;
+        cursor: pointer;
+      }
+      #tools button:hover {
+        background: #000;
+      }
+      #note {
+        position: absolute;
+        left: 50%;
+        bottom: 10px;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.85);
+        color: #e4e8ea;
+        padding: 4px 10px;
+        border-radius: 6px;
+        z-index: 2;
       }
     </style>
   </head>
   <body>
     <div id="screen"></div>
+    <div id="tools" hidden>
+      <button type="button" id="paste" title="Types your clipboard into the machine (Ctrl+V does the same)">
+        Paste as typing
+      </button>
+      <button type="button" id="cad">Ctrl+Alt+Del</button>
+      <button type="button" id="full">Full screen</button>
+    </div>
     <p id="status">Connecting to the machine's screen…</p>
+    <p id="note" hidden></p>
     <script type="module">
       // A VMware machine's screen, drawn by noVNC (public/novnc, MPL-2.0) through Fadi's bridge
       // (src/lib/lab/vnc-bridge.ts). The ticket and the screen password arrive in the URL
@@ -47,6 +94,99 @@
         status.textContent = text;
         status.hidden = !text;
       };
+      const note = (text) => {
+        const el = document.getElementById("note");
+        el.textContent = text;
+        el.hidden = !text;
+        if (text) setTimeout(() => (el.hidden = true), 3000);
+      };
+
+      // KEYSTROKES FOR TEXT. VMware's screen sharing does not carry the clipboard into the
+      // machine, so text is typed. Keysyms follow X11: Latin-1 is its own code, anything else
+      // 0x01000000 + code point. Characters that need Shift on a US keyboard get it explicitly.
+      const SHIFTED = new Set('~!@#$%^&*()_+{}|:"<>?ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(""));
+      const SHIFT = 0xffe1;
+      const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      let rfb = null;
+      let typing = Promise.resolve();
+
+      const typeText = (text) => {
+        if (!rfb || !text) return;
+        // One run at a time, in order. Never presses Enter after the last line: the person
+        // reads the command in the machine before running it.
+        typing = typing.then(async () => {
+          const clean = text.replace(/\r\n?/g, "\n").replace(/\n+$/, "");
+          for (const ch of clean) {
+            if (!rfb) return;
+            if (ch === "\n") rfb.sendKey(0xff0d, "Enter");
+            else if (ch === "\t") rfb.sendKey(0xff09, "Tab");
+            else {
+              const code = ch.codePointAt(0);
+              const keysym = code <= 0xff ? code : 0x01000000 + code;
+              const shift = SHIFTED.has(ch);
+              if (shift) rfb.sendKey(SHIFT, "ShiftLeft", true);
+              rfb.sendKey(keysym, null);
+              if (shift) rfb.sendKey(SHIFT, "ShiftLeft", false);
+            }
+            await pause(6);
+          }
+          note(`Typed ${clean.length} characters — check it, then press Enter in the machine.`);
+        });
+      };
+
+      const pasteClipboard = async () => {
+        try {
+          typeText(await navigator.clipboard.readText());
+        } catch {
+          note("The browser didn't allow reading the clipboard. Use “Type into lab” on the step.");
+        }
+      };
+
+      // Ctrl+V types the clipboard, before noVNC would send the keystroke itself.
+      window.addEventListener(
+        "keydown",
+        (event) => {
+          if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "v") {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            void pasteClipboard();
+          }
+        },
+        true
+      );
+
+      // From the project page: "Type into lab" on a step's command.
+      window.addEventListener("message", (event) => {
+        if (event.origin !== location.origin) return;
+        if (event.data?.type === "fadi-type" && typeof event.data.text === "string") {
+          typeText(event.data.text);
+          document.querySelector("#screen canvas")?.focus();
+        }
+      });
+
+      // Tell the project page the machine's resolution, so its panel takes the same shape.
+      let lastSize = "";
+      setInterval(() => {
+        const canvas = document.querySelector("#screen canvas");
+        if (!canvas || !canvas.width || !canvas.height) return;
+        const size = `${canvas.width}x${canvas.height}`;
+        if (size === lastSize) return;
+        lastSize = size;
+        if (parent !== window) {
+          parent.postMessage(
+            { type: "fadi-screen-size", width: canvas.width, height: canvas.height },
+            location.origin
+          );
+        }
+      }, 1000);
+
+      document.getElementById("paste").addEventListener("click", () => void pasteClipboard());
+      document.getElementById("cad").addEventListener("click", () => rfb?.sendCtrlAltDel());
+      document.getElementById("full").addEventListener("click", () => {
+        if (document.fullscreenElement) void document.exitFullscreen();
+        else void document.documentElement.requestFullscreen?.();
+      });
+
       const port = Number(params.get("port"));
       const ticket = params.get("t") ?? "";
       if (!port || !ticket) {
@@ -54,7 +194,7 @@
       } else {
         let attempts = 0;
         const open = () => {
-          const rfb = new RFB(
+          rfb = new RFB(
             document.getElementById("screen"),
             `ws://127.0.0.1:${port}/screen?t=${encodeURIComponent(ticket)}`,
             { credentials: { password: params.get("p") ?? "" }, wsProtocols: ["binary"] }
@@ -65,11 +205,14 @@
           rfb.addEventListener("connect", () => {
             attempts = 0;
             say("");
+            document.getElementById("tools").hidden = false;
           });
           rfb.addEventListener("securityfailure", () =>
             say("The machine refused the screen password. Turn the screen on again from Fadi.")
           );
           rfb.addEventListener("disconnect", () => {
+            rfb = null;
+            document.getElementById("tools").hidden = true;
             attempts += 1;
             if (attempts > 20) {
               say("The screen is not answering. Check the machine is running, then reload.");

@@ -32,6 +32,7 @@ import { PendingAction } from "@/components/os/pending-action-card";
 import { announceActionsChanged, usePendingActions } from "@/components/os/pending-actions";
 import { Button } from "@/components/ui/button";
 import { reachableSurface, runtimeMessage } from "@/lib/lab/runtime-contract";
+import { LabScreenFrame } from "@/components/learning/lab-screen-frame";
 import { MachineChooser } from "@/components/learning/machine-chooser";
 import { PlanHistory } from "@/components/learning/plan-history";
 import { ProjectBrief } from "@/components/learning/project-brief";
@@ -401,6 +402,11 @@ function LabSurface({
 }) {
   if (hasApproval) return null;
   const surface = runtime ? reachableSurface(runtime) : null;
+  if (surface?.sessionPath?.startsWith("/lab-screen.html")) {
+    return (
+      <LabScreenFrame src={surface.sessionPath} title={`${labLabel ?? "Lab"} ${surface.kind}`} />
+    );
+  }
   if (surface?.sessionPath) {
     return (
       <div className="relative bg-black">
