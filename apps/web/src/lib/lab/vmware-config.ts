@@ -140,3 +140,102 @@ export function parseInventory(text: string): Array<{ vmxPath: string; name: str
     )
     .map((entry) => ({ vmxPath: entry.vmxPath, name: entry.name ?? "" }));
 }
+
+/**
+ * WHAT CAN BE CHANGED ABOUT A MACHINE FROM FADI, AND TO WHAT. A closed set: every value is one
+ * of these, so nothing a caller says becomes a line in a settings file.
+ */
+export const MACHINE_CHOICES = {
+  cpus: [1, 2, 4, 6, 8],
+  memoryMb: [2048, 3072, 4096, 6144, 8192],
+  /** nat: internet and this computer. hostonly: this computer only — no internet. */
+  network: ["nat", "hostonly"],
+  /** auto: VMware decides (small, when it runs in the background). */
+  screen: ["auto", "1600x900", "1920x1080"],
+} as const;
+
+export type MachineSettings = {
+  cpus: number | null;
+  memoryMb: number | null;
+  network: string | null;
+  screen: string;
+};
+
+export type MachineChanges = Partial<{
+  cpus: (typeof MACHINE_CHOICES.cpus)[number];
+  memoryMb: (typeof MACHINE_CHOICES.memoryMb)[number];
+  network: (typeof MACHINE_CHOICES.network)[number];
+  screen: (typeof MACHINE_CHOICES.screen)[number];
+}>;
+
+export function readMachineSettings(entries: VmxEntries): MachineSettings {
+  const n = (key: string) => {
+    const value = Number(entries.get(key));
+    return Number.isFinite(value) && value > 0 ? value : null;
+  };
+  const fixed = entries.get("svga.autodetect")?.toUpperCase() === "FALSE";
+  const w = n("svga.maxwidth");
+  const h = n("svga.maxheight");
+  return {
+    cpus: n("numvcpus") ?? 1,
+    memoryMb: n("memsize"),
+    network: entries.get("ethernet0.connectiontype") ?? null,
+    screen: fixed && w && h ? `${w}x${h}` : "auto",
+  };
+}
+
+/** Only values from MACHINE_CHOICES survive; anything else is dropped. */
+export function validMachineChanges(raw: Record<string, unknown>): MachineChanges {
+  const out: MachineChanges = {};
+  const pick = <K extends keyof typeof MACHINE_CHOICES>(key: K) => {
+    const value = raw[key];
+    if ((MACHINE_CHOICES[key] as readonly unknown[]).includes(value)) {
+      (out as Record<string, unknown>)[key] = value;
+    }
+  };
+  pick("cpus");
+  pick("memoryMb");
+  pick("network");
+  pick("screen");
+  return out;
+}
+
+/** The .vmx lines a set of changes writes. */
+export function machineChangeEntries(changes: MachineChanges): Record<string, string> {
+  const entries: Record<string, string> = {};
+  if (changes.cpus) {
+    entries.numvcpus = String(changes.cpus);
+    entries["cpuid.coresPerSocket"] = String(changes.cpus);
+  }
+  if (changes.memoryMb) entries.memsize = String(changes.memoryMb);
+  if (changes.network) entries["ethernet0.connectionType"] = changes.network;
+  if (changes.screen) {
+    if (changes.screen === "auto") entries["svga.autodetect"] = "TRUE";
+    else {
+      const [w, h] = changes.screen.split("x");
+      entries["svga.autodetect"] = "FALSE";
+      entries["svga.maxWidth"] = w!;
+      entries["svga.maxHeight"] = h!;
+    }
+  }
+  return entries;
+}
+
+export function describeChanges(changes: MachineChanges): string[] {
+  const out: string[] = [];
+  if (changes.cpus) out.push(`${changes.cpus} CPU core${changes.cpus === 1 ? "" : "s"}`);
+  if (changes.memoryMb) out.push(`${changes.memoryMb / 1024} GB memory`);
+  if (changes.network)
+    out.push(
+      changes.network === "nat"
+        ? "network: NAT (internet and this computer)"
+        : "network: host-only (this computer only, no internet)"
+    );
+  if (changes.screen)
+    out.push(
+      changes.screen === "auto"
+        ? "screen: VMware decides"
+        : `screen: up to ${changes.screen.replace("x", "×")}`
+    );
+  return out;
+}

@@ -13,6 +13,7 @@ import {
 
 import { composeDockerfile, validateImageSpec } from "./image";
 import { formatMemory } from "./sizes";
+import { describeChanges, validMachineChanges, type MachineChanges } from "./vmware-config";
 import {
   baseVolumeFor,
   DISK_COPY_TIMEOUT_MS,
@@ -192,10 +193,12 @@ type StackStep = {
  */
 type MachineStep = {
   id: string;
-  machine: "memory" | "move" | "relink";
+  machine: "memory" | "move" | "relink" | "configure";
   resourceId: string;
   vmx: string;
   memoryMb?: number;
+  /** For "configure": values from the closed MACHINE_CHOICES set only. */
+  changes?: Record<string, string | number>;
 };
 
 /**
@@ -287,6 +290,8 @@ function displayOf(step: Step): string[] {
   if (isMachineStep(step)) {
     return step.machine === "memory"
       ? ["set memsize =", String(step.memoryMb), "MB in", step.vmx]
+      : step.machine === "configure"
+        ? ["in", step.vmx, "set", JSON.stringify(step.changes ?? {})]
       : step.machine === "relink"
         ? ["use the copy of", step.vmx, "that VMware's library opens"]
         : ["copy", step.vmx.slice(0, step.vmx.lastIndexOf("/")), "to the fast disk, then use the copy"];
@@ -586,6 +591,8 @@ export const RECIPE_IDS = [
   "vmware.memory",
   "vmware.move",
   "vmware.relink",
+  "vmware.configure",
+  "vmware.shutdown",
   "stack.start",
   "stack.stop",
   "stack.remove",
@@ -982,6 +989,67 @@ export const RECIPES: Record<RecipeId, Recipe> = {
         resourceId: String(p.resourceId),
         vmx: String(p.vmxPath),
         memoryMb: Number(p.memoryMb),
+      },
+    ],
+  },
+
+  /** Shut the person's VMware machine down properly, as Windows' own Shut down would. */
+  "vmware.shutdown": {
+    blast: "vm",
+    reversibility: "disruptive",
+    confirmToken: (p) => String(p.label ?? p.resourceId),
+    validate: (raw) => {
+      const resourceId = str(raw.resourceId);
+      if (!resourceId || !zUuid(resourceId)) return null;
+      return {
+        resourceId,
+        label: typeof raw.label === "string" ? raw.label : undefined,
+        vmxPath: typeof raw.vmxPath === "string" ? raw.vmxPath : undefined,
+      };
+    },
+    summary: (p) =>
+      `Shut down ${p.label ?? "your VMware machine"} properly (the OS shuts itself down, through VMware Tools). Save your work in it first.`,
+    reversal: (p) => `Start ${p.label ?? "it"} again.`,
+    render: (p) => [
+      {
+        id: "vmware-shutdown",
+        cmd: "vmrun",
+        args: ["-T", "ws", "stop", String(p.vmxPath), "soft"],
+        timeoutMs: 180_000,
+      },
+    ],
+  },
+
+  /** Change the person's VMware machine: CPU, memory, network, screen — from a closed set. */
+  "vmware.configure": {
+    blast: "vm",
+    reversibility: "reversible",
+    confirmToken: (p) => String(p.label ?? p.resourceId),
+    validate: (raw) => {
+      const resourceId = str(raw.resourceId);
+      if (!resourceId || !zUuid(resourceId)) return null;
+      const changes = validMachineChanges(
+        typeof raw.changes === "object" && raw.changes ? (raw.changes as Record<string, unknown>) : {}
+      );
+      if (Object.keys(changes).length === 0) return null;
+      return {
+        resourceId,
+        changes,
+        label: typeof raw.label === "string" ? raw.label : undefined,
+        vmxPath: typeof raw.vmxPath === "string" ? raw.vmxPath : undefined,
+      };
+    },
+    summary: (p) =>
+      `Change ${p.label ?? "your VMware machine"}: ${describeChanges(p.changes as MachineChanges).join("; ")}. ` +
+      "It must be shut down; the current settings file is kept beside it as a dated .fadi copy.",
+    reversal: () => "Change it back the same way, or restore the dated .fadi copy of its settings.",
+    render: (p) => [
+      {
+        id: "vmware-configure",
+        machine: "configure" as const,
+        resourceId: String(p.resourceId),
+        vmx: String(p.vmxPath),
+        changes: p.changes as Record<string, string | number>,
       },
     ],
   },
@@ -1612,9 +1680,15 @@ async function hydrateRecipeParams(
   params: RecipeParams
 ): Promise<RecipeParams | null> {
   if (
-    !["vmware.start", "vmware.suspend", "vmware.memory", "vmware.move", "vmware.relink"].includes(
-      recipe
-    ) &&
+    ![
+      "vmware.start",
+      "vmware.suspend",
+      "vmware.memory",
+      "vmware.move",
+      "vmware.relink",
+      "vmware.configure",
+      "vmware.shutdown",
+    ].includes(recipe) &&
     !(recipe === "lab.check" && params.resourceId)
   ) {
     return params;
@@ -2159,6 +2233,11 @@ async function runMachineStep(userId: string, step: MachineStep): Promise<StepRe
     const result = await vmware.setMachineMemory(step.vmx, Number(step.memoryMb));
     if (!result.ok) throw new Error(result.message);
     return { text: `memory set to ${step.memoryMb} MB; previous settings kept` };
+  }
+  if (step.machine === "configure") {
+    const result = await vmware.applyMachineChanges(step.vmx, step.changes ?? {});
+    if (!result.ok) throw new Error(result.message);
+    return { text: `set ${result.applied.join(", ")}; previous settings kept` };
   }
   if (step.machine === "relink") {
     const copy = await vmware.libraryCopyOf(step.vmx);

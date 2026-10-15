@@ -401,3 +401,31 @@ export function hostAddressesOnVmnets(): string[] {
     .filter(([name]) => name.startsWith("vmnet"))
     .flatMap(([, list]) => (list ?? []).filter((a) => a.family === "IPv4").map((a) => a.address));
 }
+
+/**
+ * Change a machine's settings from the closed set (vmware-config.ts MACHINE_CHOICES). Only while
+ * it is off; CPU and memory not while suspended either (its saved state has the old shape). The
+ * current settings file is kept beside it first.
+ */
+export async function applyMachineChanges(
+  vmxPath: string,
+  raw: Record<string, unknown>
+): Promise<{ ok: true; applied: string[] } | { ok: false; message: string }> {
+  const { describeChanges, machineChangeEntries, validMachineChanges } = await import(
+    "./vmware-config"
+  );
+  const changes = validMachineChanges(raw);
+  if (Object.keys(changes).length === 0) return { ok: false, message: "Nothing to change." };
+  const refusal = await refuseIfRunning(vmxPath);
+  if (refusal) return { ok: false, message: refusal };
+  const text = await readFile(vmxPath, "utf8");
+  if ((changes.cpus || changes.memoryMb) && parseVmx(text).get("checkpoint.vmstate")) {
+    return {
+      ok: false,
+      message: "The machine is suspended. Start it and shut it down properly, then change its CPU or memory.",
+    };
+  }
+  await backupVmx(vmxPath);
+  await writeFile(vmxPath, setVmxEntries(text, machineChangeEntries(changes)), "utf8");
+  return { ok: true, applied: describeChanges(changes) };
+}

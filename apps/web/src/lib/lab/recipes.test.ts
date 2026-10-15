@@ -399,6 +399,7 @@ describe("the catalogue itself stays safe as it grows", () => {
         agentIp: "172.16.89.1",
         memoryMb: 4096,
         user: "Administrator",
+        changes: { memoryMb: 4096 },
       });
       expect(params, `${id} should accept a legal parameter bag`).not.toBeNull();
 

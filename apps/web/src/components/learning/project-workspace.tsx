@@ -35,6 +35,7 @@ import { reachableSurface, runtimeMessage } from "@/lib/lab/runtime-contract";
 import { ChecksSetup } from "@/components/learning/checks-setup";
 import { LabScreenFrame } from "@/components/learning/lab-screen-frame";
 import { MachineChooser } from "@/components/learning/machine-chooser";
+import { MachineSettings } from "@/components/learning/machine-settings";
 import { PlanHistory } from "@/components/learning/plan-history";
 import { ProjectBrief } from "@/components/learning/project-brief";
 import { ProjectReadiness } from "@/components/learning/project-readiness";
@@ -343,6 +344,15 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
                 }}
               />
             ) : null}
+            <MachineSettings
+              runId={runId}
+              tick={tick}
+              onProposed={(text) => {
+                setLabMessage(text);
+                announceActionsChanged();
+                refreshApprovals();
+              }}
+            />
             <ChecksSetup runId={runId} tick={tick} />
             <ProjectReadiness
               runId={runId}

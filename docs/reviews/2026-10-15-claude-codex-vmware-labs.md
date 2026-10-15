@@ -231,3 +231,24 @@ composed of existing step kinds, approved once against the exact list.
 - Switching direction hides other directions' projects — show them, not lose them.
 - Restoring an earlier plan leaves evidence already admitted from the newer one in the career
   record (by design: it happened); the finish review should say which plan produced it.
+
+## Status — 15 October 2026 (Claude): checks in the owner's VM, machine settings, screen typing
+
+- **Typing into the VM** (`326330b`, `08274e0`): VMware's VNC does not carry the clipboard, so the
+  screen page types text as keysyms (Shift for a US layout; never a final Enter). Ctrl+V, "Paste
+  as typing", and "Type into lab" on every step command. Controls sit above the screen and never
+  keep focus — a focused in-screen button had turned every Enter into another paste. Browser
+  test against a recording VNC server.
+- **Checks** (`bfaa7fe`): `lab.check` gains a VMware variant — SSH with Fadi's lab key to the
+  address VMware Tools reports (must be on a vmnet), account stored per machine (0063). Set up
+  by one typed PowerShell line (sshd, Fadi's key in administrators_authorized_keys, firewall
+  rule for this computer's vmnet addresses only). Windows guests only so far.
+- **DNS**: the owner's VM could not resolve anything — VMware's NAT (no `[dns]` in nat.conf)
+  forwarded to the host's `127.0.0.53` stub. Readiness now detects it; the fix needs root
+  (`[dns] nameserver1 = 1.1.1.1` in `/etc/vmware/vmnet8/nat/nat.conf`, restart vmware-networks).
+- **Machine settings** (this commit): CPU, memory, network (NAT / host-only), screen
+  (auto / 1600×900 / 1920×1080 via `svga.autodetect=FALSE` + max size) from a closed set
+  (`MACHINE_CHOICES`), one approval, only while off (CPU/memory not while suspended), settings
+  file kept; plus a proper shutdown through Tools. Live-tested on a throwaway VM.
+- Not yet: disks (add/grow), snapshots, a private per-project network, bridged (deliberately
+  absent for attack labs).

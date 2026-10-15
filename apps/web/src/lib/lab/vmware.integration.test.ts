@@ -209,6 +209,32 @@ suite("a project on your own VMware machine", () => {
     expect(runtime?.phaseDetail).toMatch(/suspended/);
   }, 120_000);
 
+  it("changes network and screen with one click, but not CPU while suspended", async () => {
+    const { proposeAction, approveAndRun } = await import("./broker");
+    const ask = async (changes: Record<string, unknown>) => {
+      const proposal = await proposeAction({
+        userId,
+        recipe: "vmware.configure",
+        params: { resourceId, changes },
+        actor: "user",
+        origin: "test",
+        runId,
+      });
+      expect(proposal.ok && proposal.policy.confirm).toBe("click");
+      return proposal.ok ? approveAndRun({ userId, requestId: proposal.requestId }) : null;
+    };
+    // Suspended by the previous test: its saved state has the old CPU count.
+    expect(await ask({ cpus: 2 })).toMatchObject({ ok: false });
+    expect(readFileSync(vmx, "utf8")).not.toMatch(/numvcpus = "2"/);
+    expect(await ask({ network: "hostonly", screen: "1600x900", bridged: true })).toMatchObject({
+      ok: true,
+    });
+    const text = readFileSync(vmx, "utf8");
+    expect(text).toMatch(/svga\.autodetect = "FALSE"/);
+    expect(text).toMatch(/svga\.maxWidth = "1600"/);
+    expect(text).not.toMatch(/bridged/);
+  }, 120_000);
+
   it("refuses to resize a suspended machine, and moves it to the fast disk by copying", async () => {
     const { setMachineMemory } = await import("./vmware");
     // Suspended by the previous test: its memory was saved at the old size.
