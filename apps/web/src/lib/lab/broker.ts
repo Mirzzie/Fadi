@@ -832,6 +832,9 @@ export const RECIPES: Record<RecipeId, Recipe> = {
         id: "vmware-start",
         cmd: "vmrun",
         args: ["-T", "ws", "start", String(p.vmxPath), "nogui"],
+        // vmrun waits for power-on. A VM on a spinning disk took longer than the default 60s
+        // (it creates its memory file first), was killed mid-start, and left its lock behind.
+        timeoutMs: 180_000,
       },
     ],
   },
@@ -859,6 +862,8 @@ export const RECIPES: Record<RecipeId, Recipe> = {
         id: "vmware-suspend",
         cmd: "vmrun",
         args: ["-T", "ws", "suspend", String(p.vmxPath), "hard"],
+        // Writing a VM's memory to a spinning disk takes as long as reading it back.
+        timeoutMs: 180_000,
       },
     ],
   },
@@ -1633,11 +1638,33 @@ async function runBuildStep(userId: string, step: BuildStep): Promise<StepResult
 }
 
 async function runCommand(c: Command): Promise<StepResult> {
-  const { stdout } = await run(c.cmd, c.args, {
-    timeout: c.timeoutMs ?? 60_000,
-    maxBuffer: 512 * 1024,
-  });
-  return { text: (stdout.split("\n")[0] ?? "").trim() };
+  try {
+    const { stdout } = await run(c.cmd, c.args, {
+      timeout: c.timeoutMs ?? 60_000,
+      maxBuffer: 512 * 1024,
+    });
+    return { text: (stdout.split("\n")[0] ?? "").trim() };
+  } catch (error) {
+    throw new Error(commandFailure(c, error));
+  }
+}
+
+/**
+ * Why a command failed, in the tool's own words. `vmrun` prints its reason ("Error: …") on
+ * stdout, and the bare "Command failed: vmrun …" that used to be shown hid it — the owner saw
+ * a failed start with nothing to act on (15 Oct 2026).
+ */
+export function commandFailure(c: { cmd: string; timeoutMs?: number }, error: unknown): string {
+  const e = error as { killed?: boolean; signal?: string; stdout?: string; stderr?: string };
+  if (e?.killed || e?.signal === "SIGTERM") {
+    return `${c.cmd} took longer than ${Math.round((c.timeoutMs ?? 60_000) / 1000)} seconds, so Fadi stopped waiting. It may still finish on its own.`;
+  }
+  const said = `${e?.stdout ?? ""}\n${e?.stderr ?? ""}`
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => /^error\b/i.test(line)) ??
+    `${e?.stderr ?? ""}`.split("\n").map((l) => l.trim()).find(Boolean);
+  return said ? `${c.cmd}: ${said.replace(/^error:\s*/i, "")}` : (error instanceof Error ? error.message : "failed");
 }
 
 /**
