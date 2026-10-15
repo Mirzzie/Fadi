@@ -165,6 +165,27 @@ suite("typing a command into the lab's screen", () => {
     expect(keys[backslash - 1]).not.toEqual({ down: true, keysym: SHIFT });
   }, 20_000);
 
+  it("types a repeated request only once while it is still typing (a double press)", async () => {
+    keys.length = 0;
+    const text = "abcdefghijklmnopqrstuvwxyz0123456789";
+    await send("Runtime.evaluate", {
+      expression: `for (let i = 0; i < 3; i++) window.postMessage({ type: "fadi-type", text: ${JSON.stringify(text)} }, location.origin)`,
+    });
+    await new Promise((r) => setTimeout(r, 2500));
+    const typed = String.fromCharCode(
+      ...keys.filter((k) => k.down && k.keysym !== SHIFT).map((k) => k.keysym)
+    );
+    expect(typed).toBe(text);
+  }, 20_000);
+
+  it("has no buttons of its own on the screen — nothing there can take the keyboard", async () => {
+    const r = await send("Runtime.evaluate", {
+      expression: "document.querySelectorAll('button').length",
+      returnByValue: true,
+    });
+    expect(r.result?.result?.value).toBe(0);
+  });
+
   it("reports the machine's resolution so the panel takes its shape", async () => {
     const r = await send("Runtime.evaluate", {
       expression:
