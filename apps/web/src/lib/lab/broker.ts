@@ -192,7 +192,7 @@ type StackStep = {
  */
 type MachineStep = {
   id: string;
-  machine: "memory" | "move";
+  machine: "memory" | "move" | "relink";
   resourceId: string;
   vmx: string;
   memoryMb?: number;
@@ -255,7 +255,9 @@ function displayOf(step: Step): string[] {
   if (isMachineStep(step)) {
     return step.machine === "memory"
       ? ["set memsize =", String(step.memoryMb), "MB in", step.vmx]
-      : ["copy", step.vmx.slice(0, step.vmx.lastIndexOf("/")), "to the fast disk, then use the copy"];
+      : step.machine === "relink"
+        ? ["use the copy of", step.vmx, "that VMware's library opens"]
+        : ["copy", step.vmx.slice(0, step.vmx.lastIndexOf("/")), "to the fast disk, then use the copy"];
   }
   if (isStackStep(step)) {
     if (step.compose === "files") {
@@ -551,6 +553,7 @@ export const RECIPE_IDS = [
   "vmware.suspend",
   "vmware.memory",
   "vmware.move",
+  "vmware.relink",
   "stack.start",
   "stack.stop",
   "stack.remove",
@@ -947,6 +950,34 @@ export const RECIPES: Record<RecipeId, Recipe> = {
         resourceId: String(p.resourceId),
         vmx: String(p.vmxPath),
         memoryMb: Number(p.memoryMb),
+      },
+    ],
+  },
+
+  /** Use the copy of this machine that VMware's own library opens. Copies and deletes nothing. */
+  "vmware.relink": {
+    blast: "vm",
+    reversibility: "reversible",
+    confirmToken: (p) => String(p.label ?? p.resourceId),
+    validate: (raw) => {
+      const resourceId = str(raw.resourceId);
+      if (!resourceId || !zUuid(resourceId)) return null;
+      return {
+        resourceId,
+        label: typeof raw.label === "string" ? raw.label : undefined,
+        vmxPath: typeof raw.vmxPath === "string" ? raw.vmxPath : undefined,
+      };
+    },
+    summary: (p) =>
+      `Use the copy of ${p.label ?? "your VMware machine"} that VMware's library opens, so Fadi and ` +
+      "VMware work on the same machine. Nothing is copied or deleted; the other copy stays where it is.",
+    reversal: () => "Point Fadi back at the other copy the same way.",
+    render: (p) => [
+      {
+        id: "vmware-relink",
+        machine: "relink" as const,
+        resourceId: String(p.resourceId),
+        vmx: String(p.vmxPath),
       },
     ],
   },
@@ -1521,7 +1552,11 @@ async function hydrateRecipeParams(
   recipe: RecipeId,
   params: RecipeParams
 ): Promise<RecipeParams | null> {
-  if (!["vmware.start", "vmware.suspend", "vmware.memory", "vmware.move"].includes(recipe)) {
+  if (
+    !["vmware.start", "vmware.suspend", "vmware.memory", "vmware.move", "vmware.relink"].includes(
+      recipe
+    )
+  ) {
     return params;
   }
 
@@ -2022,6 +2057,16 @@ async function runMachineStep(userId: string, step: MachineStep): Promise<StepRe
     if (!result.ok) throw new Error(result.message);
     return { text: `memory set to ${step.memoryMb} MB; previous settings kept` };
   }
+  if (step.machine === "relink") {
+    const copy = await vmware.libraryCopyOf(step.vmx);
+    if (!copy) throw new Error("VMware's library has no other copy of this machine.");
+    await createLabResourcesRepository(getDatabase()).moveVmwareEndpoint(
+      userId,
+      step.resourceId,
+      `${vmware.VMWARE_ENDPOINT_PREFIX}${encodeURI(copy)}`
+    );
+    return { text: `now using ${copy}, the copy VMware opens` };
+  }
   const result = await vmware.moveMachineToFastDisk(step.vmx);
   if (!result.ok) throw new Error(result.message);
   await createLabResourcesRepository(getDatabase()).moveVmwareEndpoint(
@@ -2029,7 +2074,11 @@ async function runMachineStep(userId: string, step: MachineStep): Promise<StepRe
     step.resourceId,
     `${vmware.VMWARE_ENDPOINT_PREFIX}${encodeURI(result.newVmxPath)}`
   );
-  return { text: `moved to ${result.newVmxPath}; the original is untouched` };
+  return {
+    text: result.reused
+      ? `your VMware library already has it on the fast disk (${result.newVmxPath}); using that — nothing copied`
+      : `moved to ${result.newVmxPath}; the original is untouched`,
+  };
 }
 
 /** Turn on a registered VMware machine's screen, after resolving its path again. */

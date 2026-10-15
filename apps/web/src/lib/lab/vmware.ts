@@ -253,7 +253,12 @@ export function fastMachinesRoot(): string {
 export async function moveMachineToFastDisk(
   vmxPath: string,
   inventoryPath = path.join(homedir(), ".vmware", "inventory.vmls")
-): Promise<{ ok: true; newVmxPath: string } | { ok: false; message: string }> {
+): Promise<{ ok: true; newVmxPath: string; reused?: boolean } | { ok: false; message: string }> {
+  // Already on the fast disk in VMware's library? Use that copy; never make another.
+  const existing = await libraryCopyOf(vmxPath, inventoryPath);
+  if (existing && (await onFastDisk(existing))) {
+    return { ok: true, newVmxPath: existing, reused: true };
+  }
   const refusal = await refuseIfRunning(vmxPath);
   if (refusal) return { ok: false, message: refusal };
   const { cp, mkdir, readdir, statfs } = await import("node:fs/promises");
@@ -317,4 +322,45 @@ export async function moveMachineToFastDisk(
     // No library to update; Workstation can open the moved .vmx directly.
   }
   return { ok: true, newVmxPath };
+}
+
+/**
+ * The same machine somewhere else in VMware's library — by VMware's own hardware id
+ * (`uuid.bios`), not by name. The owner copied their VMs to the SSD and pointed VMware at the
+ * copies; Fadi, registered against the old path, then made a third copy (15 Oct 2026).
+ */
+async function onFastDisk(vmxPath: string): Promise<boolean> {
+  const { onSpinningDisk } = await import("./readiness-facts");
+  return (await onSpinningDisk(path.dirname(vmxPath))) === false;
+}
+
+export async function libraryCopyOf(
+  vmxPath: string,
+  inventoryPath = path.join(homedir(), ".vmware", "inventory.vmls")
+): Promise<string | null> {
+  try {
+    const id = parseVmx(await readFile(vmxPath, "utf8")).get("uuid.bios");
+    if (!id) return null;
+    const listed = parseInventory(await readFile(inventoryPath, "utf8"));
+    for (const { vmxPath: other } of listed) {
+      if (other === vmxPath) continue;
+      const text = await readFile(other, "utf8").catch(() => null);
+      if (text && parseVmx(text).get("uuid.bios") === id) return other;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Whether VMware's library opens this exact file. */
+export async function inLibrary(
+  vmxPath: string,
+  inventoryPath = path.join(homedir(), ".vmware", "inventory.vmls")
+): Promise<boolean> {
+  try {
+    return parseInventory(await readFile(inventoryPath, "utf8")).some((e) => e.vmxPath === vmxPath);
+  } catch {
+    return false;
+  }
 }

@@ -80,4 +80,12 @@ describe("can this project run here", () => {
     expect(line).toMatch(/^RESOURCES ON THIS COMPUTER/);
     expect(line).toMatch(/spinning disk/);
   });
+
+  it("says when Fadi and VMware use different copies of the same machine, instead of offering a move", () => {
+    const result = assessReadiness(
+      facts({ machine: { ...server, memoryMb: 4096, libraryCopy: "/home/me/vmware/ws/ws.vmx" } })
+    );
+    expect(result.checks.map((c) => c.id)).toContain("vm-elsewhere");
+    expect(result.checks.map((c) => c.id)).not.toContain("vm-disk");
+  });
 });

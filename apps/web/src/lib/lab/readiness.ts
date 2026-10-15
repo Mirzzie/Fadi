@@ -23,6 +23,8 @@ export type ReadinessFacts = {
         /** The disk the VM's files are on spins (an HDD). Null when unknown. */
         onSpinningDisk: boolean | null;
         toolsRunning: boolean | null;
+        /** VMware's library opens a DIFFERENT copy of this same machine (by hardware id). */
+        libraryCopy?: string | null;
       }
     | { kind: "fresh"; label: string; memoryMb: number; running: boolean }
     | null;
@@ -105,7 +107,14 @@ export function assessReadiness(facts: ReadinessFacts): Readiness {
         fix: `Give it ${gb(recommended)} (Fadi can, while it is shut down).`,
       });
     }
-    if (machine.onSpinningDisk) {
+    if (machine.libraryCopy) {
+      checks.push({
+        id: "vm-elsewhere",
+        level: "warn",
+        text: `Fadi uses one copy of ${machine.label}, but VMware opens another (${machine.libraryCopy}) — two copies of the same machine that will drift apart.`,
+        fix: "Use the one VMware opens.",
+      });
+    } else if (machine.onSpinningDisk) {
       checks.push({
         id: "vm-disk",
         level: "warn",

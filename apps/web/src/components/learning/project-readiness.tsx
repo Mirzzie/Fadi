@@ -25,7 +25,7 @@ export function ProjectReadiness({
 }) {
   const [readiness, setReadiness] = useState<Readiness | null>(null);
   const [pending, startTransition] = useTransition();
-  const fix = (kind: "memory" | "move") =>
+  const fix = (kind: "memory" | "move" | "relink") =>
     startTransition(async () => {
       const result = await proposeMachineFixAction({ runId, fix: kind });
       onProposed(result.message);
@@ -73,15 +73,15 @@ export function ProjectReadiness({
               {check.text}
               {check.fix ? <span className="text-muted-foreground"> {check.fix}</span> : null}
             </span>
-            {check.id === "vm-memory" || check.id === "vm-disk" ? (
+            {FIXES[check.id] ? (
               <Button
                 size="sm"
                 variant="outline"
                 className="ml-auto h-6 shrink-0 px-2 text-xs"
                 disabled={pending}
-                onClick={() => fix(check.id === "vm-memory" ? "memory" : "move")}
+                onClick={() => fix(FIXES[check.id]!.kind)}
               >
-                {check.id === "vm-memory" ? "Give it more memory" : "Move to SSD"}
+                {FIXES[check.id]!.label}
               </Button>
             ) : null}
           </li>
@@ -90,3 +90,9 @@ export function ProjectReadiness({
     </div>
   );
 }
+
+const FIXES: Record<string, { kind: "memory" | "move" | "relink"; label: string }> = {
+  "vm-memory": { kind: "memory", label: "Give it more memory" },
+  "vm-disk": { kind: "move", label: "Move to SSD" },
+  "vm-elsewhere": { kind: "relink", label: "Use the one VMware opens" },
+};

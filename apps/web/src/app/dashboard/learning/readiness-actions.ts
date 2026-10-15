@@ -25,12 +25,12 @@ export async function projectReadinessAction(input: {
 /** One click from a readiness warning to the fix: proposed, then approved by the person. */
 export async function proposeMachineFixAction(input: {
   runId: string;
-  fix: "memory" | "move";
+  fix: "memory" | "move" | "relink";
 }): Promise<{ ok: boolean; message: string }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
   const parsed = z
-    .object({ runId: z.string().uuid(), fix: z.enum(["memory", "move"]) })
+    .object({ runId: z.string().uuid(), fix: z.enum(["memory", "move", "relink"]) })
     .safeParse(input);
   if (!parsed.success) return { ok: false, message: "Unknown fix." };
   const { createProjectRunsRepository } = await import("@careeros/database");
@@ -55,7 +55,12 @@ export async function proposeMachineFixAction(input: {
   const { proposeAction } = await import("@/lib/lab/broker");
   const proposal = await proposeAction({
     userId: user.id,
-    recipe: parsed.data.fix === "memory" ? "vmware.memory" : "vmware.move",
+    recipe:
+      parsed.data.fix === "memory"
+        ? "vmware.memory"
+        : parsed.data.fix === "relink"
+          ? "vmware.relink"
+          : "vmware.move",
     params:
       parsed.data.fix === "memory"
         ? { resourceId: resource.id, memoryMb: family === "linux" ? 2048 : 4096 }

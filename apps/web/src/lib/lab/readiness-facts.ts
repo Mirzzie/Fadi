@@ -80,7 +80,8 @@ export async function gatherReadinessFacts(input: {
 
   let machine: ReadinessFacts["machine"] = null;
   if (input.vmware) {
-    const { guestToolsState, readVmxSummary, runningVmxPaths } = await import("./vmware");
+    const { guestToolsState, inLibrary, libraryCopyOf, readVmxSummary, runningVmxPaths } =
+      await import("./vmware");
     const [summary, running, spinning] = await Promise.all([
       readVmxSummary(input.vmware.vmxPath),
       runningVmxPaths(),
@@ -95,6 +96,9 @@ export async function gatherReadinessFacts(input: {
       running: isRunning,
       onSpinningDisk: spinning,
       toolsRunning: isRunning ? (await guestToolsState(input.vmware.vmxPath)) === "running" : null,
+      libraryCopy: (await inLibrary(input.vmware.vmxPath))
+        ? null
+        : await libraryCopyOf(input.vmware.vmxPath),
     };
   } else if (input.fresh) {
     machine = {
