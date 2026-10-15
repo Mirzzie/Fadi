@@ -1063,6 +1063,26 @@ describe("checks inside your own VMware machine", () => {
   });
 });
 
+describe("starting a lab over from its saved base", () => {
+  it("replaces only that lab's disk with a copy of the base, then starts it — and is typed", async () => {
+    const { RECIPES, recipePolicy } = await import("./broker");
+    const recipe = RECIPES["lab.reset"];
+    expect(recipe.validate({ template: "linux-ubuntu", name: "p" })).toBeNull(); // no base for containers
+    const params = recipe.validate({
+      template: "windows-server-2025",
+      name: "project-df3e6d83",
+      container: true,
+    })!;
+    const steps = recipe.render(params) as Array<{ id: string; cmd: string; args: string[] }>;
+    expect(steps.map((s) => s.id)).toEqual(["remove", "remove-disk", "seed", "start"]);
+    expect(steps[0]!.args).toEqual(["rm", "-f", "fadi-project-df3e6d83"]);
+    expect(steps[1]!.args).toEqual(["volume", "rm", "fadi-project-df3e6d83-storage"]);
+    expect(steps[2]!.args.join(" ")).toContain("fadi-base-windows-server-2025");
+    expect(recipePolicy(recipe, params).confirm).toBe("type-name");
+    expect(recipe.summary(params)).toMatch(/no download/);
+  });
+});
+
 describe("lab stacks", () => {
   it("renders only the catalogue's files and compose commands, never caller input", async () => {
     const { RECIPES } = await import("./broker");

@@ -13,6 +13,8 @@ import {
   proposeProjectLabStopAction,
   proposeSaveBaseAction,
   reopenStepAction,
+  labResetAvailabilityAction,
+  proposeLabResetAction,
   replanProjectAction,
   resetProjectAction,
   runOnThisComputerAction,
@@ -716,6 +718,15 @@ function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => Prom
   const [asking, setAsking] = useState<null | "replan" | "reset">(null);
   const [note, setNote] = useState<string | null>(null);
   const [busy, start] = useTransition();
+  // Starting over can also give the lab a clean disk from the saved base — no download.
+  const [labReset, setLabReset] = useState<{ available: boolean; reason: string | null } | null>(
+    null
+  );
+  const [resetLab, setResetLab] = useState(true);
+  const askReset = () => {
+    setAsking("reset");
+    void labResetAvailabilityAction({ runId }).then(setLabReset);
+  };
 
   if (!asking) {
     return (
@@ -729,7 +740,7 @@ function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => Prom
         </button>
         <button
           type="button"
-          onClick={() => setAsking("reset")}
+          onClick={askReset}
           className="hover:text-foreground hover:underline"
         >
           Start the project over
@@ -744,9 +755,23 @@ function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => Prom
     <div className="flex flex-wrap items-center gap-2 px-1 text-xs">
       <span>
         {reset
-          ? "Start over from step one? Every step is planned again — finished ones too. Your machine and services stay as they are."
+          ? "Start over from step one? Every step is planned again — finished ones too."
           : "Replan the steps you haven't finished? Finished steps and their results stay."}
       </span>
+      {reset && labReset ? (
+        labReset.available ? (
+          <label className="flex w-full items-center gap-2 text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={resetLab}
+              onChange={(event) => setResetLab(event.target.checked)}
+            />
+            Also give the lab a clean disk from your saved base — minutes, no download, no Setup.
+          </label>
+        ) : labReset.reason ? (
+          <span className="w-full text-muted-foreground">Lab: {labReset.reason}</span>
+        ) : null
+      ) : null}
       <Button
         size="sm"
         variant="outline"
@@ -757,8 +782,14 @@ function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => Prom
               ? await resetProjectAction({ runId })
               : await replanProjectAction({ runId });
             if (!res.ok) return setNote(res.message ?? "Couldn't plan it again.");
+            let labNote = "";
+            if (reset && resetLab && labReset?.available) {
+              const proposed = await proposeLabResetAction({ runId });
+              labNote = ` ${proposed.message}`;
+              announceActionsChanged();
+            }
             setAsking(null);
-            setNote(reset ? (res.message ?? null) : null);
+            setNote(reset ? `${res.message ?? ""}${labNote}`.trim() || null : null);
             await onReplanned();
           })
         }

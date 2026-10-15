@@ -830,6 +830,75 @@ export async function resetProjectAction(input: {
   };
 }
 
+/**
+ * Can this project's lab be started over from a saved base (no download, no Setup)? And if so,
+ * ask for it — one typed approval.
+ */
+async function labResetPlan(userId: string, runId: string) {
+  const { createProjectRunsRepository } = await import("@careeros/database");
+  const project = await createProjectRunsRepository(getDatabase()).getWithSteps(userId, runId);
+  if (!project) return { ok: false as const, reason: "That project is gone." };
+  if (project.run.resourceId) {
+    return { ok: false as const, reason: "Resetting your own VMware machine comes with snapshots — not yet." };
+  }
+  const { templateForProject } = await import("@/lib/lab/spec-from-project");
+  const template = templateForProject({ title: project.run.title, detail: project.run.detail });
+  const { supportsBase, baseVolumeFor, labNameForRun, LAB_TEMPLATES } = await import(
+    "@/lib/lab/templates"
+  );
+  if (!template || !supportsBase(template)) {
+    return { ok: false as const, reason: "This lab starts fresh in seconds anyway — nothing to reset from." };
+  }
+  const { containerState, volumeExists } = await import("@/lib/lab/runtime-observer");
+  if (!(await volumeExists(baseVolumeFor(template)))) {
+    return {
+      ok: false as const,
+      reason: `No clean ${LAB_TEMPLATES[template].label} has been saved yet. Save one (“Save as base”, while a freshly installed lab is stopped) and every reset after that takes minutes.`,
+    };
+  }
+  const name = labNameForRun(project.run.id);
+  return {
+    ok: true as const,
+    project,
+    template,
+    name,
+    container: Boolean(await containerState(name)),
+  };
+}
+
+export async function labResetAvailabilityAction(input: {
+  runId: string;
+}): Promise<{ available: boolean; reason: string | null }> {
+  const user = await getCurrentAuthUser();
+  if (!user || !z.string().uuid().safeParse(input.runId).success) {
+    return { available: false, reason: null };
+  }
+  const plan = await labResetPlan(user.id, input.runId);
+  return plan.ok ? { available: true, reason: null } : { available: false, reason: plan.reason };
+}
+
+export async function proposeLabResetAction(input: {
+  runId: string;
+}): Promise<{ ok: boolean; message: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  if (!z.string().uuid().safeParse(input.runId).success) return { ok: false, message: "Unknown project." };
+  const plan = await labResetPlan(user.id, input.runId);
+  if (!plan.ok) return { ok: false, message: plan.reason };
+  const { proposeAction } = await import("@/lib/lab/broker");
+  const proposal = await proposeAction({
+    userId: user.id,
+    recipe: "lab.reset",
+    params: { template: plan.template, name: plan.name, container: plan.container },
+    actor: "user",
+    origin: "dashboard:project_reset",
+    runId: plan.project.run.id,
+  });
+  return proposal.ok
+    ? { ok: true, message: "Resetting the lab is waiting for your approval (type its name)." }
+    : { ok: false, message: proposal.message };
+}
+
 /** Reopen a step — because "I marked that too early" needs a way back. */
 export async function reopenStepAction(input: { stepId: string }): Promise<{ ok: boolean }> {
   const user = await getCurrentAuthUser();

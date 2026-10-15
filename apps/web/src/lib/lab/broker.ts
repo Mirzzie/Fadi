@@ -609,6 +609,7 @@ export const RECIPE_IDS = [
   "container.stop",
   "container.remove",
   "lab.saveBase",
+  "lab.reset",
   "lab.remove",
   "lab.check",
   "file.write",
@@ -1570,6 +1571,49 @@ export const RECIPES: Record<RecipeId, Recipe> = {
    * Keep an installed Windows lab as the base new labs of its kind start from. Copies only;
    * the lab itself is untouched, and the base can be deleted again.
    */
+  /**
+   * START THE LAB OVER from the saved, already-installed base: a fresh disk copied from it, no
+   * download and no Windows Setup — minutes instead of an hour. Everything done in the lab
+   * since is gone, which is why it is typed.
+   */
+  "lab.reset": {
+    blast: "container",
+    reversibility: "irreversible",
+    confirmToken: (p) => NAME_PREFIX + String(p.name),
+    ownWorkOnly: true,
+    validate: (raw) => {
+      const template = str(raw.template);
+      const name = str(raw.name);
+      if (!template || !isTemplateKey(template) || !supportsBase(template)) return null;
+      if (!name || !NAME_RE.test(name)) return null;
+      return { template, name, container: raw.container === true };
+    },
+    summary: (p) => {
+      const t = LAB_TEMPLATES[String(p.template) as TemplateKey];
+      return (
+        `Start ${NAME_PREFIX}${p.name} over as a clean ${t.label}: its disk is replaced with a copy ` +
+        `of your saved base (${baseVolumeFor(String(p.template) as TemplateKey)}) — no download, no ` +
+        "Windows Setup; the copy takes a few minutes. Everything done inside this lab since is deleted."
+      );
+    },
+    reversal: () => "Not reversible — what was on the lab's disk is gone. The base is unchanged.",
+    render: (p) => {
+      const template = String(p.template) as TemplateKey;
+      const container = NAME_PREFIX + String(p.name);
+      return [
+        ...(p.container ? [{ id: "remove", cmd: "docker", args: ["rm", "-f", container] }] : []),
+        { id: "remove-disk", cmd: "docker", args: ["volume", "rm", storageVolumeFor(container)] },
+        {
+          id: "seed",
+          cmd: "docker",
+          args: seedFromBaseArgs(template, container),
+          timeoutMs: DISK_COPY_TIMEOUT_MS,
+        },
+        { id: "start", cmd: "docker", args: renderTemplate(template, container) },
+      ];
+    },
+  },
+
   "lab.saveBase": {
     blast: "container",
     reversibility: "reversible",
