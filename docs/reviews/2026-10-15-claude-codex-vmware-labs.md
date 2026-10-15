@@ -192,3 +192,42 @@ words (`vmrun` prints "Error: …" on stdout) or that Fadi stopped waiting and i
 - **Start the project over** (`resetProjectAction`): plans first, then replaces every step,
   finished ones too; machine and services stay. "Plan these steps again" still keeps finished
   steps.
+
+## Status — 15 October 2026 (Claude): earlier plans kept; project brief shown
+
+`bd8527b`: before any plan change (re-plan, start over, a step corrected by Fadi) the whole plan
+is saved with each step's status, completion and result (`project_plan_versions`, 0062, same
+transaction). "Earlier plans" shows each in full; "Use this plan again" restores it exactly and
+keeps the one it replaces. Owner-scoped (integration test). The project's description
+(`run.detail`) — stored, never shown — is now "About this project" on the project page.
+Plans replaced before this commit were not kept and cannot be recovered.
+
+## Next, agreed in outline with the owner (15 Oct)
+
+**M — Machine settings, from the project.** One "Machine" panel per VMware VM, every change a
+broker recipe (VM off for hardware; settings file backed up; click for reversible, typed for
+destructive):
+- *Specs*: CPU cores and memory (fixed choices, shown against this computer's free capacity);
+  nested virtualisation (`vhv.enable`) only when a project genuinely needs a hypervisor.
+- *Storage*: disks with size and which physical disk (SSD/HDD); move to SSD (done); add a disk
+  (`vmware-vdiskmanager -c`); grow a disk (`-x`, then the guest extends its partition).
+- *Network*: per adapter — NAT (internet), host-only (this computer only), or the project's
+  private network (no internet; the project's VMs and service containers only). Attack/defence
+  projects default to private.
+- *Snapshots*: list, take, revert (typed) — part of V3.
+
+**P — Prepared before the person opens the project.** On commit, in the background: choose the
+machine (a fitting VMware VM, a fresh clone, or a container) with the reason; decide the
+settings it needs (memory, network, services) from the readiness check; plan the steps with all
+of that; and lay out ONE setup approval listing every change ("give the VM 4 GB, put it on the
+project network, start Wazuh — downloads 7.8 GB"). The learning hub shows each project as
+Planning / Ready to start / Needs your OK (N changes) / Blocked (why). Requires a batch recipe
+composed of existing step kinds, approved once against the exact list.
+
+**H — The learning hub keeps what the person chose.**
+- Flagships: the weekly refresh replaces the list — keep earlier sets and let a flagship be
+  pinned so a refresh never drops it.
+- Deleting a project is permanent — a 30-day "recently deleted".
+- Switching direction hides other directions' projects — show them, not lose them.
+- Restoring an earlier plan leaves evidence already admitted from the newer one in the career
+  record (by design: it happened); the finish review should say which plan produced it.
