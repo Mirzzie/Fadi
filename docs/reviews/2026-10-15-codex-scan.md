@@ -103,13 +103,15 @@ adding another page, setting or decision for the user.
 - **Repair:** the exact vendored directory is excluded. Its version, licence and integrity belong
   in dependency/supply-chain checks; Fadi does not maintain a private linted fork.
 
-### C15-09 — Connected-account unlink omitted part of Better Auth's identity
+### C15-09 — Withdrawn after installing the locked dependency tree
 
 - **File:** `apps/web/src/components/settings/connected-accounts.tsx`
-- **Failure:** the UI kept the account row ID but called `unlinkAccount` without the provider ID
-  required by the active Better Auth API. Typecheck failed, and disconnecting an account could not
-  be treated as a verified path.
-- **Repair:** the call now sends both the selected provider and its account ID.
+- **Correction:** this finding came from the stale Better Auth 1.6.14 installation. After Claude
+  performed a clean install of the locked Better Auth 1.7.7, the correct API was confirmed as
+  `unlinkAccount({ accountId })`. Commit `6f8485e` restored that call and typecheck passed.
+- **Lesson:** C15-09 is evidence for the dependency-drift finding, not an application defect. A
+  type error from an invalid installed tree must be reproduced against the lockfile before it is
+  converted into a code change.
 
 ## Open findings, ordered by risk
 
@@ -144,7 +146,7 @@ adding another page, setting or decision for the user.
   semantics.
 - **Owner:** Codex X3.
 
-### P0 — The installed dependency tree does not match the lockfile
+### Resolved P0 — The installed dependency tree did not match the lockfile
 
 - **Files:** root lockfile and workspace manifests; local `node_modules`
 - **Scenario:** the repository declares Next `^16.3.8` and Better Auth `^1.7.7`, while the current
@@ -157,6 +159,9 @@ adding another page, setting or decision for the user.
   pressure are already material on this workstation.
 - **Owner:** shared release gate; Claude should not treat current-suite success as clean-install
   evidence.
+- **Resolved 15 October:** Claude ran a clean install from the lockfile on the owner's tree.
+  `npm ls` is now clean at Next 16.3.8 and Better Auth 1.7.7, and typecheck passes. The
+  clean-install CI requirement remains because it prevents the condition from returning.
 
 ### P1 — Moving a VM is not one durable operation
 
@@ -264,7 +269,7 @@ to Save evidence or Discard.
 
 | Order | Claude                                                                             | Codex                                                        |
 | ----- | ---------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| 1     | Fix dependency/release environment with Codex; do not expand runtime scope         | Land and hand off C15-01–09; browser SSRF containment        |
+| 1     | Fix dependency/release environment with Codex; do not expand runtime scope         | Land and hand off C15-01–08; browser SSRF containment        |
 | 2     | V3 disposable copy, snapshot/base and isolated execution boundary                  | Declarative check/proof contract and X2 security cases       |
 | 3     | VM operation journal/reconciliation; Wazuh secrets/network; VNC lifecycle          | V4 blueprint schema, evaluator and first direction blueprint |
 | 4     | Background preparation using only verified blueprints                              | X3 receipts and reviewed evidence conversion                 |
@@ -284,8 +289,10 @@ contract.
 - `npm ls next better-auth @better-auth/drizzle-adapter zod zod-to-json-schema --depth=0` reproduced
   the invalid Next and Better Auth installation.
 - `git diff --check` passed before this report.
-- Typecheck passes after making Better Auth's unlink provider explicit. Lint completes with zero
-  errors and 26 existing warnings after excluding the exact vendored noVNC tree.
+- Typecheck passed against the then-installed tree after the temporary C15-09 change. Claude's
+  clean-lockfile check correctly disproved that change; `6f8485e` restored the locked API and the
+  owner's clean installation now typechecks. Lint completes with zero errors and 26 existing
+  warnings after excluding the exact vendored noVNC tree.
 
 ## Claude — status, 15 October: clean-install check (order 1)
 
@@ -307,6 +314,7 @@ disturbed), then typecheck and the full web suite against exactly what the lockf
 
 Next for Claude: V3 (disposable, isolated execution), then the VM operation journal, Wazuh
 per-project secrets/enrolment and VNC ticket lifecycle, as the table above orders them.
+
 - **Done (owner approved):** dev server stopped, `npm ci` from the lockfile, dev server restarted
   (Next 16.3.8, Better Auth 1.7.7; `npm ls` clean). C15-09 reverted to `unlinkAccount({ accountId })`
   — typecheck is now clean against the installed, locked versions.
