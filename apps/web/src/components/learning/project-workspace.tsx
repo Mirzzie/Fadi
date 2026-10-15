@@ -31,6 +31,7 @@ import { PendingAction } from "@/components/os/pending-action-card";
 import { announceActionsChanged, usePendingActions } from "@/components/os/pending-actions";
 import { Button } from "@/components/ui/button";
 import { reachableSurface, runtimeMessage } from "@/lib/lab/runtime-contract";
+import { MachineChooser } from "@/components/learning/machine-chooser";
 
 /**
  * ONE PROJECT: the step you are on, and the machine you do it on. Nothing else earns a place.
@@ -303,6 +304,16 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
               ) : null}
             </div>
 
+            {!approval && (!runtime || ["stopped", "failed"].includes(runtime.phase)) ? (
+              <MachineChooser
+                runId={runId}
+                onkind={run.target.kind}
+                onChanged={(text) => {
+                  setLabMessage(text);
+                  void refresh();
+                }}
+              />
+            ) : null}
             {labMessage ? (
               <p className="border-b border-border/70 px-4 py-2 text-xs text-muted-foreground">
                 {labMessage}

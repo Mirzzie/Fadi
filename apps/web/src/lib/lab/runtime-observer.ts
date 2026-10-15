@@ -4,7 +4,11 @@ import { execFile } from "node:child_process";
 import { createConnection } from "node:net";
 import { promisify } from "node:util";
 
-import { createLabActionRequestsRepository, createProjectRunsRepository } from "@careeros/database";
+import {
+  createLabActionRequestsRepository,
+  createLabResourcesRepository,
+  createProjectRunsRepository,
+} from "@careeros/database";
 
 import { RECIPES, type RecipeParams } from "./broker";
 import type { LabRuntime, RuntimeEndpoint, RuntimeReadinessCheck } from "./runtime-contract";
@@ -173,113 +177,25 @@ export async function observeProjectRuntime(
   const request = [dockerRequest, vmwareRequest]
     .filter((candidate): candidate is NonNullable<typeof candidate> => Boolean(candidate))
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
-  if (!request || request.status === "denied") return null;
-
-  if (request.recipe === "vmware.start") {
-    const params = RECIPES["vmware.start"].validate((request.params ?? {}) as RecipeParams);
-    const vmxPath = params?.vmxPath;
-    if (!params || typeof vmxPath !== "string") return null;
-    const base = {
-      id: request.id,
-      runId,
-      resourceId: project.run.resourceId ?? String(params.resourceId),
-      template: "vmware" as const,
-      templateLabel: String(params.label ?? "VMware machine"),
-      containerName: String(params.label ?? "VMware machine"),
-      progress: null,
-      updatedAt: request.updatedAt.toISOString(),
-    };
-
-    if (request.status === "pending") {
-      return {
-        ...base,
-        phase: "queued",
-        phaseDetail: "Waiting for your approval. Nothing has run.",
-        endpoints: [],
-        readinessChecks: [],
-      };
-    }
-    if (request.status === "approved") {
-      return {
-        ...base,
-        phase: "creating",
-        phaseDetail: "VMware is opening the approved machine.",
-        endpoints: [],
-        readinessChecks: [],
-      };
-    }
-    if (request.status === "failed") {
-      return {
-        ...base,
-        phase: "failed",
-        phaseDetail: request.detail || "VMware could not start the machine.",
-        endpoints: [],
-        readinessChecks: [],
-      };
-    }
-    if (request.status !== "executed") return null;
-
-    if (
-      suspendRequest?.status === "executed" &&
-      suspendRequest.createdAt.getTime() > request.createdAt.getTime()
-    ) {
-      return {
-        ...base,
-        phase: "stopped",
-        phaseDetail: "The VMware machine is suspended.",
-        endpoints: [],
-        readinessChecks: [],
-      };
-    }
-
-    try {
-      const { stdout } = await run("vmrun", ["list"], {
-        timeout: 2500,
-        maxBuffer: 128 * 1024,
+  // A project placed on one of the person's VMware machines is observed from VMware itself —
+  // including a machine they started on their own, which Fadi uses as it is.
+  if (project.run.resourceId) {
+    const resource = await createLabResourcesRepository(db).get(userId, project.run.resourceId);
+    const { vmxPathOf } = await import("./vmware");
+    const vmxPath = vmxPathOf(resource?.endpoint);
+    if (resource && vmxPath) {
+      return observeVmwareMachine({
+        userId,
+        runId,
+        resource: { id: resource.id, label: resource.label },
+        vmxPath,
+        start: vmwareRequest ?? null,
+        suspend: suspendRequest ?? null,
       });
-      const running = stdout
-        .split("\n")
-        .map((line) => line.trim())
-        .includes(vmxPath);
-      if (!running) {
-        return {
-          ...base,
-          phase: "stopped",
-          phaseDetail: "VMware does not report this machine as running.",
-          endpoints: [],
-          readinessChecks: [],
-        };
-      }
-      return {
-        ...base,
-        phase: "booting",
-        phaseDetail:
-          "VMware reports the guest running and opened its native console. Guest readiness is not configured yet.",
-        endpoints: [
-          { id: "vmware-console", kind: "viewer", state: "reachable", sessionPath: null },
-        ],
-        readinessChecks: [
-          {
-            id: "guest-readiness",
-            name: "Guest operating system answers",
-            required: true,
-            status: "unknown",
-            observedAt: new Date().toISOString(),
-            detail: "Add an SSH or RDP endpoint before Fadi can verify the guest is usable.",
-          },
-        ],
-      };
-    } catch {
-      return {
-        ...base,
-        phase: "failed",
-        phaseDetail:
-          "The VM was started earlier, but VMware is unavailable for a current status check.",
-        endpoints: [],
-        readinessChecks: [],
-      };
     }
   }
+
+  if (!request || request.status === "denied") return null;
 
   const params = RECIPES["lab.start"].validate((request.params ?? {}) as RecipeParams);
   if (!params) return null;
@@ -475,4 +391,114 @@ export async function windowsInstalled(volume: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+type RequestRow = {
+  id: string;
+  status: string;
+  detail?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+/**
+ * A VMware machine's state for a project: VMware says whether it runs, VMware Tools inside the
+ * guest says whether the operating system is up, and the screen is offered once it answers.
+ */
+async function observeVmwareMachine(input: {
+  userId: string;
+  runId: string;
+  resource: { id: string; label: string };
+  vmxPath: string;
+  start: RequestRow | null;
+  suspend: RequestRow | null;
+}): Promise<ProjectRuntime | null> {
+  const { start, suspend, resource, vmxPath } = input;
+  const base = {
+    id: start?.id ?? `vmware-${resource.id}`,
+    runId: input.runId,
+    resourceId: resource.id,
+    template: "vmware" as const,
+    templateLabel: resource.label,
+    containerName: resource.label,
+    progress: null,
+    updatedAt: (start?.updatedAt ?? new Date()).toISOString(),
+  };
+  const quiet = (phase: ProjectRuntime["phase"], phaseDetail: string): ProjectRuntime => ({
+    ...base,
+    phase,
+    phaseDetail,
+    endpoints: [],
+    readinessChecks: [],
+  });
+
+  if (start?.status === "pending")
+    return quiet("queued", "Waiting for your approval. Nothing has run.");
+  if (start?.status === "approved") return quiet("creating", `Starting ${resource.label}…`);
+
+  const { guestToolsState, readVmxSummary, runningVmxPaths } = await import("./vmware");
+  const running = await runningVmxPaths();
+  if (running === null) {
+    return quiet("failed", "VMware's vmrun isn't answering, so Fadi can't see this machine.");
+  }
+
+  if (!running.has(vmxPath)) {
+    if (start?.status === "failed") {
+      return quiet("failed", start.detail || `VMware could not start ${resource.label}.`);
+    }
+    // Never asked to start, and not running: nothing to show yet; the page offers to start it.
+    if (!start || start.status !== "executed") return null;
+    const suspended =
+      suspend?.status === "executed" && suspend.createdAt.getTime() > start.createdAt.getTime();
+    return quiet(
+      "stopped",
+      suspended
+        ? `${resource.label} is suspended — VMware kept everything as it was.`
+        : `${resource.label} isn't running. Start it to carry on.`
+    );
+  }
+
+  const [summary, tools] = await Promise.all([readVmxSummary(vmxPath), guestToolsState(vmxPath)]);
+  const endpoints: RuntimeEndpoint[] = [];
+  if (summary?.screen && (await portAnswers(summary.screen.port))) {
+    const { ensureScreenBridge, screenTicket, SCREEN_BRIDGE_PORT } = await import("./vnc-bridge");
+    if (await ensureScreenBridge()) {
+      const ticket = screenTicket(input.userId, summary.screen.port);
+      endpoints.push(
+        endpoint(
+          "vmware-screen",
+          "viewer",
+          true,
+          `/lab-screen.html#port=${SCREEN_BRIDGE_PORT}&t=${ticket}&p=${encodeURIComponent(summary.screen.password)}`
+        )
+      );
+    }
+  }
+
+  const osUp = tools === "running";
+  const readinessChecks = [
+    check(
+      "guest-os",
+      "The operating system has started",
+      osUp,
+      osUp
+        ? "VMware Tools in the guest answered."
+        : tools === "not-installed"
+          ? "VMware Tools isn't installed in this machine, so Fadi can't tell when it has started. Install it from VMware's VM menu."
+          : "Waiting for the guest to finish starting."
+    ),
+  ];
+  const screenNote = summary?.screen
+    ? ""
+    : " Its screen isn't on for Fadi yet: shut it down once, then start it from Fadi.";
+  return {
+    ...base,
+    phase: osUp ? "ready" : "booting",
+    phaseDetail:
+      (osUp
+        ? `${resource.label} is running in the background.`
+        : `${resource.label} is starting…`) + screenNote,
+    endpoints,
+    readinessChecks,
+  };
 }

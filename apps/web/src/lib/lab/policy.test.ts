@@ -26,10 +26,18 @@ describe("confirmation strength follows the damage, not the convenience", () => 
     expect(policyFor({ blast: "workspace", reversibility: "irreversible" }).confirm).toBe("type-name");
   });
 
-  it("anything reaching past a container must be typed out, even if reversible", () => {
-    for (const blast of ["vm", "host", "remote"] as const) {
+  it("anything reaching the host or another machine must be typed out, even if reversible", () => {
+    for (const blast of ["host", "remote"] as const) {
       expect(policyFor({ blast, reversibility: "reversible" }).confirm).toBe("type-name");
     }
+  });
+
+  it("powering the person's own VM on or into suspend is one click; destroying it is typed", () => {
+    // Owner, 15 Oct 2026: typing the machine's name for every start was the most manual step
+    // left. Nothing is lost by a start or a suspend; a delete or revert loses the machine.
+    expect(policyFor({ blast: "vm", reversibility: "reversible" }).confirm).toBe("click");
+    expect(policyFor({ blast: "vm", reversibility: "disruptive" }).confirm).toBe("click");
+    expect(policyFor({ blast: "vm", reversibility: "irreversible" }).confirm).toBe("type-name");
   });
 
   it("only an irreversible prompt has a deadline at all", () => {

@@ -1,0 +1,194 @@
+import "server-only";
+
+import { execFile } from "node:child_process";
+import { copyFile, readFile, stat, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import path from "node:path";
+import { promisify } from "node:util";
+
+import {
+  newScreenPassword,
+  parseInventory,
+  parseVmx,
+  screenEntries,
+  screenOf,
+  screenPortFor,
+  setVmxEntries,
+  summariseVmx,
+  type VmxScreen,
+  type VmxSummary,
+} from "./vmware-config";
+
+/**
+ * THE PERSON'S OWN VMWARE MACHINES, as Fadi sees and uses them.
+ *
+ * Everything here goes through VMware's documented tools — `vmrun` and the machine's `.vmx`
+ * settings — and nothing here deletes, reverts or reconfigures a machine except the one
+ * change the person approves: turning on its screen for Fadi (see vmware-config.ts).
+ *
+ * Machines run in the background (`nogui`): VMware's window does not open. The person can
+ * still open the same running machine in VMware Workstation at any time.
+ */
+
+const run = promisify(execFile);
+
+export const VMWARE_ENDPOINT_PREFIX = "vmware://local";
+
+/** The .vmx path a registered resource points at, or null. Same reading as the broker's. */
+export function vmxPathOf(endpoint: string | null | undefined): string | null {
+  if (!endpoint) return null;
+  try {
+    const url = new URL(endpoint);
+    const vmxPath = decodeURIComponent(url.pathname);
+    if (url.protocol !== "vmware:" || (url.hostname && url.hostname !== "local")) return null;
+    return vmxPath.startsWith("/") && vmxPath.toLowerCase().endsWith(".vmx") ? vmxPath : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Which machines VMware reports running right now, by .vmx path. Null when vmrun is unavailable. */
+export async function runningVmxPaths(): Promise<Set<string> | null> {
+  try {
+    const { stdout } = await run("vmrun", ["-T", "ws", "list"], {
+      timeout: 4000,
+      maxBuffer: 128 * 1024,
+    });
+    return new Set(
+      stdout
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.toLowerCase().endsWith(".vmx"))
+    );
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether the guest operating system has started: VMware Tools inside it answers only once
+ * the OS is up. "running" is the only answer that means usable.
+ */
+export async function guestToolsState(
+  vmxPath: string
+): Promise<"running" | "installed" | "not-installed" | "unknown"> {
+  try {
+    const { stdout } = await run("vmrun", ["-T", "ws", "checkToolsState", vmxPath], {
+      timeout: 6000,
+      maxBuffer: 16 * 1024,
+    });
+    const state = stdout.trim().toLowerCase();
+    if (state === "running") return "running";
+    if (state === "installed") return "installed";
+    if (state === "notinstalled" || state === "not installed") return "not-installed";
+    return "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+export async function readVmxSummary(vmxPath: string): Promise<VmxSummary | null> {
+  try {
+    const text = await readFile(vmxPath, "utf8");
+    return summariseVmx(parseVmx(text), path.basename(vmxPath, ".vmx"));
+  } catch {
+    return null;
+  }
+}
+
+export type FoundMachine = VmxSummary & {
+  vmxPath: string;
+  running: boolean;
+  /** Bytes on disk, from the folder's files. Null when unreadable. */
+  sizeBytes: number | null;
+};
+
+/**
+ * The machines in the person's VMware library. Read-only: reading VMware's own list and each
+ * machine's settings file, nothing else.
+ */
+export async function discoverVmwareMachines(
+  inventoryPath = path.join(homedir(), ".vmware", "inventory.vmls")
+): Promise<FoundMachine[]> {
+  let listed: Array<{ vmxPath: string; name: string }> = [];
+  try {
+    listed = parseInventory(await readFile(inventoryPath, "utf8"));
+  } catch {
+    return [];
+  }
+  const running = (await runningVmxPaths()) ?? new Set<string>();
+  const found = await Promise.all(
+    listed.map(async ({ vmxPath, name }) => {
+      const summary = await readVmxSummary(vmxPath);
+      if (!summary) return null; // listed in VMware but the file is gone (a disk unplugged)
+      return {
+        ...summary,
+        name: name || summary.name,
+        vmxPath,
+        running: running.has(vmxPath),
+        sizeBytes: await folderSize(path.dirname(vmxPath)),
+      };
+    })
+  );
+  return found.filter((machine): machine is FoundMachine => machine !== null);
+}
+
+async function folderSize(dir: string): Promise<number | null> {
+  try {
+    const { readdir } = await import("node:fs/promises");
+    const names = await readdir(dir);
+    let total = 0;
+    for (const name of names) {
+      const info = await stat(path.join(dir, name)).catch(() => null);
+      if (info?.isFile()) total += info.size;
+    }
+    return total;
+  } catch {
+    return null;
+  }
+}
+
+/** The ports other registered machines' screens already use, so a new one does not collide. */
+async function screenPortsInUse(vmxPaths: string[]): Promise<Set<number>> {
+  const ports = new Set<number>();
+  for (const vmx of vmxPaths) {
+    const summary = await readVmxSummary(vmx);
+    if (summary?.screen) ports.add(summary.screen.port);
+  }
+  return ports;
+}
+
+/**
+ * Turn on this machine's screen for Fadi: VNC on 127.0.0.1 only, with its own password.
+ *
+ * Only while the machine is OFF — VMware rewrites the .vmx when a running machine stops, so
+ * an edit made while it runs would be lost or, worse, half-applied. The original file is kept
+ * beside it as `<name>.vmx.before-fadi` the first time, so the change can be undone by hand.
+ */
+export async function enableScreen(input: {
+  vmxPath: string;
+  resourceId: string;
+  otherVmxPaths: string[];
+}): Promise<{ ok: true; screen: VmxScreen; changed: boolean } | { ok: false; message: string }> {
+  const running = await runningVmxPaths();
+  if (running === null) return { ok: false, message: "VMware's vmrun is not available." };
+  if (running.has(input.vmxPath)) {
+    return {
+      ok: false,
+      message:
+        "The machine is running. Shut it down once, then start it from Fadi to turn its screen on.",
+    };
+  }
+  const text = await readFile(input.vmxPath, "utf8");
+  const existing = screenOf(parseVmx(text));
+  if (existing) return { ok: true, screen: existing, changed: false };
+
+  const screen = {
+    port: screenPortFor(input.resourceId, await screenPortsInUse(input.otherVmxPaths)),
+    password: newScreenPassword(),
+  };
+  const backup = `${input.vmxPath}.before-fadi`;
+  if (!(await stat(backup).catch(() => null))) await copyFile(input.vmxPath, backup);
+  await writeFile(input.vmxPath, setVmxEntries(text, screenEntries(screen)), "utf8");
+  return { ok: true, screen, changed: true };
+}

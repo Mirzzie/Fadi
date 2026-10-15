@@ -103,3 +103,43 @@ itself is the owner's.
 **For Codex:** review the shared-machine rules (no revert/delete without consent, per-project
 folders, clone tagging) and the credential storage before V1 lands; X1/X3 against the
 machine interface.
+
+## Status — 15 October 2026 (Claude): V1 landed
+
+Built on the existing VMware slice (register a `.vmx`, `vmware.start` / `vmware.suspend`
+recipes, observer via `vmrun list`), not beside it.
+
+- **Choose the machine in one click.** The project's lab panel shows "Runs on" cards: a fresh
+  lab on this computer, and the machines in the owner's VMware library that fit the project
+  (Windows Server project → the Windows Server VM; read from `~/.vmware/inventory.vmls` and
+  each `.vmx`). Picking one registers it (matched by `.vmx` path; a clashing name gets
+  "(VMware)") and places the project on it (`placeOnResource`). Only machines VMware itself
+  lists can be picked — the browser chooses among them, never types a path.
+- **Starts in the background.** `vmrun -T ws start <vmx> nogui`: VMware's window does not open;
+  Workstation can still attach to the running machine. A machine already running — started by
+  the owner or another project — is used as it is: no request, no second start.
+- **Screen inside the project.** The first start also turns on VMware's VNC on 127.0.0.1 with a
+  per-machine port (5901–5999) and password — a new broker step kind (`ScreenStep`) that
+  re-resolves the path from the owner's resource at execution and refuses while the VM runs.
+  The original is kept as `.vmx.before-fadi`. The browser draws it with noVNC 1.7.0 (MPL-2.0,
+  `public/novnc`, unmodified) through `lib/lab/vnc-bridge.ts`: WebSocket↔TCP on 127.0.0.1:6089,
+  tickets per owner and VM port (30 min), local Origin only, never a port from the browser.
+- **Readiness is observed.** "The operating system has started" passes only when VMware Tools
+  in the guest answers (`checkToolsState`); without Tools the panel says so instead of "ready".
+- **Approval policy change (for Codex's review):** `vm` + reversible/disruptive (start,
+  suspend) is now one click; `vm` + irreversible stays typed. Host and remote unchanged.
+- **Suspend is `hard`.** `soft` waits on VMware Tools to run guest scripts and never returned on
+  a guest without Tools (measured); `hard` still saves memory and disk.
+- Fadi's `Docker`/`admin` sign-in and Docker shell line are hidden for VMware machines.
+
+**Evidence.** `vmware.integration.test.ts` (VMware + DB, `FADI_TEST_VMWARE=1`) on a throwaway
+disk-less VM: one click → screen lines written, backup kept, VM running in the background →
+the project's runtime is VMware with a reachable screen → VNC greets through the bridge →
+suspend with one click → "suspended" → settings of a running VM refused and unchanged. A real
+Chromium session through the dev server drew the VM's firmware screen in `lab-screen.html`
+(connected, 1024×768). Unit: VMX parsing/editing, inventory, port/password, WebSocket framing,
+ticket/Origin refusal, recipe path pinning, policy. 453 lab/learning/AI tests pass.
+
+**Not yet:** "Open in VMware" button; images and fresh linked clones (V2); checks over SSH and
+snapshots before risky steps, private networks (V3); the Wazuh stack and re-plan (C2). The
+owner's own VMs have not been started by Fadi yet — the first real start is theirs to approve.

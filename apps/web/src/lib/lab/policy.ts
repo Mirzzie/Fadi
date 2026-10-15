@@ -57,8 +57,13 @@ export function policyFor(input: { blast: Blast; reversibility: Reversibility })
   const { blast, reversibility } = input;
 
   // Anything that cannot be undone, or that reaches past a container, is typed out.
+  //
+  // Except powering the person's OWN registered VM on, off or into suspend: nothing is lost,
+  // VMware keeps its state, and typing the machine's name for every start was the most
+  // manual step left in a project (owner, 15 Oct 2026). Deleting or reverting a VM is
+  // irreversible and still typed.
   const confirm: Confirm =
-    reversibility === "irreversible" || blast === "host" || blast === "vm" || blast === "remote"
+    reversibility === "irreversible" || blast === "host" || blast === "remote"
       ? "type-name"
       : "click";
 

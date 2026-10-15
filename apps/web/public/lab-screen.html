@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Lab screen</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #0b0d10;
+        color: #a9b2b9;
+        font: 13px/1.4 system-ui, sans-serif;
+      }
+      #screen {
+        position: absolute;
+        inset: 0;
+      }
+      #status {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        max-width: 32rem;
+        padding: 0 1rem;
+      }
+      #status[hidden] {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="screen"></div>
+    <p id="status">Connecting to the machine's screen…</p>
+    <script type="module">
+      // A VMware machine's screen, drawn by noVNC (public/novnc, MPL-2.0) through Fadi's bridge
+      // (src/lib/lab/vnc-bridge.ts). The ticket and the screen password arrive in the URL
+      // fragment, which the browser never sends to any server.
+      import RFB from "/novnc/core/rfb.js";
+
+      const params = new URLSearchParams(location.hash.slice(1));
+      const status = document.getElementById("status");
+      const say = (text) => {
+        status.textContent = text;
+        status.hidden = !text;
+      };
+      const port = Number(params.get("port"));
+      const ticket = params.get("t") ?? "";
+      if (!port || !ticket) {
+        say("This screen link is incomplete. Open it again from the project.");
+      } else {
+        let attempts = 0;
+        const open = () => {
+          const rfb = new RFB(
+            document.getElementById("screen"),
+            `ws://127.0.0.1:${port}/screen?t=${encodeURIComponent(ticket)}`,
+            { credentials: { password: params.get("p") ?? "" }, wsProtocols: ["binary"] }
+          );
+          rfb.scaleViewport = true;
+          rfb.resizeSession = false;
+          rfb.focusOnClick = true;
+          rfb.addEventListener("connect", () => {
+            attempts = 0;
+            say("");
+          });
+          rfb.addEventListener("securityfailure", () =>
+            say("The machine refused the screen password. Turn the screen on again from Fadi.")
+          );
+          rfb.addEventListener("disconnect", () => {
+            attempts += 1;
+            if (attempts > 20) {
+              say("The screen is not answering. Check the machine is running, then reload.");
+              return;
+            }
+            // A VM restarting drops the screen for a moment; come back on our own.
+            say("Screen disconnected — reconnecting…");
+            setTimeout(open, Math.min(1000 * attempts, 5000));
+          });
+        };
+        open();
+      }
+    </script>
+  </body>
+</html>

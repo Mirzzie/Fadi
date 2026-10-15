@@ -150,7 +150,16 @@ type NetStep =
  */
 type BuildStep = { id: string; build: string; tag: string };
 
-type Step = Command | FileStep | NetStep | BuildStep;
+/**
+ * Turning on a VMware machine's screen for Fadi (VNC on 127.0.0.1 only, its own password).
+ *
+ * Its own kind because it edits the machine's settings file, which is not a command. The path
+ * is shown to the person, and at execution it is resolved AGAIN from their registered machine
+ * and must match — a row edited in between cannot point the edit at another file.
+ */
+type ScreenStep = { id: string; screen: "enable"; resourceId: string; vmx: string };
+
+type Step = Command | FileStep | NetStep | BuildStep | ScreenStep;
 
 function isBuildStep(step: Step): step is BuildStep {
   return "build" in step;
@@ -162,6 +171,10 @@ function isNetStep(step: Step): step is NetStep {
 
 function isFileStep(step: Step): step is FileStep {
   return "fs" in step;
+}
+
+function isScreenStep(step: Step): step is ScreenStep {
+  return "screen" in step;
 }
 
 /** A short digest, so a display line changes when the CONTENT changes, not just its length. */
@@ -176,6 +189,9 @@ function displayOf(step: Step): string[] {
     return step.net === "sweep"
       ? ["ping every host in", step.cidr]
       : ["connect to", step.ip, "on ports", IDENTIFY_PORTS.map((p) => p.port).join(",")];
+  }
+  if (isScreenStep(step)) {
+    return ["turn on the screen (VNC, this computer only) in", step.vmx];
   }
   if (!isFileStep(step)) return [step.cmd, ...step.args];
   if (step.fs === "write") {
@@ -787,12 +803,36 @@ export const RECIPES: Record<RecipeId, Recipe> = {
         resourceId,
         label: typeof raw.label === "string" ? raw.label : undefined,
         vmxPath: typeof raw.vmxPath === "string" ? raw.vmxPath : undefined,
+        // Decided by the caller from the machine's settings: only when its screen is not on yet.
+        screen: raw.screen === true,
       };
     },
-    summary: (p) => `Open and start the registered VMware machine ${p.label ?? p.resourceId}.`,
+    summary: (p) =>
+      `Start your VMware machine ${p.label ?? p.resourceId} in the background — VMware's window ` +
+      "does not open; you can still open it in VMware Workstation at any time." +
+      (p.screen
+        ? " First, turn on its screen for Fadi: VMware's VNC on this computer only, with its own " +
+          "password, so the machine shows in the project. That adds four lines to its settings " +
+          "file; the original is kept beside it as .vmx.before-fadi."
+        : ""),
     reversal: (p) => `Suspend ${p.label ?? p.resourceId}; VMware keeps its memory and disk state.`,
     render: (p) => [
-      { id: "vmware-start", cmd: "vmrun", args: ["start", String(p.vmxPath), "gui"] },
+      ...(p.screen
+        ? [
+            {
+              id: "vmware-screen",
+              screen: "enable" as const,
+              resourceId: String(p.resourceId),
+              vmx: String(p.vmxPath),
+            },
+          ]
+        : []),
+      // In the background: Fadi shows the screen itself, and VMware can still attach to it.
+      {
+        id: "vmware-start",
+        cmd: "vmrun",
+        args: ["-T", "ws", "start", String(p.vmxPath), "nogui"],
+      },
     ],
   },
 
@@ -812,7 +852,14 @@ export const RECIPES: Record<RecipeId, Recipe> = {
     summary: (p) => `Suspend the registered VMware machine ${p.label ?? p.resourceId}.`,
     reversal: (p) => `Resume ${p.label ?? p.resourceId} in VMware.`,
     render: (p) => [
-      { id: "vmware-suspend", cmd: "vmrun", args: ["suspend", String(p.vmxPath), "soft"] },
+      // "hard" still saves memory and disk exactly as they are; "soft" only adds the guest's own
+      // suspend scripts, and waits on VMware Tools to run them — on a guest without Tools the
+      // command never returned (measured 15 Oct 2026).
+      {
+        id: "vmware-suspend",
+        cmd: "vmrun",
+        args: ["-T", "ws", "suspend", String(p.vmxPath), "hard"],
+      },
     ],
   },
 
@@ -1640,6 +1687,32 @@ async function runFileStep(userId: string, step: FileStep): Promise<StepResult> 
   };
 }
 
+/** Turn on a registered VMware machine's screen, after resolving its path again. */
+async function runScreenStep(userId: string, step: ScreenStep): Promise<StepResult> {
+  const resolved = await hydrateRecipeParams(userId, "vmware.start", {
+    resourceId: step.resourceId,
+  });
+  if (!resolved || resolved.vmxPath !== step.vmx) {
+    throw new Error("That machine's settings file changed since you approved this.");
+  }
+  const { enableScreen, vmxPathOf } = await import("./vmware");
+  const others = (await createLabResourcesRepository(getDatabase()).listForUser(userId))
+    .filter((resource) => resource.id !== step.resourceId)
+    .map((resource) => vmxPathOf(resource.endpoint))
+    .filter((vmx): vmx is string => Boolean(vmx));
+  const result = await enableScreen({
+    vmxPath: step.vmx,
+    resourceId: step.resourceId,
+    otherVmxPaths: others,
+  });
+  if (!result.ok) throw new Error(result.message);
+  return {
+    text: result.changed
+      ? `screen turned on (127.0.0.1:${result.screen.port}); original kept as .vmx.before-fadi`
+      : "screen was already on",
+  };
+}
+
 export type Execution =
   | { ok: true; output: string; discovered?: Discovered }
   | { ok: false; message: string };
@@ -1848,6 +1921,8 @@ export async function approveAndRun(input: {
           ? await runNetStep(c)
           : isFileStep(c)
             ? await runFileStep(input.userId, c)
+            : isScreenStep(c)
+              ? await runScreenStep(input.userId, c)
             : row.recipe === "lab.check"
               ? await runCheck(c)
               : await runCommand(c);

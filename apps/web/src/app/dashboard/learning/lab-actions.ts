@@ -378,10 +378,17 @@ function toRunView(
     evidencedCount: honesty.evidenced,
     labTemplate: template,
     labLabel: template ? LAB_TEMPLATES[template].label : null,
-    labSignIn: template ? (LAB_TEMPLATES[template].signIn ?? null) : null,
+    // Fadi's own lab account and shell belong to its container labs; the person's own VMware
+    // machine signs in with their account.
+    labSignIn:
+      template && resolved.kind === "local-docker"
+        ? (LAB_TEMPLATES[template].signIn ?? null)
+        : null,
     target: { kind: resolved.kind, label: resolved.label },
     labShell:
-      template && LAB_TEMPLATES[template].toolchain.shell !== "powershell"
+      resolved.kind === "local-docker" &&
+      template &&
+      LAB_TEMPLATES[template].toolchain.shell !== "powershell"
         ? `docker exec -it ${labContainerForRun(r.id)} ${LAB_TEMPLATES[template].toolchain.shell}`
         : null,
   };
@@ -411,6 +418,21 @@ export async function getProjectRunAction(input: {
 }
 
 /** The one place a project's lab target is decided — see lib/lab/target.ts. */
+/**
+ * What starting this VMware machine involves: nothing, when it is already running (Fadi uses
+ * it as it is, whoever started it); otherwise a start, plus turning its screen on the first
+ * time so it can be shown in the project.
+ */
+async function vmwareStart(resource: { id: string; endpoint: string | null }): Promise<
+  { running: true } | { running: false; params: { resourceId: string; screen: boolean } }
+> {
+  const { readVmxSummary, runningVmxPaths, vmxPathOf } = await import("@/lib/lab/vmware");
+  const vmxPath = vmxPathOf(resource.endpoint);
+  if (vmxPath && (await runningVmxPaths())?.has(vmxPath)) return { running: true };
+  const summary = vmxPath ? await readVmxSummary(vmxPath) : null;
+  return { running: false, params: { resourceId: resource.id, screen: !summary?.screen } };
+}
+
 async function targetFor(
   userId: string,
   run: { resourceId: string | null }
@@ -471,10 +493,14 @@ export async function proposeProjectLabAction(input: { runId: string }): Promise
     return { ok: false, message: unconnectedMessage(target) };
   }
   if (target.kind === "vmware" && resource) {
+    const prepared = await vmwareStart(resource);
+    if (prepared.running) {
+      return { ok: true, message: `${resource.label} is already running — Fadi uses it as it is.` };
+    }
     const proposal = await proposeAction({
       userId: user.id,
       recipe: "vmware.start",
-      params: { resourceId: resource.id },
+      params: prepared.params,
       actor: "user",
       origin: "dashboard:project_lab",
       runId: project.run.id,
@@ -645,11 +671,15 @@ export async function proposeProjectLabResumeAction(input: { runId: string }): P
     return { ok: false, message: unconnectedMessage(target) };
   }
   if (target.kind === "vmware" && resource) {
+    const prepared = await vmwareStart(resource);
+    if (prepared.running) {
+      return { ok: true, message: `${resource.label} is already running — Fadi uses it as it is.` };
+    }
     const { proposeAction } = await import("@/lib/lab/broker");
     const proposal = await proposeAction({
       userId: user.id,
       recipe: "vmware.start",
-      params: { resourceId: resource.id },
+      params: prepared.params,
       actor: "user",
       origin: "dashboard:project_lab",
       runId: project.run.id,

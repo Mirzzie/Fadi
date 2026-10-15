@@ -456,14 +456,44 @@ describe("existing VMware machines", () => {
 
     expect(res.ok).toBe(true);
     if (res.ok) {
+      // In the background: VMware's window does not open; Fadi shows the screen itself.
       expect(res.argv[0]).toEqual([
         "vmrun",
+        "-T",
+        "ws",
         "start",
         "/home/user/VMs/windows.vmx",
-        "gui",
+        "nogui",
       ]);
       expect(res.summary).toContain("Windows lab");
       expect(res.argv[0]).not.toContain("/tmp/attacker.vmx");
+    }
+  });
+
+  it("turns the screen on in the registered machine's file, never one the caller names", async () => {
+    getResource.mockResolvedValue({
+      id: "11111111-1111-4111-8111-111111111111",
+      label: "Windows lab",
+      endpoint: "vmware://local/home/user/VMs/windows.vmx",
+    });
+    const res = await propose_(
+      {
+        resourceId: "11111111-1111-4111-8111-111111111111",
+        vmxPath: "/tmp/attacker.vmx",
+        screen: true,
+      },
+      "vmware.start",
+    );
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.argv[0]).toEqual([
+        "turn on the screen (VNC, this computer only) in",
+        "/home/user/VMs/windows.vmx",
+      ]);
+      expect(res.argv.flat()).not.toContain("/tmp/attacker.vmx");
+      expect(res.summary).toContain(".vmx.before-fadi");
+      // Starting your own VM is one click; nothing is lost by it.
+      expect(res.policy.confirm).toBe("click");
     }
   });
 

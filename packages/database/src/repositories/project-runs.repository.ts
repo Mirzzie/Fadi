@@ -396,6 +396,23 @@ export function createProjectRunsRepository(db: Database) {
       });
     },
 
+    /**
+     * Place a run on one of the person's registered machines (a VMware VM), as its own explicit
+     * decision. The caller has already checked the machine is theirs.
+     */
+    async placeOnResource(
+      userId: string,
+      runId: string,
+      resource: { id: string; label: string }
+    ): Promise<boolean> {
+      const updated = await db
+        .update(projectRuns)
+        .set({ resourceId: resource.id, resourceLabel: resource.label, updatedAt: new Date() })
+        .where(and(eq(projectRuns.id, runId), eq(projectRuns.userId, userId)))
+        .returning({ id: projectRuns.id });
+      return updated.length > 0;
+    },
+
     /** Move a run to this computer, as its own explicit decision (never a side effect of a replan). */
     async placeOnThisComputer(userId: string, runId: string): Promise<boolean> {
       const updated = await db
