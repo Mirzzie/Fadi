@@ -5,7 +5,7 @@ import { readFile, statfs } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
-import type { ReadinessFacts } from "./readiness";
+import { natDnsFromConfig, type ReadinessFacts } from "./readiness";
 
 /**
  * The measured facts the readiness check decides on. Read-only: /proc, the VM's own settings,
@@ -52,28 +52,18 @@ async function usesNat(vmxPath: string): Promise<boolean> {
   }
 }
 
-/** Does VMware's NAT DNS (the address its own nat.conf names) answer a lookup? */
+/** Will VMware's NAT DNS work? Read from nat.conf and this computer's resolv.conf. */
 export async function natDnsAnswers(
   natConf = "/etc/vmware/vmnet8/nat/nat.conf"
 ): Promise<boolean | null> {
-  let gateway: string | undefined;
+  let conf: string;
   try {
-    gateway = (await readFile(natConf, "utf8")).match(/^\s*ip\s*=\s*([\d.]+)/m)?.[1];
+    conf = await readFile(natConf, "utf8");
   } catch {
     return null;
   }
-  if (!gateway) return null;
-  const { Resolver } = await import("node:dns/promises");
-  const resolver = new Resolver({ timeout: 2500, tries: 1 });
-  resolver.setServers([gateway]);
-  try {
-    await resolver.resolve4("example.com");
-    return true;
-  } catch (error) {
-    // Only a timeout or refusal means "no DNS"; a missing name would still be an answer.
-    const code = (error as { code?: string }).code;
-    return code === "ENOTFOUND" || code === "ENODATA";
-  }
+  const resolv = await readFile("/etc/resolv.conf", "utf8").catch(() => null);
+  return natDnsFromConfig(conf, resolv);
 }
 
 async function dockerFreeGb(): Promise<number | null> {

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { assessReadiness, readinessForPlanner, type ReadinessFacts } from "./readiness";
+import {
+  assessReadiness,
+  natDnsFromConfig,
+  readinessForPlanner,
+  type ReadinessFacts,
+} from "./readiness";
 
 const wazuh = { label: "Wazuh", ramMb: 2300, diskGb: 6, running: false, downloadMb: 0 };
 const server = {
@@ -94,5 +99,25 @@ describe("can this project run here", () => {
       facts({ machine: { ...server, memoryMb: 4096, onSpinningDisk: false, natDnsWorks: false } })
     );
     expect(result.checks.find((c) => c.id === "vm-dns")?.level).toBe("warn");
+  });
+});
+
+describe("VMware NAT DNS, from configuration", () => {
+  const nat = (dns: string) =>
+    `[host]\nip = 172.16.89.2\n\n[dns]\npolicy = order\n${dns}\n[netbios]\nx = 1\n`;
+  const stub = "nameserver 127.0.0.53\noptions edns0\n";
+
+  it("works when nat.conf names real servers, whatever the host uses", () => {
+    expect(natDnsFromConfig(nat("nameserver1 = 1.1.1.1\nnameserver2 = 9.9.9.9"), stub)).toBe(true);
+  });
+
+  it("fails when NAT falls back to the host's loopback stub", () => {
+    expect(natDnsFromConfig(nat("#nameserver1 = 1.1.1.1"), stub)).toBe(false);
+    expect(natDnsFromConfig(nat("nameserver1 = 127.0.0.53"), null)).toBe(false);
+  });
+
+  it("works on fallback when the host itself uses a real server; unknown without resolv.conf", () => {
+    expect(natDnsFromConfig(nat(""), "nameserver 192.168.1.1\n")).toBe(true);
+    expect(natDnsFromConfig(nat(""), null)).toBeNull();
   });
 });

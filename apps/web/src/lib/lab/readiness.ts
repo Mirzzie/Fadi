@@ -178,3 +178,21 @@ export function readinessForPlanner(readiness: Readiness): string {
     ? `RESOURCES ON THIS COMPUTER (keep steps light where it helps): ${notes.join(" ")}`
     : "";
 }
+
+/**
+ * Will VMware's NAT give the machine working DNS? Decided from the configuration, not by asking
+ * the NAT device: on this computer the host can't reach 172.16.89.2 at all (no ARP answer), so a
+ * lookup from here timed out even after the owner fixed nat.conf (15 Oct 2026). The real failure
+ * is NAT forwarding to the host's own resolver: no [dns] servers in nat.conf, and resolv.conf
+ * naming only a loopback stub such as systemd-resolved's 127.0.0.53.
+ */
+export function natDnsFromConfig(natConf: string, resolvConf: string | null): boolean | null {
+  const loopback = (ip: string) => /^127\.|^::1$/.test(ip);
+  const dns = natConf.match(/^\s*\[dns\]\s*$([\s\S]*?)(?=^\s*\[|(?![\s\S]))/m)?.[1] ?? "";
+  const named = [...dns.matchAll(/^\s*nameserver\d+\s*=\s*(\S+)/gm)].map((m) => m[1]!);
+  if (named.some((ip) => !loopback(ip))) return true;
+  if (named.length) return false;
+  if (resolvConf === null) return null;
+  const host = [...resolvConf.matchAll(/^\s*nameserver\s+(\S+)/gm)].map((m) => m[1]!);
+  return host.length ? host.some((ip) => !loopback(ip)) : null;
+}
