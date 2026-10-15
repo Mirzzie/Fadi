@@ -33,6 +33,8 @@ import { announceActionsChanged, usePendingActions } from "@/components/os/pendi
 import { Button } from "@/components/ui/button";
 import { reachableSurface, runtimeMessage } from "@/lib/lab/runtime-contract";
 import { MachineChooser } from "@/components/learning/machine-chooser";
+import { PlanHistory } from "@/components/learning/plan-history";
+import { ProjectBrief } from "@/components/learning/project-brief";
 import { ProjectReadiness } from "@/components/learning/project-readiness";
 import { ProjectServices } from "@/components/learning/project-services";
 
@@ -168,6 +170,16 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
         }
       >
         <div className="space-y-4">
+          <ProjectBrief
+            detail={run.detail}
+            runsOn={
+              hasLab
+                ? run.target.kind === "local-docker"
+                  ? `${run.labLabel ?? "a lab"} on this computer`
+                  : run.target.label
+                : null
+            }
+          />
           {current ? (
             <CurrentStep
               key={current.id}
@@ -207,6 +219,14 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
             }
           />
           <Replan runId={runId} onReplanned={refresh} />
+          <PlanHistory
+            runId={runId}
+            stepsKey={run.steps.map((s) => `${s.id}:${s.status}`).join()}
+            onRestored={async (text) => {
+              setMessage(text);
+              await refresh();
+            }}
+          />
         </div>
 
         {hasLab ? (

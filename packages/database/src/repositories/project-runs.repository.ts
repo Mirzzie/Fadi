@@ -2,9 +2,11 @@ import { and, asc, desc, eq, ne } from "drizzle-orm";
 
 import type { Database, DbOrTx } from "../client";
 import {
+  projectPlanVersions,
   projectRuns,
   projectSteps,
   type NewProjectStep,
+  type ProjectPlanVersion,
   type ProjectRun,
   type ProjectStep,
 } from "../schema/index";
@@ -48,6 +50,44 @@ async function settleProjectWork(
   for (const item of linked) {
     if (item.status !== target) await work.setStatus(userId, item.id, target);
   }
+}
+
+export type PlanReason = "replanned" | "started_over" | "step_revised" | "restored_other";
+
+/**
+ * Save the run's whole current plan as the next version, before it changes. In the caller's
+ * transaction, so a plan is never replaced without being kept. Nothing to keep, nothing saved.
+ */
+async function keepPlan(tx: DbOrTx, userId: string, runId: string, reason: PlanReason) {
+  const steps = await tx
+    .select()
+    .from(projectSteps)
+    .where(eq(projectSteps.runId, runId))
+    .orderBy(asc(projectSteps.ordinal));
+  if (steps.length === 0) return;
+  const [latest] = await tx
+    .select({ version: projectPlanVersions.version })
+    .from(projectPlanVersions)
+    .where(eq(projectPlanVersions.runId, runId))
+    .orderBy(desc(projectPlanVersions.version))
+    .limit(1);
+  await tx.insert(projectPlanVersions).values({
+    runId,
+    userId,
+    version: (latest?.version ?? 0) + 1,
+    reason,
+    steps: steps.map((step) => ({
+      ordinal: step.ordinal,
+      title: step.title,
+      instruction: step.instruction,
+      verify: step.verify,
+      produces: step.produces,
+      status: step.status,
+      completion: step.completion,
+      artifact: step.artifact,
+      completedAt: step.completedAt?.toISOString() ?? null,
+    })),
+  });
 }
 
 export function createProjectRunsRepository(db: Database) {
@@ -272,24 +312,28 @@ export function createProjectRunsRepository(db: Database) {
       stepId: string,
       patch: { instruction: string; verify?: string | null }
     ): Promise<ProjectStep | null> {
-      const [step] = await db
-        .select({ id: projectSteps.id, status: projectSteps.status })
-        .from(projectSteps)
-        .innerJoin(projectRuns, eq(projectRuns.id, projectSteps.runId))
-        .where(and(eq(projectSteps.id, stepId), eq(projectRuns.userId, userId)))
-        .limit(1);
-      if (!step || step.status === "done") return null;
+      return db.transaction(async (tx) => {
+        const [step] = await tx
+          .select({ id: projectSteps.id, status: projectSteps.status, runId: projectSteps.runId })
+          .from(projectSteps)
+          .innerJoin(projectRuns, eq(projectRuns.id, projectSteps.runId))
+          .where(and(eq(projectSteps.id, stepId), eq(projectRuns.userId, userId)))
+          .limit(1);
+        if (!step || step.status === "done") return null;
 
-      const [updated] = await db
-        .update(projectSteps)
-        .set({
-          instruction: patch.instruction,
-          ...(patch.verify ? { verify: patch.verify } : {}),
-          updatedAt: new Date(),
-        })
-        .where(eq(projectSteps.id, stepId))
-        .returning();
-      return updated ?? null;
+        // The step as it was written stays readable, and can come back.
+        await keepPlan(tx, userId, step.runId, "step_revised");
+        const [updated] = await tx
+          .update(projectSteps)
+          .set({
+            instruction: patch.instruction,
+            ...(patch.verify ? { verify: patch.verify } : {}),
+            updatedAt: new Date(),
+          })
+          .where(eq(projectSteps.id, stepId))
+          .returning();
+        return updated ?? null;
+      });
     },
 
     /**
@@ -370,6 +414,7 @@ export function createProjectRunsRepository(db: Database) {
           .from(projectSteps)
           .where(eq(projectSteps.runId, runId))
           .orderBy(asc(projectSteps.ordinal));
+        await keepPlan(tx, userId, runId, keepDone ? "replanned" : "started_over");
         const kept = keepDone ? existing.filter((step) => step.status === "done") : [];
         const after = kept.reduce((max, step) => Math.max(max, step.ordinal), 0);
 
@@ -400,6 +445,74 @@ export function createProjectRunsRepository(db: Database) {
           .limit(1);
         if (settled) await settleProjectWork(tx, userId, runId, settled.status);
         return { kept, added };
+      });
+    },
+
+    /** Every earlier plan of this run, newest first. Owner-scoped. */
+    async listPlanVersions(userId: string, runId: string): Promise<ProjectPlanVersion[]> {
+      return db
+        .select()
+        .from(projectPlanVersions)
+        .where(and(eq(projectPlanVersions.runId, runId), eq(projectPlanVersions.userId, userId)))
+        .orderBy(desc(projectPlanVersions.version));
+    },
+
+    /**
+     * Bring an earlier plan back exactly as it was — its steps, their progress and what they
+     * produced. The plan it replaces is kept first, so going back is itself reversible.
+     */
+    async restorePlanVersion(
+      userId: string,
+      runId: string,
+      versionId: string
+    ): Promise<{ steps: number } | null> {
+      return db.transaction(async (tx) => {
+        const [run] = await tx
+          .select({ id: projectRuns.id, status: projectRuns.status })
+          .from(projectRuns)
+          .where(and(eq(projectRuns.userId, userId), eq(projectRuns.id, runId)))
+          .for("update");
+        if (!run) return null;
+        const [version] = await tx
+          .select()
+          .from(projectPlanVersions)
+          .where(
+            and(
+              eq(projectPlanVersions.id, versionId),
+              eq(projectPlanVersions.runId, runId),
+              eq(projectPlanVersions.userId, userId)
+            )
+          )
+          .limit(1);
+        if (!version) return null;
+
+        await keepPlan(tx, userId, runId, "restored_other");
+        await tx.delete(projectSteps).where(eq(projectSteps.runId, runId));
+        if (version.steps.length > 0) {
+          await tx.insert(projectSteps).values(
+            version.steps.map((step) => ({
+              runId,
+              ordinal: step.ordinal,
+              title: step.title,
+              instruction: step.instruction,
+              verify: step.verify,
+              produces: step.produces,
+              status: step.status,
+              completion: step.completion,
+              artifact: step.artifact,
+              completedAt: step.completedAt ? new Date(step.completedAt) : null,
+            }))
+          );
+        }
+        await tx.update(projectRuns).set({ updatedAt: new Date() }).where(eq(projectRuns.id, runId));
+        await settleRun(tx, runId, run.status);
+        const [settled] = await tx
+          .select({ status: projectRuns.status })
+          .from(projectRuns)
+          .where(eq(projectRuns.id, runId))
+          .limit(1);
+        if (settled) await settleProjectWork(tx, userId, runId, settled.status);
+        return { steps: version.steps.length };
       });
     },
 

@@ -1518,6 +1518,50 @@ export const projectSteps = pgTable(
 );
 
 export type ProjectStep = typeof projectSteps.$inferSelect;
+
+/**
+ * Every plan a project has had, kept.
+ *
+ * A project's steps get replaced — re-planned, started over, a step corrected by Fadi — and the
+ * owner asked what happens when they preferred the earlier way (15 Oct 2026). Before any of
+ * those changes the whole plan is saved here, with each step's progress and what it produced,
+ * so an earlier plan can be read again or brought back exactly as it was.
+ */
+export const projectPlanVersions = pgTable(
+  "project_plan_versions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => projectRuns.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** 1, 2, 3… per project, in the order they were replaced. */
+    version: integer("version").notNull(),
+    /** Why it was set aside: replanned | started_over | step_revised | restored_other */
+    reason: text("reason").notNull(),
+    steps: jsonb("steps")
+      .$type<
+        Array<{
+          ordinal: number;
+          title: string;
+          instruction: string;
+          verify: string | null;
+          produces: string | null;
+          status: string;
+          completion: string | null;
+          artifact: string | null;
+          completedAt: string | null;
+        }>
+      >()
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [uniqueIndex("project_plan_versions_run_version_idx").on(table.runId, table.version)]
+);
+
+export type ProjectPlanVersion = typeof projectPlanVersions.$inferSelect;
 export type NewProjectStep = typeof projectSteps.$inferInsert;
 
 export const labResources = pgTable(
