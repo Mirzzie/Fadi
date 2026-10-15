@@ -1499,6 +1499,17 @@ export const projectSteps = pgTable(
     verify: text("verify"),
     /** What this step leaves behind — the thing that later becomes evidence. */
     produces: text("produces"),
+    /**
+     * WHERE the step happens: "lab" (inside the lab machine), "browser" (the person's own
+     * browser on their computer) or "fadi" (something Fadi does with one approval). Null on
+     * steps planned before places existed. Without it a plan told the owner to open Chrome in
+     * a lab that has none, to reach a dashboard that was on their own computer (15 Oct 2026).
+     */
+    place: text("place"),
+    /** One read-only command, run in the step's place, whose output proves the step worked. */
+    checkCommand: text("check_command"),
+    /** Text that output must contain. */
+    checkExpect: text("check_expect"),
     /** pending | done | skipped */
     status: text("status").notNull().default("pending"),
     /**
@@ -1559,6 +1570,9 @@ export const projectPlanVersions = pgTable(
           completion: string | null;
           artifact: string | null;
           completedAt: string | null;
+          place?: string | null;
+          checkCommand?: string | null;
+          checkExpect?: string | null;
         }>
       >()
       .notNull(),

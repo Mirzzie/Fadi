@@ -7,7 +7,8 @@ import { createLabResourcesRepository, createProjectRunsRepository } from "@care
 import { getDatabase } from "@/lib/database/client";
 import { AiRateLimitError, getUserDocGenerate } from "@/lib/ai/user-generate";
 import { placeLab, type Resource } from "@/lib/lab/capability";
-import { LAB_TEMPLATES, labContainerForRun, type TemplateKey } from "./templates";
+import { LAB_TEMPLATES, labContainerForRun, WINDOWS_SSH_PORT, type TemplateKey } from "./templates";
+import { placesBrief, placeViolations, usableCheck, type PlacesInput } from "./places";
 import {
   withFoldersCreated,
   hostOsOf,
@@ -48,6 +49,12 @@ const planSchema = z.object({
         instruction: z.string().min(1).max(4000),
         verify: z.string().max(1500).optional().default(""),
         produces: z.string().max(800).optional().default(""),
+        // Where it happens (places.ts) and how Fadi can tell it worked.
+        where: z.enum(["lab", "browser", "fadi"]).optional(),
+        check: z
+          .object({ command: z.string().max(600), expect: z.string().max(200) })
+          .nullable()
+          .optional(),
       })
     )
     // One, not three: a re-plan of a project with most steps finished needs only what is left,
@@ -70,6 +77,7 @@ Write steps that person can actually execute tonight. Rules:
 - Before any step writes a file, that step or an earlier one creates its folder (PowerShell: New-Item -ItemType Directory -Force -Path "C:\\LabSetup"; Linux: mkdir -p). A fresh machine has none of your folders.
 - Keep each instruction under about 900 characters: the commands, and one line on why.
 - 3 to 8 steps. A plan longer than that is a course, and it will not be finished.
+- Every step names its place in \`where\` (lab, browser or fadi — see PLACES) and gives a \`check\`: a self-contained read-only command (it sets every variable it uses) and \`expect\`, a literal piece of text its output contains only on success — never a comparison like ">=1". A dashboard or web console is opened in the browser place, never inside the lab; starting a service beside the lab is a fadi step.
 - Never install Docker, Docker Desktop, WSL, Hyper-V or any hypervisor inside the lab machine. Services the project needs (a SIEM, a database) run BESIDE it and are listed as such; the machine connects to them.
 - Never invent details about their environment beyond what you are told.`;
 
@@ -247,6 +255,14 @@ export async function planProjectRun(
       ].join("\n")
     : "";
 
+  // PLACES (places.ts): the lab as OBSERVED (lab-facts.ts), the person's browser and what
+  // Fadi does — so no step opens a browser the lab doesn't have, or a dashboard at an address
+  // that only exists on the person's computer.
+  const placesInput = template
+    ? await placesFor(userId, input.replaceRunId ?? null, template, Boolean(machineLine))
+    : null;
+  const placesLine = placesInput ? placesBrief(placesInput) : "";
+
   // RESEARCH FIRST (plan-research.ts): today's documentation for the project and its tools,
   // so commands, versions and links come from the internet rather than a model's memory.
   const { STACKS: STACK_DEFS, stacksForProject: stackKeys } = await import("./stacks");
@@ -274,6 +290,7 @@ export async function planProjectRun(
       machineLine,
       hostLine,
       servicesLine,
+      placesLine,
       resourcesLine,
       researchLine,
       doneLine,
@@ -284,18 +301,24 @@ export async function planProjectRun(
 
   // One bad answer from the provider (malformed or cut off) should not fail the plan: try once
   // more before saying so. A rate limit is not retried here — it would only fail again.
+  // A plan of up to eight detailed steps, from a brief with research and places in it, and
+  // reasoning models think before they write: at the default 4096 tokens the answer was cut off
+  // mid-JSON ("steps" missing, a step without a title) — the owner's intermittent "couldn't
+  // produce a usable plan" (15 Oct 2026). Same budget as flagship research.
+  const budget = { maxTokens: 8000 };
   const plan = async (extra = "") => {
     try {
-      return await generate.structured(SYSTEM, prompt(extra), planSchema, "project_plan");
+      return await generate.structured(SYSTEM, prompt(extra), planSchema, "project_plan", budget);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       if (error instanceof AiRateLimitError || /\b429\b|rate limit|quota/i.test(detail)) throw error;
       logger.warn("lab.plan_retry", { userId, error: detail.slice(0, 200) });
-      return generate.structured(SYSTEM, prompt(extra), planSchema, "project_plan");
+      return generate.structured(SYSTEM, prompt(extra), planSchema, "project_plan", budget);
     }
   };
   const problemsOf = async (steps: z.infer<typeof planSchema>["steps"]) => [
     ...planViolations(steps, template),
+    ...(placesInput ? placeViolations(steps, placesInput) : []),
     ...(
       await brokenLinks(steps.flatMap((step) => [step.instruction, step.verify ?? ""]))
     ).map((link) => `a link that does not exist (${link})`),
@@ -349,6 +372,9 @@ export async function planProjectRun(
       instruction: s.instruction.trim(),
       verify: s.verify?.trim() || null,
       produces: s.produces?.trim() || null,
+      place: template ? (s.where ?? "lab") : null,
+      checkCommand: usableCheck(s.check)?.command ?? null,
+      checkExpect: usableCheck(s.check)?.expect ?? null,
     }));
 
     const repo = createProjectRunsRepository(db);
@@ -439,3 +465,81 @@ export async function planProjectRun(
     };
   }
 }
+
+/**
+ * The places for a project's plan: its lab observed through the check channel (a running
+ * Fadi Windows lab over SSH, a Linux lab through docker exec, the person's VMware machine
+ * once checks are set up), and its services as seen from each place.
+ */
+async function placesFor(
+  userId: string,
+  runId: string | null,
+  template: TemplateKey,
+  onVmware: boolean
+): Promise<PlacesInput> {
+  const { STACKS, stacksForProject, vmNetworkAddress } = await import("./stacks");
+  const { probeLabFacts } = await import("./lab-facts");
+  const t = LAB_TEMPLATES[template];
+  const windows = t.toolchain.shell === "powershell";
+  const db = getDatabase();
+  const run = runId ? (await createProjectRunsRepository(db).getWithSteps(userId, runId))?.run : null;
+  const keys = run ? stacksForProject({ title: run.title, detail: run.detail }) : [];
+  const vmIp = vmNetworkAddress();
+  const services = keys.map((key) => {
+    const stack = STACKS[key];
+    const labHost = onVmware ? vmIp : stack.agent.managerHost;
+    return {
+      label: stack.open.label,
+      browserUrl: stack.open.url,
+      signIn: `${stack.open.user} / ${stack.open.password}`,
+      fromLab: `${labHost}:${stack.agentPorts.join("/")}`,
+      probe: `${labHost}:${stack.agentPorts[stack.agentPorts.length - 1]}`,
+    };
+  });
+
+  let facts = null;
+  if (run) {
+    const targets = services.map((s) => s.probe);
+    if (onVmware && run.resourceId) {
+      const resource = await createLabResourcesRepository(db).get(userId, run.resourceId);
+      const { guestAddress, runningVmxPaths, vmxPathOf } = await import("./vmware");
+      const vmx = vmxPathOf(resource?.endpoint);
+      if (resource?.guestUser && vmx && (await runningVmxPaths())?.has(vmx)) {
+        const host = await guestAddress(vmx);
+        if (host) {
+          facts = await probeLabFacts(
+            { kind: "ssh", user: resource.guestUser, host, port: 22 },
+            "powershell",
+            targets
+          );
+        }
+      }
+    } else {
+      const { labNameForRun } = await import("./templates");
+      const { containerState } = await import("./runtime-observer");
+      const name = labNameForRun(run.id);
+      if ((await containerState(name))?.running) {
+        facts = windows
+          ? await probeLabFacts(
+              { kind: "ssh", user: t.signIn?.user ?? "Docker", host: "127.0.0.1", port: WINDOWS_SSH_PORT },
+              "powershell",
+              targets
+            )
+          : await probeLabFacts({ kind: "docker", container: `fadi-${name}` }, "sh", targets);
+      }
+    }
+  }
+  return {
+    labLabel: t.label,
+    expectedOs: t.toolchain.distro,
+    hostOs: hostOsOf(process.platform),
+    facts,
+    services: services.map((service) => ({
+      label: service.label,
+      browserUrl: service.browserUrl,
+      signIn: service.signIn,
+      fromLab: service.fromLab,
+    })),
+  };
+}
+

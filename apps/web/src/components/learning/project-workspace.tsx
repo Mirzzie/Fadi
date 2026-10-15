@@ -486,11 +486,19 @@ function CurrentStep({
 
   return (
     <section className="rounded-2xl border border-primary/30 bg-card p-5">
-      <p className="text-xs font-medium text-primary">Step {step.ordinal}</p>
+      <p className="flex items-center gap-2 text-xs font-medium text-primary">
+        Step {step.ordinal}
+        {step.place ? (
+          <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            {PLACE_LABEL[step.place] ?? step.place}
+          </span>
+        ) : null}
+      </p>
       <h2 className="mt-0.5 text-lg font-semibold">{step.title}</h2>
 
       <StepText
         text={step.instruction}
+        typeable={!step.place || step.place === "lab"}
         className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground"
       />
 
@@ -831,3 +839,10 @@ function SaveBaseLink({ runId }: { runId: string }) {
     </p>
   );
 }
+
+/** Where a step happens, in the person's words. */
+const PLACE_LABEL: Record<string, string> = {
+  lab: "In the lab",
+  browser: "In your browser",
+  fadi: "Fadi does it",
+};

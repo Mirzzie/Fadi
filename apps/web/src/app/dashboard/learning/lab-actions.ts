@@ -251,6 +251,10 @@ export type StepView = {
   artifact: string | null;
   /** attested | evidenced | verified — null while pending. */
   completion: string | null;
+  /** lab | browser | fadi — where the step happens; null on steps planned before places. */
+  place: string | null;
+  /** The step's own check, when the plan gave one. */
+  check: { command: string; expect: string } | null;
 };
 export type RunView = {
   id: string;
@@ -368,6 +372,9 @@ function toRunView(
       instruction: s.instruction,
       verify: s.verify,
       produces: s.produces,
+      place: s.place ?? null,
+      check:
+        s.checkCommand && s.checkExpect ? { command: s.checkCommand, expect: s.checkExpect } : null,
       status: s.status,
       artifact: s.artifact,
       // One rule, one place: lib/lab/completion.ts decides what counts as showable,

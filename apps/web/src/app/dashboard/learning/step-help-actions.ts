@@ -261,6 +261,26 @@ export async function proposeStepCheckAction(input: {
     });
   }
 
+  // THE STEP'S OWN CHECK, written with the plan against the observed lab (verified-labs V-2):
+  // no second AI call guessing a check after the fact.
+  if (step.checkCommand && step.checkExpect) {
+    const { proposeAction } = await import("@/lib/lab/broker");
+    const proposal = await proposeAction({
+      userId: user.id,
+      recipe: "lab.check",
+      params: vmware
+        ? { ...vmware, command: step.checkCommand, expect: step.checkExpect, shell: "powershell" }
+        : { name, command: step.checkCommand, expect: step.checkExpect, shell, template },
+      actor: "model",
+      origin: "dashboard:step_check",
+      runId: project.run.id,
+      stepId: step.id,
+    });
+    return proposal.ok
+      ? { ok: true, message: "Running this step's own check — waiting for your approval; nothing has run yet." }
+      : { ok: false, message: proposal.message };
+  }
+
   const generate = await getUserDocGenerate(user.id);
   if (!generate) return { ok: false, message: "Fadi needs an AI provider for this — add one in Settings → AI." };
 

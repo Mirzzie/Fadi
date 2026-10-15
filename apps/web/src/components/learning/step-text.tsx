@@ -10,13 +10,22 @@ import { typeIntoLab, useCanTypeIntoLab } from "@/lib/learning/lab-typing";
  * A step's text with its commands pulled out into blocks you can copy in one click.
  * Everything renders as text nodes — see instruction-blocks.ts for why that matters.
  */
-export function StepText({ text, className }: { text: string; className?: string }) {
+export function StepText({
+  text,
+  className,
+  typeable = true,
+}: {
+  text: string;
+  className?: string;
+  /** False for steps that happen outside the lab: their commands are not typed into it. */
+  typeable?: boolean;
+}) {
   const blocks = parseInstruction(text);
   return (
     <div className={className ?? "space-y-3 text-sm leading-relaxed text-muted-foreground"}>
       {blocks.map((block, index) =>
         block.type === "code" ? (
-          <CommandBlock key={index} code={block.code} lang={block.lang} />
+          <CommandBlock key={index} code={block.code} lang={block.lang} typeable={typeable} />
         ) : (
           <p key={index} className="whitespace-pre-line">
             <Inline parts={block.parts} />
@@ -50,10 +59,18 @@ function Inline({ parts }: { parts: InlinePart[] }) {
   );
 }
 
-export function CommandBlock({ code, lang }: { code: string; lang: string | null }) {
+export function CommandBlock({
+  code,
+  lang,
+  typeable = true,
+}: {
+  code: string;
+  lang: string | null;
+  typeable?: boolean;
+}) {
   const [copied, setCopied] = useState(false);
   const [typed, setTyped] = useState(false);
-  const canType = useCanTypeIntoLab();
+  const canType = useCanTypeIntoLab() && typeable;
 
   function type() {
     if (!typeIntoLab(code)) return;

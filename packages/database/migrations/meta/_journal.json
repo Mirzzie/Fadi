@@ -456,6 +456,13 @@
       "when": 1792078162835,
       "tag": "0064_career_profile_flagship_ideas",
       "breakpoints": true
+    },
+    {
+      "idx": 65,
+      "version": "7",
+      "when": 1792082988709,
+      "tag": "0065_project_step_place_and_check",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
-import type { ZodSchema } from "zod";
+import { z, type ZodSchema } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
 import { aiErrorMessage, isStructuredOutputUnsupported } from "./errors";
@@ -207,9 +207,7 @@ export class OpenAIProvider implements AIProvider {
     //    conversion (which handles optionals) so the guidance is still schema-shaped.
     const jsonSchema =
       (strictFormat as { json_schema?: { schema?: unknown } } | null)?.json_schema?.schema ??
-      // Cast: the bundled zod-to-json-schema is typed against a different zod build; it
-      // only reads the schema shape at runtime, so this is safe.
-      zodToJsonSchema(schema as unknown as Parameters<typeof zodToJsonSchema>[0], schemaName);
+      describeSchema(schema, schemaName);
     const guide: AIMessage = {
       role: "system",
       content: jsonSchema
@@ -415,3 +413,25 @@ export class OpenAIProvider implements AIProvider {
     }
   }
 }
+
+/**
+ * The JSON Schema a model is told to follow on the tolerant path.
+ *
+ * Fadi is on Zod 4. zod-to-json-schema is written for Zod 3 and, given a Zod 4 schema, returns
+ * an EMPTY schema — so every structured call that fell back here (any schema with an optional
+ * field, or a provider without json_schema mode, Groq included) told the model "any JSON", and
+ * it invented its own field names: a project plan came back with "action"/"command" instead of
+ * "title"/"instruction" and failed validation (15 Oct 2026). Zod 4 converts itself.
+ */
+export function describeSchema(schema: unknown, name: string): unknown {
+  const native = (z as unknown as { toJSONSchema?: (s: unknown) => unknown }).toJSONSchema;
+  if (native) {
+    try {
+      return native(schema);
+    } catch {
+      // A schema Zod cannot express (a transform, say): fall through.
+    }
+  }
+  return zodToJsonSchema(schema as unknown as Parameters<typeof zodToJsonSchema>[0], name);
+}
+

@@ -86,6 +86,9 @@ async function keepPlan(tx: DbOrTx, userId: string, runId: string, reason: PlanR
       completion: step.completion,
       artifact: step.artifact,
       completedAt: step.completedAt?.toISOString() ?? null,
+      place: step.place,
+      checkCommand: step.checkCommand,
+      checkExpect: step.checkExpect,
     })),
   });
 }
@@ -501,6 +504,9 @@ export function createProjectRunsRepository(db: Database) {
               completion: step.completion,
               artifact: step.artifact,
               completedAt: step.completedAt ? new Date(step.completedAt) : null,
+              place: step.place ?? null,
+              checkCommand: step.checkCommand ?? null,
+              checkExpect: step.checkExpect ?? null,
             }))
           );
         }
