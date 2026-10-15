@@ -236,7 +236,9 @@ export async function setMachineMemory(
 
 /** Where moved machines go: a folder on this computer's own (fast) disk. */
 export function fastMachinesRoot(): string {
-  return process.env.FADI_FAST_VM_DIR || path.join(homedir(), "VMs");
+  // ~/vmware: where the owner keeps their VMware machines on the SSD (and VMware's own default
+  // folder name), so a moved machine lands beside the others rather than in a second place.
+  return process.env.FADI_FAST_VM_DIR || path.join(homedir(), "vmware");
 }
 
 /**

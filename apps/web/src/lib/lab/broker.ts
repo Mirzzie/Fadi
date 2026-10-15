@@ -1001,7 +1001,7 @@ export const RECIPES: Record<RecipeId, Recipe> = {
       "checked file by file, and VMware's library and Fadi then use the copy. The original stays " +
       "on the old disk until you delete it. It must be shut down; a big machine takes minutes.",
     reversal: () =>
-      "Point VMware back at the original (it is untouched) and delete the copy in ~/VMs.",
+      "Point VMware back at the original (it is untouched) and delete the copy in ~/vmware.",
     render: (p) => [
       {
         id: "vmware-move",
