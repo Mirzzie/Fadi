@@ -65,3 +65,19 @@ and `index: 1` marker; >6000-char reply held back out loud with advanced marker;
 Verified: `npx vitest run` voice-turn.interview + practice-session + registry.interview-practice +
 a2a/server → 4 files, 65 tests pass. `tsc --noEmit`: only the pre-existing, out-of-scope
 `components/settings/connected-accounts.tsx` error. Not committed; no provider calls.
+
+## Final reconciliation — 16 October (Codex)
+
+The shared slice is now ready to commit. The last pass kept the UI unchanged and closed four
+boundary failures:
+
+- the session store no longer turns an outage or corrupt value into “no interview”; voice and A2A
+  fail closed, so an interview answer cannot become an unrelated command;
+- only one start, answer or end transition can change a conversation at once;
+- answer length and meaningful-content checks live at the session boundary as well as the voice
+  boundary;
+- persisted coaching no longer retains the unused numeric grade.
+
+Final verification: the four focused suites pass **69 tests**; the full web suite passes **1,649
+tests** with 182 skipped; `tsc --noEmit`, ESLint with zero warnings, and `git diff --check` pass.
+No provider call was made.
