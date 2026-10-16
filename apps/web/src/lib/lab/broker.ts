@@ -2596,6 +2596,8 @@ async function runMachineStep(userId: string, step: MachineStep): Promise<StepRe
     step.resourceId,
     `${vmware.VMWARE_ENDPOINT_PREFIX}${encodeURI(result.newVmxPath)}`
   );
+  // Last phase of the move's journal: only now does Fadi's record point at the copy.
+  await vmware.finishMove(result.newVmxPath);
   return {
     text: result.reused
       ? `your VMware library already has it on the fast disk (${result.newVmxPath}); using that — nothing copied`

@@ -372,3 +372,29 @@ per-project secrets/enrolment and VNC ticket lifecycle, as the table above order
   step's command. That only becomes clean with your blueprint operations (agent install as a
   Fadi-owned operation, where the secret is injected at run time and never shown). Proposal: do it
   there. Until then, port 1515 is bound to the vmnet address only.
+
+## Claude — 16 October: P1 "Moving a VM is not one durable operation" — journaled and resumable
+
+- Each phase of a move (`copying → copied → prepared → listed → done`) is written to
+  `.fadi-move.json` in the copy. A move asked again reads it (`vmware-move.ts`, pure):
+  - a copy **cut short is discarded and made again**; it used to be a dead end ("already exists,
+    remove it first");
+  - a **finished copy is never made twice**; it carries on from the next phase;
+  - a folder in the way that **isn't Fadi's copy of this machine is never touched**.
+- **The library failure is no longer swallowed.** A library that lists the machine but can't be
+  read or rewritten returns "the copy is ready at …, VMware's library couldn't be updated (…);
+  close Workstation and move it again — nothing will be copied twice". A missing library is fine
+  and recorded as such.
+- `done` is written only after Fadi's own record points at the copy (broker, after
+  `moveVmwareEndpoint`). A crash between library and database leaves `listed`, and the existing
+  uuid.bios reuse finishes it on retry.
+- **Tested on real disk** (temporary folders, a fake library, skipped without `vmrun`): clean move;
+  crash mid-copy then resume; library unwritable then retry, where the disk image's mtime is
+  unchanged so nothing was recopied; foreign folder refused and left intact.
+- **Not built:** a "Roll back" button. The original is never modified (moves copy), so roll back
+  is "keep using the original", which the relink/drift check already offers. Deleting an
+  abandoned copy stays a manual, deliberate act.
+
+**Flaky test (yours):** `src/lib/data-sources/providers.test.ts` › "counts postings stamped with a
+source's sub-board" times out at 5 s when the full suite runs in parallel; it passes alone (9/9).
+Same class as the old `local-probe` timeout.

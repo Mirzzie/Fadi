@@ -297,66 +297,130 @@ export async function moveMachineToFastDisk(
   }
   const refusal = await refuseIfRunning(vmxPath);
   if (refusal) return { ok: false, message: refusal };
-  const { cp, mkdir, readdir, statfs } = await import("node:fs/promises");
+  const { cp, mkdir, readdir, statfs, writeFile } = await import("node:fs/promises");
+  const { MOVE_JOURNAL, moveDecision, reached } = await import("./vmware-move");
+  type Journal = import("./vmware-move").MoveJournal;
 
   const source = path.dirname(vmxPath);
   const target = path.join(fastMachinesRoot(), path.basename(source));
-  if (await stat(target).catch(() => null)) {
-    return { ok: false, message: `${target} already exists. Remove or rename it first.` };
-  }
-  const size = (await folderSize(source)) ?? 0;
-  await mkdir(fastMachinesRoot(), { recursive: true });
-  const free = await statfs(fastMachinesRoot());
-  if (free.bavail * free.bsize < size + 10 * 1024 ** 3) {
-    return {
-      ok: false,
-      message: `Not enough room on the fast disk: it needs ${Math.ceil(size / 1024 ** 3) + 10} GB free.`,
-    };
-  }
+  const journalPath = path.join(target, MOVE_JOURNAL);
+  const readJournal = async (): Promise<Journal | null> =>
+    JSON.parse(await readFile(journalPath, "utf8").catch(() => "null")) as Journal | null;
+  let journal = await readJournal();
+  const write = async (next: Partial<Journal>) => {
+    const now = new Date().toISOString();
+    journal = { version: 1, source, startedAt: now, phase: "copying", ...journal, ...next, updatedAt: now };
+    await writeFile(journalPath, JSON.stringify(journal, null, 2));
+  };
 
-  await mkdir(target);
-  try {
-    await run("chattr", ["+C", target], { timeout: 5000 });
-  } catch {
-    // Not btrfs, or not supported: nothing to turn off.
-  }
-  // Lock folders belong to a running VMware; a stopped machine has none worth copying.
-  await cp(source, target, {
-    recursive: true,
-    filter: (src) => !src.endsWith(".lck") && !src.includes(".lck/"),
+  // A move asked again carries on from its journal (vmware-move.ts) instead of refusing a folder
+  // it made itself, or copying a finished machine twice.
+  const decision = moveDecision({
+    targetExists: Boolean(await stat(target).catch(() => null)),
+    journal,
+    sourceDir: source,
+    targetDir: target,
   });
+  if (decision.kind === "refuse") return { ok: false, message: decision.reason };
+  if (decision.kind === "discard-partial") {
+    await rm(target, { recursive: true, force: true });
+    journal = null;
+  }
 
-  for (const name of await readdir(source)) {
-    if (name.endsWith(".lck")) continue;
-    const [a, b] = await Promise.all([
-      stat(path.join(source, name)),
-      stat(path.join(target, name)).catch(() => null),
-    ]);
-    if (a.isFile() && (!b || b.size !== a.size)) {
+  if (decision.kind !== "continue") {
+    const size = (await folderSize(source)) ?? 0;
+    await mkdir(fastMachinesRoot(), { recursive: true });
+    const free = await statfs(fastMachinesRoot());
+    if (free.bavail * free.bsize < size + 10 * 1024 ** 3) {
       return {
         ok: false,
-        message: `The copy of ${name} is incomplete; the original is untouched.`,
+        message: `Not enough room on the fast disk: it needs ${Math.ceil(size / 1024 ** 3) + 10} GB free.`,
       };
     }
+    await mkdir(target);
+    try {
+      await run("chattr", ["+C", target], { timeout: 5000 });
+    } catch {
+      // Not btrfs, or not supported: nothing to turn off.
+    }
+    await write({ phase: "copying" });
+    // Lock folders belong to a running VMware; a stopped machine has none worth copying.
+    await cp(source, target, {
+      recursive: true,
+      filter: (src) =>
+        !src.endsWith(".lck") && !src.includes(".lck/") && !src.endsWith(MOVE_JOURNAL),
+    });
+    for (const name of await readdir(source)) {
+      if (name === MOVE_JOURNAL) continue;
+      if (name.endsWith(".lck")) continue;
+      const [a, b] = await Promise.all([
+        stat(path.join(source, name)),
+        stat(path.join(target, name)).catch(() => null),
+      ]);
+      if (a.isFile() && (!b || b.size !== a.size)) {
+        return {
+          ok: false,
+          message: `The copy of ${name} is incomplete; the original is untouched. Move it again to start the copy over.`,
+        };
+      }
+    }
+    await write({ phase: "copied" });
   }
 
   const newVmxPath = path.join(target, path.basename(vmxPath));
-  const vmx = await readFile(newVmxPath, "utf8");
-  await replaceTextFileAtomically(newVmxPath, setVmxEntries(vmx, { "uuid.action": "keep" }));
+  if (!journal || !reached(journal, "prepared")) {
+    const vmx = await readFile(newVmxPath, "utf8");
+    await replaceTextFileAtomically(newVmxPath, setVmxEntries(vmx, { "uuid.action": "keep" }));
+    await write({ phase: "prepared" });
+  }
 
-  try {
-    const inventory = await readFile(inventoryPath, "utf8");
-    if (inventory.includes(`"${vmxPath}"`)) {
-      await copyFile(inventoryPath, `${inventoryPath}.fadi-${Date.now()}`);
-      await replaceTextFileAtomically(
-        inventoryPath,
-        inventory.replaceAll(`"${vmxPath}"`, `"${newVmxPath}"`)
-      );
+  if (!journal || !reached(journal, "listed")) {
+    // VMware's library: a missing library is fine (Workstation opens the .vmx directly); a
+    // library that lists the machine but can't be updated is NOT — that failure used to vanish
+    // in a catch-all and leave VMware opening the old copy while Fadi used the new one.
+    const unreadable = (error: unknown) => ({
+      ok: false as const,
+      message: `The copy is ready at ${target}, but VMware's library couldn't be updated (${error instanceof Error ? error.message : "unknown error"}). Close VMware Workstation and move it again — nothing will be copied twice.`,
+    });
+    let inventory: string | null;
+    try {
+      inventory = await readFile(inventoryPath, "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") return unreadable(error);
+      inventory = null;
     }
-  } catch {
-    // No library to update; Workstation can open the moved .vmx directly.
+    let outcome: Journal["inventory"] = "no-library";
+    if (inventory !== null) {
+      if (inventory.includes(`"${newVmxPath}"`)) outcome = "updated";
+      else if (inventory.includes(`"${vmxPath}"`)) {
+        try {
+          await copyFile(inventoryPath, `${inventoryPath}.fadi-${Date.now()}`);
+          await replaceTextFileAtomically(
+            inventoryPath,
+            inventory.replaceAll(`"${vmxPath}"`, `"${newVmxPath}"`)
+          );
+          outcome = "updated";
+        } catch (error) {
+          return unreadable(error);
+        }
+      } else outcome = "not-listed";
+    }
+    await write({ phase: "listed", inventory: outcome });
   }
   return { ok: true, newVmxPath };
+}
+
+/** Fadi's record points at the copy: the move is finished. */
+export async function finishMove(newVmxPath: string): Promise<void> {
+  const { writeFile } = await import("node:fs/promises");
+  const { MOVE_JOURNAL } = await import("./vmware-move");
+  const journalPath = path.join(path.dirname(newVmxPath), MOVE_JOURNAL);
+  const journal = JSON.parse(await readFile(journalPath, "utf8").catch(() => "null"));
+  if (!journal) return;
+  await writeFile(
+    journalPath,
+    JSON.stringify({ ...journal, phase: "done", updatedAt: new Date().toISOString() }, null, 2)
+  );
 }
 
 /**
