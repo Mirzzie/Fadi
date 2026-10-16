@@ -8,7 +8,13 @@ import { getDatabase } from "@/lib/database/client";
 import { AiRateLimitError, getUserDocGenerate } from "@/lib/ai/user-generate";
 import { placeLab, type Resource } from "@/lib/lab/capability";
 import { LAB_TEMPLATES, labContainerForRun, WINDOWS_SSH_PORT, type TemplateKey } from "./templates";
-import { placesBrief, placeViolations, usableCheck, type PlacesInput } from "./places";
+import {
+  placesBrief,
+  placeViolations,
+  stepCoherenceViolations,
+  usableCheck,
+  type PlacesInput,
+} from "./places";
 import {
   withFoldersCreated,
   hostOsOf,
@@ -320,6 +326,7 @@ export async function planProjectRun(
   const problemsOf = async (steps: z.infer<typeof planSchema>["steps"]) => [
     ...planViolations(steps, template),
     ...(placesInput ? placeViolations(steps, placesInput) : []),
+    ...stepCoherenceViolations(steps),
     ...(
       await brokenLinks(steps.flatMap((step) => [step.instruction, step.verify ?? ""]))
     ).map((link) => `a link that does not exist (${link})`),

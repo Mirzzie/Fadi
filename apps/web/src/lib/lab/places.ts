@@ -152,3 +152,37 @@ export function usableCheck(
   if (used.some((name) => !set.has(name))) return null;
   return { command, expect };
 }
+
+/**
+ * A STEP THAT EXPECTS A SERVICE RUNNING MUST START IT. The owner's step 3 installed the Wazuh
+ * agent with `msiexec /qn` and checked `Get-Service WazuhSvc` for "Running" — but a silent
+ * install leaves the service stopped, and nothing started it, so a correctly followed step
+ * failed its own check (16 Oct 2026). Plans that do this go back to the planner.
+ */
+export function stepCoherenceViolations(
+  steps: Array<{
+    title: string;
+    instruction: string;
+    check?: { command?: string | null; expect?: string | null } | null;
+  }>
+): string[] {
+  const out: string[] = [];
+  for (const step of steps) {
+    const service = /Get-Service\s+(?:-Name\s+)?['"]?([\w.-]+)/i.exec(
+      step.check?.command ?? ""
+    )?.[1];
+    if (!service || !/running/i.test(step.check?.expect ?? "")) continue;
+    if (!/msiexec|\binstall/i.test(step.instruction)) continue;
+    const name = service.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const starts = new RegExp(
+      `(Start-Service|Restart-Service)\\s+(-Name\\s+)?['"]?${name}\\b|net\\s+start\\s+['"]?${name}\\b|sc(\\.exe)?\\s+start\\s+${name}\\b`,
+      "i"
+    );
+    if (!starts.test(step.instruction)) {
+      out.push(
+        `step "${step.title}" checks that ${service} is running but never starts it — a silent install leaves a service stopped; add "Start-Service ${service}" after the install`
+      );
+    }
+  }
+  return out;
+}

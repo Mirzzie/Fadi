@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { placesBrief, placeViolations, usableCheck, type PlacesInput } from "./places";
+import {
+  placesBrief,
+  placeViolations,
+  stepCoherenceViolations,
+  usableCheck,
+  type PlacesInput,
+} from "./places";
 
 const OBSERVED: PlacesInput = {
   labLabel: "Windows Server 2025",
@@ -105,5 +111,39 @@ describe("a planned check Fadi can actually run", () => {
       usableCheck({ command: "Select-String -Path $log -Pattern 'x'", expect: "x" })
     ).toBeNull();
     expect(usableCheck(null)).toBeNull();
+  });
+});
+
+describe("a step that expects a service running must start it (16 Oct 2026)", () => {
+  const step3 = {
+    title: "Download and install Wazuh agent",
+    instruction:
+      'In PowerShell run:\nInvoke-WebRequest -Uri "https://packages.wazuh.com/4.x/windows/wazuh-agent-4.14.9-1.msi" -OutFile "C:\\LabSetup\\wazuh-agent.msi"\nmsiexec.exe /i "C:\\LabSetup\\wazuh-agent.msi" /qn WAZUH_MANAGER="172.16.89.1"',
+    check: {
+      command: "Get-Service WazuhSvc | Select-Object -ExpandProperty Status",
+      expect: "Running",
+    },
+  };
+
+  it("sends the owner's step 3 back: installed, checked for Running, never started", () => {
+    expect(stepCoherenceViolations([step3])).toEqual([
+      expect.stringContaining('add "Start-Service WazuhSvc"'),
+    ]);
+  });
+
+  it("accepts it once the step starts the service", () => {
+    const fixed = { ...step3, instruction: `${step3.instruction}\nStart-Service WazuhSvc` };
+    expect(stepCoherenceViolations([fixed])).toEqual([]);
+    const net = { ...step3, instruction: `${step3.instruction}\nnet start WazuhSvc` };
+    expect(stepCoherenceViolations([net])).toEqual([]);
+  });
+
+  it("leaves steps alone that install nothing or don't expect Running", () => {
+    expect(stepCoherenceViolations([{ ...step3, instruction: "Open the dashboard." }])).toEqual([]);
+    expect(
+      stepCoherenceViolations([
+        { ...step3, check: { command: "Get-Service WazuhSvc", expect: "WazuhSvc" } },
+      ])
+    ).toEqual([]);
   });
 });
