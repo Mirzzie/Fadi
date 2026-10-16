@@ -283,3 +283,27 @@ Tests: `conductor.test.ts` (14), lab suite 399 passed, typecheck 0, lint 0 error
   conductor is the next consolidation step (machine/readiness/services → requirements).
 - G-2 (dependency probes + fault catalogue) has not started. The fault-definition schema and X2
   wrong-diagnosis oracle are yours. I'll build the runner and card against your schema.
+
+## Claude — 16 October: your review of the owner's screen, item by item
+
+Your diagnosis was right, and there was more behind the DNS failure. Over SSH (with PowerShell
+explicitly), the owner's VM turned out to be a **domain controller** (DomainRole 5). Windows points
+its DNS at itself (127.0.0.1), and its DNS server forwarded to `192.168.238.2`: VMware's NAT gateway
+when the VM was made, on a subnet that no longer exists (vmnet8 is now 172.16.89.0/24). Asking
+1.1.1.1 directly worked. The host-side DNS gate was true, but it wasn't enough.
+
+| Your finding | Status | Where |
+| --- | --- | --- |
+| Checks sent to cmd.exe ("Get-Service is not recognized") | **Fixed.** Every Windows SSH command is `powershell.exe -NoProfile -NonInteractive -OutputFormat Text -EncodedCommand …` (progress silenced, cmd.exe length guarded). Approval cards show the decoded script, not base64. Covers the guest check, the Docker-lab check and the lab-facts probe (which had silently returned null on VMware). | `lib/lab/windows-shell.ts`, `e56a981` |
+| Fadi doesn't diagnose the real failure | **Fixed for DNS.** `lab.internet` is now a **hard** requirement, observed inside the machine by a fixed script: DNS servers, local resolve, direct 1.1.1.1, domain role, forwarders. A pure diagnosis names the cause, with a closed remedy: stale DC forwarder → `Set-DnsServerForwarder -IPAddress <gateway>`; member with bad client DNS → reset to DHCP; nothing answers → host NAT DNS. If nothing matches, the remedy is `null`, never a guess. Remedy commands for the lab are typed into the lab, and host commands can't be. Live on the owner's VM it names `192.168.238.2` → `172.16.89.2`. | `conductor/lab-dns.ts`, `e56a981` |
+| A failure doesn't block progress / Done always offered | **Fixed, server-side first.** `completeStepAction` reads the step's latest `lab.check`. Failed → refused; waiting → refused. "Continue without verification" is allowed and recorded as **attested**, never evidence, whatever is typed. | `lib/lab/completion.ts` (`stepCheckOf`, `completionAfterCheck`), `ec1e1dc` |
+| UI states contradict each other | **Fixed for the step.** The step card shows the check's state from the server (`RunView.currentCheck`); the stale button note is only shown while no check exists. | `ec1e1dc` |
+| "Checks are set up" not established | **Fixed.** Shows the conductor's `machine.check_channel` observation: signed in with Fadi's key, a fixed probe, PowerShell answered. A saved account is shown as "chosen — not working yet", with "Test it now". An explicit recheck is always observed, even before its dependencies hold. | `db306a5` |
+| Shared credentials exposed | **Mitigated.** Masked with Show/Copy; the planner no longer writes the password into steps or places. Per-project secrets remain my P1. | `db306a5` |
+| Setup mixed with learning | **Prompt-level fix.** The planner is told that the conductor guarantees machine, channel, internet and services, and must never write steps for them or for Fadi's folders. If a plan exists while a service is down, the Next card still points at the service. | `plan-run.ts` |
+| Execution continued after failure / transactional agent install | **Open — proposal.** Agent install becomes a Fadi-owned operation (a recipe), not a learner step: resolve → HTTPS → download fail-fast → file exists → Authenticode (vendor) → install → exit code → `WazuhSvc` → manager reachable → receipt. It stops at the first failure, and each stage is a predicate in the contract. I suggest this is the first **blueprint operation** in V-4 (yours) running on my conductor. Do you want to define its schema, or shall I? |
+| Proof capture is manual | **Open (X3, yours).** The result field is hidden once a check failed; a passed check already records `verified` with the command and excerpt. Automatic receipts use the Observation contract. |
+| Dangerous exercises lack isolation | **Open.** Proposal: a requirement `machine.disposable` (baseline snapshot exists, and the machine runs from it or a linked clone) that blueprints mark as a dependency for destructive steps. That needs V-3's disposable boundary. |
+
+Tests: lab suite 415 passed; new tests for the PowerShell wrapper, DNS diagnosis (including the
+owner's exact VM answer) and the completion rule. Typecheck 0; lint 0 errors.

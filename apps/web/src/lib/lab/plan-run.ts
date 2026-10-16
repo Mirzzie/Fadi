@@ -77,7 +77,8 @@ Write steps that person can actually execute tonight. Rules:
 - Before any step writes a file, that step or an earlier one creates its folder (PowerShell: New-Item -ItemType Directory -Force -Path "C:\\LabSetup"; Linux: mkdir -p). A fresh machine has none of your folders.
 - Keep each instruction under about 900 characters: the commands, and one line on why.
 - 3 to 8 steps. A plan longer than that is a course, and it will not be finished.
-- Every step names its place in \`where\` (lab, browser or fadi — see PLACES) and gives a \`check\`: a self-contained read-only command (it sets every variable it uses) and \`expect\`, a literal piece of text its output contains only on success — never a comparison like ">=1". A dashboard or web console is opened in the browser place, never inside the lab; starting a service beside the lab is a fadi step.
+- Every step names its place in \`where\` (lab, browser or fadi — see PLACES) and gives a \`check\`: a self-contained read-only command (it sets every variable it uses) and \`expect\`, a literal piece of text its output contains only on success — never a comparison like ">=1". A dashboard or web console is opened in the browser place, never inside the lab.
+- SETUP IS NOT LEARNING. Before the first step, Fadi itself guarantees the environment: the lab machine is running, Fadi can check inside it, it reaches the internet, and every service beside it is running and reachable from it. Never write a step to start, stop or check those, or to create folders or workspaces for Fadi. Steps are the work the person is here to learn.
 - Never install Docker, Docker Desktop, WSL, Hyper-V or any hypervisor inside the lab machine. Services the project needs (a SIEM, a database) run BESIDE it and are listed as such; the machine connects to them.
 - Never invent details about their environment beyond what you are told.`;
 
@@ -224,7 +225,7 @@ export async function planProjectRun(
       const stack = STACKS[key];
       return [
         `SERVICE BESIDE THE LAB: ${stack.label}. ${stack.purpose}`,
-        `The person starts it with one click under "Services beside the machine" on the project page. The FIRST step that needs it must say to start it there and wait until its dashboard link appears — an agent installed before the manager runs cannot enrol. ${stack.open.label}: ${stack.open.url} on the person's own computer (sign in as ${stack.open.user}; the password is shown beside the service on the project page — never write it into a step).`,
+        `Fadi has it running and reachable from the lab before the first step — never write a step to start it. ${stack.open.label}: ${stack.open.url} on the person's own computer (sign in as ${stack.open.user}; the password is shown beside the service on the project page — never write it into a step).`,
         `The lab machine connects to it at ${machineLine ? vmNetworkAddress() : stack.agent.managerHost} on ports ${stack.agentPorts.join(" and ")} — for Wazuh, install the Wazuh agent ${stack.version} on the lab machine with WAZUH_MANAGER set to that address.`,
         `The Windows agent installer is exactly ${stack.agent.windowsInstaller} — use that URL; it is not on GitHub. On Windows the agent's service is ${stack.agent.windowsService} (never "ossec"), its configuration ${stack.agent.windowsConfig}; with WAZUH_MANAGER set it enrols on its own when the service starts (Start-Service ${stack.agent.windowsService}).`,
         "Never install this service, Docker or a hypervisor inside the lab machine.",
