@@ -13,7 +13,12 @@ import { completionOf, type CompletableStep } from "@/lib/lab/completion";
  * written is "self-reported" and never appears in the summary as an outcome.
  */
 
-export type ReviewStep = CompletableStep & { ordinal: number; title: string };
+export type ReviewStep = CompletableStep & {
+  ordinal: number;
+  title: string;
+  /** lab | browser | fadi. "fadi" steps were Fadi setting things up — not the person's work. */
+  place?: string | null;
+};
 
 export type ReviewLine = {
   ordinal: number;
@@ -32,6 +37,8 @@ export type CompletionReview = {
 
 export function completionReview(title: string, steps: ReviewStep[]): CompletionReview {
   const lines: ReviewLine[] = [...steps]
+    // Setup is not learning: "Start Wazuh containers" is not something to claim on a résumé.
+    .filter((step) => step.place !== "fadi")
     .sort((a, b) => a.ordinal - b.ordinal)
     .map((step) => {
       const kind = completionOf(step);

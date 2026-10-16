@@ -317,8 +317,11 @@ export function createProjectRunsRepository(db: Database) {
       patch: {
         instruction: string;
         verify?: string | null;
-        /** A corrected step usually needs its check corrected with it. */
+        /** A corrected step usually needs its check corrected with it; null clears it. */
         check?: { command: string; expect: string } | null;
+        title?: string;
+        /** lab | browser | fadi */
+        place?: string;
       }
     ): Promise<ProjectStep | null> {
       return db.transaction(async (tx) => {
@@ -337,9 +340,14 @@ export function createProjectRunsRepository(db: Database) {
           .set({
             instruction: patch.instruction,
             ...(patch.verify ? { verify: patch.verify } : {}),
-            ...(patch.check
-              ? { checkCommand: patch.check.command, checkExpect: patch.check.expect }
+            ...(patch.check !== undefined
+              ? {
+                  checkCommand: patch.check?.command ?? null,
+                  checkExpect: patch.check?.expect ?? null,
+                }
               : {}),
+            ...(patch.title ? { title: patch.title } : {}),
+            ...(patch.place ? { place: patch.place } : {}),
             updatedAt: new Date(),
           })
           .where(eq(projectSteps.id, stepId))

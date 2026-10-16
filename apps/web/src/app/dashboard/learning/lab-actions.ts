@@ -776,17 +776,10 @@ export async function completeStepAction(input: {
     completion: decision.completion,
   });
 
-  // The last completed step closes the loop immediately. saveEvidenceOnce locks the run and makes
-  // this idempotent across retries or two tabs; the summary is derived only from recorded results.
-  if (updated) {
-    const project = await runs.getWithSteps(user.id, updated.runId);
-    if (project?.run.status === "done" && !project.run.evidenceItemId) {
-      const { completionReview } = await import("@/lib/learning/project-review");
-      const { saveProjectEvidenceAction } = await import("./project-finish-actions");
-      const summary = completionReview(project.run.title, project.steps).summary;
-      await saveProjectEvidenceAction({ runId: project.run.id, summary });
-    }
-  }
+  // The last step does NOT save the project to the career record. Completion asks one question
+  // first — is this an accurate record? — on the finish review, and only the person's yes saves
+  // it. Saving here as well was a second completion path that skipped that question
+  // (docs/UI_UX_GUIDELINES.md "Completion"; Codex X3: evidence only after review).
   return { ok: Boolean(updated) };
 }
 

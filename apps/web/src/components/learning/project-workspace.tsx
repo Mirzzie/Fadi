@@ -576,6 +576,8 @@ function CurrentStep({
   const script = stepScript(step.instruction);
   const inLab = !step.place || step.place === "lab";
   const canRun = canCheck && inLab && Boolean(script) && Boolean(step.check);
+  // Fadi checks inside the lab only. A browser step's result is on the person's screen.
+  const canCheckHere = canCheck && inLab;
   const failed = check.state === "failed";
 
   const ask = (run: boolean) =>
@@ -603,7 +605,7 @@ function CurrentStep({
   } else {
     const [label, go] = canRun
       ? [failed ? "Run again" : "Run in lab", () => ask(true)]
-      : canCheck
+      : canCheckHere
         ? [failed ? "Check again" : "Check and continue", () => ask(false)]
         : ["Done, continue", () => onComplete({ unverified: false, artifact: null })];
     primary = (
@@ -705,7 +707,7 @@ function CurrentStep({
                 typeable={inLab}
                 className="space-y-2 text-sm text-muted-foreground"
               />
-              {canCheck ? (
+              {canCheckHere ? (
                 <Button size="sm" variant="outline" disabled={asking} onClick={() => ask(false)}>
                   I did it — check it
                 </Button>

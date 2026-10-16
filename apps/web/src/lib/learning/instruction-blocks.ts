@@ -96,29 +96,33 @@ export function parseInstruction(input: string): InstructionBlock[] {
       continue;
     }
 
-    // A command on its own line at column 0, with no fence or indent: the planner wrote
-    // "In PowerShell run:" and then two bare commands, so the page offered no command to copy
-    // or type, the whole instruction was pasted, and PowerShell ran "In PowerShell run:"
-    // (16 Oct 2026). Each bare command is its own block — the second (msiexec) must not run
-    // when the first (the download) failed — except a here-string, which is one command.
+    // Commands at column 0, with no fence or indent: the planner wrote "In PowerShell run:" and
+    // then bare commands, so the page offered nothing to run or copy and the whole instruction
+    // was pasted — PowerShell ran "In PowerShell run:" (16 Oct 2026). A bare command starts a
+    // block that continues over every following line until a blank line or a sentence: a
+    // `foreach (…) { … }`, a `# comment`, a `"text" | Set-Content` belong to the script, and a
+    // block cut short would make "Run in lab" run half of it. A here-string runs to its close.
     if (looksLikeCommand(line)) {
       flushText();
       flushIndented();
-      const body = [line];
-      const hereString = /@(["'])\s*$/.exec(line);
-      if (hereString) {
-        const close = new RegExp(`^${hereString[1]}@`);
-        while (i + 1 < lines.length) {
-          i++;
-          body.push(lines[i]);
-          if (close.test(lines[i])) break;
+      const body: string[] = [];
+      let j = i;
+      while (j < lines.length) {
+        const current = lines[j];
+        if (j > i && (current.trim() === "" || looksLikeProse(current))) break;
+        body.push(current);
+        const hereString = /@(["'])\s*$/.exec(current);
+        if (hereString) {
+          const close = new RegExp(`^${hereString[1]}@`);
+          while (j + 1 < lines.length) {
+            j++;
+            body.push(lines[j]);
+            if (close.test(lines[j])) break;
+          }
         }
+        j++;
       }
-      // A line ending in a pipe or PowerShell's backtick continues on the next one.
-      while (/(\||`)\s*$/.test(body[body.length - 1]) && i + 1 < lines.length) {
-        i++;
-        body.push(lines[i]);
-      }
+      i = j - 1;
       blocks.push({ type: "code", code: body.join("\n"), lang: commandLang(line) });
       continue;
     }
@@ -165,6 +169,16 @@ export function looksLikeCommand(line: string): boolean {
   if (/:\s*$/.test(trimmed)) return false;
   if (/^[A-Z][a-z]+ [a-z]+ .*\.$/.test(trimmed) && !CMDLET.test(trimmed)) return false;
   return CMDLET.test(trimmed) || PROGRAM.test(trimmed) || POWERSHELL_EXPR.test(trimmed);
+}
+
+/**
+ * A sentence, not code: it starts with a capitalised word followed by ordinary lowercase words,
+ * and isn't a cmdlet. "Restart the service so it re-reads the log." / "Open the dashboard:".
+ */
+export function looksLikeProse(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed || CMDLET.test(trimmed) || PROGRAM.test(trimmed)) return false;
+  return /^[A-Z][a-z’']*(?:\s+[a-z][\w’'-]*){2,}/.test(trimmed) || /^\*\*|^[-*] [A-Z]/.test(trimmed);
 }
 
 function commandLang(line: string): string | null {

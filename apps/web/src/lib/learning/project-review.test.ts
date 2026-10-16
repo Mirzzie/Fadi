@@ -97,3 +97,14 @@ describe("what a saved project can become", () => {
     expect(items.every((i) => i.state === "waiting")).toBe(true);
   });
 });
+
+describe("setup is not the person's work (16 Oct 2026)", () => {
+  it("leaves out steps Fadi did, so 'Start Wazuh containers' never reaches a résumé", () => {
+    const review = completionReview("SIEM", [
+      { ordinal: 1, title: "Start Wazuh containers", place: "fadi", status: "done", artifact: null, completion: "attested" },
+      { ordinal: 2, title: "Install the agent", place: "lab", status: "done", artifact: "WazuhSvc Running", completion: "verified" },
+    ]);
+    expect(review.lines.map((line) => line.title)).toEqual(["Install the agent"]);
+    expect(review.summary).not.toContain("Start Wazuh containers");
+  });
+});

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { parseInline, parseInstruction } from "./instruction-blocks";
+import { parseInline, parseInstruction, stepScript } from "./instruction-blocks";
 
 describe("finding the commands in a step", () => {
   it("THE REPORTED STEP: an indented command becomes a copyable block", () => {
@@ -121,21 +121,24 @@ describe("a closing fence with the next sentence on the same line", () => {
 });
 
 describe("bare commands at the start of a line (16 Oct 2026)", () => {
-  it("pulls the owner's step 3 apart: the sentence is text, each command its own block", () => {
+  it("pulls the owner's step 3 apart: the sentence is text, the commands one script", () => {
     const blocks = parseInstruction(
       'In PowerShell run:\nInvoke-WebRequest -Uri "https://packages.wazuh.com/4.x/windows/wazuh-agent-4.14.9-1.msi" -OutFile "C:\\LabSetup\\wazuh-agent.msi"\nmsiexec.exe /i "C:\\LabSetup\\wazuh-agent.msi" /qn WAZUH_MANAGER="172.16.89.1"'
     );
-    expect(blocks.map((b) => b.type)).toEqual(["text", "code", "code"]);
+    // One script: "Run in lab" stops at its first error, so the installer never runs after a
+    // failed download — splitting it for the person to sequence by hand isn't needed.
+    expect(blocks.map((b) => b.type)).toEqual(["text", "code"]);
     expect(blocks[1]).toMatchObject({ lang: "powershell" });
-    expect((blocks[2] as { code: string }).code.startsWith("msiexec.exe /i")).toBe(true);
+    const lines = (blocks[1] as { code: string }).code.split("\n");
+    expect(lines[1]!.startsWith("msiexec.exe /i")).toBe(true);
   });
 
   it("keeps a here-string as one command, XML and all", () => {
     const blocks = parseInstruction(
       'Create a test directory and add an integrity rule:\nNew-Item -ItemType Directory -Force -Path "C:\\RansomTest"\n$conf = @"\n<ossec_config>\n  <syscheck>\n</ossec_config>\n"@\nAdd-Content -Path "C:\\x.conf" -Value $conf'
     );
-    expect(blocks.map((b) => b.type)).toEqual(["text", "code", "code", "code"]);
-    expect((blocks[2] as { code: string }).code).toContain('</ossec_config>\n"@');
+    expect(blocks.map((b) => b.type)).toEqual(["text", "code"]);
+    expect((blocks[1] as { code: string }).code).toContain('</ossec_config>\n"@\nAdd-Content');
   });
 
   it("leaves sentences alone", () => {
@@ -147,5 +150,25 @@ describe("bare commands at the start of a line (16 Oct 2026)", () => {
     ]) {
       expect(parseInstruction(line).map((b) => b.type)).toEqual(["text"]);
     }
+  });
+
+  it("keeps the owner's step 5 whole: foreach, comments and piped strings are the script", () => {
+    const step5 = [
+      "Run the following PowerShell script to create and encrypt 5 files and write a fake LSASS dump:",
+      '$files = 1..5 | ForEach-Object { "C:\\RansomTest\\secret$_.txt" }',
+      'foreach ($f in $files) { "Sensitive data $((Get-Random))" | Set-Content $f }',
+      "foreach ($f in $files) { $bytes = [System.IO.File]::ReadAllBytes($f) }",
+      "# fake credential dump",
+      '"LSASS dump" | Set-Content "C:\\RansomTest\\lsass.dmp"',
+    ].join("\n");
+    expect(stepScript(step5)!.split("\n")).toHaveLength(5);
+    expect(stepScript(step5)).toContain('"LSASS dump" | Set-Content');
+  });
+
+  it("ends a script at a sentence", () => {
+    const blocks = parseInstruction(
+      "Restart-Service WazuhSvc\nThen open the dashboard and look for the alert."
+    );
+    expect(blocks.map((b) => b.type)).toEqual(["code", "text"]);
   });
 });
