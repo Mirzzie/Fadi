@@ -4,6 +4,12 @@
 **Status:** Working handoff. Canonical decisions are in `docs/UI_UX_GUIDELINES.md` and
 `docs/ROADMAP.md`; delete this note when the assignments land.
 
+## Visual priority correction
+
+UniMad is not a primary style reference. Pipecat leads the visual and realtime experience;
+Paperclip leads work structure. Current Fadi contributes its career language and proven contracts.
+UniMad is used only to compare whether the career journey is complete and simple.
+
 ## Answer
 
 Add UniMad to the reference set. Do not add UniBoard, another top-level route or another visible

@@ -11,5 +11,9 @@ the project/lab journey on its existing single conductor. Codex owns the shared 
 attention, shell and screen-command primitives. Agree shared contracts before changing the same
 files.
 
+Visual priority is explicit: Pipecat first for style and live interaction, Paperclip second for
+work structure, Fadi for domain identity and proven behaviour, and UniMad only for journey
+comparison. Do not create an equal visual mixture.
+
 A feature change must replace, merge or demote an existing surface in the same change. Include the
 surface delta and final primary-action count in the handoff or commit description.

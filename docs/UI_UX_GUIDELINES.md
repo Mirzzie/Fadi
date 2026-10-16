@@ -16,7 +16,21 @@ to that work.
 
 ## Reference model and limits
 
-Fadi borrows patterns, not branding or product metaphors.
+Fadi borrows patterns, not branding or product metaphors. These references are deliberately not
+equal. When they disagree, use this order:
+
+1. **Pipecat for visual language and live interaction** — space, typography, focus, realtime state,
+   voice and the feeling that the product is alive.
+2. **Paperclip for work structure and operational clarity** — goals, work threads, attention,
+   decisions, approvals and traceability.
+3. **Current Fadi for domain identity and proven behaviour** — the four destinations, career truth,
+   safety contracts and teal accent. Existing visual patterns are not presumptively retained.
+4. **UniMad for career-journey comparison only** — shared profile context and end-to-end flow. It is
+   not a visual reference until its authenticated product is independently evaluated.
+
+Do not average the four styles. A Fadi screen should look and feel closest to Pipecat, organise work
+like Paperclip, speak in Fadi's career language, and use UniMad only to check that the job-seeker
+journey is complete.
 
 | Reference | Use in Fadi | Do not copy |
 |---|---|---|
@@ -357,19 +371,63 @@ They are not the primary Evidence page experience.
 
 ## Visual system
 
-Fadi keeps its own identity:
+### Primary direction: Pipecat
 
-- calm teal/aurora accent for active state and primary action;
-- neutral surfaces with strong type hierarchy;
-- generous space around the current task;
-- compact, information-dense rows for history and secondary state;
-- monospace only for commands, identifiers, addresses and machine values;
-- semantic colours for success, caution, danger and blocked state;
-- one token source for colour, type, space, radius, shadow and motion.
+The interface uses Pipecat's visual discipline as its main reference:
+
+- high-contrast neutral canvas with substantial breathing room;
+- large, confident type for the page's single purpose;
+- a restrained grid or technical texture only where it gives orientation;
+- one contained live surface as the focal point;
+- crisp borders and direct controls instead of layered decoration;
+- realtime state made visible through precise text, motion and one accent colour;
+- product capability demonstrated in the working surface rather than explained through card copy.
+
+This does not mean every page becomes a marketing hero. Entry, empty and completion moments may use
+large type and open space. Active workspaces become denser while preserving one focal region.
+
+### Structural direction: Paperclip
+
+Use Paperclip's disciplined information hierarchy beneath that visual language:
+
+- slim persistent navigation;
+- compact rows and separators for repeated information;
+- work status and decisions placed in the work narrative;
+- optional inspector rather than permanent secondary panels;
+- consistent semantic status vocabulary;
+- actions and traces beside the object they affect.
+
+Do not copy Paperclip's agent-company dashboard density, org chart, budgets or administrative chrome.
+
+### Fadi identity
+
+Fadi retains:
+
+- calm teal/cyan as the primary active and voice accent;
+- the four career destinations;
+- approachable career language;
+- the Fadi presence mark, integrated into the shell rather than floating over work;
+- dark focus mode where it improves labs, terminals and live interviews;
+- light and dark themes with the same hierarchy and contrast.
+
+Existing gradients, aurora backgrounds, glass panels, large corner radii, glowing card borders and
+floating navigation are legacy patterns unless a specific brand moment justifies them. They are not
+the default visual system.
+
+### Component grammar
+
+- Prefer one bounded work surface over several rounded cards.
+- Use separators and spacing before adding containers.
+- Reserve pills for status, filters and compact metadata; do not put ordinary labels in pills.
+- Use one primary button colour per screen. Secondary actions are quieter.
+- Keep repeated result rows compact; open detail alongside or on demand.
+- Use monospace only for commands, identifiers, addresses and machine values.
+- Use semantic colours for success, caution, danger and blocked state.
+- Keep colour, type, spacing, radius, shadow and motion in one token source.
 
 Hierarchy comes from structure, typography and whitespace. Glass, glow, animated grids and
-holographic decoration are limited to brand moments and Fadi presence. They do not wrap routine
-cards or compete with state and action.
+holographic decoration are limited to rare brand moments and Fadi presence. They do not wrap routine
+content or compete with state and action.
 
 Motion has named tokens and a purpose: orient, acknowledge or show continuity. Respect reduced
 motion. Do not use ambient animation around urgent decisions, text entry or remote desktops.

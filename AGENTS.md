@@ -4,6 +4,10 @@ Before changing a user-facing journey, read `docs/UI_UX_GUIDELINES.md`. For chan
 screen context, work threads or agent execution, also read proposed ADR
 `docs/adr/0013-unified-work-surface-and-multimodal-agent-runtime.md`.
 
+Reference priority: Pipecat defines the primary visual and live-interaction language; Paperclip
+defines work structure; Fadi contributes its career domain, safety and teal identity; UniMad is a
+journey comparator only. Do not average these styles.
+
 Every UI change must:
 
 - identify the one authoritative state owner and one primary next action;

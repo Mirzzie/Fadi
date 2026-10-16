@@ -4,6 +4,19 @@
 **Status:** Working handoff; decisions have been copied into canonical UI guidance and proposed ADR
 0013. Delete this note when the assignments land.
 
+## Owner's visual priority
+
+The references are not an equal mixture. The owner chose Pipecat as the primary UI/UX style,
+Paperclip as the next strongest reference, current Fadi as a source of domain identity and proven
+behaviour, and UniMad only as a nearby career-workflow comparison.
+
+Implementation interpretation:
+
+- make it look and feel closest to Pipecat;
+- organise durable work like Paperclip;
+- retain Fadi's career model, four destinations, safety and teal accent;
+- do not copy UniMad styling or add its module structure.
+
 ## The decision
 
 Do not make Fadi look like Paperclip or Pipecat. Use their deeper strengths:
