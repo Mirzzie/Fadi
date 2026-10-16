@@ -1,10 +1,63 @@
 # Fadi UI and UX guidelines
 
-**Status:** Current product standard
-
+**Status:** Current product standard for every new or changed surface
 **Updated:** 16 October 2026
 
-Fadi should feel like one calm assistant guiding one career journey. A page is successful when the person understands the state, the next action, and its consequence without learning the platform's internal architecture.
+Fadi should feel like one calm, capable career partner guiding one career journey. A screen is
+successful when a person can answer three questions without learning Fadi's architecture:
+
+1. What is happening?
+2. Does Fadi need me?
+3. What should I do next?
+
+Features are not the unit of interface design. **The person's work is the unit.** Job discovery,
+documents, interview practice, labs, evidence and publishing are stages and capabilities attached
+to that work.
+
+## Reference model and limits
+
+Fadi borrows patterns, not branding or product metaphors.
+
+| Reference | Use in Fadi | Do not copy |
+|---|---|---|
+| Paperclip | Goal-aligned work, one attention queue, work threads containing activity and decisions, persistent status, inline approvals, traceable execution | Org charts, agent employees, budgets, ticket administration, dense operator dashboards |
+| Pipecat | One live multimodal session, explicit listening/thinking/speaking/acting states, natural turn detection, interruption, typed screen commands, cancellable progress | Provider selectors, pipeline internals, developer controls, an always-on microphone |
+| Current Fadi | Four human destinations, career direction, canonical career record, trustworthy evidence, calm teal identity | Card walls, infrastructure-first controls, duplicate conductors, raw logs as the experience |
+
+The references support these choices:
+
+- Paperclip presents work as goal-aligned tasks with conversations, activity and decisions attached
+to the task, and centralises human decisions instead of scattering them across pages.
+- Pipecat separates the voice conversation from a UI worker that receives screen context and emits
+typed UI commands. Its turn detection and interruption model treat a pause as distinct from the end
+of a person's turn.
+
+Sources: [Paperclip](https://paperclip.ing/), [Paperclip tasks](https://docs.paperclip.ing/guides/day-to-day/issues/),
+[Paperclip decisions](https://docs.paperclip.ing/guides/day-to-day/decisions/),
+[Pipecat UI worker](https://docs.pipecat.ai/pipecat/learn/ui-worker),
+[Pipecat turn detection](https://docs.pipecat.ai/pipecat/learn/speech-input), and
+[Pipecat interruptions](https://docs.pipecat.ai/pipecat/fundamentals/interruptions).
+
+## The experience model
+
+Every journey uses one chain:
+
+```text
+Goal → Plan → Next step → Execution → Receipt → Output → Evidence → Projection → Outcome
+```
+
+- **Goal** explains why the work matters.
+- **Plan** is the resumable sequence Fadi owns.
+- **Next step** is the only primary action presented now.
+- **Execution** is observable work by the person, Fadi or an approved tool.
+- **Receipt** records what actually happened.
+- **Output** is the resulting document, lab artefact, message or assessment.
+- **Evidence** is an approved claim about the person's career record.
+- **Projection** adapts evidence for a résumé, portfolio, interview story or public post.
+- **Outcome** records what happened in the world and changes what Fadi recommends next.
+
+A domain may project this chain differently, but may not invent a parallel plan, completion state,
+approval store or activity log.
 
 ## Four destinations
 
@@ -17,148 +70,315 @@ Use the navigation source in `apps/web/src/components/os/navigation.ts`:
 | Practice | What should I learn, build, or rehearse? | Learning, interview practice |
 | My career | What is true about me and what do I share? | Record, documents, portfolio, directions |
 
-Profile and Settings belong to the account menu. Machines, permissions, provider health, audit events, and raw logs are contextual or advanced controls, not primary destinations.
+Profile and Settings belong to the account menu. Machines, permissions, provider health, audit
+events and raw logs are contextual or advanced controls.
+
+The four destinations remain visible. Desktop may use a slim, collapsible left rail when this
+improves scanning; mobile uses four labelled bottom destinations. Lab focus mode may collapse
+navigation so it never covers the remote desktop, terminal or primary action.
+
+## Product shell
+
+The shell has three responsibilities:
+
+1. show where the person is;
+2. show Fadi's live state and the work it belongs to;
+3. surface decisions that need the person.
+
+The shell must not become a fifth dashboard. It shows:
+
+- the current destination;
+- the active direction or goal, once;
+- Fadi's current state;
+- one count for decisions needing attention;
+- account and settings access.
+
+Apply and Prepare are lifecycle phases of the active goal. They may reorder recommendations and
+change the next action. They must not hide routes, records or capabilities.
+
+## The work surface
+
+A substantial piece of work uses one consistent surface:
+
+```text
+┌ Context: goal, object, status ────────────────────────────┐
+│ Next: one explanation + one primary action                │
+├──────────────────────────────────────┬─────────────────────┤
+│ Work thread                          │ Context inspector   │
+│ user intent, plan progress,          │ facts, properties, │
+│ Fadi activity, receipts, outputs,    │ history, advanced  │
+│ failures and decisions in sequence   │ controls           │
+└──────────────────────────────────────┴─────────────────────┘
+```
+
+The inspector is optional and closed by default. On small screens it becomes a sheet. The work
+thread is not a generic chat transcript: it is the durable narrative of this work. Voice, text,
+buttons, tools and background work continue the same thread.
+
+Approvals render inline at the consequential action. Today may show the same approval in the
+attention queue, but it is the same record and resolution, not a second workflow.
 
 ## Page hierarchy
 
-Every primary page should present, in this order:
+Every primary page presents, in order:
 
-1. the current goal or object;
-2. its state in plain language;
+1. current goal or object;
+2. state in plain language;
 3. one primary next action;
-4. decisions that block progress;
-5. optional explanation and advanced controls.
+4. decisions blocking progress;
+5. recent verified result;
+6. optional details and advanced controls.
 
-Use progressive disclosure. Do not present every engine, data source, recommendation type, or machine action as a peer.
+Do not present every engine, source, recommendation type or machine action as a peer. Do not use a
+grid of equal cards when the actions have a natural order.
 
 ## Interaction budget and replacement rule
 
-Adding a capability does not justify adding a permanent control. The default surface for one
-task has this budget:
+Adding a capability does not justify adding a permanent control. The default task surface has:
 
 - one clear state;
 - one recommended action;
-- at most one secondary choice when the choice changes the outcome;
-- one compact status line for the environment;
+- at most one secondary choice when it changes the outcome;
+- one compact environment or context line;
 - details, commands, logs, provenance and administration disclosed on request.
 
-If Fadi already owns the data, can observe the result, or has an approved execution channel, it
-must not ask the person to re-enter, copy, paste, relay, or manually confirm that information.
-The normal action sequence is: observe automatically; propose a consequential change; obtain one
-scoped approval when required; execute; verify; record a receipt. A manual path is a fallback for
-an external environment, a deliberate learning mode, or an authority boundary such as `sudo`.
+If Fadi owns the data, can observe the result or has an approved execution channel, it must not ask
+the person to re-enter, copy, paste, relay or manually confirm that information. The normal sequence
+is:
 
-Every change that introduces a visible feature must name the existing surface it replaces,
-merges, moves under Details, or removes. Adding a new card above the old cards is incomplete work.
-If no surface can be retired, the change needs evidence that the new control represents a distinct
-user decision. Pull requests and handoffs must include a **surface delta**: controls added,
-controls removed, and the final number of primary actions.
+```text
+observe → propose consequential change → approve if required → execute → verify → record receipt
+```
 
-One object has one authoritative state and one conductor. Different views may project that state,
-but they must not own separate polling, readiness, approval, or completion logic. An approval is
-rendered at the point of action from the shared approval record; the global inbox is another view
-of that record, not a second journey.
+Manual work is appropriate when it is the skill being learned, an external environment cannot be
+observed, or an authority boundary such as `sudo` requires the person. In learning mode, Fadi may
+teach the command before running it; the learner chooses **Guide me** or **Do it with Fadi**, not a
+series of copy buttons.
 
-For lab work, use a focus layout:
+Every visible feature change must include a **surface delta**:
 
-1. next step, reason and observed state;
-2. one stateful action such as **Run in lab**, **Approve and run**, **Check and continue**, or
-   **Fix issue**;
-3. the lab surface;
-4. environment summary and diagnostics under Details.
+- controls added;
+- controls removed, merged or moved under Details;
+- primary actions before and after;
+- duplicate state owners removed.
 
-Raw commands, copy buttons, result fields, credentials, machine settings, service controls and
-audit output do not remain expanded beside the lab. The bottom navigation and assistant presence
-must not cover the remote desktop, terminal, primary action or operating-system controls.
+Adding a new card above old cards is incomplete work. If no surface can be retired, the change
+needs evidence that it represents a distinct user decision.
 
-This standard follows established accessibility and service-design guidance: instructions should
-be concise and adjacent to the activity, repeated input should be reused, long transactions should
-be simplified before a task list is introduced, and secondary information should be disclosed only
-when needed. See [W3C step-by-step instructions](https://www.w3.org/WAI/WCAG2/supplemental/patterns/o4p07-step-instructions/),
-[W3C predictable interfaces](https://www.w3.org/WAI/fundamentals/accessibility-principles/),
-[GOV.UK question pages](https://design-system.service.gov.uk/patterns/question-pages/),
-[GOV.UK multiple tasks](https://design-system.service.gov.uk/patterns/complete-multiple-tasks/)
-and [GOV.UK details](https://design-system.service.gov.uk/components/details/).
+## One authority for each concept
+
+One object has one authoritative state and one conductor. Views may project it, but must not own
+separate polling, readiness, approval or completion logic.
+
+| Concept | Authority | Projections |
+|---|---|---|
+| Work progress | Work kernel and executions | Today, relevant workspace, Fadi presence |
+| Human decisions | Shared attention/approval record | Inline action, Today queue, shell count |
+| Career truth | Canonical career record and history | Résumé, portfolio, interview, public campaign |
+| Lab readiness | Project conductor and observed checks | Next action, compact Environment line |
+| Fadi live state | Shared agent session | Shell, orb, active work surface |
+
+A projection never silently repairs or overwrites its source.
+
+## Fadi presence, voice and screen context
+
+Fadi is present across the system, not confined to a chat window. The UI exposes these semantic
+states when relevant:
+
+- ready;
+- listening;
+- understanding;
+- speaking;
+- acting;
+- waiting for approval;
+- blocked;
+- offline.
+
+Rules:
+
+- Listening is visible and user-initiated; there is no always-on microphone.
+- A short pause does not automatically end a turn. The person can finish explicitly, and semantic
+  turn detection may finish when confidence is sufficient.
+- The person can interrupt Fadi while it speaks and cancel long work while it acts.
+- The live transcript is visible and correctable before a consequential interpretation.
+- Voice, text and controls use the same work session, context envelope, tools, approvals and
+  receipts.
+- Fadi names the action, target, expected effect and reversal before consequential execution.
+- The orb signals presence; it is never the only route to a waiting decision.
+
+The runtime boundary is defined by ADR 0013. The conversation worker does not receive an arbitrary
+DOM dump or mutate the page directly. A screen-context worker receives a bounded accessibility
+snapshot and active work context, then returns typed UI commands. Long work belongs to the task
+executor and reports cancellable progress.
 
 ## Today
 
-Today is the operating surface, not an analytics dashboard. It shows:
+Today is an attention and continuation surface. It shows:
 
-- what the person is working toward;
-- the next executable step;
-- recent consequential work by Fadi;
+- the active goal;
+- one next action;
+- what Fadi is doing now;
 - decisions waiting for the person;
+- recent consequential receipts;
 - no more than three grounded suggestions.
 
-Empty sections explain the next useful setup action. They do not fill space with zero metrics.
+It is not an analytics dashboard. Empty sections explain the next useful setup action instead of
+showing zero metrics.
 
-## Apply and Prepare
+## Opportunities and application workspaces
 
-Apply and Prepare describe the phase of a goal. They may reorder recommendations or change the next action. They must not hide routes, records, documents, or capabilities. A person can move between discovering, preparing, applying, interviewing, and following up without losing context.
+An opportunity workspace changes with the lifecycle stage while keeping one narrative:
 
-## Practice and labs
+1. decide whether the role merits time;
+2. prepare and review the required application package;
+3. submit or record the external submission;
+4. prepare for the actual interview stage;
+5. follow up;
+6. record the outcome and learn from it.
 
-Practice should expose three concepts:
+Show one next action for the current stage. Résumé, cover letter, email and value proposition are
+outputs within the package, not four equally prominent workflows. Fit, score and red-pen analysis
+are checks attached to the relevant output, not permanent accordion panels.
 
-- **Now** — the current activity and next step;
-- **Plan** — queued work and why it matters;
-- **Completed** — verified outcomes and what they produced.
+Interview practice launched here inherits the role, employer, posting, direction, region,
+seniority, application documents and relevant evidence. The user is not asked to select them
+again.
 
-A machine appears inside the project as **Environment**. Global machine inventory, grants, and raw action history belong under advanced administration.
+## Practice, learning and labs
 
-When Fadi can observe an environment, the primary control is **Check and continue**. Manual result text, pasted terminal output, and manual verification are fallbacks for external environments.
+Practice exposes three concepts:
 
-A commitment has one finish line. A generated practical project completes through its run; an external course or activity uses a compact completion review. Both call the same outcome service.
+- **Continue** — the current activity and next step;
+- **Recommended next** — one recommendation with a reason;
+- **Explore** — optional courses, projects and interview practice.
 
-## Completion
+A project workspace uses focus layout:
 
-Completion asks one question first: **Is this an accurate record of what you completed?**
+1. one **Next** state and action;
+2. the lab surface;
+3. a compact **Environment** line;
+4. the remaining plan as orientation;
+5. diagnostics and infrastructure controls under Details.
 
-After approval, show one completion package with optional downstream proposals: career record, portfolio placement, résumé wording, interview story, and public campaign. Each proposal has Accept or Skip. Do not send the person through five pages to repeat the same facts.
+The project conductor verifies prerequisites and determines the next step. A check that fails must
+say what Fadi observed, the likely known cause, and the recovery action. Unknown failures say what
+was checked and remain unknown; they are not filled with model guesses.
 
-Media is optional. Say “Add proof” when useful; never show “no evidence” as a public placeholder.
+Raw commands, copy buttons, result fields, credentials, machine settings, service controls and
+audit output remain collapsed unless they are the learning material or a fallback is required.
+
+A commitment has one finish line. A generated practical project completes through its run; an
+external course or activity uses a compact completion review. Both call the same outcome service.
+
+## Completion and personal brand
+
+Completion first asks: **Is this an accurate record of what you completed?**
+
+After approval, show one completion package with optional proposals:
+
+- add or update the career record;
+- place it in the portfolio;
+- suggest résumé wording;
+- create an interview story;
+- draft a multi-channel campaign.
+
+Each proposal is Accept or Skip. The same approved facts and media feed every destination. Media is
+optional. Say **Add proof** when useful; never publish a “no evidence” placeholder.
+
+Direct publishing requires a channel-specific connection, preview and explicit approval. Copy,
+download and open-share remain the reliable fallback.
 
 ## Interview practice
 
-When launched from an application, prefill the job, role, employer, description, direction, region, and seniority. The default setup asks only:
+The default setup asks only:
 
 - interview stage;
 - 10 or 20 minutes;
 - **Start talking**.
 
-Put overrides under “Change context.” Use competencies and behavioral anchors rather than an ungrounded decimal score. If no career story matches, say so and create a preparation step; never return an irrelevant story as the strongest match.
+Put overrides under **Change context**. During the interview, the dominant surface is the human
+exchange: interviewer presence, live listening state, concise transcript and one stop control.
+Configuration and rubrics remain outside the live stage.
 
-Call transcript-only measures “answer length and filler words.” Reserve delivery coaching for measured audio duration, rate, pauses, and interruptions. Do not grade accent conformity.
+Fadi waits through thoughtful pauses, supports interruption and keeps questions grounded in the
+specific role and the person's actual evidence. Use competencies and behavioural anchors rather
+than an ungrounded decimal score. If no career story matches, say so and create a preparation step.
 
-## Fadi presence and voice
+Call transcript-only measures **answer length and filler words**. Reserve delivery coaching for
+measured audio duration, rate, pauses and interruptions. Do not grade accent conformity.
 
-Fadi is available from every destination and carries the active work context. The UI always shows one of these states when relevant: idle, listening, thinking, speaking, acting, waiting for approval, blocked, or offline.
+## My career
 
-- Listening is visible and user-initiated.
-- The transcript is visible and editable before a consequential interpretation.
-- The person can interrupt speech.
-- Voice, chat, and buttons continue the same thread.
-- An action confirmation names the object, effect, target, and reversal when available.
+My career starts with the canonical record. Source versions, provenance, variants, direction
+selection and reconciliation are available when needed, not shown as default controls on every
+record.
 
-The orb can signal presence; it must not be the only way to discover pending work or approvals.
+A person adds outside work through one intake flow:
 
-## Choices and language
+1. import a source or add a fact;
+2. review the proposed canonical records and conflicts;
+3. approve the truth once;
+4. attach optional proof;
+5. let directions and outputs project from it.
 
-- Prefer one recommended action plus a secondary alternative.
-- Replace internal nouns with the person's language: “Environment,” not hypervisor inventory; “What Fadi did,” not execution ledger.
+Auto/Include/Exclude and wording variants are advanced decisions within a direction or document.
+They are not the primary Evidence page experience.
+
+## Visual system
+
+Fadi keeps its own identity:
+
+- calm teal/aurora accent for active state and primary action;
+- neutral surfaces with strong type hierarchy;
+- generous space around the current task;
+- compact, information-dense rows for history and secondary state;
+- monospace only for commands, identifiers, addresses and machine values;
+- semantic colours for success, caution, danger and blocked state;
+- one token source for colour, type, space, radius, shadow and motion.
+
+Hierarchy comes from structure, typography and whitespace. Glass, glow, animated grids and
+holographic decoration are limited to brand moments and Fadi presence. They do not wrap routine
+cards or compete with state and action.
+
+Motion has named tokens and a purpose: orient, acknowledge or show continuity. Respect reduced
+motion. Do not use ambient animation around urgent decisions, text entry or remote desktops.
+
+## Content and feedback
+
+- Buttons name the action: **Check and continue**, **Approve and run**, **Save as evidence**.
+- Status describes observed reality, not intent.
+- Errors say what happened, what Fadi checked and what can be done next.
+- Keep waits and errors inline while they remain relevant.
+- Do not toast a state already visible on the page.
 - Explain why a recommendation matters to the active goal.
-- Use labels that remain visible. Do not rely on hover to identify navigation.
-- Avoid fake precision, celebratory friction, and gamification that scores outcomes outside the person's control.
-- Keep destructive controls available, clearly scoped, and separated from routine actions.
+- Never expose provider, model, hypervisor or pipeline choice until the task requires it.
+- Keep destructive controls available, clearly scoped and separated from routine actions.
 
-## Accessibility and responsive behavior
+## Accessibility and responsive behaviour
 
 - Every action works by keyboard and has a visible focus state.
-- Icon-only controls have accessible names; primary navigation includes visible text.
-- Do not use color as the only status signal.
+- Icon-only controls have accessible names; primary navigation has visible text.
+- Do not use colour as the only status signal.
 - Announce asynchronous status and validation with appropriate live regions.
-- Respect reduced motion and system contrast preferences.
-- At narrow widths, preserve the goal, state, primary action, and Fadi status before secondary detail.
+- Preserve logical heading and landmark order.
+- The screen-context worker consumes the same accessibility semantics the person relies on.
+- At narrow widths preserve goal, state, primary action and Fadi status before secondary detail.
+- Remote desktops and terminals must retain usable keyboard, viewport and operating-system controls.
+
+## Review gates
+
+A changed journey is not complete until a reviewer can answer yes to all applicable checks:
+
+1. Is there exactly one primary action?
+2. Can the person tell what Fadi observed versus inferred?
+3. Is the authoritative state shared rather than copied locally?
+4. Did the change remove or demote an older control?
+5. Can the person resume after reload or interruption?
+6. Can long work be cancelled and consequential work be approved at the point of action?
+7. Are failure and recovery visible without reading a raw log?
+8. Does voice continue the same work as the screen?
+9. Does the narrow layout preserve the task and action?
+10. Was the journey tested with its real data shape and signed-in state?
 
 ## Retired patterns
 
@@ -173,4 +393,8 @@ Do not reintroduce:
 - audit logs as the main user experience;
 - raw Auto/Include/Exclude controls on every card by default;
 - provider or infrastructure choices before a task requires them;
-- duplicate forms asking for context Fadi already owns.
+- duplicate forms asking for context Fadi already owns;
+- generic chat as the primary way to discover or move work;
+- equal card grids for actions that have an order;
+- a second poller, conductor or state machine for an existing concept;
+- autonomous UI clicks generated from unbounded model text.

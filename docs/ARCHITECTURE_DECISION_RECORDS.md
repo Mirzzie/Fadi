@@ -13,6 +13,7 @@ ADRs capture durable decisions that affect ownership, trust boundaries, storage,
 | [0010](adr/0010-reactive-resume-editor-adoption.md) | Reactive résumé editor adoption | Accepted |
 | [0011](adr/0011-lab-resources-and-evidence-capture.md) | Lab resources and evidence capture | Accepted |
 | [0012](adr/0012-local-machine-permission-broker.md) | Local machine permission broker | Accepted |
+| [0013](adr/0013-unified-work-surface-and-multimodal-agent-runtime.md) | Unified work surface and multimodal agent runtime | Proposed |
 
 The earlier framework, auth, ORM, provider, and PostgreSQL decisions predate the numbered files. Their current state is documented in [Architecture](ARCHITECTURE.md), [Authentication](AUTHENTICATION_ARCHITECTURE.md), and [PostgreSQL architecture](POSTGRES_FIRST_ARCHITECTURE.md). Create a retrospective ADR only when a new decision changes one of them.
 
@@ -21,7 +22,7 @@ The earlier framework, auth, ORM, provider, and PostgreSQL decisions predate the
 Write an ADR before landing:
 
 - a transactional outbox and its delivery guarantees;
-- a unified Realtime voice transport and audio-retention policy;
+- a unified Realtime voice transport and audio-retention policy (ADR 0013 defines the worker boundary, not transport or retention);
 - a general capability/approval policy beyond the lab broker;
 - social publishing connections and token custody;
 - a new hypervisor provider contract;

@@ -7,7 +7,7 @@ This directory describes the product that exists now and the decisions guiding i
 1. [Product context](FadiOS-Project-Context.md) — what Fadi is, who it serves, and the product rules.
 2. [Architecture](ARCHITECTURE.md) — the current system, trust boundaries, and intended direction.
 3. [Data model](DATABASE_SCHEMA.md) — ownership of career records, projections, work, and supporting domains.
-4. [UI and UX rules](UI_UX_GUIDELINES.md) — the four destinations and interaction standards.
+4. [UI and UX rules](UI_UX_GUIDELINES.md) — the four destinations, work surface, live Fadi model, visual system and interaction standards.
 5. [Roadmap](ROADMAP.md) — current sequence and explicit non-goals.
 6. [Technical debt](TECHNICAL_DEBT_REGISTER.md) — known defects and architectural gaps.
 
@@ -20,19 +20,21 @@ This directory describes the product that exists now and the decisions guiding i
 | Portfolio | [Portfolio engine](PORTFOLIO_WEBSITE_ENGINE.md), [ADR 0008](adr/0008-github-portfolio-publishing.md), [ADR 0009](adr/0009-portfolio-hosting-and-static-export.md) |
 | Authentication and safety | [Authentication](AUTHENTICATION_ARCHITECTURE.md), [security](SECURITY_AND_COMPLIANCE.md), [agent guardrails](security/AGENT_GUARDRAILS.md) |
 | Operations | [Development](DEVELOPMENT_GUIDE.md), [local database](LOCAL_DEVELOPMENT_DATABASE.md), [deployment](INFRASTRUCTURE_AND_DEPLOYMENT.md), [production checklist](PRODUCTION_CHECKLIST.md), [product quality and growth](PRODUCT_QUALITY_STANDARD.md), [MCP](MCP-CONNECT.md) |
+| Experience architecture | [ADR 0013](adr/0013-unified-work-surface-and-multimodal-agent-runtime.md) — proposed unified work surface and multimodal runtime |
 | Engineering process | [Contributing](CONTRIBUTING.md), [coding standards](CODING_STANDARDS.md), [Git workflow](GIT_WORKFLOW.md), [ADR index](ARCHITECTURE_DECISION_RECORDS.md) |
 
 ## Historical evidence retained on purpose
 
 [Data-flow audit](DATA_FLOW_AUDIT.md) and [architecture assessment](ARCHITECTURE_ASSESSMENT.md) are dated investigations referenced by regression tests and source comments. They are evidence for why safeguards exist, not descriptions of the current system. The claim-oracle fixture under `reviews/2026-09-10-codex-claim-oracle/` is executable test material.
 
-The two current collaboration notes are:
+Current collaboration notes:
 
 - [Phase 1 work kernel landed](reviews/2026-09-23-claude-phase-1-landed.md)
 - [Apply/Prepare, Practice, interview and brand review](reviews/2026-09-23-codex-to-claude-apply-prepare-interview-learning-brand.md)
 - [Independent validation of Claude Phase 1](reviews/2026-09-23-codex-validates-claude-phase-1.md)
 - [Lab-engine ownership and status](reviews/2026-09-30-claude-codex-lab-engine-plan.md)
 - [Industry product-quality handoff](reviews/2026-10-05-codex-to-claude-product-quality.md)
+- [Paperclip/Pipecat transformation handoff](reviews/2026-10-16-codex-to-claude-paperclip-pipecat-transformation.md)
 
 Once their decisions land in code or this canonical documentation, remove the notes.
 

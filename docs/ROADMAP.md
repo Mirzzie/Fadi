@@ -1,7 +1,7 @@
 # Fadi roadmap
 
 **Status:** Current implementation sequence  
-**Updated:** 23 September 2026
+**Updated:** 16 October 2026
 
 This roadmap orders work by user harm and architectural dependency. It is not a feature inventory.
 
@@ -25,6 +25,17 @@ This roadmap orders work by user harm and architectural dependency. It is not a 
 5. Measure job-source health, coverage, duplicates, freshness, and failed searches before expanding sources.
 
 Exit condition: Fadi does not confidently present an irrelevant story, false delivery analysis, wrong career identity, duplicate portfolio projection, or silent empty search as trustworthy.
+
+## Now: establish one experience surface
+
+1. Adopt the work-surface, attention and live-state rules in `UI_UX_GUIDELINES.md`.
+2. Define one work-thread event contract and one projection for decisions needing attention.
+3. Define the shared session envelope and typed screen-command protocol from proposed ADR 0013.
+4. Convert one signed-in application workspace and remove its parallel action panels.
+5. Finish the lab workspace with its existing single conductor; do not add another readiness path.
+
+Exit condition: application and project work each have one state owner, one next action, one work
+thread and one attention record, and voice can reference the same work without a new workflow.
 
 ## Next: simplify Practice and completion
 
