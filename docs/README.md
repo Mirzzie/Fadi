@@ -35,6 +35,7 @@ Current collaboration notes:
 - [Lab-engine ownership and status](reviews/2026-09-30-claude-codex-lab-engine-plan.md)
 - [Industry product-quality handoff](reviews/2026-10-05-codex-to-claude-product-quality.md)
 - [Paperclip/Pipecat transformation handoff](reviews/2026-10-16-codex-to-claude-paperclip-pipecat-transformation.md)
+- [UniMad review and platform migration sequence](reviews/2026-10-16-codex-to-claude-unimad-review-and-sequencing.md)
 
 Once their decisions land in code or this canonical documentation, remove the notes.
 

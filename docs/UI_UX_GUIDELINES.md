@@ -22,6 +22,7 @@ Fadi borrows patterns, not branding or product metaphors.
 |---|---|---|
 | Paperclip | Goal-aligned work, one attention queue, work threads containing activity and decisions, persistent status, inline approvals, traceable execution | Org charts, agent employees, budgets, ticket administration, dense operator dashboards |
 | Pipecat | One live multimodal session, explicit listening/thinking/speaking/acting states, natural turn detection, interruption, typed screen commands, cancellable progress | Provider selectors, pipeline internals, developer controls, an always-on microphone |
+| UniMad | One profile grounding the job-search journey, low-clutter presentation, role positioning before documents, discovery connected to applications and interviews | A new UniBoard destination, visible specialist-agent topology, ATS scores presented as truth, marketing and coaching funnels inside the product |
 | Current Fadi | Four human destinations, career direction, canonical career record, trustworthy evidence, calm teal identity | Card walls, infrastructure-first controls, duplicate conductors, raw logs as the experience |
 
 The references support these choices:
@@ -35,8 +36,11 @@ of a person's turn.
 Sources: [Paperclip](https://paperclip.ing/), [Paperclip tasks](https://docs.paperclip.ing/guides/day-to-day/issues/),
 [Paperclip decisions](https://docs.paperclip.ing/guides/day-to-day/decisions/),
 [Pipecat UI worker](https://docs.pipecat.ai/pipecat/learn/ui-worker),
-[Pipecat turn detection](https://docs.pipecat.ai/pipecat/learn/speech-input), and
-[Pipecat interruptions](https://docs.pipecat.ai/pipecat/fundamentals/interruptions).
+[Pipecat turn detection](https://docs.pipecat.ai/pipecat/learn/speech-input),
+[Pipecat interruptions](https://docs.pipecat.ai/pipecat/fundamentals/interruptions), and
+[UniMad](https://www.unimad.ai/). The authenticated UniBoard jobs screen was not available for
+independent inspection; decisions attributed to it must remain limited to public product claims and
+the public shell until a signed-in evaluation is performed.
 
 ## The experience model
 
@@ -243,6 +247,33 @@ are checks attached to the relevant output, not permanent accordion panels.
 Interview practice launched here inherits the role, employer, posting, direction, region,
 seniority, application documents and relevant evidence. The user is not asked to select them
 again.
+
+### Job discovery board
+
+Do not add a separate UniBoard-style destination. The board is the discovery stage of
+**Opportunities** and feeds the existing role and application workspace.
+
+Desktop uses a compact list plus selected-role detail. Mobile opens one role at a time. The default
+view shows roles matched to the active direction and stated market. One search field accepts role,
+place and work mode in natural language. Saved filters are available under refinement, and source
+health remains under diagnostics.
+
+The default result row contains only what changes a decision:
+
+- title, employer and location;
+- freshness and original source;
+- a grounded fit label with the strongest evidence and any hard blocker;
+- current stage such as new, saved, preparing, applied or interviewing;
+- one action appropriate to that stage.
+
+The full description, matched terms, source diagnostics and scoring explanation belong in the
+selected-role detail. Do not present a 0–100 fit or ATS number as objective truth. Use labels such as
+**strong evidence**, **possible fit**, **missing required experience** or **posting may be stale**, with
+the supporting facts visible.
+
+Search progress, cached-result age, provider failures and market coverage remain honest but compact.
+The main journey says what Fadi found and what to do; **Search details** explains which sources ran.
+Paste-a-link is a secondary entry inside the same search control.
 
 ## Practice, learning and labs
 

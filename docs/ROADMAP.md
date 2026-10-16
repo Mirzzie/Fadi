@@ -5,6 +5,23 @@
 
 This roadmap orders work by user harm and architectural dependency. It is not a feature inventory.
 
+## Delivery method
+
+Do not pause all product work for a platform-wide visual rewrite. Keep correctness, data-integrity
+and machine-safety repairs moving. Establish shared experience primitives, then replace one complete
+journey at a time. Each migrated journey must remove its superseded UI before the next begins.
+
+Migration order:
+
+1. shared shell, attention, work-thread and live-session contracts;
+2. Opportunities from discovery through application and interview handoff;
+3. Practice from recommendation through verified completion;
+4. My career from intake through truthful projection;
+5. Today as the final cross-journey projection.
+
+New feature surfaces are paused during migration. A needed capability lands inside the current
+journey contract rather than creating another destination or panel.
+
 ## Landed foundation
 
 - One work kernel for goals, plans, steps, executions, and outputs.
