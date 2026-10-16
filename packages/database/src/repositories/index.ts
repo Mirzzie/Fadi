@@ -15,6 +15,7 @@ export * from "./interview-sessions.repository";
 export * from "./outbox.repository";
 export * from "./jobs.repository";
 export * from "./lab-action-requests.repository";
+export * from "./lab-observations.repository";
 export * from "./lab-permissions.repository";
 export * from "./lab-settings.repository";
 export * from "./lab-resources.repository";

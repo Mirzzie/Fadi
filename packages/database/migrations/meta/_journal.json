@@ -463,6 +463,13 @@
       "when": 1792082988709,
       "tag": "0065_project_step_place_and_check",
       "breakpoints": true
+    },
+    {
+      "idx": 66,
+      "version": "7",
+      "when": 1792163029695,
+      "tag": "0066_lab_observations",
+      "breakpoints": true
     }
   ]
 }

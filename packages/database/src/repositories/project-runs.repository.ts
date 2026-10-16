@@ -2,6 +2,7 @@ import { and, asc, desc, eq, ne } from "drizzle-orm";
 
 import type { Database, DbOrTx } from "../client";
 import {
+  labObservations,
   projectPlanVersions,
   projectRuns,
   projectSteps,
@@ -436,10 +437,7 @@ export function createProjectRunsRepository(db: Database) {
               .returning()
           : [];
 
-        await tx
-          .update(projectRuns)
-          .set({ updatedAt: new Date() })
-          .where(eq(projectRuns.id, runId));
+        await tx.update(projectRuns).set({ updatedAt: new Date() }).where(eq(projectRuns.id, runId));
         await settleRun(tx, runId, run.status);
         const [settled] = await tx
           .select({ status: projectRuns.status })
@@ -465,6 +463,12 @@ export function createProjectRunsRepository(db: Database) {
         if (!run) return false;
         await tx.delete(projectSteps).where(eq(projectSteps.runId, runId));
         await tx.delete(projectPlanVersions).where(eq(projectPlanVersions.runId, runId));
+        // What Fadi saw of the old environment is not true of the fresh one.
+        await tx
+          .delete(labObservations)
+          .where(
+            and(eq(labObservations.userId, userId), eq(labObservations.subject, `run:${runId}`))
+          );
         await tx
           .update(projectRuns)
           .set({ status: "running", completedAt: null, updatedAt: new Date() })

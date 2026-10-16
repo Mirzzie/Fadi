@@ -41,6 +41,7 @@ import { MachineChooser } from "@/components/learning/machine-chooser";
 import { MachineSettings } from "@/components/learning/machine-settings";
 import { PlanHistory } from "@/components/learning/plan-history";
 import { ProjectBrief } from "@/components/learning/project-brief";
+import { ProjectNext } from "@/components/learning/project-next";
 import { ProjectReadiness } from "@/components/learning/project-readiness";
 import { ProjectServices } from "@/components/learning/project-services";
 
@@ -167,6 +168,19 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
           </div>
         </div>
       </header>
+
+      {hasLab ? (
+        <ProjectNext
+          runId={runId}
+          tick={tick}
+          onChanged={(text) => {
+            if (text) setLabMessage(text);
+            announceActionsChanged();
+            refreshApprovals();
+            void refresh();
+          }}
+        />
+      ) : null}
 
       <div
         className={
@@ -340,14 +354,16 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
             </div>
 
             {!approval && (!runtime || ["stopped", "failed"].includes(runtime.phase)) ? (
-              <MachineChooser
-                runId={runId}
-                onkind={run.target.kind}
-                onChanged={(text) => {
-                  setLabMessage(text);
-                  void refresh();
-                }}
-              />
+              <div id="lab-machine">
+                <MachineChooser
+                  runId={runId}
+                  onkind={run.target.kind}
+                  onChanged={(text) => {
+                    setLabMessage(text);
+                    void refresh();
+                  }}
+                />
+              </div>
             ) : null}
             <MachineSettings
               runId={runId}
@@ -358,7 +374,9 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
                 refreshApprovals();
               }}
             />
-            <ChecksSetup runId={runId} tick={tick} />
+            <div id="lab-checks">
+              <ChecksSetup runId={runId} tick={tick} />
+            </div>
             <ProjectReadiness
               runId={runId}
               tick={tick}
@@ -807,7 +825,13 @@ function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => Prom
           })
         }
       >
-        {busy ? (reset ? "Preparing…" : "Planning…") : reset ? "Start over from nothing" : "Replace"}
+        {busy
+          ? reset
+            ? "Preparing…"
+            : "Planning…"
+          : reset
+            ? "Start over from nothing"
+            : "Replace"}
       </Button>
       <Button
         size="sm"
@@ -872,8 +896,8 @@ function FreshStart({ runId, onPlanned }: { runId: string; onPlanned: () => Prom
       <p className="text-xs font-medium text-primary">Fresh start</p>
       <h2 className="mt-0.5 text-lg font-semibold">Nothing done yet</h2>
       <p className="mt-2 text-sm text-muted-foreground">
-        Choose where this project runs (on the right), start the machine, then plan the steps —
-        Fadi looks at the running machine first, so the steps fit it.
+        Choose where this project runs (on the right), start the machine, then plan the steps — Fadi
+        looks at the running machine first, so the steps fit it.
       </p>
       <Button
         className="mt-4"
@@ -894,4 +918,3 @@ function FreshStart({ runId, onPlanned }: { runId: string; onPlanned: () => Prom
     </section>
   );
 }
-

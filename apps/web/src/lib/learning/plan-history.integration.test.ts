@@ -103,6 +103,21 @@ suite("earlier plans", () => {
   });
 
   it("a fresh start clears steps and earlier plans, and touches nobody else's", async () => {
+    const { drizzle } = await import("drizzle-orm/node-postgres");
+    const { createLabObservationsRepository } = await import("@careeros/database");
+    const observations = createLabObservationsRepository(drizzle(pool) as never);
+    const seen = {
+      predicateId: "machine.running",
+      predicateVersion: 1,
+      paramsKey: "",
+      verdict: "pass" as const,
+      evidence: { seen: "on" },
+      observerVersion: "test",
+    };
+    await observations.record(userId, { ...seen, subject: `run:${runId}` });
+    await observations.record(userId, { ...seen, subject: "host", predicateId: "host.vmnet_dns" });
+    await observations.record(otherId, { ...seen, subject: `run:${runId}` });
+
     expect(await repo.resetProgress(otherId, runId)).toBe(false);
     expect((await repo.getWithSteps(userId, runId))!.steps.length).toBeGreaterThan(0);
 
@@ -111,5 +126,9 @@ suite("earlier plans", () => {
     expect(after.steps).toEqual([]);
     expect(after.run.status).toBe("running");
     expect(await repo.listPlanVersions(userId, runId)).toEqual([]);
+    // What Fadi saw of the old environment goes; this computer's facts and others' stay.
+    const left = await observations.forSubjects(userId, ["host", `run:${runId}`]);
+    expect(left.map((o) => o.subject)).toEqual(["host"]);
+    expect(await observations.forSubjects(otherId, [`run:${runId}`])).toHaveLength(1);
   });
 });

@@ -1582,6 +1582,44 @@ export const projectPlanVersions = pgTable(
 );
 
 export type ProjectPlanVersion = typeof projectPlanVersions.$inferSelect;
+
+/**
+ * WHAT FADI LAST OBSERVED about a lab requirement (guided labs, G-1). One row per subject and
+ * predicate: the latest observation replaces the one before. A host requirement ("VMware's NAT
+ * has working DNS") belongs to this computer and is shared by every project; a machine or
+ * service requirement belongs to its project. "Stale" is never stored — it is the age of
+ * `observed_at` against the predicate's freshness period, decided when read.
+ */
+export const labObservations = pgTable(
+  "lab_observations",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** "host", or "run:<project run id>". */
+    subject: text("subject").notNull(),
+    predicateId: text("predicate_id").notNull(),
+    predicateVersion: integer("predicate_version").notNull(),
+    /** The predicate's typed parameters, canonically serialised (e.g. ports "1514,1515"). */
+    paramsKey: text("params_key").notNull().default(""),
+    /** pass | fail | unknown */
+    verdict: text("verdict").notNull(),
+    evidence: jsonb("evidence").$type<Record<string, unknown>>().notNull().default({}),
+    observerVersion: text("observer_version").notNull(),
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("lab_observations_subject_predicate_idx").on(
+      table.userId,
+      table.subject,
+      table.predicateId,
+      table.paramsKey
+    ),
+  ]
+);
+
+export type LabObservation = typeof labObservations.$inferSelect;
 export type NewProjectStep = typeof projectSteps.$inferInsert;
 
 export const labResources = pgTable(
