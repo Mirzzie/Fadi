@@ -307,3 +307,17 @@ when the VM was made, on a subnet that no longer exists (vmnet8 is now 172.16.89
 
 Tests: lab suite 415 passed; new tests for the PowerShell wrapper, DNS diagnosis (including the
 owner's exact VM answer) and the completion rule. Typecheck 0; lint 0 errors.
+
+## Codex — 16 October: the owner has set a UI simplification gate
+
+The conductor is the right engine, but the shipped screen made it another layer above the old
+controls. The owner has rejected that direction. Before G-2 or G-3 adds another visible card,
+complete the G-1 replacement: one Next action, one lab surface and one collapsed Environment
+detail view. Remove the redundant readiness/checks/services/default settings surfaces and their
+polling. Render the shared broker approval inside Next. Replace per-command Type/Copy, result,
+Done/Check/Stuck controls with one stateful blueprint-operation action and automatic receipt.
+
+The detailed overlap inventory, target layout, research and acceptance checks are in
+`docs/reviews/2026-10-16-codex-to-claude-ui-simplification.md`. The durable product rule is now in
+`docs/UI_UX_GUIDELINES.md`: every added visible feature must state which old surface it replaces,
+merges, moves under Details or removes. Adding a new panel above the old journey is incomplete.

@@ -2,7 +2,7 @@
 
 **Status:** Current product standard
 
-**Updated:** 23 September 2026
+**Updated:** 16 October 2026
 
 Fadi should feel like one calm assistant guiding one career journey. A page is successful when the person understands the state, the next action, and its consequence without learning the platform's internal architecture.
 
@@ -30,6 +30,55 @@ Every primary page should present, in this order:
 5. optional explanation and advanced controls.
 
 Use progressive disclosure. Do not present every engine, data source, recommendation type, or machine action as a peer.
+
+## Interaction budget and replacement rule
+
+Adding a capability does not justify adding a permanent control. The default surface for one
+task has this budget:
+
+- one clear state;
+- one recommended action;
+- at most one secondary choice when the choice changes the outcome;
+- one compact status line for the environment;
+- details, commands, logs, provenance and administration disclosed on request.
+
+If Fadi already owns the data, can observe the result, or has an approved execution channel, it
+must not ask the person to re-enter, copy, paste, relay, or manually confirm that information.
+The normal action sequence is: observe automatically; propose a consequential change; obtain one
+scoped approval when required; execute; verify; record a receipt. A manual path is a fallback for
+an external environment, a deliberate learning mode, or an authority boundary such as `sudo`.
+
+Every change that introduces a visible feature must name the existing surface it replaces,
+merges, moves under Details, or removes. Adding a new card above the old cards is incomplete work.
+If no surface can be retired, the change needs evidence that the new control represents a distinct
+user decision. Pull requests and handoffs must include a **surface delta**: controls added,
+controls removed, and the final number of primary actions.
+
+One object has one authoritative state and one conductor. Different views may project that state,
+but they must not own separate polling, readiness, approval, or completion logic. An approval is
+rendered at the point of action from the shared approval record; the global inbox is another view
+of that record, not a second journey.
+
+For lab work, use a focus layout:
+
+1. next step, reason and observed state;
+2. one stateful action such as **Run in lab**, **Approve and run**, **Check and continue**, or
+   **Fix issue**;
+3. the lab surface;
+4. environment summary and diagnostics under Details.
+
+Raw commands, copy buttons, result fields, credentials, machine settings, service controls and
+audit output do not remain expanded beside the lab. The bottom navigation and assistant presence
+must not cover the remote desktop, terminal, primary action or operating-system controls.
+
+This standard follows established accessibility and service-design guidance: instructions should
+be concise and adjacent to the activity, repeated input should be reused, long transactions should
+be simplified before a task list is introduced, and secondary information should be disclosed only
+when needed. See [W3C step-by-step instructions](https://www.w3.org/WAI/WCAG2/supplemental/patterns/o4p07-step-instructions/),
+[W3C predictable interfaces](https://www.w3.org/WAI/fundamentals/accessibility-principles/),
+[GOV.UK question pages](https://design-system.service.gov.uk/patterns/question-pages/),
+[GOV.UK multiple tasks](https://design-system.service.gov.uk/patterns/complete-multiple-tasks/)
+and [GOV.UK details](https://design-system.service.gov.uk/components/details/).
 
 ## Today
 
