@@ -224,7 +224,7 @@ export async function planProjectRun(
       const stack = STACKS[key];
       return [
         `SERVICE BESIDE THE LAB: ${stack.label}. ${stack.purpose}`,
-        `The person starts it with one click under "Services beside the machine" on the project page. The FIRST step that needs it must say to start it there and wait until its dashboard link appears — an agent installed before the manager runs cannot enrol. ${stack.open.label}: ${stack.open.url} on the person's own computer (sign in ${stack.open.user} / ${stack.open.password}).`,
+        `The person starts it with one click under "Services beside the machine" on the project page. The FIRST step that needs it must say to start it there and wait until its dashboard link appears — an agent installed before the manager runs cannot enrol. ${stack.open.label}: ${stack.open.url} on the person's own computer (sign in as ${stack.open.user}; the password is shown beside the service on the project page — never write it into a step).`,
         `The lab machine connects to it at ${machineLine ? vmNetworkAddress() : stack.agent.managerHost} on ports ${stack.agentPorts.join(" and ")} — for Wazuh, install the Wazuh agent ${stack.version} on the lab machine with WAZUH_MANAGER set to that address.`,
         `The Windows agent installer is exactly ${stack.agent.windowsInstaller} — use that URL; it is not on GitHub. On Windows the agent's service is ${stack.agent.windowsService} (never "ossec"), its configuration ${stack.agent.windowsConfig}; with WAZUH_MANAGER set it enrols on its own when the service starts (Start-Service ${stack.agent.windowsService}).`,
         "Never install this service, Docker or a hypervisor inside the lab machine.",
@@ -491,7 +491,8 @@ async function placesFor(
     return {
       label: stack.open.label,
       browserUrl: stack.open.url,
-      signIn: `${stack.open.user} / ${stack.open.password}`,
+      // Never the password: steps are shown, screenshotted and kept in plan history.
+      signIn: `${stack.open.user} (password beside the service on the project page)`,
       fromLab: `${labHost}:${stack.agentPorts.join("/")}`,
       probe: `${labHost}:${stack.agentPorts[stack.agentPorts.length - 1]}`,
     };

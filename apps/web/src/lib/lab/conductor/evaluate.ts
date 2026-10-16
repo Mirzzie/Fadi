@@ -161,7 +161,8 @@ export async function evaluateConductor(
         }
       : null;
 
-    if (depsMet && (!fresh || recheck.has(requirement.id))) {
+    // Stale ones are re-taken once their dependencies hold; one the person asked about, always.
+    if ((depsMet && !fresh) || recheck.has(requirement.id)) {
       const result = await observer.observe(requirement);
       const saved = await observationsRepo.record(userId, {
         subject: subjectOf(requirement, runId),

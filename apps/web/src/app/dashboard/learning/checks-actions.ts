@@ -27,16 +27,38 @@ async function machineOf(userId: string, runId: string) {
   return { resource, windows: Boolean(summary?.family.startsWith("windows")) };
 }
 
-export async function checksStateAction(input: {
-  runId: string;
-}): Promise<{ applicable: boolean; user: string | null }> {
+export type ChecksState = {
+  applicable: boolean;
+  /** The account Fadi will sign in as — only what was chosen, not proof it works. */
+  user: string | null;
+  /** What Fadi last saw when it actually signed in: pass, fail, or never tried. */
+  proven: { verdict: "pass" | "fail" | "unknown"; seen: string | null; at: string } | null;
+};
+
+export async function checksStateAction(input: { runId: string }): Promise<ChecksState> {
+  const none: ChecksState = { applicable: false, user: null, proven: null };
   const user = await getCurrentAuthUser();
   const id = z.string().uuid().safeParse(input.runId);
-  if (!user || !id.success) return { applicable: false, user: null };
+  if (!user || !id.success) return none;
   const machine = await machineOf(user.id, id.data);
-  return machine?.windows
-    ? { applicable: true, user: machine.resource.guestUser ?? null }
-    : { applicable: false, user: null };
+  if (!machine?.windows) return none;
+  // Proof is the conductor's observation of the check channel (sign in with Fadi's key, see
+  // PowerShell answer) — never the saved account name (Codex review, 16 Oct 2026).
+  const { createLabObservationsRepository } = await import("@careeros/database");
+  const [row] = (
+    await createLabObservationsRepository(getDatabase()).forSubjects(user.id, [`run:${id.data}`])
+  ).filter((o) => o.predicateId === "machine.check_channel");
+  return {
+    applicable: true,
+    user: machine.resource.guestUser ?? null,
+    proven: row
+      ? {
+          verdict: row.verdict as "pass" | "fail" | "unknown",
+          seen: typeof row.evidence.seen === "string" ? row.evidence.seen : null,
+          at: row.observedAt.toISOString(),
+        }
+      : null,
+  };
 }
 
 /** The setup line for this machine, and remember which account Fadi signs in as. */

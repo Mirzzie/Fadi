@@ -4,7 +4,12 @@ import { ShieldCheck } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
-import { checksSetupAction, checksStateAction } from "@/app/dashboard/learning/checks-actions";
+import {
+  checksSetupAction,
+  checksStateAction,
+  type ChecksState,
+} from "@/app/dashboard/learning/checks-actions";
+import { conductorAction } from "@/app/dashboard/learning/conductor-actions";
 import { typeIntoLab, useCanTypeIntoLab } from "@/lib/learning/lab-typing";
 
 /**
@@ -13,7 +18,7 @@ import { typeIntoLab, useCanTypeIntoLab } from "@/lib/learning/lab-typing";
  * only); the person presses Enter there. No password is asked for or kept.
  */
 export function ChecksSetup({ runId, tick }: { runId: string; tick: number }) {
-  const [state, setState] = useState<{ applicable: boolean; user: string | null } | null>(null);
+  const [state, setState] = useState<ChecksState | null>(null);
   const [account, setAccount] = useState("Administrator");
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -39,22 +44,40 @@ export function ChecksSetup({ runId, tick }: { runId: string; tick: number }) {
       if (!typeIntoLab(result.script)) {
         return setNote("Open the machine's screen first, then try again.");
       }
-      setState({ applicable: true, user: account });
+      // Chosen, not proven: the line has only been typed. Proof comes from signing in.
+      setState({ ...state!, user: account, proven: null });
       setOpen(false);
       setNote(
-        "Typed into the machine. In an Administrator PowerShell window there, press Enter — it says “Fadi checks are set up.”"
+        "Typed into the machine. In an Administrator PowerShell window there, press Enter — then “Test it now”."
       );
     });
+
+  const test = () =>
+    startTransition(async () => {
+      await conductorAction({ runId, recheck: ["channel"] });
+      const next = await checksStateAction({ runId });
+      setState(next);
+      setNote(next.proven?.verdict === "pass" ? null : (next.proven?.seen ?? null));
+    });
+
+  const proven = state.proven?.verdict === "pass";
 
   return (
     <div className="border-b border-border/70 px-4 py-3 text-xs">
       <div className="flex flex-wrap items-center gap-2">
         <ShieldCheck className="size-4 text-muted-foreground" aria-hidden="true" />
         <span className="flex-1 text-muted-foreground">
-          {state.user
-            ? `“Check it for me” signs in as ${state.user} with Fadi's own key.`
-            : "“Check it for me” needs one setup line in this machine — no password."}
+          {!state.user
+            ? "“Check it for me” needs one setup line in this machine — no password."
+            : proven
+              ? `Checks work: ${state.proven!.seen ?? `Fadi signs in as ${state.user}.`}`
+              : `Account ${state.user} chosen — not working yet. Fadi hasn't been able to sign in.`}
         </span>
+        {state.user && !proven ? (
+          <Button size="sm" className="h-7" disabled={pending} onClick={test}>
+            Test it now
+          </Button>
+        ) : null}
         <Button size="sm" variant="outline" className="h-7" onClick={() => setOpen((v) => !v)}>
           {state.user ? "Set up again" : "Set up checks"}
         </Button>
@@ -75,8 +98,8 @@ export function ChecksSetup({ runId, tick }: { runId: string; tick: number }) {
           </Button>
           <span className="w-full text-muted-foreground">
             Click into an Administrator PowerShell window in the machine first. Fadi types one line
-            — it starts Windows&apos; SSH server, lets Fadi&apos;s key in, and opens SSH to this computer
-            only.
+            — it starts Windows&apos; SSH server, lets Fadi&apos;s key in, and opens SSH to this
+            computer only.
           </span>
         </div>
       ) : null}

@@ -92,14 +92,7 @@ export function ProjectServices({
                 >
                   Open {service.open.label} <ExternalLink className="size-3" aria-hidden="true" />
                 </a>
-                <span>
-                  Sign in{" "}
-                  <code className="rounded bg-muted px-1 text-foreground">{service.open.user}</code>{" "}
-                  /{" "}
-                  <code className="rounded bg-muted px-1 text-foreground">
-                    {service.open.password}
-                  </code>
-                </span>
+                <SignIn user={service.open.user} password={service.open.password} />
                 <span>
                   Agents connect to{" "}
                   <code className="rounded bg-muted px-1 text-foreground">
@@ -134,4 +127,38 @@ function describe(service: ProjectService): string {
     default:
       return service.purpose;
   }
+}
+
+/**
+ * The service's sign-in, password hidden until asked for: a screenshot, a recording or someone
+ * beside the person shouldn't carry it away (Codex review, 16 Oct 2026). Copy works hidden.
+ */
+function SignIn({ user, password }: { user: string; password: string }) {
+  const [shown, setShown] = useState(false);
+  const [copied, setCopied] = useState(false);
+  return (
+    <span className="inline-flex items-center gap-1">
+      Sign in <code className="rounded bg-muted px-1 text-foreground">{user}</code> /
+      <code className="rounded bg-muted px-1 text-foreground">{shown ? password : "••••••••"}</code>
+      <button
+        type="button"
+        className="text-primary hover:underline"
+        onClick={() => setShown((v) => !v)}
+      >
+        {shown ? "Hide" : "Show"}
+      </button>
+      <button
+        type="button"
+        className="text-primary hover:underline"
+        onClick={() =>
+          void navigator.clipboard.writeText(password).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          })
+        }
+      >
+        {copied ? "Copied" : "Copy"}
+      </button>
+    </span>
+  );
 }
