@@ -13,7 +13,8 @@
 const MAX_COMMAND = 8000;
 
 const PREFIX = "$ProgressPreference='SilentlyContinue'; ";
-const ENCODED = /^powershell\.exe -NoProfile -NonInteractive -OutputFormat Text -EncodedCommand ([A-Za-z0-9+/=]+)$/;
+const ENCODED =
+  /^powershell\.exe -NoProfile -NonInteractive -OutputFormat Text -EncodedCommand ([A-Za-z0-9+/=]+)$/;
 
 /** How an encoded command is shown to the person: the script itself. Anything else unchanged. */
 export function readablePowershell(arg: string): string {
@@ -51,4 +52,33 @@ export function powershellCheck(command: string, marker: string): string {
       `if ($fadiOk) { Write-Output "${marker}=0" } else { Write-Output "${marker}=1" }`,
     ].join("; ")
   );
+}
+
+/** Printed after a step's script: 0 when every command in it succeeded. */
+export const RUN_MARKER = "FADI_RUN";
+
+/**
+ * "Run in lab": the step's own script, then — only if every command in it succeeded — the
+ * step's own check. The script stops at its first error ($ErrorActionPreference = 'Stop'), so a
+ * failed download never reaches the installer (Codex, 16 Oct 2026). Plain PowerShell text; the
+ * caller wraps it with powershellCheck, whose marker then reports the check.
+ */
+export function powershellRunThenCheck(script: string, check: string): string {
+  return [
+    "$global:LASTEXITCODE = 0",
+    `$fadiRun = @(try { & { $ErrorActionPreference = 'Stop'; ${script} } 2>&1 } catch { $_ })`,
+    "$fadiRunOk = (@($fadiRun | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] }).Count -eq 0) -and ($LASTEXITCODE -eq 0)",
+    "$fadiRun | Out-String -Width 240",
+    `if ($fadiRunOk) { Write-Output "${RUN_MARKER}=0"; ${check} } else { Write-Output "${RUN_MARKER}=1"; Write-Output 'The step stopped at its first error; its check did not run.'; $global:LASTEXITCODE = 1 }`,
+  ].join("\n");
+}
+
+/** The same for a Linux lab, in sh: the script in a subshell with `set -e`. */
+export function shRunThenCheck(script: string, check: string): string {
+  return [
+    `( set -e\n${script}\n)`,
+    "fadi_run=$?",
+    `echo "${RUN_MARKER}=$fadi_run"`,
+    `if [ "$fadi_run" -eq 0 ]; then\n${check}\nelse\nfalse\nfi`,
+  ].join("\n");
 }

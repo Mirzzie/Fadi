@@ -23,7 +23,7 @@ import { useVoiceMode } from "./use-voice-mode";
  * so the orb is what you talk to: press it to speak, and open the thread from the label beside
  * it when you want to read rather than listen.
  */
-export function FadiOrb() {
+export function FadiOrb({ tucked = false }: { tucked?: boolean } = {}) {
   const {
     open,
     openFadi,
@@ -54,7 +54,7 @@ export function FadiOrb() {
       <div
         className={cn(
           "fixed bottom-20 right-5 z-40 flex flex-col items-end gap-2",
-          open && "pointer-events-none opacity-0"
+          (open || tucked) && "pointer-events-none opacity-0"
         )}
       >
         {nudge ? (

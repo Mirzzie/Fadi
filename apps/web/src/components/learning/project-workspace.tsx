@@ -1,8 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { ArrowLeft, Check, ExternalLink, LifeBuoy, Loader2, RotateCcw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
+import {
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  ExternalLink,
+  LifeBuoy,
+  Loader2,
+  RotateCcw,
+} from "lucide-react";
 
 import {
   completeStepAction,
@@ -42,7 +50,10 @@ import { MachineChooser } from "@/components/learning/machine-chooser";
 import { MachineSettings } from "@/components/learning/machine-settings";
 import { PlanHistory } from "@/components/learning/plan-history";
 import { ProjectBrief } from "@/components/learning/project-brief";
-import { ProjectNext } from "@/components/learning/project-next";
+import { Checked, ProjectNext } from "@/components/learning/project-next";
+import { conductorAction } from "@/app/dashboard/learning/conductor-actions";
+import type { ConductorView } from "@/lib/lab/conductor/evaluate";
+import { stepScript } from "@/lib/learning/instruction-blocks";
 import { ProjectReadiness } from "@/components/learning/project-readiness";
 import { ProjectServices } from "@/components/learning/project-services";
 
@@ -57,24 +68,55 @@ import { ProjectServices } from "@/components/learning/project-services";
 export function ProjectWorkspace({ runId }: { runId: string }) {
   const [run, setRun] = useState<RunView | null | undefined>(undefined);
   const [runtime, setRuntime] = useState<ProjectRuntimeView | undefined>(undefined);
-  const [artifact, setArtifact] = useState("");
+  const [conductor, setConductor] = useState<ConductorView | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [labMessage, setLabMessage] = useState<string | null>(null);
+  const [environmentOpen, setEnvironmentOpen] = useState(false);
   const [tick, setTick] = useState(0);
   const [pending, startTransition] = useTransition();
   const { pending: approvals, refresh: refreshApprovals } = usePendingActions();
+  const projectInFlight = useRef(false);
+  const conductorInFlight = useRef(false);
 
-  // Background refresh is a plain async call, never inside startTransition: otherwise every
-  // poll flips `pending` and every button flashes ("buttons refresh for no reason").
-  const refresh = useCallback(async () => {
-    const [result, observed] = await Promise.all([
-      getProjectRunAction({ runId }),
-      projectRuntimeAction({ runId }),
-    ]);
-    setRun(result.ok ? result.run : null);
-    setRuntime(observed.ok ? observed.runtime : null);
-    setTick((value) => value + 1);
+  // THE ONE REFRESH OWNER for this page (docs/UI_UX_GUIDELINES.md): the project and its machine,
+  // and the conductor, on one timer. The conductor can take a while (it may ask inside the
+  // machine), so it never holds the project back, and neither is ever asked twice at once.
+  // Background refresh is never inside startTransition: every poll would flip `pending` and make
+  // every button flash.
+  const refreshProject = useCallback(async () => {
+    if (projectInFlight.current) return;
+    projectInFlight.current = true;
+    try {
+      const [result, observed] = await Promise.all([
+        getProjectRunAction({ runId }),
+        projectRuntimeAction({ runId }),
+      ]);
+      setRun(result.ok ? result.run : null);
+      setRuntime(observed.ok ? observed.runtime : null);
+      setTick((value) => value + 1);
+    } finally {
+      projectInFlight.current = false;
+    }
   }, [runId]);
+
+  const refreshConductor = useCallback(
+    async (recheck?: string[]) => {
+      if (conductorInFlight.current && !recheck) return;
+      conductorInFlight.current = true;
+      try {
+        const result = await conductorAction({ runId, recheck });
+        if (result.ok) setConductor(result.view);
+      } finally {
+        conductorInFlight.current = false;
+      }
+    },
+    [runId]
+  );
+
+  const refresh = useCallback(async () => {
+    void refreshConductor();
+    await refreshProject();
+  }, [refreshConductor, refreshProject]);
 
   useEffect(() => {
     void refresh();
@@ -83,6 +125,13 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
     }, 8_000);
     return () => clearInterval(timer);
   }, [refresh]);
+
+  // The Next card sends "choose a machine" / "set up checks" here: open Environment details.
+  useEffect(() => {
+    const open = () => setEnvironmentOpen(true);
+    window.addEventListener("fadi:environment", open);
+    return () => window.removeEventListener("fadi:environment", open);
+  }, []);
 
   const current = useMemo(() => run?.steps.find((step) => step.status === "pending"), [run]);
   const approval = approvals.find((request) => request.runId === runId) ?? null;
@@ -109,56 +158,72 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
     );
   }
 
-  const completeCurrent = (unverified = false) => {
+  const changed = (text: string | null) => {
+    if (text) setLabMessage(text);
+    announceActionsChanged();
+    refreshApprovals();
+    void refreshProject();
+  };
+
+  const completeCurrent = (input: { unverified: boolean; artifact: string | null }) => {
     if (!current) return;
     setMessage(null);
     startTransition(async () => {
-      const result = await completeStepAction({
-        stepId: current.id,
-        artifact: artifact.trim() || null,
-        unverified,
-      });
+      const result = await completeStepAction({ stepId: current.id, ...input });
       if (!result.ok) {
-        await refresh();
+        await refreshProject();
         return setMessage(
           result.reason === "check_failed"
-            ? "Fadi's check of this step failed, so it isn't done. Fix it and check again — or continue without verification."
+            ? "Fadi's check of this step failed, so it isn't done."
             : result.reason === "check_waiting"
-              ? "A check of this step is waiting for your approval. Approve or decline it first."
+              ? "A check of this step is waiting for your approval — approve or decline it first."
               : "Couldn't save that. Nothing changed."
         );
       }
-      setArtifact("");
       await refresh();
     });
   };
 
-  const proposeLab = (mode: "prepare" | "stop" | "resume" | "restart") => {
-    setLabMessage(null);
-    startTransition(async () => {
-      let result =
-        mode === "stop"
-          ? await proposeProjectLabStopAction({ runId })
-          : mode === "prepare"
-            ? await proposeProjectLabAction({ runId })
-            : await proposeProjectLabResumeAction({ runId });
-      // A lab that failed before its container existed has nothing to start: create it.
-      if (mode === "restart" && !result.ok) result = await proposeProjectLabAction({ runId });
-      if (!result.ok) setLabMessage(result.message ?? "That didn't work.");
-      else {
-        announceActionsChanged();
-        refreshApprovals();
-      }
-      await refresh();
-    });
+  /** Start, resume or restart the lab — whichever its observed state needs. */
+  const startLab = async () => {
+    let result =
+      runtime && runtime.phase === "stopped"
+        ? await proposeProjectLabResumeAction({ runId })
+        : await proposeProjectLabAction({ runId });
+    // A lab that failed before its container existed has nothing to resume: create it.
+    if (!result.ok && runtime?.phase === "failed")
+      result = await proposeProjectLabAction({ runId });
+    return { ok: result.ok, message: result.message };
   };
+
+  const pauseLab = () =>
+    startTransition(async () => {
+      const result = await proposeProjectLabStopAction({ runId });
+      changed(result.ok ? (result.message ?? null) : (result.message ?? "That didn't work."));
+    });
 
   const total = run.steps.length;
   const percent = total === 0 ? 0 : Math.round((run.doneCount / total) * 100);
   const hasLab = Boolean(run.labTemplate);
+  // While the environment needs something, that is the Next card; then the current step is.
+  const environmentNext = hasLab && conductor?.next ? conductor : null;
+  // An approval appears where its action was asked: a step's run or check on the step, the
+  // rest on the environment card — or, when neither is showing, on top of the column.
+  const approvalCard = approval ? (
+    <PendingAction
+      w={approval}
+      onSettled={(result) => {
+        setLabMessage(result);
+        refreshApprovals();
+        void refresh();
+      }}
+    />
+  ) : null;
+  const stepApproval = approval?.recipe === "lab.check" ? approvalCard : null;
+  const environmentApproval = approval && approval.recipe !== "lab.check" ? approvalCard : null;
 
   return (
-    <div className="space-y-4 pb-28">
+    <div className="space-y-4">
       <header className="flex flex-wrap items-center gap-3">
         <Link
           href="/dashboard/learning/projects"
@@ -172,7 +237,11 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
         </h1>
         <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <span className="tabular-nums">
-            {current ? `Step ${current.ordinal} of ${total}` : "All steps done"}
+            {total === 0
+              ? "Not planned yet"
+              : current
+                ? `Step ${current.ordinal} of ${total}`
+                : "All steps done"}
           </span>
           <div className="h-1.5 w-28 overflow-hidden rounded-full bg-border" aria-hidden="true">
             <div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} />
@@ -180,27 +249,97 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
         </div>
       </header>
 
-      {hasLab ? (
-        <ProjectNext
-          runId={runId}
-          tick={tick}
-          onChanged={(text) => {
-            if (text) setLabMessage(text);
-            announceActionsChanged();
-            refreshApprovals();
-            void refresh();
-          }}
-        />
-      ) : null}
-
       <div
         className={
           hasLab
-            ? "grid items-start gap-4 lg:grid-cols-[minmax(24rem,5fr)_minmax(28rem,7fr)]"
+            ? "grid items-start gap-4 lg:grid-cols-[minmax(22rem,4fr)_minmax(28rem,8fr)]"
             : "mx-auto max-w-3xl space-y-4"
         }
       >
         <div className="space-y-4">
+          {environmentNext ? (
+            <ProjectNext
+              runId={runId}
+              view={environmentNext}
+              approval={environmentApproval}
+              onChanged={changed}
+              onRecheck={(ids) => refreshConductor(ids)}
+              onStartLab={startLab}
+            />
+          ) : environmentApproval && !stepApproval ? (
+            environmentApproval
+          ) : null}
+
+          {run.steps.length === 0 ? (
+            // A lab project is planned from the Next card (the conductor's last requirement).
+            hasLab ? null : (
+              <FreshStart runId={runId} onPlanned={refreshProject} />
+            )
+          ) : current ? (
+            <CurrentStep
+              key={current.id}
+              runId={runId}
+              step={current}
+              pending={pending}
+              message={message}
+              onComplete={completeCurrent}
+              onRevised={refreshProject}
+              // Waits for the environment: the step reads, but its action is the Next card's.
+              blocked={Boolean(environmentNext)}
+              canCheck={Boolean(
+                (run.target.kind === "vmware" ||
+                  ((run.labShell || run.labSignIn) && run.target.kind === "local-docker")) &&
+                runtime &&
+                !["stopped", "failed", "queued", "stopping"].includes(runtime.phase)
+              )}
+              approval={stepApproval}
+              check={run.currentCheck ?? { state: "none", detail: null }}
+              onProposed={() => {
+                announceActionsChanged();
+                refreshApprovals();
+              }}
+            />
+          ) : (
+            <FinishReview runId={runId} stepsKey={run.steps.map((s) => s.status).join()} />
+          )}
+
+          {run.steps.length > 0 ? (
+            <details className="group rounded-2xl border border-border bg-card">
+              <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm">
+                <span className="font-medium">All steps</span>
+                <span className="text-muted-foreground">
+                  {run.doneCount} of {total} done
+                </span>
+                <ChevronDown
+                  className="ml-auto size-4 text-muted-foreground transition group-open:rotate-180"
+                  aria-hidden="true"
+                />
+              </summary>
+              <div className="space-y-3 border-t border-border/70 p-3">
+                <StepList
+                  steps={run.steps}
+                  currentId={current?.id ?? null}
+                  pending={pending}
+                  onReopen={(stepId) =>
+                    startTransition(async () => {
+                      await reopenStepAction({ stepId });
+                      await refreshProject();
+                    })
+                  }
+                />
+                <Replan runId={runId} onReplanned={refresh} />
+                <PlanHistory
+                  runId={runId}
+                  stepsKey={run.steps.map((s) => `${s.id}:${s.status}`).join()}
+                  onRestored={async (text) => {
+                    setMessage(text);
+                    await refreshProject();
+                  }}
+                />
+              </div>
+            </details>
+          ) : null}
+
           <ProjectBrief
             detail={run.detail}
             runsOn={
@@ -211,228 +350,133 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
                 : null
             }
           />
-          {run.steps.length === 0 ? (
-            <FreshStart runId={runId} onPlanned={refresh} />
-          ) : current ? (
-            <CurrentStep
-              key={current.id}
-              runId={runId}
-              step={current}
-              artifact={artifact}
-              setArtifact={setArtifact}
-              pending={pending}
-              message={message}
-              onComplete={completeCurrent}
-              check={run.currentCheck ?? { state: "none", detail: null }}
-              onRevised={refresh}
-              canCheck={Boolean(
-                // Linux labs check through docker exec; Windows labs over SSH (labSignIn); the
-                // person's own VMware machine over SSH once checks are set up (the action says so
-                // when they are not).
-                (run.target.kind === "vmware" ||
-                  ((run.labShell || run.labSignIn) && run.target.kind === "local-docker")) &&
-                runtime &&
-                !["stopped", "failed", "queued", "stopping"].includes(runtime.phase)
-              )}
-              onCheckProposed={() => {
-                announceActionsChanged();
-                refreshApprovals();
-              }}
-            />
-          ) : (
-            <FinishReview runId={runId} stepsKey={run.steps.map((s) => s.status).join()} />
-          )}
-
-          <StepList
-            steps={run.steps}
-            currentId={current?.id ?? null}
-            pending={pending}
-            onReopen={(stepId) =>
-              startTransition(async () => {
-                await reopenStepAction({ stepId });
-                await refresh();
-              })
-            }
-          />
-          <Replan runId={runId} onReplanned={refresh} />
-          <PlanHistory
-            runId={runId}
-            stepsKey={run.steps.map((s) => `${s.id}:${s.status}`).join()}
-            onRestored={async (text) => {
-              setMessage(text);
-              await refresh();
-            }}
-          />
         </div>
 
         {hasLab ? (
-          <section className="overflow-hidden rounded-2xl border border-border bg-card lg:sticky lg:top-4">
-            <div className="flex flex-wrap items-center gap-3 border-b border-border/70 px-4 py-3">
+          <section className="overflow-hidden rounded-2xl border border-border bg-card lg:sticky lg:top-12">
+            {/* ONE environment line. Everything that used to be stacked here — machine choice,
+                settings, checks setup, readiness, services, sign-in, base, pause — is behind it,
+                and none of it polls while closed. */}
+            <button
+              type="button"
+              aria-expanded={environmentOpen}
+              onClick={() => setEnvironmentOpen((v) => !v)}
+              className="flex w-full items-center gap-3 border-b border-border/70 px-4 py-2.5 text-left"
+            >
               <span
-                className={`size-2 rounded-full ${
-                  runtime?.phase === "ready"
+                className={`size-2 shrink-0 rounded-full ${
+                  conductor?.ready
                     ? "bg-emerald-500"
-                    : runtime && !["failed", "stopped"].includes(runtime.phase)
-                      ? "animate-pulse bg-amber-500"
-                      : runtime?.phase === "failed"
-                        ? "bg-destructive"
-                        : "bg-muted-foreground/40"
+                    : runtime?.phase === "failed"
+                      ? "bg-destructive"
+                      : "bg-amber-500"
                 }`}
                 aria-hidden="true"
               />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold">
-                  {run.labLabel}{" "}
-                  <span className="font-normal text-muted-foreground">
-                    ·{" "}
-                    {run.target.kind === "local-docker"
-                      ? "on this computer"
-                      : `on ${run.target.label}`}
-                  </span>
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {run.target.kind === "unconnected"
-                    ? `Fadi can't reach ${run.target.label} yet. Connect it in Machines, or run here.`
-                    : runtime
-                      ? runtimeMessage(runtime)
-                      : "Not started"}
-                </p>
-                {run.labSignIn ? (
-                  <p className="text-xs text-muted-foreground">
-                    Sign in as{" "}
-                    <code className="rounded bg-muted px-1 text-foreground">
-                      {run.labSignIn.user}
-                    </code>{" "}
-                    · password{" "}
-                    <code className="rounded bg-muted px-1 text-foreground">
-                      {run.labSignIn.password}
-                    </code>{" "}
-                    (a local administrator; lab only)
-                  </p>
-                ) : null}
-                {run.labSignIn && runtime?.phase === "stopped" ? (
-                  <SaveBaseLink runId={runId} />
-                ) : null}
-              </div>
-              {run.target.kind === "unconnected" ? (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={pending}
-                  onClick={() =>
-                    startTransition(async () => {
-                      const result = await runOnThisComputerAction({ runId });
-                      setLabMessage(result.message ?? null);
-                      await refresh();
-                    })
-                  }
-                >
-                  Run on this computer instead
-                </Button>
-              ) : !runtime ? (
-                <Button
-                  size="sm"
-                  disabled={pending || Boolean(approval)}
-                  onClick={() => proposeLab("prepare")}
-                >
-                  Start lab
-                </Button>
-              ) : runtime.phase === "stopped" ? (
-                <Button
-                  size="sm"
-                  disabled={pending || Boolean(approval)}
-                  onClick={() => proposeLab("resume")}
-                >
-                  Resume
-                </Button>
-              ) : runtime.phase === "failed" ? (
-                <Button
-                  size="sm"
-                  disabled={pending || Boolean(approval)}
-                  onClick={() => proposeLab("restart")}
-                >
-                  Start again
-                </Button>
-              ) : runtime.phase !== "queued" ? (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  disabled={pending || Boolean(approval)}
-                  onClick={() => proposeLab("stop")}
-                >
-                  Pause
-                </Button>
-              ) : null}
-            </div>
+              <span className="min-w-0 flex-1 truncate text-sm">
+                <span className="font-medium">Environment</span>{" "}
+                <span className="text-muted-foreground">
+                  · {run.labLabel}
+                  {run.target.kind === "local-docker"
+                    ? " on this computer"
+                    : ` on ${run.target.label}`}{" "}
+                  ·{" "}
+                  {conductor?.ready
+                    ? "ready"
+                    : run.target.kind === "unconnected"
+                      ? "not reachable"
+                      : runtime
+                        ? runtimeMessage(runtime)
+                        : "needs attention"}
+                </span>
+              </span>
+              <span className="text-xs text-muted-foreground">Details</span>
+              <ChevronDown
+                className={`size-4 text-muted-foreground transition ${environmentOpen ? "rotate-180" : ""}`}
+                aria-hidden="true"
+              />
+            </button>
 
-            {!approval && (!runtime || ["stopped", "failed"].includes(runtime.phase)) ? (
-              <div id="lab-machine">
-                <MachineChooser
-                  runId={runId}
-                  onkind={run.target.kind}
-                  onChanged={(text) => {
-                    setLabMessage(text);
-                    void refresh();
-                  }}
-                />
+            {environmentOpen ? (
+              <div className="border-b border-border/70">
+                <div className="flex flex-wrap items-center gap-2 px-4 py-2 text-xs text-muted-foreground">
+                  {run.labSignIn ? (
+                    <span>
+                      Sign in as{" "}
+                      <code className="rounded bg-muted px-1 text-foreground">
+                        {run.labSignIn.user}
+                      </code>{" "}
+                      · password{" "}
+                      <code className="rounded bg-muted px-1 text-foreground">
+                        {run.labSignIn.password}
+                      </code>
+                    </span>
+                  ) : null}
+                  {run.target.kind === "unconnected" ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-7"
+                      disabled={pending}
+                      onClick={() =>
+                        startTransition(async () => {
+                          const result = await runOnThisComputerAction({ runId });
+                          changed(result.message ?? null);
+                        })
+                      }
+                    >
+                      Run on this computer instead
+                    </Button>
+                  ) : runtime && !["stopped", "failed", "queued"].includes(runtime.phase) ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="ml-auto h-7"
+                      disabled={pending}
+                      onClick={pauseLab}
+                    >
+                      Pause the machine
+                    </Button>
+                  ) : null}
+                </div>
+                {run.labSignIn && runtime?.phase === "stopped" ? (
+                  <div className="px-4 pb-2">
+                    <SaveBaseLink runId={runId} />
+                  </div>
+                ) : null}
+                {!runtime || ["stopped", "failed"].includes(runtime.phase) ? (
+                  <MachineChooser
+                    runId={runId}
+                    onkind={run.target.kind}
+                    onChanged={(text) => changed(text)}
+                  />
+                ) : null}
+                <MachineSettings runId={runId} tick={tick} onProposed={(text) => changed(text)} />
+                <ChecksSetup runId={runId} tick={tick} />
+                <ProjectServices runId={runId} tick={tick} onProposed={(text) => changed(text)} />
+                <ProjectReadiness runId={runId} tick={tick} onProposed={(text) => changed(text)} />
+                {runtime && run.labShell && runtime.phase !== "stopped" ? (
+                  <div className="p-4">
+                    <p className="mb-2 text-xs text-muted-foreground">
+                      A terminal into the lab, from your computer:
+                    </p>
+                    <CommandBlock code={run.labShell} lang="terminal" />
+                  </div>
+                ) : null}
+                {conductor ? (
+                  <div className="px-4 pb-3">
+                    <Checked items={conductor.items} />
+                  </div>
+                ) : null}
               </div>
             ) : null}
-            <MachineSettings
-              runId={runId}
-              tick={tick}
-              onProposed={(text) => {
-                setLabMessage(text);
-                announceActionsChanged();
-                refreshApprovals();
-              }}
-            />
-            <div id="lab-checks">
-              <ChecksSetup runId={runId} tick={tick} />
-            </div>
-            <ProjectReadiness
-              runId={runId}
-              tick={tick}
-              onProposed={(text) => {
-                setLabMessage(text);
-                announceActionsChanged();
-                refreshApprovals();
-              }}
-            />
-            <ProjectServices
-              runId={runId}
-              tick={tick}
-              onProposed={(text) => {
-                setLabMessage(text);
-                announceActionsChanged();
-                refreshApprovals();
-              }}
-            />
             {labMessage ? (
               <p className="border-b border-border/70 px-4 py-2 text-xs text-muted-foreground">
                 {labMessage}
               </p>
             ) : null}
-            {approval ? (
-              <div className="p-4">
-                <PendingAction
-                  w={approval}
-                  onSettled={(result) => {
-                    setLabMessage(result);
-                    refreshApprovals();
-                    void refresh();
-                  }}
-                />
-              </div>
-            ) : runtime && run.labShell && runtime.phase !== "stopped" ? (
-              <div className="border-b border-border/70 p-4">
-                <p className="mb-2 text-xs text-muted-foreground">
-                  Open a terminal on your computer and run:
-                </p>
-                <CommandBlock code={run.labShell} lang="terminal" />
-              </div>
-            ) : null}
 
-            <LabSurface runtime={runtime} labLabel={run.labLabel} hasApproval={Boolean(approval)} />
+            <LabSurface runtime={runtime} labLabel={run.labLabel} />
           </section>
         ) : null}
       </div>
@@ -443,13 +487,10 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
 function LabSurface({
   runtime,
   labLabel,
-  hasApproval,
 }: {
   runtime: ProjectRuntimeView | undefined;
   labLabel: string | null;
-  hasApproval: boolean;
 }) {
-  if (hasApproval) return null;
   const surface = runtime ? reachableSurface(runtime) : null;
   if (surface?.sessionPath?.startsWith("/lab-screen.html")) {
     return (
@@ -490,34 +531,92 @@ function LabSurface({
   );
 }
 
+/**
+ * THE CURRENT STEP, when the environment is ready: what to do, what "done" means, and ONE
+ * action that follows the state — Run in lab (Fadi runs the step's script in the machine, then
+ * its check, after one approval), Check and continue (the person did it; Fadi checks), or Done.
+ *
+ * Replaced (16 Oct 2026, docs/UI_UX_GUIDELINES.md "Interaction budget"): Type into lab and Copy
+ * on every command, the result field, and Done / Check it for me / Continue without verification
+ * side by side. Commands, manual completion and help are under "Other ways".
+ */
 function CurrentStep({
   runId,
   step,
-  artifact,
-  setArtifact,
   pending,
   message,
   onComplete,
   onRevised,
+  blocked,
   canCheck,
-  onCheckProposed,
+  approval,
   check,
+  onProposed,
 }: {
   runId: string;
   step: StepView;
-  artifact: string;
-  setArtifact: (value: string) => void;
   pending: boolean;
   message: string | null;
-  onComplete: (unverified?: boolean) => void;
+  onComplete: (input: { unverified: boolean; artifact: string | null }) => void;
   onRevised: () => Promise<void>;
+  /** The environment needs something first: the Next card above has the action. */
+  blocked: boolean;
   canCheck: boolean;
-  onCheckProposed: () => void;
+  /** This step's pending run or check, shown where it was asked for. */
+  approval: React.ReactNode;
   check: StepCheck;
+  onProposed: () => void;
 }) {
+  const [other, setOther] = useState(false);
   const [stuck, setStuck] = useState(false);
-  const [checkNote, setCheckNote] = useState<string | null>(null);
-  const [checking, startCheck] = useTransition();
+  const [artifact, setArtifact] = useState("");
+  const [note, setNote] = useState<string | null>(null);
+  const [asking, startAsk] = useTransition();
+
+  const script = stepScript(step.instruction);
+  const inLab = !step.place || step.place === "lab";
+  const canRun = canCheck && inLab && Boolean(script) && Boolean(step.check);
+  const failed = check.state === "failed";
+
+  const ask = (run: boolean) =>
+    startAsk(async () => {
+      setNote(null);
+      const result = await proposeStepCheckAction({ runId, stepId: step.id, run });
+      if (result.ok) onProposed();
+      else setNote(result.message);
+    });
+
+  // ONE action, by state.
+  let primary: React.ReactNode;
+  if (blocked) {
+    primary = (
+      <p className="text-sm text-muted-foreground">Fadi is getting the lab ready first — above.</p>
+    );
+  } else if (approval) {
+    primary = approval;
+  } else if (check.state === "waiting") {
+    primary = (
+      <p className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Running in the lab…
+      </p>
+    );
+  } else {
+    const [label, go] = canRun
+      ? [failed ? "Run again" : "Run in lab", () => ask(true)]
+      : canCheck
+        ? [failed ? "Check again" : "Check and continue", () => ask(false)]
+        : ["Done, continue", () => onComplete({ unverified: false, artifact: null })];
+    primary = (
+      <Button onClick={go} disabled={pending || asking}>
+        {pending || asking ? (
+          <Loader2 className="animate-spin" aria-hidden="true" />
+        ) : (
+          <Check aria-hidden="true" />
+        )}
+        {label}
+      </Button>
+    );
+  }
 
   return (
     <section className="rounded-2xl border border-primary/30 bg-card p-5">
@@ -531,91 +630,46 @@ function CurrentStep({
       </p>
       <h2 className="mt-0.5 text-lg font-semibold">{step.title}</h2>
 
+      {/* The task in words. The commands themselves are Fadi's to run; they are under Other ways. */}
       <StepText
         text={step.instruction}
-        typeable={!step.place || step.place === "lab"}
+        hideCommands={canRun}
+        typeable={inLab}
         className="mt-3 space-y-3 text-sm leading-relaxed text-muted-foreground"
       />
 
       {step.verify ? (
-        <div className="mt-4 rounded-lg bg-emerald-500/5 px-3 py-2.5 ring-1 ring-emerald-500/25">
-          <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">Done when</p>
-          <StepText text={step.verify} className="mt-1 space-y-2 text-sm text-muted-foreground" />
-        </div>
+        <p className="mt-3 text-sm">
+          <span className="font-medium text-emerald-600 dark:text-emerald-400">Done when </span>
+          <span className="text-muted-foreground">{step.verify}</span>
+        </p>
       ) : null}
 
-      {check.state === "failed" ? (
+      {failed ? (
         <div className="mt-4 rounded-lg bg-destructive/5 px-3 py-2.5 ring-1 ring-destructive/30">
-          <p className="text-xs font-semibold text-destructive">
-            Fadi checked this step: it failed. It isn&apos;t done.
+          <p className="text-sm font-medium text-destructive">
+            Fadi checked: it didn&apos;t work yet.
           </p>
           {check.detail ? (
             <p className="mt-1 text-sm text-muted-foreground">{check.detail}</p>
           ) : null}
         </div>
-      ) : check.state === "waiting" ? (
-        <p className="mt-4 text-sm text-muted-foreground">
-          A check of this step is waiting for your approval. Nothing has run yet.
-        </p>
       ) : null}
 
-      <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-        {check.state === "failed" ? null : (
-          <input
-            value={artifact}
-            onChange={(event) => setArtifact(event.target.value)}
-            placeholder={
-              step.produces
-                ? `Result (optional): ${step.produces}`
-                : "Result (optional): a path, output or link"
-            }
-            aria-label="Result of this step"
-            className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm"
-          />
-        )}
-        {check.state === "failed" || check.state === "waiting" ? null : (
-          <Button onClick={() => onComplete()} disabled={pending}>
-            {pending ? (
-              <Loader2 className="animate-spin" aria-hidden="true" />
-            ) : (
-              <Check aria-hidden="true" />
-            )}
-            Done, next step
-          </Button>
-        )}
-        {canCheck && check.state !== "waiting" ? (
-          <Button
-            variant={check.state === "failed" ? "default" : "outline"}
-            disabled={checking || pending}
-            onClick={() =>
-              startCheck(async () => {
-                setCheckNote(null);
-                const result = await proposeStepCheckAction({ runId, stepId: step.id });
-                setCheckNote(result.message);
-                if (result.ok) onCheckProposed();
-              })
-            }
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        {primary}
+        {failed && !blocked ? (
+          <button
+            type="button"
+            onClick={() => setStuck(true)}
+            className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
           >
-            {checking ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-            {check.state === "failed" ? "Check again" : "Check it for me"}
-          </Button>
+            <LifeBuoy className="size-4" aria-hidden="true" /> Need help?
+          </button>
         ) : null}
       </div>
-      {check.state === "failed" ? (
-        <button
-          type="button"
-          disabled={pending}
-          onClick={() => onComplete(true)}
-          className="mt-2 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-        >
-          Continue without verification — it counts as your word only, never as evidence
-        </button>
-      ) : null}
-      {message ? <p className="mt-2 text-xs text-muted-foreground">{message}</p> : null}
-      {/* The server's state of the check wins over what this button said when it was asked. */}
-      {checkNote && check.state === "none" ? (
-        <p className="mt-2 text-xs text-muted-foreground">{checkNote}</p>
-      ) : null}
+      {message ? <p className="mt-2 text-sm text-muted-foreground">{message}</p> : null}
+      {note ? <p className="mt-2 text-sm text-muted-foreground">{note}</p> : null}
 
       {stuck ? (
         <StuckPanel
@@ -624,15 +678,84 @@ function CurrentStep({
           onClose={() => setStuck(false)}
           onRevised={onRevised}
         />
-      ) : (
-        <button
-          type="button"
-          onClick={() => setStuck(true)}
-          className="mt-3 inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <LifeBuoy className="size-4" aria-hidden="true" /> Stuck? Show Fadi the error
-        </button>
-      )}
+      ) : null}
+
+      <button
+        type="button"
+        aria-expanded={other}
+        onClick={() => setOther((v) => !v)}
+        className="mt-4 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+      >
+        Other ways
+        <ChevronDown
+          className={`size-3.5 transition ${other ? "rotate-180" : ""}`}
+          aria-hidden="true"
+        />
+      </button>
+      {other ? (
+        <div className="mt-3 space-y-4 border-t border-border/70 pt-3 text-sm">
+          {canRun && script ? (
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Do it yourself in the machine — when practising the commands is the point:
+              </p>
+              <StepText
+                text={step.instruction}
+                commandsOnly
+                typeable={inLab}
+                className="space-y-2 text-sm text-muted-foreground"
+              />
+              {canCheck ? (
+                <Button size="sm" variant="outline" disabled={asking} onClick={() => ask(false)}>
+                  I did it — check it
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              {failed || check.state === "waiting"
+                ? "Mark it done without Fadi's check — it counts as your word only, never as evidence."
+                : "Mark it done yourself, with what it produced if you like:"}
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              {failed || check.state === "waiting" ? null : (
+                <input
+                  value={artifact}
+                  onChange={(event) => setArtifact(event.target.value)}
+                  placeholder={
+                    step.produces ? `Result: ${step.produces}` : "Result: a path, output or link"
+                  }
+                  aria-label="Result of this step"
+                  className="h-8 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm"
+                />
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={pending}
+                onClick={() =>
+                  onComplete({
+                    unverified: failed || check.state === "waiting",
+                    artifact: artifact.trim() || null,
+                  })
+                }
+              >
+                Mark done
+              </Button>
+            </div>
+          </div>
+          {failed || stuck ? null : (
+            <button
+              type="button"
+              onClick={() => setStuck(true)}
+              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <LifeBuoy className="size-3.5" aria-hidden="true" /> Stuck? Show Fadi the error
+            </button>
+          )}
+        </div>
+      ) : null}
     </section>
   );
 }

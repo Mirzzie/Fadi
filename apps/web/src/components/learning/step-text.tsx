@@ -14,13 +14,21 @@ export function StepText({
   text,
   className,
   typeable = true,
+  hideCommands = false,
+  commandsOnly = false,
 }: {
   text: string;
   className?: string;
   /** False for steps that happen outside the lab: their commands are not typed into it. */
   typeable?: boolean;
+  /** The words only: Fadi runs this step's commands, so they aren't the person's to relay. */
+  hideCommands?: boolean;
+  /** The commands only — the manual mode under "Other ways". */
+  commandsOnly?: boolean;
 }) {
-  const blocks = parseInstruction(text);
+  const blocks = parseInstruction(text).filter((block) =>
+    hideCommands ? block.type !== "code" : commandsOnly ? block.type === "code" : true
+  );
   return (
     <div className={className ?? "space-y-3 text-sm leading-relaxed text-muted-foreground"}>
       {blocks.map((block, index) =>

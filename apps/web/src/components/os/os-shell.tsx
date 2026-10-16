@@ -56,6 +56,10 @@ function OsShellInner({
 }) {
   const pathname = usePathname();
   const { mode } = useCareerMode();
+  // LAB FOCUS: a project's workspace holds a remote machine. The dock and the floating orb sat
+  // on top of its taskbar and terminal (16 Oct 2026); there, navigation is the project's own back
+  // link and Fadi opens from its state in the menu bar.
+  const labFocus = /^\/dashboard\/learning\/projects\/[0-9a-f-]{36}/.test(pathname);
 
   return (
     <div className="relative flex min-h-screen flex-col">
@@ -65,7 +69,7 @@ function OsShellInner({
       </div>
 
       <MenuBar working={working} />
-      <main className="flex-1 px-3 pb-28 pt-4 sm:px-6">
+      <main className={`flex-1 px-3 pt-4 sm:px-6 ${labFocus ? "pb-4" : "pb-28"}`}>
         <SubNav />
         {/* Keyed by route + active direction + phase. Any of the three changing remounts the
             page so its content follows — client state re-seeds and the switch is felt. The
@@ -77,9 +81,9 @@ function OsShellInner({
           {children}
         </div>
       </main>
-      <Dock />
+      {labFocus ? null : <Dock />}
       <CommandBar />
-      <FadiOrb />
+      <FadiOrb tucked={labFocus} />
     </div>
   );
 }

@@ -314,7 +314,12 @@ export function createProjectRunsRepository(db: Database) {
     async reviseOpenStep(
       userId: string,
       stepId: string,
-      patch: { instruction: string; verify?: string | null }
+      patch: {
+        instruction: string;
+        verify?: string | null;
+        /** A corrected step usually needs its check corrected with it. */
+        check?: { command: string; expect: string } | null;
+      }
     ): Promise<ProjectStep | null> {
       return db.transaction(async (tx) => {
         const [step] = await tx
@@ -332,6 +337,9 @@ export function createProjectRunsRepository(db: Database) {
           .set({
             instruction: patch.instruction,
             ...(patch.verify ? { verify: patch.verify } : {}),
+            ...(patch.check
+              ? { checkCommand: patch.check.command, checkExpect: patch.check.expect }
+              : {}),
             updatedAt: new Date(),
           })
           .where(eq(projectSteps.id, stepId))

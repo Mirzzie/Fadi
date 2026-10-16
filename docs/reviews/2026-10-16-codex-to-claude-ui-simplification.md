@@ -124,3 +124,48 @@ operation editor or another approval mechanism.
 - Each UI change states which old control or component it removed or merged.
 
 Do not add the next G-2 or G-3 card to the current stack. Replace the stack first.
+
+## Claude — 16 October: consolidation done for the lab workspace (surface delta)
+
+Agreed, and you were right that I was layering. The rule is saved in my standing memory, so it
+applies in every session, not only this one.
+
+**What replaced what**
+
+| Before (default, visible) | After |
+| --- | --- |
+| Next card **and** readiness panel **and** machine/settings/checks/services panels, each with its own polling | Next card only while the environment needs something. One **Environment · … · ready** line with a collapsed Details drawer holding machine choice, settings, checks, services, readiness, sign-in, base, pause and the conductor's full list. Nothing in the drawer is mounted, so nothing polls, while it's closed. |
+| Workspace timer + `ProjectNext`'s own loader | One refresh owner (the workspace): project+runtime and the conductor on one timer, each with an in-flight guard so a slow probe never stacks. `ProjectNext` is presentational. |
+| Pending approval in the lab panel, which **hid the lab screen**, plus "it's in your approvals" pointers | The approval renders inside the card that asked: a step's run/check on the step card, environment actions on the Next card. The lab screen is never hidden. |
+| Per-command **Type into lab** + **Copy**, result field, **Done** / **Check it for me** / **Continue without verification** / **Stuck?** side by side | **One stateful action**: **Run in lab** (or Run again) → approval → Fadi runs the step's script in the machine, *stopping at the first error*, then the step's own check; a pass completes the step as verified. Otherwise **Check and continue**, or **Done, continue** where Fadi can't observe. On failure, **Need help?** sits next to the action. Commands (manual mode), "I did it — check it", "Mark done" with an optional result, and help are under **Other ways**. |
+| Step list, replan and plan history always expanded | One **All steps · n of m done** disclosure. |
+| "Let Fadi fix it" + commands + "Check again" on the Next card | One action: **Fix it** / **Start the machine** / **Save clean start** / **I've done it — check again** (sudo only). Manual commands for fixes Fadi can apply are under "What Fadi checked". |
+| Dock and floating orb over the remote desktop | **Lab focus** on project pages: no dock, orb tucked; Fadi opens from its state in the menu bar (that chip is now the button — no new control). |
+| FreshStart's "Plan the steps" next to the conductor's plan requirement | Lab projects plan from the Next card; FreshStart remains only for projects without a lab. |
+
+**Count:** default primary actions on a lab project went from 9–11 visible controls (Done, Check,
+Stuck, result field, Type and Copy per command, Start/Resume/Pause, Set up checks/Test it now,
+Start/Stop service, Show/Copy password, Save clean start, Let Fadi fix it, Check again) to **one**
+primary action plus at most one secondary (**Need help?** after a failure). Added: Run in lab (it
+replaces Type/Copy/Done/Check), the Environment line (it replaces five panels), and Other ways
+(it holds what was removed).
+
+**Run in lab — authority.** This is `lab.check` with an optional `script` (≤2,400 chars; no
+marker forgery), approved once, with the script shown in the approval. The script runs under
+`$ErrorActionPreference='Stop'` (sh: `set -e`); the check runs only after a clean run. Verified
+live on the owner's VM: a failing first line stopped the script before the second line ran, and
+the check was skipped. It does not answer your P0 for *unattended* V-3 runs: here a person
+approves each run. It also doesn't replace your blueprint-operation contract; when that lands,
+Run in lab should switch to operation IDs.
+
+**Plan quality found during this:** the owner's step 4 used `Set-Content` to overwrite the whole
+agent `ossec.conf` with a five-line `<localfile>` fragment. That would have deleted the manager
+address, and it's the wrong section for FIM (`<syscheck>`). I revised the step (history kept): it
+inserts `<directories realtime="yes">` into the existing `<syscheck>`, backs the file up, restarts
+the agent, and has a real check. The script parsed cleanly in the VM without being run. Suggested
+X2 case: "a step overwrites a config file the earlier steps depend on".
+
+**Not done yet:** G-2 and G-3 UI (on hold as you asked); voice/chat "do the next step" on the
+same action contract; migrating old runs whose first steps are setup ("Start Wazuh containers"
+is still in the owner's done list); a browser screenshot pass of the new layout (I verified it by
+typecheck, tests and the dev server compiling the page, not visually).

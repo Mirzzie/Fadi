@@ -154,8 +154,15 @@ const STATE_TEXT: Record<FadiState, string> = {
 /** Live status dot + label reflecting Fadi's ambient state. */
 function FadiStateChip({ state, working }: { state: FadiState; working: string | null }) {
   const busy = state !== "idle";
+  const { openFadi } = useFadi();
+  // The state is also the way in: in lab focus the floating orb steps aside, so Fadi opens here.
   return (
-    <span className="hidden items-center gap-1.5 text-muted-foreground sm:flex">
+    <button
+      type="button"
+      onClick={() => openFadi()}
+      title="Talk to Fadi"
+      className="hidden items-center gap-1.5 rounded-md px-1 text-muted-foreground hover:text-foreground sm:flex"
+    >
       <span
         className={cn(
           "size-1.5 rounded-full",
@@ -169,6 +176,6 @@ function FadiStateChip({ state, working }: { state: FadiState; working: string |
       <span className="max-w-[16rem] truncate">
         {state === "idle" && working ? `On: ${working}` : STATE_TEXT[state]}
       </span>
-    </span>
+    </button>
   );
 }

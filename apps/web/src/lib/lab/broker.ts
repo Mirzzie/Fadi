@@ -16,7 +16,13 @@ import { formatMemory } from "./sizes";
 import { describeChanges, validMachineChanges, type MachineChanges } from "./vmware-config";
 import { CLEAN_SNAPSHOT } from "./vmware-snapshot";
 import { CHECK_DID_NOT_PASS } from "./completion";
-import { powershellCheck, readablePowershell } from "./windows-shell";
+import {
+  powershellCheck,
+  powershellRunThenCheck,
+  readablePowershell,
+  RUN_MARKER,
+  shRunThenCheck,
+} from "./windows-shell";
 import {
   baseVolumeFor,
   DISK_COPY_TIMEOUT_MS,
@@ -1647,6 +1653,18 @@ export const RECIPES: Record<RecipeId, Recipe> = {
       const shell =
         raw.shell === "bash" ? "bash" : raw.shell === "powershell" ? "powershell" : "sh";
       const template = str(raw.template);
+      // "Run in lab": the step's own script, run before its check, approved together.
+      const script = typeof raw.script === "string" ? raw.script.replace(/\r\n?/g, "\n").trim() : "";
+      if (
+        script &&
+        (script.length > 2400 ||
+          script.includes("\0") ||
+          script.includes(CHECK_MARKER) ||
+          script.includes(RUN_MARKER))
+      ) {
+        return null;
+      }
+      const withScript = script ? { script } : {};
       const commandOk =
         command &&
         command.length <= 600 &&
@@ -1663,6 +1681,7 @@ export const RECIPES: Record<RecipeId, Recipe> = {
           user,
           command,
           expect,
+          ...withScript,
           shell: "powershell",
           label: typeof raw.label === "string" ? raw.label : undefined,
           vmxPath: typeof raw.vmxPath === "string" ? raw.vmxPath : undefined,
@@ -1679,12 +1698,23 @@ export const RECIPES: Record<RecipeId, Recipe> = {
       )
         return null;
       if (!expect || expect.length > 200) return null;
-      return { name, command, expect, shell, ...(shell === "powershell" ? { template } : {}) };
+      return {
+        name,
+        command,
+        expect,
+        shell,
+        ...withScript,
+        ...(shell === "powershell" ? { template } : {}),
+      };
     },
     summary: (p) =>
-      `Run a check inside ${p.resourceId ? (p.label ?? "your VMware machine") : NAME_PREFIX + p.name}: ${p.command} — it passes if the output contains "${p.expect}".`,
-    reversal: () =>
-      "A check is meant to only read. If the command changes something, it changes it inside the lab only.",
+      p.script
+        ? `Run this step in ${p.resourceId ? (p.label ?? "your VMware machine") : NAME_PREFIX + p.name}: its commands, stopping at the first error, then its check (${p.command}) — done if the output contains "${p.expect}".`
+        : `Run a check inside ${p.resourceId ? (p.label ?? "your VMware machine") : NAME_PREFIX + p.name}: ${p.command} — it passes if the output contains "${p.expect}".`,
+    reversal: (p) =>
+      p.script
+        ? "The step's commands change the lab, and only the lab. Starting the project over returns it to its clean start."
+        : "A check is meant to only read. If the command changes something, it changes it inside the lab only.",
     render: (p) => [
       p.resourceId
         ? {
@@ -1693,7 +1723,9 @@ export const RECIPES: Record<RecipeId, Recipe> = {
             resourceId: String(p.resourceId),
             vmx: String(p.vmxPath),
             user: String(p.user),
-            command: String(p.command),
+            command: p.script
+              ? powershellRunThenCheck(String(p.script), String(p.command))
+              : String(p.command),
           }
         : p.shell === "powershell"
           ? {
@@ -1702,7 +1734,9 @@ export const RECIPES: Record<RecipeId, Recipe> = {
               cmd: "ssh",
               args: windowsCheckArgs(
                 String(p.template) as TemplateKey,
-                String(p.command),
+                p.script
+                  ? powershellRunThenCheck(String(p.script), String(p.command))
+                  : String(p.command),
                 CHECK_MARKER
               ),
             }
@@ -1714,7 +1748,7 @@ export const RECIPES: Record<RecipeId, Recipe> = {
                 NAME_PREFIX + String(p.name),
                 String(p.shell),
                 "-c",
-                `${String(p.command)}\necho "${CHECK_MARKER}=$?"`,
+                `${p.script ? shRunThenCheck(String(p.script), String(p.command)) : String(p.command)}\necho "${CHECK_MARKER}=$?"`,
               ],
             },
     ],
@@ -2873,15 +2907,18 @@ export async function approveAndRun(input: {
 
   if (row.recipe === "lab.check") {
     const verdict = checkVerdict(out.join("\n"), String(params.expect));
-    const detail = verdict.passed
-      ? `Check passed: found "${params.expect}".`
-      : `${CHECK_DID_NOT_PASS}: "${params.expect}" was not in the output${verdict.exit !== null ? ` (exit ${verdict.exit})` : ""}.`;
-    if (verdict.passed && row.stepId) {
+    const stopped = new RegExp(`${RUN_MARKER}=1`).test(out.join("\n"));
+    const detail = stopped
+      ? `${CHECK_DID_NOT_PASS}: the step's commands stopped at their first error, so its check didn't run. ${verdict.excerpt.split("\n")[0] ?? ""}`.trim()
+      : verdict.passed
+        ? `Check passed: found "${params.expect}".`
+        : `${CHECK_DID_NOT_PASS}: "${params.expect}" was not in the output${verdict.exit !== null ? ` (exit ${verdict.exit})` : ""}.`;
+    if (verdict.passed && !stopped && row.stepId) {
       const { createProjectRunsRepository } = await import("@careeros/database");
       await createProjectRunsRepository(db).setStepStatus(input.userId, row.stepId, {
         status: "done",
         completion: "verified",
-        artifact: `Checked in the lab: ${String(params.command)} → ${verdict.excerpt}`.slice(
+        artifact: `${params.script ? "Ran in the lab and checked" : "Checked in the lab"}: ${String(params.command)} → ${verdict.excerpt}`.slice(
           0,
           1_000
         ),

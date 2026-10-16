@@ -196,6 +196,11 @@ If the success condition cannot be checked from inside the lab (it needs a brows
 export async function proposeStepCheckAction(input: {
   runId: string;
   stepId: string;
+  /**
+   * "Run in lab": also run the step's own commands first, in the machine, approved together
+   * with its check — the person stops relaying commands between two places Fadi controls.
+   */
+  run?: boolean;
 }): Promise<{ ok: boolean; message: string }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Sign in again." };
@@ -263,21 +268,43 @@ export async function proposeStepCheckAction(input: {
 
   // THE STEP'S OWN CHECK, written with the plan against the observed lab (verified-labs V-2):
   // no second AI call guessing a check after the fact.
+  let script: string | null = null;
+  if (input.run) {
+    const { stepScript } = await import("@/lib/learning/instruction-blocks");
+    script = stepScript(step.instruction);
+    if (!script) return { ok: false, message: "This step has no commands for Fadi to run." };
+    if (!step.checkCommand || !step.checkExpect) {
+      return {
+        ok: false,
+        message:
+          "This step has no check of its own, so Fadi can't tell whether running it worked. Do it yourself (Other ways), then Check and continue.",
+      };
+    }
+  }
+
   if (step.checkCommand && step.checkExpect) {
     const { proposeAction } = await import("@/lib/lab/broker");
     const proposal = await proposeAction({
       userId: user.id,
       recipe: "lab.check",
-      params: vmware
-        ? { ...vmware, command: step.checkCommand, expect: step.checkExpect, shell: "powershell" }
-        : { name, command: step.checkCommand, expect: step.checkExpect, shell, template },
+      params: {
+        ...(vmware
+          ? { ...vmware, command: step.checkCommand, expect: step.checkExpect, shell: "powershell" }
+          : { name, command: step.checkCommand, expect: step.checkExpect, shell, template }),
+        ...(script ? { script } : {}),
+      },
       actor: "model",
       origin: "dashboard:step_check",
       runId: project.run.id,
       stepId: step.id,
     });
     return proposal.ok
-      ? { ok: true, message: "Running this step's own check — waiting for your approval; nothing has run yet." }
+      ? {
+          ok: true,
+          message: script
+            ? "Ready to run this step — approve it here; nothing has run yet."
+            : "Running this step's own check — waiting for your approval; nothing has run yet.",
+        }
       : { ok: false, message: proposal.message };
   }
 

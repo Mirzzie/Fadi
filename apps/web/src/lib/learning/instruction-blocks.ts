@@ -170,3 +170,12 @@ export function looksLikeCommand(line: string): boolean {
 function commandLang(line: string): string | null {
   return CMDLET.test(line) || POWERSHELL_EXPR.test(line) ? "powershell" : null;
 }
+
+/** A step's commands as one script, in order — what "Run in lab" runs. Null when it has none. */
+export function stepScript(instruction: string): string | null {
+  const code = parseInstruction(instruction)
+    .filter((block): block is Extract<InstructionBlock, { type: "code" }> => block.type === "code")
+    .map((block) => block.code.trim())
+    .filter(Boolean);
+  return code.length ? code.join("\n") : null;
+}

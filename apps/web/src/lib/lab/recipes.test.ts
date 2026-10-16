@@ -1221,3 +1221,45 @@ describe("vmware.guestFix: a closed list of fixes inside the person's machine", 
     expect(RECIPES["vmware.guestFix"]).toMatchObject({ blast: "vm", reversibility: "reversible" });
   });
 });
+
+describe("Run in lab: lab.check with the step's script (16 Oct 2026)", () => {
+  const vm = {
+    resourceId: "11111111-1111-4111-8111-111111111111",
+    user: "Administrator",
+    command: "Get-Service WazuhSvc",
+    expect: "Running",
+    vmxPath: "/home/user/vmware/ws/ws.vmx",
+  };
+
+  it("runs the script first, stopping at its first error, then the check — one approval", async () => {
+    const { RECIPES } = await import("./broker");
+    const params = RECIPES["lab.check"].validate({
+      ...vm,
+      script: "Invoke-WebRequest x\nmsiexec /i y",
+    })!;
+    const [step] = RECIPES["lab.check"].render(params) as Array<{ command: string }>;
+    expect(step!.command).toContain(
+      "$ErrorActionPreference = 'Stop'; Invoke-WebRequest x\nmsiexec /i y"
+    );
+    expect(step!.command).toContain('Write-Output "FADI_RUN=0"; Get-Service WazuhSvc');
+    expect(RECIPES["lab.check"].summary(params)).toMatch(/^Run this step in/);
+  });
+
+  it("refuses a script that is too long or forges a marker", async () => {
+    const { RECIPES } = await import("./broker");
+    expect(RECIPES["lab.check"].validate({ ...vm, script: "x".repeat(2401) })).toBeNull();
+    expect(
+      RECIPES["lab.check"].validate({ ...vm, script: 'Write-Output "FADI_RUN=0"' })
+    ).toBeNull();
+    expect(
+      RECIPES["lab.check"].validate({ ...vm, script: 'Write-Output "__FADI_CHECK_EXIT=0"' })
+    ).toBeNull();
+  });
+
+  it("is unchanged without a script", async () => {
+    const { RECIPES } = await import("./broker");
+    const params = RECIPES["lab.check"].validate(vm)!;
+    const [step] = RECIPES["lab.check"].render(params) as Array<{ command: string }>;
+    expect(step!.command).toBe("Get-Service WazuhSvc");
+  });
+});
