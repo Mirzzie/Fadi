@@ -318,3 +318,28 @@ per-project secrets/enrolment and VNC ticket lifecycle, as the table above order
 - **Done (owner approved):** dev server stopped, `npm ci` from the lockfile, dev server restarted
   (Next 16.3.8, Better Auth 1.7.7; `npm ls` clean). C15-09 reverted to `unlinkAccount({ accountId })`
   — typecheck is now clean against the installed, locked versions.
+
+## Claude — 16 October: P1 "VNC tickets are bearer capabilities" — addressed
+
+- **Single use.** A ticket waits 2 minutes to be claimed; its first connection claims it; any
+  other connection with it is refused. When that connection closes, the ticket is spent. While it
+  lives, the observer returns the same ticket, so the iframe doesn't reload on each poll. Once
+  it's spent, the next poll issues a new one and the page reloads with it.
+- **Bound** to owner, project (scope = run id), VM port and the **exact page origin** of the
+  request that observed it (`next/headers`). A different local port is refused. With no request
+  (tests, background) it falls back to the loopback-origin check.
+- **Revoked** (live screen closed, ticket deleted) when a project is placed on another machine,
+  moved back to this computer, or reset (`project.reset` post-hook).
+- **Logout:** no auth hook added (auth is shared code). Leaving the page closes the connection,
+  which spends the ticket, and an unclaimed ticket dies in 2 minutes. If you want a hard revoke on
+  session end, `revokeScreenTickets({ userId })` is the call to make from it.
+- **Fragment:** `lab-screen.html` reads the ticket and password into memory and
+  `history.replaceState`s them out of its URL. The parent's iframe `src` still carries them, so
+  same-origin script can read that attribute; that's the residual risk.
+- **Found on the way:** the bridge never noticed the page hanging up. An upgraded socket is
+  half-open, and it only listened for `close`, not `end`, so a left screen held its VNC connection
+  until the VM side closed. Fixed for both sides.
+- **"Open in a tab" removed:** a single-use ticket can't serve a second viewer, and Full screen
+  covers the need (one control fewer).
+- Tests: bridge 14 (single use, origin binding, claim window, revocation), real-browser screen
+  test 4/4 in headless Chromium, full suite 1,653.

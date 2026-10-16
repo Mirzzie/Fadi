@@ -14,6 +14,7 @@ import {
   FrameReader,
   isLocalOrigin,
   SCREEN_BRIDGE_PORT,
+  revokeScreenTickets,
   screenTicket,
 } from "./vnc-bridge";
 
@@ -94,11 +95,23 @@ describe("who may connect", () => {
     expect(isLocalOrigin(undefined)).toBe(false);
   });
 
-  it("reuses a ticket for the same owner and machine, never across owners", () => {
-    const a = screenTicket("user-a", 5931);
-    expect(screenTicket("user-a", 5931)).toBe(a);
-    expect(screenTicket("user-b", 5931)).not.toBe(a);
-    expect(screenTicket("user-a", 5932)).not.toBe(a);
+  const t = (userId: string, vncPort: number, scope = "run-1", origin: string | null = null) =>
+    screenTicket({ userId, vncPort, scope, origin });
+
+  it("reuses an unclaimed ticket for the same owner, project, machine and page — nothing else", () => {
+    const a = t("user-a", 5931);
+    expect(t("user-a", 5931)).toBe(a);
+    expect(t("user-b", 5931)).not.toBe(a);
+    expect(t("user-a", 5932)).not.toBe(a);
+    expect(t("user-a", 5931, "run-2")).not.toBe(a);
+    expect(t("user-a", 5931, "run-1", "http://localhost:3000")).not.toBe(a);
+  });
+
+  it("forgets an unclaimed ticket after its two-minute window", () => {
+    const now = Date.now();
+    const a = screenTicket({ userId: "u", vncPort: 5933, scope: "r", origin: null }, now);
+    const later = screenTicket({ userId: "u", vncPort: 5933, scope: "r", origin: null }, now + 3 * 60_000);
+    expect(later).not.toBe(a);
   });
 });
 
@@ -156,8 +169,12 @@ describe("the bridge", () => {
       }
     );
 
-  it("carries the VM's screen both ways for a valid ticket from this computer", async () => {
-    const conn = await open(screenTicket("owner", VNC_PORT), "http://localhost:3000");
+  const ticket = (scope: string, origin: string | null = "http://localhost:3000") =>
+    screenTicket({ userId: "owner", vncPort: VNC_PORT, scope, origin });
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 400));
+
+  it("carries the VM's screen both ways for a valid ticket from its page", async () => {
+    const conn = await open(ticket("carry"), "http://localhost:3000");
     expect(conn.status).toBe("HTTP/1.1 101 Switching Protocols");
     expect(conn.data.toString("latin1")).toContain("RFB 003.008");
     conn.end();
@@ -167,8 +184,36 @@ describe("the bridge", () => {
     expect((await open("not-a-ticket", "http://localhost:3000")).status).toBe(
       "HTTP/1.1 401 Unauthorized"
     );
-    expect((await open(screenTicket("owner", VNC_PORT), "https://evil.example")).status).toBe(
+    expect((await open(ticket("evil"), "https://evil.example")).status).toBe(
       "HTTP/1.1 403 Forbidden"
     );
+  });
+
+  it("refuses another local page than the one the ticket was issued to", async () => {
+    expect((await open(ticket("other-port"), "http://localhost:4000")).status).toBe(
+      "HTTP/1.1 403 Forbidden"
+    );
+  });
+
+  it("SINGLE USE: a second connection is refused; while the first lives, the page keeps its ticket; once it closes, it is spent", async () => {
+    const token = ticket("once");
+    const first = await open(token, "http://localhost:3000");
+    expect(first.status).toBe("HTTP/1.1 101 Switching Protocols");
+    expect((await open(token, "http://localhost:3000")).status).toBe("HTTP/1.1 401 Unauthorized");
+    expect(ticket("once")).toBe(token); // the screen doesn't reload while it's connected
+    first.end();
+    await settle();
+    expect((await open(token, "http://localhost:3000")).status).toBe("HTTP/1.1 401 Unauthorized");
+    expect(ticket("once")).not.toBe(token);
+  });
+
+  it("revoking a project's screen closes it and kills its ticket", async () => {
+    const token = ticket("moved");
+    const live = await open(token, "http://localhost:3000");
+    expect(live.status).toBe("HTTP/1.1 101 Switching Protocols");
+    expect(revokeScreenTickets({ userId: "owner", scope: "moved" })).toBe(1);
+    await settle();
+    expect(ticket("moved")).not.toBe(token);
+    expect(revokeScreenTickets({ userId: "someone-else", scope: "moved" })).toBe(0);
   });
 });

@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardPaste, ExternalLink, Keyboard, Maximize2 } from "lucide-react";
+import { ClipboardPaste, Keyboard, Maximize2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { registerLabTyper } from "@/lib/learning/lab-typing";
@@ -115,9 +115,6 @@ export function LabScreenFrame({ src, title }: { src: string; title: string }) {
         >
           <Maximize2 className="size-3.5" aria-hidden="true" /> Full screen
         </button>
-        <a href={src} target="_blank" rel="noreferrer" className={`${button} ml-auto`}>
-          <ExternalLink className="size-3.5" aria-hidden="true" /> Open in a tab
-        </a>
         {note ? <p className="w-full px-2 text-xs text-amber-600">{note}</p> : null}
         {typing ? (
           <div className="flex w-full items-center gap-2 px-2 text-xs text-muted-foreground">

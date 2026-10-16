@@ -2878,6 +2878,9 @@ export async function approveAndRun(input: {
   if (row.recipe === "project.reset" && row.runId) {
     const { createProjectRunsRepository } = await import("@careeros/database");
     await createProjectRunsRepository(db).resetProgress(input.userId, row.runId);
+    // The machine went back to its clean start: its screen session is over.
+    const { revokeScreenTickets } = await import("./vnc-bridge");
+    revokeScreenTickets({ userId: input.userId, scope: row.runId });
   }
 
   if (row.recipe === "vmware.guestFix") {

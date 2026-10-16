@@ -93,7 +93,7 @@ suite("typing a command into the lab's screen", () => {
     await new Promise<void>((resolve) => vnc.listen(VNC_PORT, "127.0.0.1", resolve));
     const { ensureScreenBridge, screenTicket } = await import("./vnc-bridge");
     expect(await ensureScreenBridge()).toBe(true);
-    const ticket = screenTicket("owner", VNC_PORT);
+    const ticket = screenTicket({ userId: "owner", vncPort: VNC_PORT, scope: "typing", origin: null });
 
     browser = spawn(
       "chromium",

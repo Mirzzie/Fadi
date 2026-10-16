@@ -151,6 +151,9 @@ export async function placeOnVmwareAction(input: {
     id: resource.id,
     label: resource.label,
   });
+  // The screen it showed was the old machine's: close it and void its ticket.
+  const { revokeScreenTickets } = await import("@/lib/lab/vnc-bridge");
+  revokeScreenTickets({ userId: user.id, scope: project.run.id });
   await createLabActionsRepository(db).record({
     userId: user.id,
     actor: "user",
@@ -182,6 +185,8 @@ export async function placeOnFreshLabAction(input: {
   if (!(await runs.placeOnThisComputer(user.id, id.data))) {
     return { ok: false, message: "That project is unavailable." };
   }
+  const { revokeScreenTickets } = await import("@/lib/lab/vnc-bridge");
+  revokeScreenTickets({ userId: user.id, scope: id.data });
   revalidatePath("/dashboard/learning");
   return { ok: true, message: "This project will use a fresh lab on this computer." };
 }

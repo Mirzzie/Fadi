@@ -18,10 +18,15 @@ import { logger } from "@/lib/observability/logger";
  * Who can reach a screen through it, and why that is enough:
  * - It listens on 127.0.0.1 only, and each VM's VNC listens on 127.0.0.1 only.
  * - A connection needs a TICKET, issued by Fadi to the signed-in owner of a project whose
- *   machine it is, naming exactly one VM port and expiring after thirty minutes. The bridge
- *   never takes a port from the browser.
- * - The page must come from this computer (Origin check), so a website open in another tab
- *   cannot connect even if it guessed a ticket.
+ *   machine it is, naming exactly one VM port. The bridge never takes a port from the browser.
+ * - A ticket is single-use (Codex review, 15 Oct 2026: it was a 30-minute bearer token any
+ *   local page could replay). Unclaimed, it dies in two minutes; the first connection claims
+ *   it; when that connection closes it is spent. While the connection lives, Fadi hands out the
+ *   same ticket, so the screen doesn't reload on every refresh; once spent, the next refresh
+ *   brings a new one. Moving a project off its machine or starting it over revokes its tickets
+ *   and closes the screen. Signing out closes the page, which spends it.
+ * - The page must come from the exact origin the ticket was issued to (or, when that is
+ *   unknown, from this computer), so a website in another tab can't connect with it.
  * - VMware still asks for the machine's own screen password.
  *
  * One bridge per Fadi process, kept on globalThis so a hot reload in development does not try
@@ -29,12 +34,24 @@ import { logger } from "@/lib/observability/logger";
  */
 
 export const SCREEN_BRIDGE_PORT = Number(process.env.FADI_SCREEN_BRIDGE_PORT) || 6089;
-const TICKET_TTL_MS = 30 * 60_000;
+/** How long an issued ticket waits to be claimed by its one connection. */
+const CLAIM_WINDOW_MS = 2 * 60_000;
 const MAX_CONNECTIONS = 8;
 const MAX_FRAME_PAYLOAD = 16 * 1024 * 1024;
 const VNC_CONNECT_TIMEOUT_MS = 10_000;
 
-type Ticket = { userId: string; vncPort: number; expiresAt: number };
+type Ticket = {
+  userId: string;
+  vncPort: number;
+  /** The project it was issued for: revoking a project's screen names this. */
+  scope: string;
+  /** The page origin it was issued to; null when it couldn't be known (then: this computer). */
+  origin: string | null;
+  claimBy: number;
+  state: "unused" | "live" | "spent";
+  /** Closes its live connection. */
+  close: (() => void) | null;
+};
 type BridgeState = {
   server: Server | null;
   listening: boolean;
@@ -46,20 +63,47 @@ const state: BridgeState = ((
   globalThis as { __fadiScreenBridge?: BridgeState }
 ).__fadiScreenBridge ??= { server: null, listening: false, tickets: new Map(), connections: 0 });
 
-/** A ticket for this owner to see this VM port, reused while it has more than ten minutes left. */
-export function screenTicket(userId: string, vncPort: number, now = Date.now()): string {
+/**
+ * The ticket for this owner, project and VM port: the live one while its connection lasts, an
+ * unclaimed one while it can still be claimed, otherwise a new one.
+ */
+export function screenTicket(
+  input: { userId: string; vncPort: number; scope: string; origin: string | null },
+  now = Date.now()
+): string {
   for (const [token, ticket] of state.tickets) {
-    if (ticket.expiresAt <= now) state.tickets.delete(token);
-    else if (
-      ticket.userId === userId &&
-      ticket.vncPort === vncPort &&
-      ticket.expiresAt - now > 10 * 60_000
-    )
+    if (ticket.state === "spent" || (ticket.state === "unused" && ticket.claimBy <= now)) {
+      state.tickets.delete(token);
+    } else if (
+      ticket.userId === input.userId &&
+      ticket.vncPort === input.vncPort &&
+      ticket.scope === input.scope &&
+      ticket.origin === input.origin &&
+      (ticket.state === "live" || ticket.claimBy - now > 30_000)
+    ) {
       return token;
+    }
   }
   const token = randomBytes(24).toString("hex");
-  state.tickets.set(token, { userId, vncPort, expiresAt: now + TICKET_TTL_MS });
+  state.tickets.set(token, {
+    ...input,
+    claimBy: now + CLAIM_WINDOW_MS,
+    state: "unused",
+    close: null,
+  });
   return token;
+}
+
+/** Revoke an owner's screen tickets — for one project, or all — and close their screens. */
+export function revokeScreenTickets(match: { userId: string; scope?: string }): number {
+  let revoked = 0;
+  for (const [token, ticket] of state.tickets) {
+    if (ticket.userId !== match.userId || (match.scope && ticket.scope !== match.scope)) continue;
+    ticket.close?.();
+    state.tickets.delete(token);
+    revoked += 1;
+  }
+  return revoked;
 }
 
 /** Start the bridge if it is not running. Resolves false when the port is held by something else. */
@@ -101,12 +145,17 @@ function refuse(socket: Duplex, status: string) {
 
 function handleUpgrade(req: IncomingMessage, socket: Duplex) {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
-  const ticket = state.tickets.get(url.searchParams.get("t") ?? "");
+  const token = url.searchParams.get("t") ?? "";
+  const ticket = state.tickets.get(token);
   const key = req.headers["sec-websocket-key"];
   if (url.pathname !== "/screen" || typeof key !== "string")
     return refuse(socket, "400 Bad Request");
   if (!isLocalOrigin(req.headers.origin)) return refuse(socket, "403 Forbidden");
-  if (!ticket || ticket.expiresAt <= Date.now()) return refuse(socket, "401 Unauthorized");
+  // Single use: only an unclaimed ticket, inside its window, from the origin it was issued to.
+  if (!ticket || ticket.state !== "unused" || ticket.claimBy <= Date.now()) {
+    return refuse(socket, "401 Unauthorized");
+  }
+  if (ticket.origin && req.headers.origin !== ticket.origin) return refuse(socket, "403 Forbidden");
   if (state.connections >= MAX_CONNECTIONS) return refuse(socket, "503 Service Unavailable");
 
   const offered = String(req.headers["sec-websocket-protocol"] ?? "")
@@ -120,9 +169,14 @@ function handleUpgrade(req: IncomingMessage, socket: Duplex) {
     if (closed) return;
     closed = true;
     state.connections -= 1;
+    ticket.state = "spent";
+    ticket.close = null;
+    state.tickets.delete(token);
     vnc.destroy();
     socket.destroy();
   };
+  ticket.state = "live";
+  ticket.close = close;
 
   vnc.once("connect", () => {
     vnc.setTimeout(0);
@@ -157,6 +211,11 @@ function handleUpgrade(req: IncomingMessage, socket: Duplex) {
   vnc.on("close", () => close());
   socket.on("error", () => close());
   socket.on("close", () => close());
+  // An upgraded socket is half-open: the page hanging up arrives as "end", and "close" only
+  // follows once this side ends too — which it never did, so a left screen held its VNC
+  // connection (and now its ticket) until the VM side closed.
+  socket.on("end", () => close());
+  vnc.on("end", () => close());
 }
 
 /* ── WebSocket framing (RFC 6455), the parts a VNC stream needs ───────────── */

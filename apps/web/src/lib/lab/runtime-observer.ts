@@ -405,6 +405,23 @@ type RequestRow = {
  * A VMware machine's state for a project: VMware says whether it runs, VMware Tools inside the
  * guest says whether the operating system is up, and the screen is offered once it answers.
  */
+/**
+ * The origin of the page that asked — a screen ticket is bound to it. Null outside a request
+ * (tests, background work): then the bridge accepts any page served from this computer.
+ */
+async function requestOrigin(): Promise<string | null> {
+  try {
+    const { headers } = await import("next/headers");
+    const h = await headers();
+    const origin = h.get("origin");
+    if (origin) return new URL(origin).origin;
+    const host = h.get("host");
+    return host ? `${h.get("x-forwarded-proto") ?? "http"}://${host}` : null;
+  } catch {
+    return null;
+  }
+}
+
 async function observeVmwareMachine(input: {
   userId: string;
   runId: string;
@@ -463,7 +480,12 @@ async function observeVmwareMachine(input: {
   if (summary?.screen && (await portAnswers(summary.screen.port))) {
     const { ensureScreenBridge, screenTicket, SCREEN_BRIDGE_PORT } = await import("./vnc-bridge");
     if (await ensureScreenBridge()) {
-      const ticket = screenTicket(input.userId, summary.screen.port);
+      const ticket = screenTicket({
+        userId: input.userId,
+        vncPort: summary.screen.port,
+        scope: input.runId,
+        origin: await requestOrigin(),
+      });
       endpoints.push(
         endpoint(
           "vmware-screen",
