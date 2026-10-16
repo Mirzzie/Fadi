@@ -1,3 +1,5 @@
+import { powershellCheck } from "./windows-shell";
+
 /**
  * THE LAB CATALOGUE — machines Fadi knows how to bring up.
  *
@@ -494,7 +496,6 @@ export function windowsCheckArgs(key: TemplateKey, command: string, marker: stri
     "-o", "UserKnownHostsFile=/dev/null",
     "-o", "LogLevel=ERROR",
     user + "@127.0.0.1",
-    // $? rather than $LASTEXITCODE: cmdlets (Get-Service, Get-ADForest) never set the latter.
-    command + "; if ($?) { Write-Output \"" + marker + "=0\" } else { Write-Output \"" + marker + "=1\" }",
+    powershellCheck(command, marker),
   ];
 }

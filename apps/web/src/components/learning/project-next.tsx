@@ -140,9 +140,24 @@ export function ProjectNext({
 
       {next.remedy?.kind === "manual" ? (
         <div className="mt-3 space-y-2">
-          <p className="text-sm">{next.remedy.explain}</p>
+          <p className="text-sm">
+            <span className="font-medium">
+              {next.remedy.place === "lab" ? "In the machine: " : "On this computer: "}
+            </span>
+            {next.remedy.explain}
+          </p>
           {next.remedy.commands.map((command) => (
-            <CommandBlock key={command} code={command} lang="bash" typeable={false} />
+            // Commands for this computer can never be typed into the lab, and the reverse.
+            <CommandBlock
+              key={command}
+              code={command}
+              lang={
+                next.remedy?.kind === "manual" && next.remedy.place === "lab"
+                  ? "powershell"
+                  : "bash"
+              }
+              typeable={next.remedy?.kind === "manual" && next.remedy.place === "lab"}
+            />
           ))}
         </div>
       ) : null}

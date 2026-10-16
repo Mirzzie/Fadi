@@ -98,10 +98,11 @@ export function requirementsFor(spec: LabSpec): Requirement[] {
     predicate: "lab.internet",
     params: {},
     dependsOn: vmware ? ["channel", "host-dns"] : ["channel"],
-    blocking: "soft",
+    // Hard: an agent step after a failed download was the owner's first failure (16 Oct 2026).
+    blocking: "hard",
     remedy: vmware ? { kind: "manual", id: "host.vmnet_dns" } : null,
     title: "The machine reaches the internet",
-    why: "Most steps download something.",
+    why: "Most steps download something — an agent, a package, an update. Without it they fail one after another.",
   });
 
   const reach: string[] = [];
@@ -131,7 +132,7 @@ export function requirementsFor(spec: LabSpec): Requirement[] {
     });
   }
 
-  add(planRequirement(["channel", ...reach]));
+  add(planRequirement(["channel", "internet", ...reach]));
   return list;
 }
 

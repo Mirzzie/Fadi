@@ -130,7 +130,11 @@ describe("Windows checks", () => {
     const [step] = RECIPES["lab.check"].render(params) as Array<{ cmd: string; args: string[] }>;
     expect(step!.cmd).toBe("ssh");
     expect(step!.args).toContain("Docker@127.0.0.1");
-    expect(step!.args.at(-1)).toMatch(/^Get-Service sshd; if \(\$\?\)/);
+    // PowerShell explicitly, encoded: Windows OpenSSH may start commands in cmd.exe.
+    const remote = step!.args.at(-1)!;
+    expect(remote).toMatch(/^powershell\.exe -NoProfile -NonInteractive .* -EncodedCommand /);
+    const script = Buffer.from(remote.split(" -EncodedCommand ")[1]!, "base64").toString("utf16le");
+    expect(script).toMatch(/Get-Service sshd; if \(\$\?\)/);
   });
 
   it("will not run a Windows check without knowing the lab", () => {

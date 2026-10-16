@@ -3,6 +3,8 @@ import "server-only";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
+import { powershellRemote } from "./windows-shell";
+
 /**
  * WHAT THE LAB ACTUALLY IS — observed, not assumed (verified-labs V-1).
  *
@@ -56,7 +58,6 @@ export function windowsFactsScript(targets: string[]): string {
     ? `foreach($t in @(${safe.map((t) => `'${t}'`).join(",")})){ $p=$t.Split(':'); $c=New-Object Net.Sockets.TcpClient; try { $ok=$c.ConnectAsync($p[0],[int]$p[1]).Wait(2500) -and $c.Connected } catch { $ok=$false }; $c.Close(); $r[$t]=$ok }`
     : "";
   return [
-    "$ProgressPreference='SilentlyContinue'",
     "$o=Get-CimInstance Win32_OperatingSystem",
     "$h=@{}",
     tools,
@@ -117,7 +118,7 @@ export async function probeLabFacts(
           "-o",
           "LogLevel=ERROR",
           `${channel.user}@${channel.host}`,
-          windowsFactsScript(targets),
+          powershellRemote(windowsFactsScript(targets)),
         ],
         { timeout: 45_000, maxBuffer: 64 * 1024 }
       ));

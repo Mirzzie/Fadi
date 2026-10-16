@@ -93,8 +93,9 @@ describe("what is next", () => {
   });
 
   it("lets a failed soft requirement warn without holding the plan back", () => {
+    const soft = all.map((r) => (r.id === "internet" ? { ...r, blocking: "soft" as const } : r));
     const result = conduct(
-      all,
+      soft,
       seen({
         "lab-spec": "pass",
         "host-dns": "pass",
@@ -113,9 +114,16 @@ describe("what is next", () => {
 
   it("is ready when every hard requirement is met", () => {
     const every = Object.fromEntries(all.map((r) => [r.id, "pass" as const]));
-    const result = conduct(all, seen({ ...every, internet: "fail" }));
+    const result = conduct(all, seen(every));
     expect(result.next).toBeNull();
     expect(result.ready).toBe(true);
+  });
+
+  it("holds the plan back while the machine has no internet (16 Oct 2026)", () => {
+    const every = Object.fromEntries(all.map((r) => [r.id, "pass" as const]));
+    const result = conduct(all, seen({ ...every, internet: "fail", plan: "fail" }));
+    expect(result.next?.requirement.id).toBe("internet");
+    expect(result.items.find((i) => i.requirement.id === "plan")?.state).toBe("waiting");
   });
 });
 

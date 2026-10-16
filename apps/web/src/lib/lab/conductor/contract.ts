@@ -39,7 +39,10 @@ export type PredicateDefinition = {
 
 export type RemedyRef =
   | { kind: "recipe"; id: "lab.start" | "vmware.snapshot" | "stack.start" }
-  | { kind: "manual"; id: "host.vmnet_dns" | "host.firewall_vmnet" }
+  | {
+      kind: "manual";
+      id: "host.vmnet_dns" | "host.firewall_vmnet" | "lab.dns_forwarder" | "lab.dns_client";
+    }
   | { kind: "flow"; id: "checks.setup" | "plan.create" | "machine.choose" };
 
 export type Requirement = {

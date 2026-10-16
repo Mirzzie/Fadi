@@ -9,7 +9,13 @@ import {
 
 import { getDatabase } from "@/lib/database/client";
 
-import { PREDICATES, paramsKey, type Observation, type Requirement } from "./contract";
+import {
+  PREDICATES,
+  paramsKey,
+  type Observation,
+  type RemedyRef,
+  type Requirement,
+} from "./contract";
 import { conduct, requirementsFor, type ConductedState } from "./graph";
 import { createObserver, OBSERVER_VERSION, type ObserveContext } from "./observe";
 import { remedyView, type RemedyView } from "./remedies";
@@ -38,6 +44,13 @@ export type ConductorView = {
   next: ConductorItem | null;
   ready: boolean;
 };
+
+type ManualRemedyId = Extract<RemedyRef, { kind: "manual" }>["id"];
+const DIAGNOSED_REMEDIES = new Set<string>([
+  "host.vmnet_dns",
+  "lab.dns_forwarder",
+  "lab.dns_client",
+] satisfies ManualRemedyId[]);
 
 /** The broker recipe a remedy proposes, to tell "waiting for your approval" from "not asked". */
 const RECIPE_OF: Record<string, (ctx: ObserveContext) => string> = {
@@ -179,13 +192,21 @@ export async function evaluateConductor(
   const requests = createLabActionRequestsRepository(db);
   const { vmNetworkAddress } = await import("../stacks");
   const vmnetIp = context.placement === "vmware" ? vmNetworkAddress() : null;
+  const { vmwareNatGateway } = await import("./observe");
+  const natGateway = context.placement === "vmware" ? await vmwareNatGateway() : null;
 
   const items = await Promise.all(
     result.items.map(async ({ requirement, observation, state }): Promise<ConductorItem> => {
       let remedy: ConductorItem["remedy"] = null;
-      if (requirement.remedy && state !== "done" && state !== "waiting") {
-        const view = remedyView(requirement.remedy, requirement, { vmnetIp });
-        const recipe = RECIPE_OF[requirement.remedy.id]?.(context);
+      // The observer may name a more precise remedy from its diagnosis — only a closed id.
+      const diagnosed = observation?.evidence.remedy;
+      const remedyRef: RemedyRef | null =
+        typeof diagnosed === "string" && DIAGNOSED_REMEDIES.has(diagnosed)
+          ? { kind: "manual", id: diagnosed as ManualRemedyId }
+          : requirement.remedy;
+      if (remedyRef && state !== "done" && state !== "waiting") {
+        const view = remedyView(remedyRef, requirement, { vmnetIp, natGateway });
+        const recipe = RECIPE_OF[remedyRef.id]?.(context);
         const last = recipe ? await requests.latestForRun(userId, runId, recipe) : null;
         remedy = { ...view, waiting: last?.status === "pending" || last?.status === "approved" };
       }

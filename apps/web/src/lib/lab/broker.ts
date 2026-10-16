@@ -15,6 +15,7 @@ import { composeDockerfile, validateImageSpec } from "./image";
 import { formatMemory } from "./sizes";
 import { describeChanges, validMachineChanges, type MachineChanges } from "./vmware-config";
 import { CLEAN_SNAPSHOT } from "./vmware-snapshot";
+import { powershellCheck, readablePowershell } from "./windows-shell";
 import {
   baseVolumeFor,
   DISK_COPY_TIMEOUT_MS,
@@ -318,7 +319,8 @@ function displayOf(step: Step): string[] {
     }
     return ["docker", ...composeArgs(step, stackFolder(step.project))];
   }
-  if (!isFileStep(step)) return [step.cmd, ...step.args];
+  // An encoded PowerShell command is shown as the script it carries, so the person reads it.
+  if (!isFileStep(step)) return [step.cmd, ...step.args.map(readablePowershell)];
   if (step.fs === "write") {
     return [
       "write",
@@ -2424,8 +2426,7 @@ async function runGuestCheck(userId: string, step: GuestCheckStep): Promise<Step
     "-o",
     "LogLevel=ERROR",
     `${step.user}@${address}`,
-    // $? rather than $LASTEXITCODE: cmdlets never set the latter.
-    `${step.command}; if ($?) { Write-Output "${CHECK_MARKER}=0" } else { Write-Output "${CHECK_MARKER}=1" }`,
+    powershellCheck(step.command, CHECK_MARKER),
   ];
   try {
     const { stdout, stderr } = await run("ssh", args, { timeout: 30_000, maxBuffer: 256 * 1024 });

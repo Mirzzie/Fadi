@@ -50,6 +50,52 @@ type Channel =
   | { kind: "ssh"; user: string; host: string; port: number }
   | { kind: "docker"; container: string };
 
+type SshAnswer = { ok: true; stdout: string } | { ok: false; denied: boolean };
+
+/** One command over Fadi's lab key, bounded in time and output. */
+async function sshRun(
+  c: { user: string; host: string; port: number },
+  remote: string,
+  timeoutMs: number
+): Promise<SshAnswer> {
+  const { labKeyPath } = await import("../templates");
+  try {
+    const { stdout } = await run(
+      "ssh",
+      [
+        "-i",
+        labKeyPath(),
+        "-p",
+        String(c.port),
+        "-o",
+        "BatchMode=yes",
+        "-o",
+        "ConnectTimeout=6",
+        "-o",
+        "StrictHostKeyChecking=no",
+        "-o",
+        "UserKnownHostsFile=/dev/null",
+        "-o",
+        "LogLevel=ERROR",
+        `${c.user}@${c.host}`,
+        remote,
+      ],
+      { timeout: timeoutMs, maxBuffer: 64 * 1024 }
+    );
+    return { ok: true, stdout };
+  } catch (error) {
+    const stderr = String((error as { stderr?: string }).stderr ?? "");
+    return { ok: false, denied: /Permission denied|publickey/i.test(stderr) };
+  }
+}
+
+/** VMware NAT's gateway on this computer, from its own nat.conf ([host] ip). */
+export async function vmwareNatGateway(): Promise<string | null> {
+  const text = await readFile("/etc/vmware/vmnet8/nat/nat.conf", "utf8").catch(() => null);
+  const ip = text?.match(/^\s*ip\s*=\s*((?:\d{1,3}\.){3}\d{1,3})\s*$/m)?.[1];
+  return ip ?? null;
+}
+
 /** Per evaluation: the channel and the lab-facts probe are asked once, then shared. */
 export function createObserver(context: ObserveContext) {
   let channel: Promise<Channel | null> | null = null;
@@ -189,52 +235,62 @@ export function createObserver(context: ObserveContext) {
             "fail",
             "VMware doesn't report the machine's address on its own network yet."
           );
-        try {
-          if (c.kind === "docker") {
+        const target = c.kind === "ssh" ? `${c.user}@${c.host}:${c.port}` : c.container;
+        if (c.kind === "docker") {
+          try {
             await run("docker", ["exec", c.container, "true"], { timeout: 8000 });
-          } else {
-            const { labKeyPath } = await import("../templates");
-            const { stdout } = await run(
-              "ssh",
-              [
-                "-i",
-                labKeyPath(),
-                "-p",
-                String(c.port),
-                "-o",
-                "BatchMode=yes",
-                "-o",
-                "ConnectTimeout=6",
-                "-o",
-                "StrictHostKeyChecking=no",
-                "-o",
-                "UserKnownHostsFile=/dev/null",
-                "-o",
-                "LogLevel=ERROR",
-                `${c.user}@${c.host}`,
-                "echo fadi-ok",
-              ],
-              { timeout: 15_000, maxBuffer: 16 * 1024 }
-            );
-            if (!stdout.includes("fadi-ok")) throw new Error("no answer");
+            return said("pass", "Fadi reaches the lab.", { target });
+          } catch {
+            return said("fail", "Fadi can't reach inside the lab.", { target });
           }
-          return said(
-            "pass",
-            c.kind === "ssh" ? `Fadi signs in as ${c.user} at ${c.host}.` : "Fadi reaches the lab.",
-            { target: c.kind === "ssh" ? `${c.user}@${c.host}:${c.port}` : c.container }
-          );
-        } catch {
+        }
+        // Proven, not assumed: sign in with Fadi's key, run a fixed harmless probe, and see
+        // PowerShell answer — a saved account name is only intent (Codex review, 16 Oct 2026).
+        const { powershellRemote } = await import("../windows-shell");
+        const answer = await sshRun(
+          c,
+          powershellRemote("Write-Output ('fadi-ok ' + $PSVersionTable.PSVersion.Major)"),
+          15_000
+        );
+        if (!answer.ok) {
           return said(
             "fail",
-            c.kind === "ssh"
-              ? `The machine is at ${c.host}, but Fadi's key isn't accepted there as ${c.user} — the setup line hasn't run, or ran in a window that wasn't Administrator.`
-              : "Fadi can't reach inside the lab.",
-            { target: c.kind === "ssh" ? `${c.user}@${c.host}:${c.port}` : c.container }
+            answer.denied
+              ? `The machine is at ${c.host}, but Fadi's key isn't accepted there as ${c.user} — the setup line hasn't run yet, or ran in a window that wasn't Administrator.`
+              : `Fadi can't open a connection to ${c.host} — the machine's SSH server isn't running or its firewall blocks this computer.`,
+            { target }
           );
         }
+        const version = answer.stdout.match(/fadi-ok (\d+)/)?.[1];
+        return version
+          ? said(
+              "pass",
+              `Fadi signs in as ${c.user} at ${c.host}; PowerShell ${version} answers.`,
+              {
+                target,
+                shell: `powershell ${version}`,
+              }
+            )
+          : said("fail", `Fadi signs in at ${c.host}, but PowerShell doesn't answer there.`, {
+              target,
+            });
       }
 
       case "lab.internet": {
+        const c = await (channel ??= channelOf());
+        if (c?.kind === "ssh" && context.windows) {
+          const { powershellRemote } = await import("../windows-shell");
+          const { WINDOWS_DNS_SCRIPT, diagnoseLabDns, parseLabDns } = await import("./lab-dns");
+          const answer = await sshRun(c, powershellRemote(WINDOWS_DNS_SCRIPT), 45_000);
+          const facts = answer.ok ? parseLabDns(answer.stdout) : null;
+          if (!facts) return said("unknown", "Fadi couldn't ask the machine.");
+          const gateway = await vmwareNatGateway();
+          const result = diagnoseLabDns(facts, context.placement === "vmware" ? gateway : null);
+          return said(result.verdict, result.seen, {
+            ...facts,
+            ...(result.remedy ? { remedy: result.remedy } : {}),
+          });
+        }
         const f = await labFacts();
         if (!f || f.internet === null) return said("unknown", "Fadi couldn't ask the machine.");
         return f.internet
