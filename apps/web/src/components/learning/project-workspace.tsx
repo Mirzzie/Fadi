@@ -679,6 +679,8 @@ function CurrentStep({
           step={step}
           onClose={() => setStuck(false)}
           onRevised={onRevised}
+          // After Fadi's own run or check failed, it explains from what the machine printed.
+          fromFadi={failed}
         />
       ) : null}
 
@@ -771,16 +773,28 @@ function StuckPanel({
   step,
   onClose,
   onRevised,
+  fromFadi = false,
 }: {
   runId: string;
   step: StepView;
   onClose: () => void;
   onRevised: () => Promise<void>;
+  /** Fadi ran or checked this step and kept what it printed: explain that, ask for nothing. */
+  fromFadi?: boolean;
 }) {
   const [output, setOutput] = useState("");
   const [help, setHelp] = useState<StepHelp | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, start] = useTransition();
+
+  useEffect(() => {
+    if (!fromFadi) return;
+    start(async () => {
+      const result = await helpWithStepAction({ runId, stepId: step.id, output: "" });
+      if (result.ok) setHelp(result.help);
+      else setError(result.message);
+    });
+  }, [fromFadi, runId, step.id]);
 
   const ask = () =>
     start(async () => {
@@ -805,7 +819,14 @@ function StuckPanel({
 
   return (
     <div className="mt-4 space-y-3 border-t border-border/70 pt-4">
-      {!help ? (
+      {!help && fromFadi ? (
+        busy ? (
+          <p className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="size-4 animate-spin" aria-hidden="true" /> Reading what the machine
+            printed…
+          </p>
+        ) : null
+      ) : !help ? (
         <>
           <textarea
             value={output}
@@ -838,9 +859,11 @@ function StuckPanel({
                 Fix this step
               </Button>
             ) : null}
-            <Button size="sm" variant="ghost" onClick={() => setHelp(null)}>
-              Paste more output
-            </Button>
+            {fromFadi ? null : (
+              <Button size="sm" variant="ghost" onClick={() => setHelp(null)}>
+                Paste more output
+              </Button>
+            )}
             <Button size="sm" variant="ghost" onClick={onClose}>
               Close
             </Button>

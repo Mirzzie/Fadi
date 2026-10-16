@@ -118,4 +118,22 @@ suite("a write waits for a person, and is spent once", () => {
     expect(names).not.toContain("ghost");
     expect(pending.status).toBe("pending");
   });
+
+  it("keeps what a step's check printed, bounded, for that step only (16 Oct 2026)", async () => {
+    const runId = "33333333-3333-4333-8333-333333333333";
+    const stepId = "44444444-4444-4444-8444-444444444444";
+    const row = await repo.propose(proposal({ recipe: "lab.check", runId, stepId }) as never);
+    await repo.approve(userId, row.id);
+    const printed = "x".repeat(9_000) + "\nGet-Service : Cannot find any service with service name 'WazuhSvc'.";
+    await repo.finish(userId, row.id, { status: "executed", detail: "Check did not pass", output: printed });
+
+    const last = await repo.latestForStep(userId, stepId, "lab.check");
+    // The tail is where the error is: bounded from the end, never the start.
+    expect(last?.output?.length).toBe(8_000);
+    expect(last?.output?.endsWith("name 'WazuhSvc'.")).toBe(true);
+    expect(await repo.latestForStep(userId, stepId, "vmware.start")).toBeNull();
+    const stranger = "55555555-5555-4555-8555-555555555555";
+    expect(await repo.latestForStep(stranger, stepId, "lab.check")).toBeNull();
+  });
 });
+

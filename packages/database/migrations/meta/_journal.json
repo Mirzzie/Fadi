@@ -470,6 +470,13 @@
       "when": 1792163029695,
       "tag": "0066_lab_observations",
       "breakpoints": true
+    },
+    {
+      "idx": 67,
+      "version": "7",
+      "when": 1792174174290,
+      "tag": "0067_lab_action_request_output",
+      "breakpoints": true
     }
   ]
 }

@@ -35,6 +35,7 @@ export type A2AMessage = {
   parts: A2APart[];
   taskId?: string;
   contextId?: string;
+  metadata?: Record<string, unknown>;
 };
 export type A2ATask = {
   id: string;
@@ -93,7 +94,14 @@ export type A2ADeps = {
     speech: string;
     contextId: string;
     pending: { id: string; readBack: string; tool?: string } | null;
+    interview?: { state: string; index?: number; total?: number } | null;
   }>;
+  /**
+   * True while a spoken mock interview is running in this conversation. Its new messages are then
+   * answers: they go straight to converse (an answer that says "apply to the Deerfoot role" is not
+   * a plan), and they alone may be longer than COMMAND_MAX_CHARS.
+   */
+  interviewLive?: (contextId: string) => Promise<boolean>;
   /** A held change (or its outcome, for an hour), by task id. */
   heldChange?: (id: string) => Promise<HeldChange | null>;
   confirmChange?: (id: string) => Promise<{ ok: boolean; speech: string }>;
@@ -116,6 +124,13 @@ export type HeldChange = {
  * artifact names. Versioned, because Buddy keys its confirmation flow on it.
  */
 export const HELD_CHANGE_METADATA = "fadi.heldChange";
+
+/**
+ * Where a voice client finds that this Message is a step in a live session (e.g. a spoken mock
+ * interview): `{ version, state, index?, total? }`. Buddy keys its answer loop on it, the same
+ * way it keys confirmation on HELD_CHANGE_METADATA.
+ */
+export const INTERVIEW_METADATA = "fadi.interview";
 
 export type JsonRpcId = string | number | null;
 export type JsonRpcRequest = {
@@ -302,8 +317,13 @@ function textOf(message: unknown): string | null {
     )
     .join(" ")
     .trim();
-  return text && text.length <= 500 ? text : null;
+  return text && text.length <= MESSAGE_MAX_CHARS ? text : null;
 }
+
+/** The longest message carried at all: a spoken interview answer runs long. */
+export const MESSAGE_MAX_CHARS = 4096;
+/** Everything else — a request, a question, a confirmation — as before. */
+export const COMMAND_MAX_CHARS = 500;
 
 /** A message on an existing task: approve, continue, done or stop — one action per message. */
 async function continueTask(plan: PlanView, command: string, deps: A2ADeps): Promise<A2ATask> {
@@ -397,7 +417,28 @@ export async function handleA2AMessage(
   if (!message || message.role !== "ROLE_USER" || !text) {
     return fail(
       RPC_INVALID_PARAMS,
-      "message needs role ROLE_USER and one text part of at most 500 characters"
+      `message needs role ROLE_USER and one text part of at most ${MESSAGE_MAX_CHARS} characters`
+    );
+  }
+  const contextId =
+    typeof (message as { contextId?: unknown }).contextId === "string"
+      ? String((message as { contextId?: unknown }).contextId).slice(0, 100)
+      : null;
+  // Only a new message in a conversation with a live interview is an answer.
+  let answering = false;
+  if (typeof message.taskId !== "string" && contextId !== null && deps.converse !== undefined) {
+    try {
+      answering = (await deps.interviewLive?.(contextId)) === true;
+    } catch {
+      // Fail closed: an interview answer can contain words such as "apply" or "delete". If the
+      // session store is unavailable, never reinterpret those words as an ordinary intent.
+      return fail(-32603, "Fadi could not verify the conversation state. Nothing was run.");
+    }
+  }
+  if (text.length > COMMAND_MAX_CHARS && !answering) {
+    return fail(
+      RPC_INVALID_PARAMS,
+      `text over ${COMMAND_MAX_CHARS} characters is only accepted as an answer in a live interview`
     );
   }
 
@@ -438,7 +479,7 @@ export async function handleA2AMessage(
   }
 
   // A new line is an intent, resolved deterministically. No name, no task — and no guess.
-  const intent = await deps.resolve(text);
+  const intent = answering ? ({ kind: "none" } as const) : await deps.resolve(text);
   if (intent.kind === "none") {
     if (!deps.converse) {
       return ok(
@@ -450,10 +491,6 @@ export async function handleA2AMessage(
     }
     // Anything else is a conversation with Fadi's agent: questions answered, reads done, and at
     // most one change held for the person to confirm.
-    const contextId =
-      typeof (message as { contextId?: unknown }).contextId === "string"
-        ? String((message as { contextId?: unknown }).contextId).slice(0, 100)
-        : null;
     const turn = await deps.converse(text, contextId);
     if (turn.pending) {
       return ok(
@@ -470,7 +507,13 @@ export async function handleA2AMessage(
         )
       );
     }
-    return ok({ ...agentMessage(turn.speech, deps), contextId: turn.contextId });
+    return ok({
+      ...agentMessage(turn.speech, deps),
+      contextId: turn.contextId,
+      ...(turn.interview
+        ? { metadata: { [INTERVIEW_METADATA]: { version: 1, ...turn.interview } } }
+        : {}),
+    });
   }
   const opened = await deps.open(intent.template, intent.refs);
   if (!opened.ok) return ok(agentMessage(opened.reason, deps));

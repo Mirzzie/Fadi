@@ -112,7 +112,12 @@ const CUES: [RegExp, string[]][] = [
   ],
   [
     /\binterview|star\b|behavioural|behavioral|question/i,
-    ["prep_interview", "mock_interview_questions", "answer_behavioral_question"],
+    ["prep_interview", "mock_interview_questions", "answer_behavioral_question", "interview_practice"],
+  ],
+  // A live spoken practice loop: starting one, or answering/continuing one.
+  [
+    /\bpractice\b.*\binterview|\binterview me\b|ask me (a|another) question|next question|my answer\b/i,
+    ["interview_practice"],
   ],
   [
     /\bcv\b|\bcvs\b|r[ée]sum[ée]|cover letter|document/i,

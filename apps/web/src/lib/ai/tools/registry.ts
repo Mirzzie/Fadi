@@ -12,6 +12,13 @@ import { prepareInterviewForJob } from "@/lib/interview/jd-prep";
 import { formatPrepQuestion } from "@/lib/interview/jd-prep";
 import { prepareCompanyBrief, formatBrief } from "@/lib/interview/company-brief";
 import { generateMockQuestions, scoreInterviewAnswer } from "@/lib/interview/mock";
+import {
+  answerPracticeSession,
+  endPracticeSession,
+  getPracticeSession,
+  isEndCommand,
+  startPracticeSession,
+} from "@/lib/interview/practice-session";
 import { getDashboardProfileSummary } from "@/lib/career-report/data";
 import { rankedEvidenceForActiveTrack } from "@/lib/evidence/pool";
 import { fetchCompanyAtsJobs } from "@/lib/data-sources/ats-boards";
@@ -1112,6 +1119,89 @@ const scoreAnswerTool: FadiTool = {
   },
 };
 
+const interviewPracticeTool: FadiTool = {
+  name: "interview_practice",
+  risk: "read",
+  description:
+    "Run a LIVE back-and-forth spoken mock interview as a session: start one for a role, take the person's spoken answer and give short coaching plus the next question, or end with a summary. Prefer this over mock_interview_questions/score_interview_answer when the person wants to practice OUT LOUD ('practice interview', 'interview me', 'ask me a question', 'next question', or when they are answering a question you just asked). One question at a time.",
+  parameters: {
+    type: "object",
+    properties: {
+      action: {
+        type: "string",
+        description: "start | answer | end. Omit to let Fadi infer from whether a session is running.",
+      },
+      role: {
+        type: "string",
+        description: "Role to practice for when starting (defaults to the active direction).",
+      },
+      answer: {
+        type: "string",
+        description: "The person's spoken answer to the current question, verbatim.",
+      },
+    },
+  },
+  async execute(args, ctx): Promise<FadiToolResult> {
+    const contextId = ctx.contextId;
+    if (!contextId) {
+      return {
+        summary: "Interview practice runs in a live conversation — try it by voice with Buddy.",
+        view: "none",
+      };
+    }
+    const action = typeof args.action === "string" ? args.action.toLowerCase() : "";
+    const answer = typeof args.answer === "string" ? args.answer.trim() : "";
+    const live = await getPracticeSession(ctx.userId, contextId);
+
+    // End on request, or when a live session hears ONLY a stop phrase ("stop", "back to Buddy").
+    // An answer that mentions being done with something is still an answer.
+    if (action === "end" || (live && answer && isEndCommand(answer))) {
+      const res = await endPracticeSession(ctx.userId, contextId);
+      const line = res.ok ? res.summary : res.message;
+      return { summary: line, spoken: line, view: "none", data: { interview: { state: "done" } } };
+    }
+
+    // Answer the current question when a session is live and we have the person's words.
+    if (live && action !== "start" && answer) {
+      const res = await answerPracticeSession(ctx.userId, { contextId, answer });
+      if (!res.ok) return { summary: res.message, spoken: res.message, view: "none" };
+      const nextLine = res.nextQuestion
+        ? ` Next question: ${res.nextQuestion}`
+        : " That was the last one — say 'done' for your summary.";
+      const line = `${res.coaching}${nextLine}`;
+      return {
+        summary: line,
+        spoken: line,
+        view: "none",
+        data: {
+          interview: {
+            state: res.done ? "awaiting_end" : "awaiting_answer",
+            index: res.index,
+            total: res.total,
+          },
+        },
+      };
+    }
+
+    // Otherwise start a new session, grounded in the active direction.
+    const profile = await getDashboardProfileSummary(ctx.userId);
+    const role = (typeof args.role === "string" && args.role.trim()) || profile?.targetRole || "";
+    const res = await startPracticeSession(ctx.userId, {
+      contextId,
+      role,
+      country: profile?.locationPreference ?? null,
+      seniority: profile?.experienceLevel ?? null,
+    });
+    if (!res.ok) return { summary: res.message, spoken: res.message, view: "none" };
+    return {
+      summary: `Starting a mock interview for ${role || "your role"}. Question 1 of ${res.total}: ${res.question}`,
+      spoken: `Okay, let's practice for ${role || "your role"}. First question: ${res.question}`,
+      view: "none",
+      data: { interview: { state: "awaiting_answer", index: 0, total: res.total } },
+    };
+  },
+};
+
 const relevantEvidenceTool: FadiTool = {
   name: "get_relevant_evidence",
   risk: "read",
@@ -1274,6 +1364,7 @@ const TOOLS: FadiTool[] = [
   companyBriefTool,
   mockQuestionsTool,
   scoreAnswerTool,
+  interviewPracticeTool,
   relevantEvidenceTool,
   draftReferralOutreachTool,
   answerBehavioralTool,

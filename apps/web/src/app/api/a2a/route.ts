@@ -128,7 +128,12 @@ function depsFor(userId: string): A2ADeps {
         pending: turn.pending
           ? { id: turn.pending.id, readBack: turn.pending.readBack, tool: turn.pending.tool }
           : null,
+        interview: turn.interview,
       };
+    },
+    interviewLive: async (contextId) => {
+      const { getPracticeSession } = await import("@/lib/interview/practice-session");
+      return Boolean(await getPracticeSession(userId, contextId));
     },
     heldChange: async (id) => {
       const { getPendingAction } = await import("@/lib/agent/voice-turn");

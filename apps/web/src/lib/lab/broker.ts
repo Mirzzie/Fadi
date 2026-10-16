@@ -2889,6 +2889,7 @@ export async function approveAndRun(input: {
     await requests.finish(input.userId, row.id, {
       status: failed ? "failed" : "executed",
       detail,
+      output: out.join("\n"),
     });
     await audit.record({
       userId: input.userId,
@@ -2927,6 +2928,7 @@ export async function approveAndRun(input: {
     await requests.finish(input.userId, row.id, {
       status: "executed",
       detail: detail.slice(0, 400),
+      output: out.join("\n"),
     });
     await audit.record({
       userId: input.userId,

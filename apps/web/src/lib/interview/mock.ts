@@ -299,7 +299,8 @@ HARD RULE: the strongerVersion must only reshape what the candidate actually sai
   const user = [
     input.role ? `Role: ${input.role}` : "",
     `Question: ${input.question}`,
-    `Candidate's answer:\n${answer.slice(0, 4000)}`,
+    // 4096: the longest spoken answer a live interview accepts (INTERVIEW_ANSWER_MAX_CHARS), whole.
+    `Candidate's answer:\n${answer.slice(0, 4096)}`,
   ]
     .filter(Boolean)
     .join("\n");

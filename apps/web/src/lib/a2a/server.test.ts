@@ -389,3 +389,104 @@ describe("talking to Fadi's agent", () => {
     expect(said(polled)).toBe("Logged Stripe as applied.");
   });
 });
+
+describe("message length and a live interview", () => {
+  /** Fadi's agent with an interview running in conversation "ctx-live" only. */
+  function interviewing() {
+    const k = kernel();
+    const conversed: { text: string; contextId: string | null }[] = [];
+    let resolved = 0;
+    const resolve = k.deps.resolve;
+    k.deps.resolve = async (text) => {
+      resolved++;
+      return resolve(text);
+    };
+    k.deps.interviewLive = async (contextId) => contextId === "ctx-live";
+    k.deps.converse = async (text, contextId) => {
+      conversed.push({ text, contextId });
+      return {
+        speech: "Nice. Next question: why this role?",
+        contextId: contextId ?? "ctx-new",
+        pending: null,
+        interview: { state: "awaiting_answer", index: 1, total: 4 },
+      };
+    };
+    return { ...k, conversed, resolvedCount: () => resolved };
+  }
+
+  const inConversation = (text: string, contextId: string, taskId?: string) => {
+    const message = send(text, taskId);
+    (message.params.message as { contextId?: string }).contextId = contextId;
+    return message;
+  };
+  const errorOf = (response: unknown) =>
+    (response as { error?: { code: number; message: string } }).error;
+
+  it("carries a 4096-character answer whole to a live interview", async () => {
+    const { deps, conversed } = interviewing();
+    const answer = "I rebuilt the deploy pipeline. ".repeat(140).slice(0, 4095) + "!";
+    const response = await handleA2AMessage(inConversation(answer, "ctx-live"), deps);
+    expect(errorOf(response)).toBeUndefined();
+    expect(conversed).toEqual([{ text: answer, contextId: "ctx-live" }]);
+  });
+
+  it("refuses over 4096 characters even mid-interview, saying the limit", async () => {
+    const { deps, conversed } = interviewing();
+    const response = await handleA2AMessage(inConversation("a".repeat(4097), "ctx-live"), deps);
+    expect(errorOf(response)?.message).toMatch(/4096/);
+    expect(conversed).toHaveLength(0);
+  });
+
+  it("keeps 500 for everything that is not a live interview answer", async () => {
+    const { deps, conversed, calls } = interviewing();
+    const long = "b".repeat(501);
+    // No interview in this conversation, no conversation at all, or a task reply.
+    for (const message of [
+      inConversation(long, "ctx-other"),
+      send(long),
+      inConversation(long, "ctx-live", "33333333-3333-4333-8333-333333333333"),
+    ]) {
+      const response = await handleA2AMessage(message, deps);
+      expect(errorOf(response)?.message).toMatch(/over 500 characters/);
+    }
+    expect(conversed).toHaveLength(0);
+    expect(calls).toHaveLength(0);
+    // 500 exactly is still an ordinary message.
+    await handleA2AMessage(inConversation("c".repeat(500), "ctx-other"), deps);
+    expect(conversed).toHaveLength(1);
+  });
+
+  it("treats a live interview message as an answer, never as a plan", async () => {
+    const { deps, conversed, calls, resolvedCount } = interviewing();
+    const response = (await handleA2AMessage(
+      inConversation("apply to the Deerfoot role", "ctx-live"),
+      deps
+    )) as { result: { metadata?: Record<string, unknown> } };
+    expect(calls).not.toContain("open");
+    expect(resolvedCount()).toBe(0);
+    expect(conversed[0]!.text).toBe("apply to the Deerfoot role");
+    expect(response.result.metadata?.["fadi.interview"]).toMatchObject({ version: 1, index: 1 });
+    // The same words with no interview running still open the plan.
+    await handleA2AMessage(inConversation("apply to the Deerfoot role", "ctx-other"), deps);
+    expect(calls).toContain("open");
+  });
+
+  it("runs nothing when the interview state cannot be read", async () => {
+    const { deps, calls } = interviewing();
+    let conversed = false;
+    deps.interviewLive = async () => {
+      throw new Error("store unavailable");
+    };
+    deps.converse = async () => {
+      conversed = true;
+      throw new Error("must not run");
+    };
+    const response = await handleA2AMessage(
+      inConversation("apply to the role I just mentioned", "ctx-live"),
+      deps
+    );
+    expect(errorOf(response)).toMatchObject({ code: -32603 });
+    expect(calls).not.toContain("open");
+    expect(conversed).toBe(false);
+  });
+});

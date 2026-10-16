@@ -1409,6 +1409,11 @@ export const labActionRequests = pgTable(
     executedAt: timestamp("executed_at", { withTimezone: true }),
     /** What it produced, or why it failed. */
     detail: text("detail"),
+    /**
+     * What a check or a lab run printed, its tail, bounded. Kept so that when it fails Fadi
+     * explains it from what it saw — the person is never asked to paste output Fadi already has.
+     */
+    output: text("output"),
     ...timestamps,
   },
   (table) => [index("lab_action_requests_user_idx").on(table.userId, table.status)]

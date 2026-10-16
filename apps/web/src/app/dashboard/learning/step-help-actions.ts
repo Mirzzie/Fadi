@@ -84,10 +84,20 @@ export async function helpWithStepAction(input: {
   const ids = z.object({ runId: z.string().uuid(), stepId: z.string().uuid() }).safeParse(input);
   if (!ids.success) return { ok: false, message: "That step could not be found." };
 
-  const output = (input.output ?? "").trim();
+  let output = (input.output ?? "").trim();
   const note = (input.note ?? "").trim().slice(0, 500);
   if (!output && !note) {
-    return { ok: false, message: "Paste what your terminal printed, or describe what happened." };
+    // What Fadi's own run or check of this step printed — never ask the person to paste it.
+    const { createLabActionRequestsRepository } = await import("@careeros/database");
+    const last = await createLabActionRequestsRepository(getDatabase()).latestForStep(
+      user.id,
+      ids.data.stepId,
+      "lab.check"
+    );
+    output = (last?.output ?? "").trim();
+    if (!output) {
+      return { ok: false, message: "Paste what your terminal printed, or describe what happened." };
+    }
   }
 
   const project = await createProjectRunsRepository(getDatabase()).getWithSteps(

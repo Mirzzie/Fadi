@@ -84,6 +84,12 @@ export interface FadiToolContext {
   /** The work this call serves, so its receipt lands on that piece of work. */
   workItemId?: string | null;
   /**
+   * The conversation this call belongs to, when one exists (the voice turn sets it). Tools that
+   * run a multi-turn flow — e.g. a spoken mock-interview session — key their ephemeral state to
+   * it so "answer the question" continues the same session. Unset for stateless one-shot callers.
+   */
+  contextId?: string | null;
+  /**
    * Generation capability, supplied by the chat route from the user's provider,
    * so tools that need the model (e.g. generate_document) can produce content
    * without holding a provider reference themselves.

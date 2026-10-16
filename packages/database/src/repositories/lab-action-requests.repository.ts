@@ -172,13 +172,14 @@ export function createLabActionRequestsRepository(db: Database) {
     async finish(
       userId: string,
       id: string,
-      outcome: { status: "executed" | "failed"; detail: string }
+      outcome: { status: "executed" | "failed"; detail: string; output?: string }
     ): Promise<void> {
       await db
         .update(labActionRequests)
         .set({
           status: outcome.status,
           detail: outcome.detail,
+          ...(outcome.output !== undefined ? { output: outcome.output.slice(-8_000) } : {}),
           executedAt: new Date(),
           updatedAt: new Date(),
         })

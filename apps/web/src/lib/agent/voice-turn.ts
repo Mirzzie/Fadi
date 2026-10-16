@@ -6,6 +6,15 @@ import { buildFadiContext } from "@/lib/ai/context/builder";
 import { buildFadiMessages } from "@/lib/ai/prompts/system";
 import { buildProviderChain } from "@/lib/ai/registry";
 import { executeFadiTool, getToolsForUser } from "@/lib/ai/tools/registry";
+import {
+  getPracticeSession,
+  endPracticeSession,
+  INTERVIEW_ANSWER_MAX_CHARS,
+  INTERVIEW_CONTEXT_MAX_CHARS,
+  isEndCommand,
+  isMeaningfulAnswer,
+  type PracticeSession,
+} from "@/lib/interview/practice-session";
 import { toolsForTurn } from "@/lib/ai/tools/routing";
 import { toToolSpec, type FadiToolContext } from "@/lib/ai/tools/types";
 import { getUserDocGenerate } from "@/lib/ai/user-generate";
@@ -32,12 +41,20 @@ import { positionSaid, refsFrom, withPositionsResolved, type VoiceRef } from "./
  *   change per turn.
  * - Tools that touch a machine (risk "external") and UI-only tools are not offered at all.
  * - The answer is shaped for the ear (toSpeech) and conversation history is kept per caller
- *   context, briefly, so "save the second one" follows "find me roles".
+ *   context, briefly, so "save the second one" follows "find me roles" — but never a live
+ *   interview answer (interviewTurn).
  */
 
 const HISTORY_TTL_S = 30 * 60;
 const PENDING_TTL_S = 5 * 60;
 const HISTORY_TURNS = 8;
+/** One spoken request. A live interview answer is the one exception (INTERVIEW_ANSWER_MAX_CHARS). */
+export const VOICE_TEXT_MAX_CHARS = 500;
+/**
+ * Coaching plus the whole next question, said whole: Buddy plays a reply up to this length in
+ * sentence-bounded chunks. Longer is refused out loud, never cut — a cut drops the question.
+ */
+export const INTERVIEW_SPOKEN_MAX_CHARS = 6000;
 const NOT_BY_VOICE = new Set(["open_page"]);
 
 const VOICE_STYLE = [
@@ -56,11 +73,16 @@ export type PendingAction = {
   contextId: string;
 };
 
+/** A live multi-turn flow (e.g. a spoken mock interview) tells the voice client what to do next. */
+export type InterviewMarker = { state: string; index?: number; total?: number };
+
 export type VoiceTurn = {
   speech: string;
   contextId: string;
   pending: PendingAction | null;
   tools: string[];
+  /** Set when a session tool (interview_practice) is mid-flow, so Buddy can run its answer loop. */
+  interview: InterviewMarker | null;
 };
 
 type Turn = { role: "user" | "assistant"; content: string };
@@ -99,8 +121,47 @@ export async function runVoiceTurn(
   userId: string,
   input: { text: string; contextId?: string | null }
 ): Promise<VoiceTurn> {
-  const contextId = input.contextId?.trim() || randomUUID();
-  const text = input.text.slice(0, 500);
+  const contextId = (input.contextId?.trim() || randomUUID()).slice(0, INTERVIEW_CONTEXT_MAX_CHARS);
+  const said = input.text.trim();
+
+  // A LIVE SESSION OWNS THE TURN. Live testing (12 Oct) showed that once a mock interview is
+  // running, even a capable model does not reliably re-invoke interview_practice for the next
+  // spoken answer — it just chats back a new question, so no coaching is produced and the session
+  // never advances. While a session exists, route the whole utterance to it deterministically,
+  // which also skips an unneeded provider round-trip.
+  let liveSession: PracticeSession | null;
+  try {
+    liveSession = await getPracticeSession(userId, contextId);
+  } catch (error) {
+    // Do not reinterpret an interview answer as an ordinary command when the session store is
+    // unavailable. That could turn words inside an answer into an unrelated tool or plan.
+    logger.warn("voice.interview_state_unavailable", {
+      userId,
+      error: error instanceof Error ? error.name : "unknown",
+    });
+    return {
+      speech:
+        "I can't verify the interview state just now, so I haven't used those words for anything. Try that answer again in a moment.",
+      contextId,
+      pending: null,
+      tools: [],
+      interview: { state: "unavailable" },
+    };
+  }
+  if (liveSession) return interviewTurn(userId, contextId, said, liveSession);
+
+  // Said, not cut: a request trimmed to its first 500 characters is a different request.
+  if (said.length > VOICE_TEXT_MAX_CHARS) {
+    return {
+      speech:
+        "That was too long for me to take by voice. Say it more briefly, or write it in Fadi.",
+      contextId,
+      pending: null,
+      tools: [],
+      interview: null,
+    };
+  }
+  const text = said;
 
   const context = await buildFadiContext(userId, { includeLiveMarket: true }).catch(() => null);
   if (!context) {
@@ -110,6 +171,7 @@ export async function runVoiceTurn(
       contextId,
       pending: null,
       tools: [],
+      interview: null,
     };
   }
 
@@ -126,9 +188,10 @@ export async function runVoiceTurn(
   const byName = new Map(all.map((tool) => [tool.name, tool]));
 
   const generate = (await getUserDocGenerate(userId)) ?? undefined;
-  const ctx: FadiToolContext = { userId, surface: "agent", workItemId: null, generate };
+  const ctx: FadiToolContext = { userId, surface: "agent", workItemId: null, generate, contextId };
 
   let pending: PendingAction | null = null;
+  let interview: InterviewMarker | null = null;
   const used: string[] = [];
   // What the tools said, for when the model runs them and then says nothing itself.
   const summaries: string[] = [];
@@ -144,6 +207,8 @@ export async function runVoiceTurn(
       const result = await executeFadiTool(name, args, ctx);
       // Heard, not read: a tool's spoken version when it has one.
       summaries.push(result.spoken ?? result.summary);
+      const marker = (result.data as { interview?: InterviewMarker } | undefined)?.interview;
+      if (marker && typeof marker.state === "string") interview = marker;
       const listed = refsFrom(result.data);
       if (listed) {
         refs = listed;
@@ -224,7 +289,95 @@ export async function runVoiceTurn(
     { role: "assistant", content: speech },
   ]);
   logger.info("voice.turn", { userId, tools: used.join(","), held: held?.tool ?? null });
-  return { speech, contextId, pending: held, tools: used };
+  return { speech, contextId, pending: held, tools: used, interview };
+}
+
+/**
+ * One turn of a live spoken interview: the answer is coached and the next question asked, or a
+ * stop phrase ends it. No model chooses anything here and nothing reaches a provider except the
+ * answer's own scoring — ending is free.
+ *
+ * PRIVACY: an interview answer is NOT written to the conversation history. Answers carry the most
+ * personal detail anyone tells Fadi; the scorer reads it once and practice-session stores only
+ * the coaching. The coaching reply is left out too, since it is model output about the answer.
+ */
+async function interviewTurn(
+  userId: string,
+  contextId: string,
+  said: string,
+  session: PracticeSession
+): Promise<VoiceTurn> {
+  const reply = (speech: string, interview: InterviewMarker | null): VoiceTurn => ({
+    speech,
+    contextId,
+    pending: null,
+    tools: ["interview_practice"],
+    interview,
+  });
+  // Still on the same question: Buddy keeps listening for the answer.
+  const sameQuestion: InterviewMarker = {
+    state: session.index < session.questions.length ? "awaiting_answer" : "awaiting_end",
+    index: session.index,
+    total: session.questions.length,
+  };
+  if (said.length > INTERVIEW_ANSWER_MAX_CHARS) {
+    return reply(
+      "That answer ran longer than I can take in one go. Try it again a little shorter — a few minutes at most.",
+      sameQuestion
+    );
+  }
+  const ending = isEndCommand(said);
+  if (!ending && !isMeaningfulAnswer(said)) {
+    return reply(
+      "I didn't catch an answer there. Give it another go when you're ready.",
+      sameQuestion
+    );
+  }
+
+  const generate = ending ? undefined : ((await getUserDocGenerate(userId)) ?? undefined);
+  const ctx: FadiToolContext = { userId, surface: "agent", workItemId: null, generate, contextId };
+  const result = await executeFadiTool(
+    "interview_practice",
+    ending ? { action: "end" } : { answer: said },
+    ctx
+  ).catch(() => ({
+    summary: "I couldn't score that answer just now. Try it again in a moment.",
+    spoken: undefined,
+    data: undefined,
+  }));
+  const line = result.spoken ?? result.summary ?? "Okay.";
+  const marker = (result.data as { interview?: InterviewMarker } | undefined)?.interview ?? null;
+  logger.info("voice.turn", { userId, tools: "interview_practice", held: null });
+
+  // A turn that did not finish (the scorer unavailable, an end that didn't close) leaves the
+  // session where it was. Say why, and keep Buddy on the same question rather than dropping out
+  // of the interview while it is still live — or claiming it moved on or ended when it didn't.
+  const finished = ending ? marker?.state === "done" : marker !== null;
+  if (!finished) {
+    const still = await getPracticeSession(userId, contextId).catch(() => null);
+    return reply(toSpeech(line), still ? sameQuestion : null);
+  }
+
+  // The coaching AND the next question are said in full: no word cut. The general sixty-word cut
+  // stopped at a sentence end inside the coaching and dropped the question the person has to
+  // answer next. Too long to say is said plainly instead of cut; the session has moved on, so the
+  // marker does too.
+  const speech = toSpeech(line, Number.POSITIVE_INFINITY);
+  if (speech.length > INTERVIEW_SPOKEN_MAX_CHARS) {
+    try {
+      await endPracticeSession(userId, contextId);
+      return reply(
+        "The next question was too long to say aloud, so I stopped this practice session rather than ask you to answer a question you haven't heard. Start a new interview with shorter questions.",
+        { state: "done" }
+      );
+    } catch {
+      return reply(
+        "The next question is too long to speak, and I couldn't verify that the session ended. Say stop to retry ending it; don't answer an unheard question.",
+        marker
+      );
+    }
+  }
+  return reply(speech, marker);
 }
 
 /** A held change, while it is still waiting (five minutes). */
