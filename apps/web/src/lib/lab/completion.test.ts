@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { completionFor, completionOf, evidencedSteps, runHonesty } from "./completion";
+import {
+  CHECK_DID_NOT_PASS,
+  completionAfterCheck,
+  completionFor,
+  completionOf,
+  evidencedSteps,
+  runHonesty,
+  stepCheckOf,
+} from "./completion";
 
 /**
  * THE BUG THIS PINS.
@@ -77,5 +85,55 @@ describe("THE REPORTED BUG: six empty clicks", () => {
     const h = runHonesty([]);
     expect(h.complete).toBe(false);
     expect(h.canBecomeEvidence).toBe(false);
+  });
+});
+
+describe("a step Fadi checked (Codex review, 16 Oct 2026)", () => {
+  const failed = stepCheckOf({
+    status: "executed",
+    detail: `${CHECK_DID_NOT_PASS}: "Running" was not in the output (exit 1).`,
+  });
+
+  it("reads the broker's request as the check's state", () => {
+    expect(failed.state).toBe("failed");
+    expect(stepCheckOf({ status: "failed", detail: "Fadi couldn't sign in" }).state).toBe("failed");
+    expect(stepCheckOf({ status: "pending", detail: null }).state).toBe("waiting");
+    expect(
+      stepCheckOf({ status: "executed", detail: 'Check passed: found "Running".' }).state
+    ).toBe("passed");
+    expect(stepCheckOf({ status: "denied", detail: null }).state).toBe("none");
+    expect(stepCheckOf(null).state).toBe("none");
+  });
+
+  it("stays failed: Done is refused", () => {
+    expect(completionAfterCheck(failed, "C:\\agent.msi", false)).toEqual({
+      ok: false,
+      reason: "check_failed",
+    });
+  });
+
+  it("may go on without verification, but only ever as the person's word", () => {
+    expect(completionAfterCheck(failed, "looks installed to me", true)).toEqual({
+      ok: true,
+      completion: "attested",
+    });
+  });
+
+  it("waits for a check that hasn't run, unless the person goes on without it", () => {
+    const waiting = stepCheckOf({ status: "approved", detail: null });
+    expect(completionAfterCheck(waiting, null, false)).toMatchObject({
+      ok: false,
+      reason: "check_waiting",
+    });
+    expect(completionAfterCheck(waiting, null, true)).toEqual({ ok: true, completion: "attested" });
+  });
+
+  it("is unchanged for a step nobody checked", () => {
+    const none = stepCheckOf(null);
+    expect(completionAfterCheck(none, "C:\\Lab", false)).toEqual({
+      ok: true,
+      completion: "evidenced",
+    });
+    expect(completionAfterCheck(none, null, false)).toEqual({ ok: true, completion: "attested" });
   });
 });

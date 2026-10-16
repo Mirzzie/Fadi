@@ -108,6 +108,27 @@ export function createLabActionRequestsRepository(db: Database) {
       return row ?? null;
     },
 
+    /** Latest request for one step and recipe — the step's last check, say. Owner-scoped. */
+    async latestForStep(
+      userId: string,
+      stepId: string,
+      recipe: string
+    ): Promise<LabActionRequest | null> {
+      const [row] = await db
+        .select()
+        .from(labActionRequests)
+        .where(
+          and(
+            eq(labActionRequests.userId, userId),
+            eq(labActionRequests.stepId, stepId),
+            eq(labActionRequests.recipe, recipe)
+          )
+        )
+        .orderBy(desc(labActionRequests.createdAt))
+        .limit(1);
+      return row ?? null;
+    },
+
     /**
      * Claim a pending request for execution.
      *

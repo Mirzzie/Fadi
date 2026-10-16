@@ -19,6 +19,7 @@ import {
   type RunView,
   type StepView,
 } from "@/app/dashboard/learning/lab-actions";
+import type { StepCheck } from "@/lib/lab/completion";
 import {
   helpWithStepAction,
   acceptRevisedStepAction,
@@ -108,15 +109,25 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
     );
   }
 
-  const completeCurrent = () => {
+  const completeCurrent = (unverified = false) => {
     if (!current) return;
     setMessage(null);
     startTransition(async () => {
       const result = await completeStepAction({
         stepId: current.id,
         artifact: artifact.trim() || null,
+        unverified,
       });
-      if (!result.ok) return setMessage("Couldn't save that. Nothing changed.");
+      if (!result.ok) {
+        await refresh();
+        return setMessage(
+          result.reason === "check_failed"
+            ? "Fadi's check of this step failed, so it isn't done. Fix it and check again — or continue without verification."
+            : result.reason === "check_waiting"
+              ? "A check of this step is waiting for your approval. Approve or decline it first."
+              : "Couldn't save that. Nothing changed."
+        );
+      }
       setArtifact("");
       await refresh();
     });
@@ -212,6 +223,7 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
               pending={pending}
               message={message}
               onComplete={completeCurrent}
+              check={run.currentCheck ?? { state: "none", detail: null }}
               onRevised={refresh}
               canCheck={Boolean(
                 // Linux labs check through docker exec; Windows labs over SSH (labSignIn); the
@@ -489,6 +501,7 @@ function CurrentStep({
   onRevised,
   canCheck,
   onCheckProposed,
+  check,
 }: {
   runId: string;
   step: StepView;
@@ -496,10 +509,11 @@ function CurrentStep({
   setArtifact: (value: string) => void;
   pending: boolean;
   message: string | null;
-  onComplete: () => void;
+  onComplete: (unverified?: boolean) => void;
   onRevised: () => Promise<void>;
   canCheck: boolean;
   onCheckProposed: () => void;
+  check: StepCheck;
 }) {
   const [stuck, setStuck] = useState(false);
   const [checkNote, setCheckNote] = useState<string | null>(null);
@@ -530,29 +544,48 @@ function CurrentStep({
         </div>
       ) : null}
 
+      {check.state === "failed" ? (
+        <div className="mt-4 rounded-lg bg-destructive/5 px-3 py-2.5 ring-1 ring-destructive/30">
+          <p className="text-xs font-semibold text-destructive">
+            Fadi checked this step: it failed. It isn&apos;t done.
+          </p>
+          {check.detail ? (
+            <p className="mt-1 text-sm text-muted-foreground">{check.detail}</p>
+          ) : null}
+        </div>
+      ) : check.state === "waiting" ? (
+        <p className="mt-4 text-sm text-muted-foreground">
+          A check of this step is waiting for your approval. Nothing has run yet.
+        </p>
+      ) : null}
+
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-        <input
-          value={artifact}
-          onChange={(event) => setArtifact(event.target.value)}
-          placeholder={
-            step.produces
-              ? `Result (optional): ${step.produces}`
-              : "Result (optional): a path, output or link"
-          }
-          aria-label="Result of this step"
-          className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm"
-        />
-        <Button onClick={onComplete} disabled={pending}>
-          {pending ? (
-            <Loader2 className="animate-spin" aria-hidden="true" />
-          ) : (
-            <Check aria-hidden="true" />
-          )}
-          Done, next step
-        </Button>
-        {canCheck ? (
+        {check.state === "failed" ? null : (
+          <input
+            value={artifact}
+            onChange={(event) => setArtifact(event.target.value)}
+            placeholder={
+              step.produces
+                ? `Result (optional): ${step.produces}`
+                : "Result (optional): a path, output or link"
+            }
+            aria-label="Result of this step"
+            className="h-9 min-w-0 flex-1 rounded-md border border-border bg-background px-3 text-sm"
+          />
+        )}
+        {check.state === "failed" || check.state === "waiting" ? null : (
+          <Button onClick={() => onComplete()} disabled={pending}>
+            {pending ? (
+              <Loader2 className="animate-spin" aria-hidden="true" />
+            ) : (
+              <Check aria-hidden="true" />
+            )}
+            Done, next step
+          </Button>
+        )}
+        {canCheck && check.state !== "waiting" ? (
           <Button
-            variant="outline"
+            variant={check.state === "failed" ? "default" : "outline"}
             disabled={checking || pending}
             onClick={() =>
               startCheck(async () => {
@@ -564,12 +597,25 @@ function CurrentStep({
             }
           >
             {checking ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-            Check it for me
+            {check.state === "failed" ? "Check again" : "Check it for me"}
           </Button>
         ) : null}
       </div>
+      {check.state === "failed" ? (
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => onComplete(true)}
+          className="mt-2 text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+        >
+          Continue without verification — it counts as your word only, never as evidence
+        </button>
+      ) : null}
       {message ? <p className="mt-2 text-xs text-muted-foreground">{message}</p> : null}
-      {checkNote ? <p className="mt-2 text-xs text-muted-foreground">{checkNote}</p> : null}
+      {/* The server's state of the check wins over what this button said when it was asked. */}
+      {checkNote && check.state === "none" ? (
+        <p className="mt-2 text-xs text-muted-foreground">{checkNote}</p>
+      ) : null}
 
       {stuck ? (
         <StuckPanel

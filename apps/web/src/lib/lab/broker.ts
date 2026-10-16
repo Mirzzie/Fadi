@@ -15,6 +15,7 @@ import { composeDockerfile, validateImageSpec } from "./image";
 import { formatMemory } from "./sizes";
 import { describeChanges, validMachineChanges, type MachineChanges } from "./vmware-config";
 import { CLEAN_SNAPSHOT } from "./vmware-snapshot";
+import { CHECK_DID_NOT_PASS } from "./completion";
 import { powershellCheck, readablePowershell } from "./windows-shell";
 import {
   baseVolumeFor,
@@ -2781,7 +2782,7 @@ export async function approveAndRun(input: {
     const verdict = checkVerdict(out.join("\n"), String(params.expect));
     const detail = verdict.passed
       ? `Check passed: found "${params.expect}".`
-      : `Check did not pass: "${params.expect}" was not in the output${verdict.exit !== null ? ` (exit ${verdict.exit})` : ""}.`;
+      : `${CHECK_DID_NOT_PASS}: "${params.expect}" was not in the output${verdict.exit !== null ? ` (exit ${verdict.exit})` : ""}.`;
     if (verdict.passed && row.stepId) {
       const { createProjectRunsRepository } = await import("@careeros/database");
       await createProjectRunsRepository(db).setStepStatus(input.userId, row.stepId, {

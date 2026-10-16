@@ -43,6 +43,50 @@ export function completionOf(step: CompletableStep): Completion | null {
   return step.artifact && step.artifact.trim() ? "evidenced" : "attested";
 }
 
+/** How the broker words a check that ran and did not pass. One constant, read in both places. */
+export const CHECK_DID_NOT_PASS = "Check did not pass";
+
+export type StepCheck = {
+  /** none: never checked · waiting: asked, not run yet · passed · failed */
+  state: "none" | "waiting" | "passed" | "failed";
+  detail: string | null;
+};
+
+/** The state of a step's latest check, from its broker request. Denied or expired counts as never run. */
+export function stepCheckOf(request: { status: string; detail: string | null } | null): StepCheck {
+  if (!request || request.status === "denied" || request.status === "expired") {
+    return { state: "none", detail: null };
+  }
+  if (request.status === "pending" || request.status === "approved") {
+    return { state: "waiting", detail: null };
+  }
+  if (request.status === "failed" || (request.detail ?? "").startsWith(CHECK_DID_NOT_PASS)) {
+    return { state: "failed", detail: request.detail };
+  }
+  return request.status === "executed"
+    ? { state: "passed", detail: request.detail }
+    : { state: "none", detail: null };
+}
+
+/**
+ * A step Fadi checked and saw fail stays failed (Codex review, 16 Oct 2026: a failed agent
+ * install could be marked done). The person may still go on WITHOUT verification — then it is
+ * their word only, never evidence, whatever they type into the result.
+ */
+export function completionAfterCheck(
+  check: StepCheck,
+  artifact: string | null,
+  unverified: boolean
+): { ok: true; completion: Completion } | { ok: false; reason: "check_failed" | "check_waiting" } {
+  if (check.state === "waiting" && !unverified) return { ok: false, reason: "check_waiting" };
+  if (check.state === "failed") {
+    return unverified
+      ? { ok: true, completion: "attested" }
+      : { ok: false, reason: "check_failed" };
+  }
+  return { ok: true, completion: unverified ? "attested" : completionFor(artifact) };
+}
+
 /** What a step becomes when it is completed with (or without) something recorded. */
 export function completionFor(artifact: string | null | undefined): Completion {
   return artifact && artifact.trim() ? "evidenced" : "attested";

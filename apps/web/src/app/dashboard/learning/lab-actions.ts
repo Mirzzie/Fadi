@@ -8,7 +8,13 @@ import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
 import { placeLab, type Resource } from "@/lib/lab/capability";
 import { specForProject } from "@/lib/lab/spec-from-project";
-import { completionFor, completionOf, runHonesty } from "@/lib/lab/completion";
+import {
+  completionAfterCheck,
+  completionOf,
+  runHonesty,
+  stepCheckOf,
+  type StepCheck,
+} from "@/lib/lab/completion";
 import { templateForProject } from "@/lib/lab/spec-from-project";
 import { LAB_TEMPLATES, labContainerForRun } from "@/lib/lab/templates";
 
@@ -257,6 +263,8 @@ export type StepView = {
   check: { command: string; expect: string } | null;
 };
 export type RunView = {
+  /** The current step's latest check — one answer for the whole page (project view only). */
+  currentCheck?: StepCheck;
   id: string;
   title: string;
   detail: string | null;
@@ -421,7 +429,17 @@ export async function getProjectRunAction(input: {
     : null;
   const { resolveTarget } = await import("@/lib/lab/target");
   const resources: Resources = new Map(resource ? [[resource.id, resource]] : []);
-  return { ok: true, run: toRunView(detail.run, detail.steps, resources, resolveTarget) };
+  const current = detail.steps.find((step) => step.status === "pending");
+  const { createLabActionRequestsRepository } = await import("@careeros/database");
+  const currentCheck = current
+    ? stepCheckOf(
+        await createLabActionRequestsRepository(db).latestForStep(user.id, current.id, "lab.check")
+      )
+    : undefined;
+  return {
+    ok: true,
+    run: { ...toRunView(detail.run, detail.steps, resources, resolveTarget), currentCheck },
+  };
 }
 
 /** The one place a project's lab target is decided — see lib/lab/target.ts. */
@@ -735,16 +753,27 @@ export async function proposeProjectLabResumeAction(input: { runId: string }): P
 export async function completeStepAction(input: {
   stepId: string;
   artifact?: string | null;
-}): Promise<{ ok: boolean }> {
+  /** "Continue without verification": allowed, but only ever the person's word. */
+  unverified?: boolean;
+}): Promise<{ ok: boolean; reason?: "check_failed" | "check_waiting" }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false };
+  if (!z.string().uuid().safeParse(input.stepId).success) return { ok: false };
   const artifact = input.artifact?.trim() || null;
-  const { createProjectRunsRepository } = await import("@careeros/database");
-  const runs = createProjectRunsRepository(getDatabase());
+  const { createLabActionRequestsRepository, createProjectRunsRepository } =
+    await import("@careeros/database");
+  const db = getDatabase();
+  // A step Fadi checked and saw fail stays failed: decided here, not only by the button.
+  const check = stepCheckOf(
+    await createLabActionRequestsRepository(db).latestForStep(user.id, input.stepId, "lab.check")
+  );
+  const decision = completionAfterCheck(check, artifact, input.unverified === true);
+  if (!decision.ok) return { ok: false, reason: decision.reason };
+  const runs = createProjectRunsRepository(db);
   const updated = await runs.setStepStatus(user.id, input.stepId, {
     status: "done",
     artifact,
-    completion: completionFor(artifact),
+    completion: decision.completion,
   });
 
   // The last completed step closes the loop immediately. saveEvidenceOnce locks the run and makes
