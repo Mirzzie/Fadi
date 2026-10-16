@@ -34,11 +34,21 @@ export function powershellRemote(script: string): string {
 }
 
 /**
- * A check that prints `<marker>=0` when it succeeded and `<marker>=1` when it didn't.
- * `$?` rather than `$LASTEXITCODE`: cmdlets (Get-Service, Get-ADForest) never set the latter.
+ * A check that prints its output as plain text, then `<marker>=0` when it succeeded and
+ * `<marker>=1` when it didn't. Errors are folded into the output as text (left on stderr,
+ * PowerShell sends them as CLIXML — the owner saw `_x000D__x000A_` soup, 16 Oct 2026).
+ * Success is decided by what happened, not by `$?`, which after the capture only says the
+ * assignment worked: no error records, and no native command exiting non-zero. Checked live
+ * on the owner's VM: a missing service and `cmd /c exit 3` fail; a running service passes.
  */
 export function powershellCheck(command: string, marker: string): string {
   return powershellRemote(
-    `${command}; if ($?) { Write-Output "${marker}=0" } else { Write-Output "${marker}=1" }`
+    [
+      "$global:LASTEXITCODE = 0",
+      `$fadiOut = @(& { ${command} } 2>&1)`,
+      "$fadiOk = (@($fadiOut | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] }).Count -eq 0) -and ($LASTEXITCODE -eq 0)",
+      "$fadiOut | Out-String -Width 240",
+      `if ($fadiOk) { Write-Output "${marker}=0" } else { Write-Output "${marker}=1" }`,
+    ].join("; ")
   );
 }

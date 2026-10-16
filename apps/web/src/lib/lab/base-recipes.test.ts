@@ -134,7 +134,7 @@ describe("Windows checks", () => {
     const remote = step!.args.at(-1)!;
     expect(remote).toMatch(/^powershell\.exe -NoProfile -NonInteractive .* -EncodedCommand /);
     const script = Buffer.from(remote.split(" -EncodedCommand ")[1]!, "base64").toString("utf16le");
-    expect(script).toMatch(/Get-Service sshd; if \(\$\?\)/);
+    expect(script).toContain("& { Get-Service sshd } 2>&1");
   });
 
   it("will not run a Windows check without knowing the lab", () => {

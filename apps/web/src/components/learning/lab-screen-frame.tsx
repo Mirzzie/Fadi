@@ -18,6 +18,9 @@ export function LabScreenFrame({ src, title }: { src: string; title: string }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [ratio, setRatio] = useState<number | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  // Text the screen wants shown to the person before it types it (more than one short line).
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const [typing, setTyping] = useState<{ done: number; total: number } | null>(null);
 
   const post = (message: object) => {
     const target = frame.current;
@@ -30,16 +33,39 @@ export function LabScreenFrame({ src, title }: { src: string; title: string }) {
     const onMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin || event.source !== frame.current?.contentWindow)
         return;
-      const data = event.data as { type?: string; width?: number; height?: number };
+      const data = event.data as {
+        type?: string;
+        width?: number;
+        height?: number;
+        text?: string;
+        done?: number;
+        total?: number;
+        finished?: boolean;
+        refused?: string;
+      };
       if (data?.type === "fadi-screen-size" && data.width && data.height) {
         setRatio(data.height / data.width);
+      } else if (data?.type === "fadi-confirm-type" && typeof data.text === "string") {
+        setConfirm(data.text);
+      } else if (data?.type === "fadi-typing") {
+        if (data.refused) {
+          setTyping(null);
+          setNote(
+            `That's ${(data.total ?? 0).toLocaleString()} characters — too long to type into the machine.`
+          );
+        } else if (data.finished) setTyping(null);
+        else setTyping({ done: data.done ?? 0, total: data.total ?? 0 });
       }
     };
     window.addEventListener("message", onMessage);
     registerLabTyper((text) => {
       const target = frame.current;
       target?.focus();
-      target?.contentWindow?.postMessage({ type: "fadi-type", text }, window.location.origin);
+      // A command the person chose on a step: shown there already, so typed without asking.
+      target?.contentWindow?.postMessage(
+        { type: "fadi-type", text, confirmed: true },
+        window.location.origin
+      );
     });
     return () => {
       window.removeEventListener("message", onMessage);
@@ -52,7 +78,8 @@ export function LabScreenFrame({ src, title }: { src: string; title: string }) {
       const text = await navigator.clipboard.readText();
       if (!text) return setNote("The clipboard is empty.");
       setNote(null);
-      post({ type: "fadi-type", text });
+      // The screen decides whether to ask first (more than one short line) — same as Ctrl+V.
+      post({ type: "fadi-type", text, confirmed: false });
     } catch {
       setNote("The browser didn't allow reading the clipboard. Use “Type into lab” on the step.");
     }
@@ -92,6 +119,33 @@ export function LabScreenFrame({ src, title }: { src: string; title: string }) {
           <ExternalLink className="size-3.5" aria-hidden="true" /> Open in a tab
         </a>
         {note ? <p className="w-full px-2 text-xs text-amber-600">{note}</p> : null}
+        {typing ? (
+          <div className="flex w-full items-center gap-2 px-2 text-xs text-muted-foreground">
+            Typing into the machine… {typing.done.toLocaleString()} of{" "}
+            {typing.total.toLocaleString()}
+            <button
+              type="button"
+              onMouseDown={keep}
+              onClick={() => post({ type: "fadi-stop-typing" })}
+              className="rounded-md bg-destructive/10 px-2 py-0.5 font-medium text-destructive hover:bg-destructive/20"
+            >
+              Stop (Esc)
+            </button>
+          </div>
+        ) : null}
+        {confirm !== null ? (
+          <TypeConfirm
+            text={confirm}
+            onType={() => {
+              post({ type: "fadi-type", text: confirm, confirmed: true });
+              setConfirm(null);
+            }}
+            onCancel={() => {
+              setConfirm(null);
+              post({ type: "fadi-focus" });
+            }}
+          />
+        ) : null}
       </div>
       <div className="bg-black">
         <iframe
@@ -106,6 +160,58 @@ export function LabScreenFrame({ src, title }: { src: string; title: string }) {
           allow="clipboard-read; clipboard-write; fullscreen"
           sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts"
         />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Before typing more than one short line: what will be typed, and what that means. Every line
+ * break is an Enter in the machine, so each line runs as it is typed.
+ */
+function TypeConfirm({
+  text,
+  onType,
+  onCancel,
+}: {
+  text: string;
+  onType: () => void;
+  onCancel: () => void;
+}) {
+  const lines = text.split("\n");
+  const preview = lines.slice(0, 6).join("\n");
+  return (
+    <div className="w-full space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-xs">
+      <p className="font-medium text-foreground">
+        Type {lines.length === 1 ? "this" : `these ${lines.length} lines`} into the machine?
+      </p>
+      <p className="text-muted-foreground">
+        {lines.length > 1
+          ? "Every line break presses Enter there, so each line runs as soon as it is typed."
+          : `${text.length.toLocaleString()} characters.`}{" "}
+        Make sure it&apos;s the command you meant — not something else left in your clipboard.
+      </p>
+      <pre className="max-h-32 overflow-auto rounded bg-muted px-2 py-1.5 font-mono text-[11px] whitespace-pre-wrap text-foreground">
+        {preview}
+        {lines.length > 6 ? `\n… and ${lines.length - 6} more lines` : ""}
+      </pre>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={onType}
+          className="rounded-md bg-primary px-2.5 py-1 font-medium text-primary-foreground"
+        >
+          Type it
+        </button>
+        <button
+          type="button"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={onCancel}
+          className="rounded-md px-2.5 py-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          Cancel
+        </button>
       </div>
     </div>
   );
