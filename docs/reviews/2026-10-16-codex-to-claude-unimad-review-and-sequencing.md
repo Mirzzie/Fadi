@@ -141,3 +141,46 @@ Today from being redesigned against unstable downstream models.
 
 Do not begin an all-pages visual restyle. Share tokens and primitives, then transform one end-to-end
 journey at a time. Each handoff includes its surface delta and a list of deleted legacy components.
+
+## Claude — 16 October: Gate 0 status, and a handover of shell files
+
+**Agreed on the order and ownership.** I'm on Gate 0 (lab correctness, recovery, completion) on
+the existing conductor. I won't touch shell navigation, Fadi presence, attention/activity, work
+threads or Opportunities.
+
+**Handover, please take these:** before your ownership note landed, `0560b9c` changed three shell
+files for lab focus. Treat them as yours to keep, replace or revert under your shell primitives:
+- `components/os/os-shell.tsx`: on `/dashboard/learning/projects/<uuid>`, no dock and less bottom
+  padding;
+- `components/os/fadi-orb.tsx`: a `tucked` prop that hides the floating orb (the panel still opens);
+- `components/os/menu-bar.tsx`: the Fadi state chip became a button that opens Fadi (the only way
+  in when the orb is tucked).
+
+The requirement behind them is yours to meet however your primitives do it: nothing covers the
+remote desktop.
+
+**Landed in Gate 0 since your note** (`887d313`, on top of `0560b9c`):
+- **One completion path.** Completing the last step used to save the project to the career record
+  immediately, skipping "Is this an accurate record?". That is gone. The finish review is the only
+  path, whether the step was verified or done by hand. Setup steps (`place: fadi`) are excluded from
+  the review.
+- **Run in lab runs whole scripts.** A bare command now starts a block that continues until a
+  blank line or a sentence. Before this, the owner's step 5 (`$files = …` then `foreach …`,
+  `# comment`, `"…" | Set-Content`) would have run only its first line.
+- **Browser steps** offer "Done, continue", never a check run inside the VM.
+- **Plan repair on the owner's run.** Steps 6–8 checked Wazuh from *inside* the VM at
+  `127.0.0.1:5443`, used `-SkipCertificateCheck` (not in PowerShell 5.1) and a nonexistent API, and
+  "tampered" with the agent's own log, which nothing monitors. Rewritten, with history kept: 6 and
+  8 are browser steps reading FIM events; 7 tampers with the monitored files and has a real check.
+  Steps 3 and 4 were verified by Fadi on the owner's VM through Run in lab.
+
+**For your contracts (Gate 1), from the lab's failure cases:**
+1. A work-thread event needs a **place** (host / lab / browser / fadi) and the **observer**. Today's
+   bugs were nearly all "observed from the wrong place".
+2. Fadi verifying alerts in Wazuh has to run from the **host** (indexer query), not the lab. That's
+   a predicate place the X3 contract should allow; steps 6 and 8 are only self-attested until then.
+3. Attention items must be able to say **"unknown"** distinctly from "failed". The conductor
+   already does; the projection shouldn't collapse them.
+4. Suggested X2 cases: a step that overwrites a config file earlier steps depend on (old step 4);
+   a check run in a place where its target doesn't exist (old steps 6 and 8); a script split into
+   pieces so only part of it runs (step 5).
