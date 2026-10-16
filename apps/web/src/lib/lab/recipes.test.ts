@@ -400,6 +400,8 @@ describe("the catalogue itself stays safe as it grows", () => {
         memoryMb: 4096,
         user: "Administrator",
         changes: { memoryMb: 4096 },
+        fix: "dns_forwarder",
+        gateway: "172.16.89.2",
       });
       expect(params, `${id} should accept a legal parameter bag`).not.toBeNull();
 
@@ -1186,3 +1188,36 @@ describe("lab stacks", () => {
   });
 });
 
+describe("vmware.guestFix: a closed list of fixes inside the person's machine", () => {
+  const base = {
+    resourceId: "11111111-1111-4111-8111-111111111111",
+    user: "Administrator",
+    fix: "dns_forwarder",
+    gateway: "172.16.89.2",
+    previous: ["192.168.238.2"],
+    vmxPath: "/home/user/vmware/ws/ws.vmx",
+  };
+
+  it("runs only the fixed script for its id, with the validated gateway", async () => {
+    const { RECIPES } = await import("./broker");
+    const params = RECIPES["vmware.guestFix"].validate(base)!;
+    const [step] = RECIPES["vmware.guestFix"].render(params) as Array<{ command: string }>;
+    expect(step!.command.startsWith("Set-DnsServerForwarder -IPAddress 172.16.89.2;")).toBe(true);
+    expect(RECIPES["vmware.guestFix"].reversal(params)).toContain("192.168.238.2");
+  });
+
+  it("refuses anything that isn't on the list", async () => {
+    const { RECIPES } = await import("./broker");
+    const validate = RECIPES["vmware.guestFix"].validate;
+    expect(validate({ ...base, fix: "Remove-Item C:\\" })).toBeNull();
+    expect(validate({ ...base, gateway: "172.16.89.2; Stop-Computer" })).toBeNull();
+    expect(validate({ ...base, user: "Administrator; whoami" })).toBeNull();
+    expect(validate({ ...base, resourceId: "not-a-uuid" })).toBeNull();
+    expect(validate({ ...base, previous: ["1.2.3.4", "$(evil)"] })!.previous).toEqual(["1.2.3.4"]);
+  });
+
+  it("is one click: it is reversible and stays inside the VM", async () => {
+    const { RECIPES } = await import("./broker");
+    expect(RECIPES["vmware.guestFix"]).toMatchObject({ blast: "vm", reversibility: "reversible" });
+  });
+});

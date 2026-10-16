@@ -17,6 +17,8 @@ export type RemedyView =
       commands: string[];
       /** Where the commands run: a terminal on this computer, or typed into the lab machine. */
       place: "host" | "lab";
+      /** Fadi can apply it itself, once approved (a lab fix over its sign-in). */
+      fadiCanApply?: boolean;
     };
 
 const IPV4 = /^(?:\d{1,3}\.){3}\d{1,3}$/;
@@ -60,6 +62,7 @@ export function remedyView(
         id: remedy.id,
         label: "Fix it in the machine",
         place: "lab",
+        fadiCanApply: Boolean(gateway),
         explain: gateway
           ? `In an Administrator PowerShell in the machine: point its DNS server's forwarder at VMware's gateway, ${gateway}, and forget the failed answers.`
           : "Fadi can't read VMware's gateway address on this computer, so it can't say where the forwarder should point.",
@@ -74,6 +77,7 @@ export function remedyView(
         id: remedy.id,
         label: "Fix it in the machine",
         place: "lab",
+        fadiCanApply: true,
         explain:
           "In an Administrator PowerShell in the machine: give its network adapter back the DNS server VMware hands out, and forget the failed answers.",
         commands: [

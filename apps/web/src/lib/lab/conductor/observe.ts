@@ -25,6 +25,7 @@ export type ObserveContext = {
   runId: string;
   placement: "vmware" | "fadi-container" | "none";
   steps: number;
+  progressed: boolean;
   labName: string;
   template: string | null;
   windows: boolean;

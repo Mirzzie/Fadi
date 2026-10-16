@@ -13,7 +13,8 @@ describe("finding the commands in a step", () => {
   });
 
   it("a fenced block keeps its language and its inner indentation", () => {
-    const step = "Create the config:\n\n```nginx\nserver {\n    listen 443 ssl;\n}\n```\nThen reload.";
+    const step =
+      "Create the config:\n\n```nginx\nserver {\n    listen 443 ssl;\n}\n```\nThen reload.";
     const blocks = parseInstruction(step);
     const code = blocks.find((b) => b.type === "code");
     expect(code).toBeDefined();
@@ -47,19 +48,20 @@ describe("finding the commands in a step", () => {
     const code = blocks[1];
     if (code.type === "code") {
       expect(code.code).toBe(
-        "mkdir -p /etc/fail2ban/jail.d\ncat > /etc/fail2ban/jail.d/nginx.conf <<'EOF'\n[nginx-http]\nenabled = true\nEOF\nrc-service fail2ban start",
+        "mkdir -p /etc/fail2ban/jail.d\ncat > /etc/fail2ban/jail.d/nginx.conf <<'EOF'\n[nginx-http]\nenabled = true\nEOF\nrc-service fail2ban start"
       );
     }
   });
 
   it("THE STORED OPENSSL STEP: deeper-indented continuation lines stay in the command", () => {
-    const step = "Generate a cert:\n\n    openssl req -newkey rsa:2048 \\\n        -x509 -days 365 \\\n        -subj \"/CN=localhost\"\n    ls -l /etc/nginx/ssl";
+    const step =
+      'Generate a cert:\n\n    openssl req -newkey rsa:2048 \\\n        -x509 -days 365 \\\n        -subj "/CN=localhost"\n    ls -l /etc/nginx/ssl';
     const blocks = parseInstruction(step);
     expect(blocks.map((b) => b.type)).toEqual(["text", "code"]);
     const code = blocks[1];
     if (code.type === "code") {
       expect(code.code).toBe(
-        'openssl req -newkey rsa:2048 \\\n    -x509 -days 365 \\\n    -subj "/CN=localhost"\nls -l /etc/nginx/ssl',
+        'openssl req -newkey rsa:2048 \\\n    -x509 -days 365 \\\n    -subj "/CN=localhost"\nls -l /etc/nginx/ssl'
       );
     }
   });
@@ -88,7 +90,10 @@ describe("inline marks", () => {
   });
 
   it("marks `inline code`", () => {
-    expect(parseInline("run `cat file.txt` now")[1]).toEqual({ type: "code", value: "cat file.txt" });
+    expect(parseInline("run `cat file.txt` now")[1]).toEqual({
+      type: "code",
+      value: "cat file.txt",
+    });
   });
 
   it("never turns markup into HTML — a script tag is just characters", () => {
@@ -112,5 +117,35 @@ describe("a closing fence with the next sentence on the same line", () => {
     const code = blocks[1] as { type: "code"; code: string };
     expect(code.code).not.toContain("flag installs");
     expect(code.code.split("\n")).toHaveLength(2);
+  });
+});
+
+describe("bare commands at the start of a line (16 Oct 2026)", () => {
+  it("pulls the owner's step 3 apart: the sentence is text, each command its own block", () => {
+    const blocks = parseInstruction(
+      'In PowerShell run:\nInvoke-WebRequest -Uri "https://packages.wazuh.com/4.x/windows/wazuh-agent-4.14.9-1.msi" -OutFile "C:\\LabSetup\\wazuh-agent.msi"\nmsiexec.exe /i "C:\\LabSetup\\wazuh-agent.msi" /qn WAZUH_MANAGER="172.16.89.1"'
+    );
+    expect(blocks.map((b) => b.type)).toEqual(["text", "code", "code"]);
+    expect(blocks[1]).toMatchObject({ lang: "powershell" });
+    expect((blocks[2] as { code: string }).code.startsWith("msiexec.exe /i")).toBe(true);
+  });
+
+  it("keeps a here-string as one command, XML and all", () => {
+    const blocks = parseInstruction(
+      'Create a test directory and add an integrity rule:\nNew-Item -ItemType Directory -Force -Path "C:\\RansomTest"\n$conf = @"\n<ossec_config>\n  <syscheck>\n</ossec_config>\n"@\nAdd-Content -Path "C:\\x.conf" -Value $conf'
+    );
+    expect(blocks.map((b) => b.type)).toEqual(["text", "code", "code", "code"]);
+    expect((blocks[2] as { code: string }).code).toContain('</ossec_config>\n"@');
+  });
+
+  it("leaves sentences alone", () => {
+    for (const line of [
+      "Open the Wazuh dashboard in your browser.",
+      "Restart the agent and wait a minute.",
+      "In PowerShell run:",
+      "Wait until the agent shows Active.",
+    ]) {
+      expect(parseInstruction(line).map((b) => b.type)).toEqual(["text"]);
+    }
   });
 });

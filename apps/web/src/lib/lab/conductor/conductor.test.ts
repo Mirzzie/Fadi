@@ -194,3 +194,29 @@ describe("remedies are closed ids with reviewed text", () => {
     expect(JSON.stringify(odd)).not.toContain("rm -rf");
   });
 });
+
+describe("a project already under way (16 Oct 2026)", () => {
+  it("doesn't hold the machine's checks behind a snapshot that would no longer be clean", () => {
+    const all = requirementsFor({ ...siemOnVmware, progressed: true });
+    const result = conduct(
+      all,
+      seen({
+        "lab-spec": "pass",
+        "host-dns": "pass",
+        "host-firewall": "pass",
+        baseline: "fail",
+        machine: "pass",
+        channel: "pass",
+        internet: "fail",
+        "service-wazuh": "pass",
+        "reach-wazuh": "pass",
+        plan: "pass",
+      })
+    );
+    expect(result.next?.requirement.id).toBe("internet");
+    expect(result.items.find((i) => i.requirement.id === "baseline")).toMatchObject({
+      state: "open",
+      requirement: { blocking: "soft" },
+    });
+  });
+});

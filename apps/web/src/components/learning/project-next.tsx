@@ -11,7 +11,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 
-import { conductorAction } from "@/app/dashboard/learning/conductor-actions";
+import { conductorAction, proposeLabFixAction } from "@/app/dashboard/learning/conductor-actions";
 import { proposeCleanSnapshotAction } from "@/app/dashboard/learning/fresh-start-actions";
 import { proposeProjectLabAction, replanProjectAction } from "@/app/dashboard/learning/lab-actions";
 import { proposeServiceAction } from "@/app/dashboard/learning/stack-actions";
@@ -146,6 +146,35 @@ export function ProjectNext({
             </span>
             {next.remedy.explain}
           </p>
+          {next.remedy.fadiCanApply ? (
+            next.remedy.waiting ? (
+              <p className="text-sm text-muted-foreground">
+                Fadi&apos;s fix is waiting for your approval — it&apos;s in your approvals.
+              </p>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  size="sm"
+                  disabled={pending}
+                  onClick={() =>
+                    startTransition(async () => {
+                      setMessage(null);
+                      const result = await proposeLabFixAction({ runId });
+                      if (!result.ok) setMessage(result.message);
+                      onChanged(result.ok ? result.message : null);
+                      await load([next.id]);
+                    })
+                  }
+                >
+                  {pending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
+                  Let Fadi fix it
+                </Button>
+                <span className="text-xs text-muted-foreground">
+                  You approve it first. Or type it yourself:
+                </span>
+              </div>
+            )
+          ) : null}
           {next.remedy.commands.map((command) => (
             // Commands for this computer can never be typed into the lab, and the reverse.
             <CommandBlock

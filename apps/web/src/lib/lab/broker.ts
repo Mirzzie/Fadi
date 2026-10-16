@@ -262,6 +262,14 @@ function isGuestCheckStep(step: Step): step is GuestCheckStep {
 /** A Windows account name: letters, digits and . _ - only, so it can never carry an option. */
 const GUEST_USER_RE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 
+/** The scripts behind vmware.guestFix. Fixed text; the gateway is validated IPv4 before use. */
+const GUEST_FIXES = {
+  dns_forwarder: (gateway: string) =>
+    `Set-DnsServerForwarder -IPAddress ${gateway}; Clear-DnsServerCache -Force; Resolve-DnsName example.com -DnsOnly -ErrorAction Stop | Select-Object -First 1 Name, IPAddress`,
+  dns_client: () =>
+    "Get-NetAdapter | Where-Object Status -eq 'Up' | Set-DnsClientServerAddress -ResetServerAddresses; Clear-DnsClientCache; Resolve-DnsName example.com -DnsOnly -ErrorAction Stop | Select-Object -First 1 Name, IPAddress",
+} as const;
+
 function composeArgs(step: StackStep, dir: string): string[] {
   const file = `${dir}/${step.file}`;
   if (step.compose === "files") return [];
@@ -608,6 +616,7 @@ export const RECIPE_IDS = [
   "vmware.configure",
   "vmware.shutdown",
   "vmware.snapshot",
+  "vmware.guestFix",
   "project.reset",
   "stack.start",
   "stack.stop",
@@ -1037,6 +1046,64 @@ export const RECIPES: Record<RecipeId, Recipe> = {
         cmd: "vmrun",
         args: ["-T", "ws", "snapshot", String(p.vmxPath), CLEAN_SNAPSHOT],
         timeoutMs: 180_000,
+      },
+    ],
+  },
+
+  /**
+   * A KNOWN FIX INSIDE THE PERSON'S VMWARE MACHINE, from a closed list — what the conductor
+   * diagnosed, applied over Fadi's sign-in once the person approves it. The owner's domain
+   * controller forwarded DNS to a VMware gateway that no longer existed (16 Oct 2026); the fix
+   * was one line they shouldn't have to type. Nothing here is free text: the fix is an id, the
+   * addresses are validated IPv4, and the script for each id is written below. The script ends
+   * by resolving a name, so the fix proves itself.
+   */
+  "vmware.guestFix": {
+    blast: "vm",
+    reversibility: "reversible",
+    confirmToken: (p) => String(p.label ?? p.resourceId),
+    validate: (raw) => {
+      const resourceId = str(raw.resourceId);
+      const user = str(raw.user);
+      const fix = raw.fix === "dns_forwarder" || raw.fix === "dns_client" ? raw.fix : null;
+      const gateway = str(raw.gateway);
+      const previous = Array.isArray(raw.previous)
+        ? raw.previous.filter((ip): ip is string => typeof ip === "string" && IPV4_RE.test(ip))
+        : [];
+      if (!resourceId || !zUuid(resourceId) || !user || !GUEST_USER_RE.test(user) || !fix) {
+        return null;
+      }
+      if (fix === "dns_forwarder" && (!gateway || !IPV4_RE.test(gateway))) return null;
+      return {
+        resourceId,
+        user,
+        fix,
+        ...(fix === "dns_forwarder" ? { gateway } : {}),
+        previous: previous.slice(0, 4),
+        label: typeof raw.label === "string" ? raw.label : undefined,
+        vmxPath: typeof raw.vmxPath === "string" ? raw.vmxPath : undefined,
+      };
+    },
+    summary: (p) =>
+      p.fix === "dns_forwarder"
+        ? `In ${p.label ?? "your VMware machine"}: point its DNS server's forwarder at VMware's gateway ${p.gateway}${(p.previous as string[]).length ? ` (instead of ${(p.previous as string[]).join(", ")})` : ""}, clear its DNS cache, then resolve a name to prove it works.`
+        : `In ${p.label ?? "your VMware machine"}: give its network adapter back the DNS server VMware hands out${(p.previous as string[]).length ? ` (instead of ${(p.previous as string[]).join(", ")})` : ""}, clear its DNS cache, then resolve a name to prove it works.`,
+    reversal: (p) =>
+      (p.previous as string[]).length
+        ? p.fix === "dns_forwarder"
+          ? `In the machine: Set-DnsServerForwarder -IPAddress ${(p.previous as string[]).join(",")}`
+          : `In the machine: Set-DnsClientServerAddress -InterfaceAlias <adapter> -ServerAddresses ${(p.previous as string[]).join(",")}`
+        : "In the machine, set the DNS setting back by hand.",
+    render: (p) => [
+      {
+        id: "guest-fix",
+        guestCheck: true as const,
+        resourceId: String(p.resourceId),
+        vmx: String(p.vmxPath),
+        user: String(p.user),
+        command: GUEST_FIXES[p.fix === "dns_forwarder" ? "dns_forwarder" : "dns_client"](
+          String(p.gateway ?? "")
+        ),
       },
     ],
   },
@@ -1877,6 +1944,7 @@ async function hydrateRecipeParams(
       "vmware.configure",
       "vmware.shutdown",
       "vmware.snapshot",
+      "vmware.guestFix",
     ].includes(recipe) &&
     !(recipe === "project.reset" && params.resourceId) &&
     !(recipe === "lab.check" && params.resourceId)
@@ -2776,6 +2844,31 @@ export async function approveAndRun(input: {
   if (row.recipe === "project.reset" && row.runId) {
     const { createProjectRunsRepository } = await import("@careeros/database");
     await createProjectRunsRepository(db).resetProgress(input.userId, row.runId);
+  }
+
+  if (row.recipe === "vmware.guestFix") {
+    const verdict = checkVerdict(out.join("\n"), "Name");
+    const failed = verdict.exit !== 0;
+    const detail = failed
+      ? `The fix ran but the machine still can't resolve names${verdict.exit !== null ? ` (exit ${verdict.exit})` : ""}.`
+      : "Fixed: the machine resolves names again.";
+    await requests.finish(input.userId, row.id, {
+      status: failed ? "failed" : "executed",
+      detail,
+    });
+    await audit.record({
+      userId: input.userId,
+      actor: "user",
+      origin: "approval",
+      runId: row.runId ?? null,
+      stepId: row.stepId ?? null,
+      capability: "vmware.guestFix",
+      decision: "allowed",
+      detail,
+    });
+    return failed
+      ? { ok: false, message: `${detail}\n\n${verdict.excerpt}` }
+      : { ok: true, output: `${detail}\n\n${verdict.excerpt}` };
   }
 
   if (row.recipe === "lab.check") {

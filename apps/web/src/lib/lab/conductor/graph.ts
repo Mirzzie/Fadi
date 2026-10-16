@@ -15,6 +15,12 @@ export type LabSpec = {
   /** A plan can be made at all (a lab template or a chosen machine exists). */
   hasSpec: boolean;
   services: Array<{ key: string; label: string; agentPorts: number[] }>;
+  /**
+   * The project already has finished steps. Then a snapshot is no longer a clean start — the
+   * machine has the project's changes in it — so it is advice, not a gate: it held the owner's
+   * Next card on "Save clean start" while the real blocker was the machine's DNS (16 Oct 2026).
+   */
+  progressed?: boolean;
 };
 
 export function requirementsFor(spec: LabSpec): Requirement[] {
@@ -66,7 +72,7 @@ export function requirementsFor(spec: LabSpec): Requirement[] {
       predicate: "machine.baseline",
       params: {},
       dependsOn: ["lab-spec"],
-      blocking: "hard",
+      blocking: spec.progressed ? "soft" : "hard",
       remedy: { kind: "recipe", id: "vmware.snapshot" },
       title: "A clean start of the machine is saved",
       why: "Before the project changes anything, so “Start the project over” can put it back exactly.",
@@ -77,7 +83,7 @@ export function requirementsFor(spec: LabSpec): Requirement[] {
     id: "machine",
     predicate: "machine.running",
     params: {},
-    dependsOn: vmware ? ["baseline"] : ["lab-spec"],
+    dependsOn: vmware && !spec.progressed ? ["baseline"] : ["lab-spec"],
     blocking: "hard",
     remedy: { kind: "recipe", id: "lab.start" },
     title: "The lab machine is running",

@@ -96,6 +96,33 @@ export function parseInstruction(input: string): InstructionBlock[] {
       continue;
     }
 
+    // A command on its own line at column 0, with no fence or indent: the planner wrote
+    // "In PowerShell run:" and then two bare commands, so the page offered no command to copy
+    // or type, the whole instruction was pasted, and PowerShell ran "In PowerShell run:"
+    // (16 Oct 2026). Each bare command is its own block — the second (msiexec) must not run
+    // when the first (the download) failed — except a here-string, which is one command.
+    if (looksLikeCommand(line)) {
+      flushText();
+      flushIndented();
+      const body = [line];
+      const hereString = /@(["'])\s*$/.exec(line);
+      if (hereString) {
+        const close = new RegExp(`^${hereString[1]}@`);
+        while (i + 1 < lines.length) {
+          i++;
+          body.push(lines[i]);
+          if (close.test(lines[i])) break;
+        }
+      }
+      // A line ending in a pipe or PowerShell's backtick continues on the next one.
+      while (/(\||`)\s*$/.test(body[body.length - 1]) && i + 1 < lines.length) {
+        i++;
+        body.push(lines[i]);
+      }
+      blocks.push({ type: "code", code: body.join("\n"), lang: commandLang(line) });
+      continue;
+    }
+
     if (indented.length && line.trim() === "") {
       // A blank line inside an indented run belongs to it only if more code follows.
       const next = lines.slice(i + 1).find((l) => l.trim() !== "");
@@ -118,4 +145,28 @@ function dedent(lines: string[]): string {
   const indents = lines.filter((l) => l.trim()).map((l) => /^\s*/.exec(l)![0].length);
   const min = indents.length ? Math.min(...indents) : 0;
   return lines.map((l) => l.slice(min)).join("\n");
+}
+
+/** PowerShell's Verb-Noun cmdlets: New-Item, Invoke-WebRequest, Set-Service… */
+const CMDLET = /^[A-Z][a-z]+-[A-Z][A-Za-z]+(?:\s|$)/;
+/** Programs a step runs by name, followed by arguments or nothing. */
+const PROGRAM =
+  /^(?:msiexec|sc|netsh|wevtutil|reg|ipconfig|powershell|pwsh|curl|wget|sudo|apt-get|apt|dnf|yum|systemctl|journalctl|docker|git|mkdir|chmod|chown|tar|python3?|pip3?|npm|ssh|cat|echo|grep|tail)(?:\.exe)?(?:\s|$)/;
+/** `$conf = …`, `$x | …`, `& "C:\path.exe" …` */
+const POWERSHELL_EXPR = /^(?:\$[A-Za-z_][\w:]*\s*(?:=|\|)|&\s+["'$\w])/;
+
+/**
+ * A line that is a command rather than a sentence. Conservative: prose that happens to start
+ * with "Restart" or "Open" isn't one, and a line ending with ":" or "." after words is prose.
+ */
+export function looksLikeCommand(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed !== line.trimEnd() || /^\s/.test(line)) return false;
+  if (/:\s*$/.test(trimmed)) return false;
+  if (/^[A-Z][a-z]+ [a-z]+ .*\.$/.test(trimmed) && !CMDLET.test(trimmed)) return false;
+  return CMDLET.test(trimmed) || PROGRAM.test(trimmed) || POWERSHELL_EXPR.test(trimmed);
+}
+
+function commandLang(line: string): string | null {
+  return CMDLET.test(line) || POWERSHELL_EXPR.test(line) ? "powershell" : null;
 }

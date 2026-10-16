@@ -57,6 +57,8 @@ const RECIPE_OF: Record<string, (ctx: ObserveContext) => string> = {
   "lab.start": (ctx) => (ctx.placement === "vmware" ? "vmware.start" : "lab.start"),
   "vmware.snapshot": () => "vmware.snapshot",
   "stack.start": () => "stack.start",
+  "lab.dns_forwarder": () => "vmware.guestFix",
+  "lab.dns_client": () => "vmware.guestFix",
 };
 
 async function contextFor(userId: string, runId: string): Promise<ObserveContext | null> {
@@ -96,6 +98,7 @@ async function contextFor(userId: string, runId: string): Promise<ObserveContext
     runId: run.id,
     placement,
     steps: project.steps.length,
+    progressed: project.steps.some((step) => step.status === "done"),
     labName,
     template,
     windows,
@@ -123,6 +126,7 @@ export async function evaluateConductor(
   const requirements = requirementsFor({
     placement: context.placement,
     hasSpec: context.placement !== "none",
+    progressed: context.progressed,
     services: context.services,
   });
   const stored = await observationsRepo.forSubjects(userId, ["host", `run:${runId}`]);
