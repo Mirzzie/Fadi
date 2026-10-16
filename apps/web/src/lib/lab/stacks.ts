@@ -29,7 +29,8 @@ export type StackDefinition = {
   ramMb: number;
   diskGb: number;
   /** Where the person opens it, and how they sign in. Lab-only defaults, said plainly. */
-  open: { label: string; url: string; user: string; password: string };
+  /** Where the person opens it. The password is the project's own: lib/lab/stack-secrets.ts. */
+  open: { label: string; url: string; user: string };
   /** Ports the project's machine connects to on the agent address. */
   agentPorts: number[];
   /** Containers that must be running for the stack to be up. */
@@ -69,7 +70,6 @@ export const STACKS: Record<StackKey, StackDefinition> = {
       label: "Wazuh dashboard",
       url: "https://127.0.0.1:5443",
       user: "admin",
-      password: "SecretPassword",
     },
     agentPorts: [1514, 1515],
     services: ["wazuh.manager", "wazuh.indexer", "wazuh.dashboard"],

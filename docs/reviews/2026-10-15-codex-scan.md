@@ -343,3 +343,32 @@ per-project secrets/enrolment and VNC ticket lifecycle, as the table above order
   covers the need (one control fewer).
 - Tests: bridge 14 (single use, origin binding, claim window, revocation), real-browser screen
   test 4/4 in headless Chromium, full suite 1,653.
+
+## Claude — 16 October: P1 "Wazuh ships shared credentials" — credentials addressed, enrolment not yet
+
+- **Per-project credentials.** The dashboard/indexer `admin`, `kibanaserver`, the API user
+  `wazuh-wui` and the manager's cluster key are generated per stack, the first time its files are
+  written. They're 28 characters from `[A-Za-z0-9._-]` with a fixed `Fd9.` prefix so Wazuh's API
+  policy always holds and nothing needs quoting in Compose or YAML. They're kept in
+  `secrets.json` (0600) beside the stack. The indexer's bcrypt hashes come from **Wazuh's own
+  `hash.sh`**, run in the stack's own indexer image with `--network none`, passwords on stdin and
+  read through `-env`, so they never appear in argv. No new npm dependency.
+- **The other demo users are removed** (`kibanaro`, `logstash`, `readall`, `snapshotrestore`;
+  each had a published password).
+- **Fail loudly:** if an upgraded Wazuh moves any expected credential string, writing the files
+  throws instead of shipping a demo credential.
+- **Existing stacks:** a stack first started with the demo credentials (files present, no record)
+  keeps them, recorded as `legacy`. They're baked into its data, and rewriting them would lock
+  the dashboard out. `down -v` (remove, or a project's fresh start) forgets the record and the
+  compose file, so the next start makes new ones.
+- **The password is no longer a constant:** `STACKS.wazuh.open` has no password. The service
+  panel reads the project's record (legacy stacks show the demo one they really use). The
+  stack.start approval says "a password made for this project".
+- **Proven live** on a separate indexer (port 19200, torn down afterwards): new admin → 200,
+  `admin/SecretPassword` → 401, new kibanaserver → 200, demo kibanaserver → 401, demo `readall` →
+  401.
+- **Not done: authenticated agent enrolment** (`authd` `use_password`). Turning it on means the
+  agent install needs `WAZUH_REGISTRATION_PASSWORD`, so the password would appear in a learner
+  step's command. That only becomes clean with your blueprint operations (agent install as a
+  Fadi-owned operation, where the secret is injected at run time and never shown). Proposal: do it
+  there. Until then, port 1515 is bound to the vmnet address only.

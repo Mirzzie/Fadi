@@ -1333,8 +1333,9 @@ export const RECIPES: Record<RecipeId, Recipe> = {
         "downloads the images. Its files go in " +
         `${stackFolder(stackProject(String(p.name), String(p.stack) as StackKey))}. ` +
         `${stack.open.label}: ${stack.open.url} (this computer only), signed in as ` +
-        `${stack.open.user} / ${stack.open.password} — the lab's default, reachable from nowhere ` +
-        `else. Agents connect on ${p.agentIp}:${stack.agentPorts.join("/")}, the VMware ` +
+        `${stack.open.user} with a password made for this project (shown beside the service once ` +
+        `it runs; a stack first started before 16 Oct keeps Wazuh's demo password until it is ` +
+        `removed). Agents connect on ${p.agentIp}:${stack.agentPorts.join("/")}, the VMware ` +
         "network on this computer, not your home network." +
         (p.lab
           ? ` Your lab ${NAME_PREFIX}${p.lab} joins its network and reaches the manager as ${stack.agent.managerHost}.`
@@ -2460,7 +2461,14 @@ async function runStackStep(step: StackStep): Promise<StepResult> {
   if (step.compose === "files") {
     const { mkdir, writeFile } = await import("node:fs/promises");
     const path = await import("node:path");
-    const files = STACKS[step.stack].files(String(step.agentIp));
+    await mkdir(dir, { recursive: true });
+    // This project's own credentials — made once, before the files that carry them.
+    const { stackSecretsForFiles } = await import("./stack-secrets");
+    const { applyWazuhSecrets } = await import("./stack-secrets-core");
+    const files = applyWazuhSecrets(
+      STACKS[step.stack].files(String(step.agentIp)),
+      await stackSecretsForFiles(dir)
+    );
     for (const [relative, content] of Object.entries(files)) {
       const target = path.join(dir, relative);
       await mkdir(path.dirname(target), { recursive: true });
@@ -2491,6 +2499,12 @@ async function runStackStep(step: StackStep): Promise<StepResult> {
       maxBuffer: 4 * 1024 * 1024,
     });
     const lines = `${stdout}\n${stderr}`.trim().split("\n").filter(Boolean);
+    // `down -v` removed the stack's data, which is where its credentials live on: forget them, so
+    // the next start makes new ones instead of reusing a password for data that's gone.
+    if (step.compose === "down") {
+      const { forgetStackSecrets } = await import("./stack-secrets");
+      await forgetStackSecrets(dir);
+    }
     return { text: lines[lines.length - 1] ?? `docker compose ${step.compose}` };
   } catch (error) {
     throw new Error(commandFailure(command, error));

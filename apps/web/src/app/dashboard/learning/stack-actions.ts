@@ -39,8 +39,10 @@ export async function projectServicesAction(input: {
   const project = await projectOf(user.id, id.data);
   if (!project) return { ok: false, message: "That project is unavailable." };
 
-  const { STACKS, stackProject, stacksForProject, vmNetworkAddress } =
+  const { STACKS, stackFolder, stackProject, stacksForProject, vmNetworkAddress } =
     await import("@/lib/lab/stacks");
+  const { readStackSecrets } = await import("@/lib/lab/stack-secrets");
+  const { WAZUH_DEMO_SECRETS } = await import("@/lib/lab/stack-secrets-core");
   const keys = stacksForProject({ title: project.run.title, detail: project.run.detail });
   if (keys.length === 0) return { ok: true, services: [] };
 
@@ -84,7 +86,14 @@ export async function projectServicesAction(input: {
               : null,
         running: observed?.running ?? 0,
         total: observed?.total ?? stack.services.length,
-        open: stack.open,
+        // This project's own password; a stack started before per-project credentials existed
+        // (no record beside it) runs with Wazuh's demo password, so that is what it shows.
+        open: {
+          ...stack.open,
+          password:
+            (await readStackSecrets(stackFolder(stackProject(labName, key))))?.admin ??
+            WAZUH_DEMO_SECRETS.admin,
+        },
         agentAddress: onContainerLab ? stack.agent.managerHost : vmNetworkAddress(),
       };
     })
