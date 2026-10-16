@@ -73,7 +73,9 @@ export function requirementsFor(spec: LabSpec): Requirement[] {
       params: {},
       dependsOn: ["lab-spec"],
       blocking: spec.progressed ? "soft" : "hard",
-      remedy: { kind: "recipe", id: "vmware.snapshot" },
+      // Once the project has changed the machine, a snapshot would not be a clean start: offer
+      // none (16 Oct 2026 — one was saved mid-project and the reset brought the session back).
+      remedy: spec.progressed ? null : { kind: "recipe", id: "vmware.snapshot" },
       title: "A clean start of the machine is saved",
       why: "Before the project changes anything, so “Start the project over” can put it back exactly.",
     });

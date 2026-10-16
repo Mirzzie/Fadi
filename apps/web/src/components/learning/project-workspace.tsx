@@ -941,6 +941,9 @@ function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => Prom
   const [asking, setAsking] = useState<null | "replan" | "reset">(null);
   const [note, setNote] = useState<string | null>(null);
   const [needsSnapshot, setNeedsSnapshot] = useState(false);
+  // No clean start to go back to: the same button then starts over WITHOUT resetting the
+  // machine, and says so. It replaces "Start over from nothing", never sits beside it.
+  const [keepMachine, setKeepMachine] = useState(false);
   const [busy, start] = useTransition();
 
   if (!asking) {
@@ -969,6 +972,7 @@ function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => Prom
   const done = (message: string) => {
     setAsking(null);
     setNeedsSnapshot(false);
+    setKeepMachine(false);
     setNote(message);
     announceActionsChanged();
   };
@@ -1002,9 +1006,10 @@ function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => Prom
         onClick={() =>
           start(async () => {
             if (reset) {
-              const result = await proposeFreshStartAction({ runId });
+              const result = await proposeFreshStartAction({ runId, keepMachine });
               if (!result.ok) {
                 setNeedsSnapshot(Boolean(result.needsSnapshot));
+                setKeepMachine(Boolean(result.canKeepMachine));
                 return setNote(result.message);
               }
               done(result.message);
@@ -1024,7 +1029,9 @@ function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => Prom
             ? "Preparing…"
             : "Planning…"
           : reset
-            ? "Start over from nothing"
+            ? keepMachine
+              ? "Start over, keep the machine as it is"
+              : "Start over from nothing"
             : "Replace"}
       </Button>
       <Button
@@ -1034,6 +1041,7 @@ function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => Prom
         onClick={() => {
           setAsking(null);
           setNeedsSnapshot(false);
+          setKeepMachine(false);
         }}
       >
         Cancel

@@ -220,3 +220,12 @@ describe("a project already under way (16 Oct 2026)", () => {
     });
   });
 });
+
+describe("no 'clean start' offered for a machine the project has already changed", () => {
+  it("offers to save one before the project begins, never after", () => {
+    const fresh = requirementsFor(siemOnVmware).find((r) => r.id === "baseline")!;
+    expect(fresh.remedy).toMatchObject({ id: "vmware.snapshot" });
+    const begun = requirementsFor({ ...siemOnVmware, progressed: true }).find((r) => r.id === "baseline")!;
+    expect(begun.remedy).toBeNull();
+  });
+});

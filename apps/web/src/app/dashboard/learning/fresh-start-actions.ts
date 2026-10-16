@@ -17,7 +17,7 @@ import { getDatabase } from "@/lib/database/client";
  * Docker or VMware — and plan it against the fresh machine.
  */
 
-async function freshStartPlan(userId: string, runId: string) {
+async function freshStartPlan(userId: string, runId: string, keepMachine = false) {
   const db = getDatabase();
   const project = await createProjectRunsRepository(db).getWithSteps(userId, runId);
   if (!project) return { ok: false as const, message: "That project is gone." };
@@ -32,12 +32,20 @@ async function freshStartPlan(userId: string, runId: string) {
     const resource = await createLabResourcesRepository(db).get(userId, project.run.resourceId);
     const { hasCleanSnapshot, vmxPathOf } = await import("@/lib/lab/vmware");
     const vmx = vmxPathOf(resource?.endpoint);
-    if (resource && vmx) {
+    if (resource && vmx && !keepMachine) {
       if ((await hasCleanSnapshot(vmx)) !== true) {
+        // Saving a "clean start" now would save this project's own changes as the clean start —
+        // what happened on 16 Oct 2026: the reset then put back the very session it was meant to
+        // clear. Once a project has begun, the honest choices are to keep the machine as it is,
+        // or to start on a machine that is clean.
+        const begun = project.steps.some((step) => step.status === "done");
         return {
           ok: false as const,
-          needsSnapshot: true,
-          message: `${resource.label} has no clean start to return to yet. Put it in the state every fresh start should begin from, then “Save clean start”.`,
+          needsSnapshot: !begun,
+          canKeepMachine: true,
+          message: begun
+            ? `${resource.label} has no clean start from before this project, and saving one now would keep this project's changes in it. You can start the project over and keep the machine as it is: progress goes to zero, the machine keeps what was done in it.`
+            : `${resource.label} has no clean start to return to yet. If it is as every fresh start should begin, “Save clean start” first.`,
         };
       }
       vmware = { resourceId: resource.id, label: resource.label };
@@ -53,12 +61,14 @@ async function freshStartPlan(userId: string, runId: string) {
 
 export async function proposeFreshStartAction(input: {
   runId: string;
-}): Promise<{ ok: boolean; message: string; needsSnapshot?: boolean }> {
+  /** Start the project over without returning its VMware machine to a clean start. */
+  keepMachine?: boolean;
+}): Promise<{ ok: boolean; message: string; needsSnapshot?: boolean; canKeepMachine?: boolean }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
   const id = z.string().uuid().safeParse(input.runId);
   if (!id.success) return { ok: false, message: "Unknown project." };
-  const plan = await freshStartPlan(user.id, id.data);
+  const plan = await freshStartPlan(user.id, id.data, input.keepMachine === true);
   if (!plan.ok) return plan;
 
   // Nothing of the environment exists yet: only the project itself to clear.
@@ -99,6 +109,13 @@ export async function proposeCleanSnapshotAction(input: {
   const project = await createProjectRunsRepository(getDatabase()).getWithSteps(user.id, id.data);
   if (!project?.run.resourceId) {
     return { ok: false, message: "This project isn't on one of your VMware machines." };
+  }
+  const done = project.steps.filter((step) => step.status === "done").length;
+  if (done > 0) {
+    return {
+      ok: false,
+      message: `The machine already has this project's work in it (${done} step${done === 1 ? "" : "s"} done), so saving it now wouldn't be a clean start — a reset would bring that work back. Save a clean start before a project begins.`,
+    };
   }
   const { proposeAction } = await import("@/lib/lab/broker");
   const proposal = await proposeAction({

@@ -1044,7 +1044,8 @@ export const RECIPES: Record<RecipeId, Recipe> = {
     },
     summary: (p) =>
       `Save ${p.label ?? "your VMware machine"} as it is now as its "${CLEAN_SNAPSHOT}" snapshot. ` +
-      "Resetting a project on it returns the machine to exactly this state.",
+      "Resetting a project on it returns the machine to exactly this state — if it is running, " +
+      "to this running moment, open windows and all. For a clean boot, shut it down first.",
     reversal: () => `Delete the "${CLEAN_SNAPSHOT}" snapshot in VMware.`,
     render: (p) => [
       {
