@@ -48,8 +48,10 @@ Practice adds four domain-neutral contracts to that journey:
 1. **Activity definition** — the intended outcome, competencies, ordered steps, prerequisites,
    expected outputs, estimated effort and versioned source.
 2. **Environment adapter** — prepares and observes the place where a step happens. Initial adapter
-   kinds are `none`, `browser`, `document`, `conversation`, `external_tool`, `simulation`,
-   `local_workspace`, `container`, `virtual_machine` and `physical_world`.
+   kinds are `unspecified`, `none`, `browser`, `document`, `conversation`, `external_tool`,
+   `simulation`, `local_workspace`, `managed_lab`, `container`, `virtual_machine` and
+   `physical_world`. `unspecified` preserves uncertainty rather than guessing an environment;
+   `managed_lab` is the compatibility boundary while existing lab rows migrate.
 3. **Assessment adapter** — decides what can be established from the result. Initial kinds are
    `machine_predicate`, `submission`, `rubric`, `scenario_outcome`, `external_credential`,
    `reflection` and `attestation`. `unknown`, `observed`, `self_reported` and `verified` remain

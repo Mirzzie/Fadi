@@ -1,4 +1,5 @@
 import { completionOf, type CompletableStep } from "@/lib/lab/completion";
+import { isFacilitatorPlace } from "@/lib/practice/contract";
 
 /**
  * WHAT A FINISHED PROJECT CAN HONESTLY SAY.
@@ -16,7 +17,7 @@ import { completionOf, type CompletableStep } from "@/lib/lab/completion";
 export type ReviewStep = CompletableStep & {
   ordinal: number;
   title: string;
-  /** lab | browser | fadi. "fadi" steps were Fadi setting things up — not the person's work. */
+  /** Legacy delivery place. "fadi" steps were setup — not the person's work. */
   place?: string | null;
 };
 
@@ -38,7 +39,7 @@ export type CompletionReview = {
 export function completionReview(title: string, steps: ReviewStep[]): CompletionReview {
   const lines: ReviewLine[] = [...steps]
     // Setup is not learning: "Start Wazuh containers" is not something to claim on a résumé.
-    .filter((step) => step.place !== "fadi")
+    .filter((step) => !isFacilitatorPlace(step.place))
     .sort((a, b) => a.ordinal - b.ordinal)
     .map((step) => {
       const kind = completionOf(step);
@@ -57,10 +58,10 @@ export function completionReview(title: string, steps: ReviewStep[]): Completion
 
   const shown = lines.filter((line) => line.proof !== "self-reported");
   const summary = [
-    `Worked through "${title}" in a local lab.`,
+    `Completed practical work for "${title}".`,
     ...shown.map((line) =>
       line.proof === "checked"
-        ? `- ${line.title} (checked in the lab${line.result ? `: ${line.result}` : ""})`
+        ? `- ${line.title} (verified${line.result ? `: ${line.result}` : ""})`
         : `- ${line.title}${line.result ? `: ${line.result}` : ""}`
     ),
   ].join("\n");
