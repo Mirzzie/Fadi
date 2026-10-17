@@ -209,7 +209,12 @@ export async function evaluateConductor(
         typeof diagnosed === "string" && DIAGNOSED_REMEDIES.has(diagnosed)
           ? { kind: "manual", id: diagnosed as ManualRemedyId }
           : requirement.remedy;
-      if (remedyRef && state !== "done" && state !== "waiting") {
+      // A machine that is ON but still booting (VMware Tools not answering yet) needs waiting,
+      // not "Start the machine" — it is started. The action becomes Check again.
+      const booting =
+        requirement.predicate === "machine.running" &&
+        typeof observation?.evidence.tools === "string";
+      if (remedyRef && !booting && state !== "done" && state !== "waiting") {
         const view = remedyView(remedyRef, requirement, { vmnetIp, natGateway });
         const recipe = RECIPE_OF[remedyRef.id]?.(context);
         const last = recipe ? await requests.latestForRun(userId, runId, recipe) : null;

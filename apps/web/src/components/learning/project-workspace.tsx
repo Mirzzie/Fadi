@@ -463,7 +463,9 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
                     <CommandBlock code={run.labShell} lang="terminal" />
                   </div>
                 ) : null}
-                {conductor ? (
+                {/* The checklist lives in the Next card while there is one; here only once the
+                    lab is ready and the Next card has gone — never both at once. */}
+                {conductor && !environmentNext ? (
                   <div className="px-4 pb-3">
                     <Checked items={conductor.items} />
                   </div>
