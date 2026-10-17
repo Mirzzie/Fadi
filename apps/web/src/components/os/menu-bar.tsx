@@ -4,6 +4,7 @@ import { Search, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { FadiLogo } from "@/components/brand/fadi-logo";
+import { FADI_STATE_LABEL } from "@/lib/agent/state";
 import { stopFadiSpeech } from "@/lib/voice/fadi-speech";
 import { cn } from "@/lib/utils";
 import { ActivityCenter } from "./activity-center";
@@ -143,17 +144,9 @@ function VoiceToggle() {
   );
 }
 
-const STATE_TEXT: Record<FadiState, string> = {
-  idle: "Fadi active",
-  listening: "Listening…",
-  thinking: "Thinking…",
-  working: "Working…",
-  speaking: "Speaking…",
-};
-
 /** Live status dot + label reflecting Fadi's ambient state. */
 function FadiStateChip({ state, working }: { state: FadiState; working: string | null }) {
-  const busy = state !== "idle";
+  const busy = !["ready", "offline"].includes(state);
   const { openFadi } = useFadi();
   // The state is also the way in: in lab focus the floating orb steps aside, so Fadi opens here.
   return (
@@ -166,15 +159,21 @@ function FadiStateChip({ state, working }: { state: FadiState; working: string |
       <span
         className={cn(
           "size-1.5 rounded-full",
-          busy
-            ? "bg-primary shadow-[0_0_6px_var(--color-primary)] animate-pulse"
-            : "bg-emerald-400 shadow-[0_0_6px_var(--color-emerald-400,#34d399)]"
+          state === "offline"
+            ? "bg-muted-foreground"
+            : state === "blocked"
+              ? "bg-destructive shadow-[0_0_6px_var(--color-destructive)]"
+              : state === "waiting_for_approval"
+                ? "bg-amber-400 shadow-[0_0_6px_var(--color-amber-400,#fbbf24)] animate-pulse"
+                : busy
+                  ? "bg-primary shadow-[0_0_6px_var(--color-primary)] animate-pulse"
+                  : "bg-emerald-400 shadow-[0_0_6px_var(--color-emerald-400,#34d399)]"
         )}
       />
       {/* What it is doing beats what it is. "Fadi active" on every screen of a product that
           runs plans is a light that is always on. */}
       <span className="max-w-[16rem] truncate">
-        {state === "idle" && working ? `On: ${working}` : STATE_TEXT[state]}
+        {state === "ready" && working ? `On: ${working}` : `Fadi ${FADI_STATE_LABEL[state].toLowerCase()}`}
       </span>
     </button>
   );

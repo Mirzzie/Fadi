@@ -8,7 +8,8 @@ import type { FadiState } from "./fadi-presence";
 /**
  * The living Fadi — a luminous, reactive core. Layered glow + orbiting particles +
  * counter-rotating rings + a speaking waveform, driven by Fadi's live state
- * (idle / listening / thinking / working / speaking). One component for the orb,
+ * (ready / listening / understanding / speaking / acting / waiting / blocked / offline).
+ * One component for the orb,
  * the boot sequence, and the desktop centerpiece.
  *
  * Performance: every loop here is a pure CSS animation on transform/opacity, so it
@@ -23,12 +24,30 @@ const VIOLET = "oklch(0.66 0.22 285)";
 const TEAL_HALO = "oklch(0.72 0.19 192 / 0.5)";
 
 // Ring spin period (s) + overall energy per state.
-const SPIN: Record<FadiState, number> = { idle: 18, listening: 9, thinking: 5, working: 5, speaking: 8 };
-const ENERGY: Record<FadiState, number> = { idle: 0.45, listening: 0.85, thinking: 1, working: 1, speaking: 0.9 };
+const SPIN: Record<FadiState, number> = {
+  ready: 18,
+  listening: 9,
+  understanding: 5,
+  speaking: 8,
+  acting: 5,
+  waiting_for_approval: 12,
+  blocked: 16,
+  offline: 24,
+};
+const ENERGY: Record<FadiState, number> = {
+  ready: 0.45,
+  listening: 0.85,
+  understanding: 1,
+  speaking: 0.9,
+  acting: 1,
+  waiting_for_approval: 0.7,
+  blocked: 0.6,
+  offline: 0.2,
+};
 const PARTICLE_DEGS = [0, 45, 90, 135, 180, 225, 270, 315];
 
 export function FadiCore({
-  state = "idle",
+  state = "ready",
   size = 56,
   className,
 }: {

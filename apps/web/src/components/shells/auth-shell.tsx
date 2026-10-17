@@ -57,7 +57,7 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
         <div className="grid w-full max-w-4xl gap-12 lg:grid-cols-[1fr_420px] lg:items-center">
           {/* Left — the invitation */}
           <div className="hidden flex-col items-start gap-7 lg:flex">
-            <FadiCore state="idle" size={120} />
+            <FadiCore state="ready" size={120} />
             <div className="space-y-3">
               <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-primary">
                 Your career, as one system
@@ -98,7 +98,7 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
           {/* Right — the form card */}
           <div className="w-full rounded-2xl border border-border bg-card p-6 shadow-lg">
             <div className="mb-4 flex items-center gap-3 lg:hidden">
-              <FadiCore state="idle" size={40} />
+              <FadiCore state="ready" size={40} />
               <span className="font-heading font-semibold tracking-tight">Fadi</span>
             </div>
             <h2 className="font-heading text-xl font-semibold tracking-tight">

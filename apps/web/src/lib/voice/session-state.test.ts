@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { INTERVIEW_THOUGHTFUL_PAUSE_MS, resolveVoiceSessionPhase } from "./session-state";
+import {
+  INTERVIEW_THOUGHTFUL_PAUSE_MS,
+  resolveVoiceSessionPhase,
+  voicePhaseToFadiState,
+} from "./session-state";
 
 describe("shared voice session state", () => {
   it("keeps enough silence for a thoughtful interview pause", () => {
@@ -21,5 +25,16 @@ describe("shared voice session state", () => {
     expect(resolveVoiceSessionPhase({ recorder: "idle", error: true, speaking: true })).toBe(
       "error"
     );
+  });
+
+  it("translates voice-engine phases into the shared Fadi state vocabulary", () => {
+    expect(voicePhaseToFadiState("idle")).toBe("ready");
+    expect(voicePhaseToFadiState("ready")).toBe("ready");
+    expect(voicePhaseToFadiState("requesting")).toBe("waiting_for_approval");
+    expect(voicePhaseToFadiState("listening")).toBe("listening");
+    expect(voicePhaseToFadiState("transcribing")).toBe("understanding");
+    expect(voicePhaseToFadiState("thinking")).toBe("understanding");
+    expect(voicePhaseToFadiState("speaking")).toBe("speaking");
+    expect(voicePhaseToFadiState("error")).toBe("blocked");
   });
 });

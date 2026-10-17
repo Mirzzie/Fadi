@@ -4,8 +4,9 @@ import { ArrowUpRight, Ear, Loader2, MessageSquare, MicOff, X } from "lucide-rea
 import Link from "next/link";
 
 import { FadiChat } from "@/components/fadi/fadi-chat";
+import { FADI_STATE_LABEL } from "@/lib/agent/state";
 import { cn } from "@/lib/utils";
-import { VOICE_SESSION_LABEL } from "@/lib/voice/session-state";
+import { VOICE_SESSION_LABEL, voicePhaseToFadiState } from "@/lib/voice/session-state";
 import { FadiCore } from "./fadi-core";
 import { useFadi, type FadiState } from "./fadi-presence";
 import { useVoiceMode } from "./use-voice-mode";
@@ -37,16 +38,7 @@ export function FadiOrb({ tucked = false }: { tucked?: boolean } = {}) {
     clearFocus,
   } = useFadi();
   const voice = useVoiceMode();
-  const voiceDisplayState: FadiState =
-    voice.phase === "speaking"
-      ? "speaking"
-      : voice.phase === "listening"
-        ? "listening"
-        : voice.phase === "thinking" ||
-            voice.phase === "transcribing" ||
-            voice.phase === "requesting"
-          ? "thinking"
-          : "idle";
+  const voiceDisplayState: FadiState = voicePhaseToFadiState(voice.phase);
 
   return (
     <>
@@ -162,7 +154,7 @@ export function FadiOrb({ tucked = false }: { tucked?: boolean } = {}) {
                 <div className="leading-tight">
                   <span className="block text-sm font-semibold">Fadi</span>
                   <span className="block text-[0.65rem] text-muted-foreground">
-                    {STATE_LABEL[displayState]}
+                    {FADI_STATE_LABEL[displayState]}
                   </span>
                 </div>
               </div>
@@ -200,14 +192,6 @@ export function FadiOrb({ tucked = false }: { tucked?: boolean } = {}) {
     </>
   );
 }
-
-const STATE_LABEL: Record<FadiState, string> = {
-  idle: "Active",
-  listening: "Listening…",
-  thinking: "Thinking…",
-  working: "Working…",
-  speaking: "Speaking…",
-};
 
 /** The orb is the living Fadi core, made clickable when it's the ambient launcher. */
 function OrbButton({

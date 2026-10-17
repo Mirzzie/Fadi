@@ -17,6 +17,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FadiBadge } from "@/components/ui/fadi-badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import type { FadiRuntimeState } from "@/lib/agent/state";
 import { useGroqVoice } from "@/lib/voice/use-groq-voice";
 import { useSpeechOutput } from "@/lib/voice/use-speech-output";
 import { isFadiSpeaking, subscribeFadiSpeaking } from "@/lib/voice/fadi-speech";
@@ -60,7 +61,7 @@ export function FadiChat({
   /** A question handed off from the ⌘K spotlight; fired once per nonce. */
   seed?: { text: string; nonce: number } | null;
   /** Publish Fadi's live state to the ambient orb (only the orb panel passes this). */
-  onStateChange?: (state: "idle" | "listening" | "thinking" | "speaking") => void;
+  onStateChange?: (state: FadiRuntimeState) => void;
   /** The work this conversation is about; null is the general conversation. */
   workItemId?: string | null;
 } = {}) {
@@ -402,13 +403,13 @@ export function FadiChat({
   }
 
   // Fadi's live state — drives the animated persona orb.
-  const fadiState: "speaking" | "thinking" | "listening" | "idle" = isSpeaking
+  const fadiState: FadiRuntimeState = isSpeaking
     ? "speaking"
     : isStreaming || isTranscribing
-      ? "thinking"
+      ? "understanding"
       : isListening
         ? "listening"
-        : "idle";
+        : "ready";
 
   // Publish that live state up to the ambient orb (no-op unless the orb panel
   // passed onStateChange — the dedicated Fadi page leaves the orb alone).
@@ -459,8 +460,8 @@ export function FadiChat({
             <p className="text-sm font-medium">
               {fadiState === "speaking"
                 ? "Fadi is speaking…"
-                : fadiState === "thinking"
-                  ? "Fadi is thinking…"
+                : fadiState === "understanding"
+                  ? "Fadi is understanding…"
                   : fadiState === "listening"
                     ? "Listening — go ahead"
                     : "Say something…"}
@@ -797,7 +798,7 @@ function renderToolResult(r: FadiToolResultView) {
 }
 
 /** Animated Fadi persona — reacts to whether Fadi is listening, thinking, or speaking. */
-function FadiOrb({ state }: { state: "speaking" | "thinking" | "listening" | "idle" }) {
+function FadiOrb({ state }: { state: FadiRuntimeState }) {
   return (
     <div className="relative grid size-10 shrink-0 place-items-center">
       {state === "listening" ? (
@@ -812,11 +813,11 @@ function FadiOrb({ state }: { state: "speaking" | "thinking" | "listening" | "id
       <span
         className={cn(
           "relative grid size-7 place-items-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.66_0.22_285)] shadow",
-          state === "idle" && "animate-pulse",
+          state === "ready" && "animate-pulse",
           state === "listening" && "ring-2 ring-emerald-400/50"
         )}
       >
-        {state === "thinking" ? (
+        {state === "understanding" ? (
           <Loader2 className="size-3.5 animate-spin text-primary-foreground" aria-hidden="true" />
         ) : (
           <span className="size-2.5 rounded-full bg-primary-foreground/90" />
