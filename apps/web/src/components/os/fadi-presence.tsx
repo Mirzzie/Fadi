@@ -11,6 +11,7 @@ import {
 } from "react";
 
 import { subscribeFadiSpeaking } from "@/lib/voice/fadi-speech";
+import type { FadiRuntimeState } from "@/lib/agent/state";
 
 /**
  * Fadi is ambient — one presence the whole OS shares, not a mode you toggle into.
@@ -23,7 +24,7 @@ import { subscribeFadiSpeaking } from "@/lib/voice/fadi-speech";
  * with the same ambient Fadi.
  */
 
-export type FadiState = "idle" | "listening" | "thinking" | "working" | "speaking";
+export type FadiState = FadiRuntimeState;
 
 /** A proactively surfaced card the orb shows without being opened. */
 export type FadiNudge = { label: string; detail: string; href: string };
@@ -69,7 +70,7 @@ const FadiPresenceContext = createContext<FadiPresenceValue | null>(null);
 export function FadiPresenceProvider({ children }: { children: React.ReactNode }) {
   const [open, setOpen] = useState(false);
   const [seed, setSeed] = useState<FadiSeed | null>(null);
-  const [state, setState] = useState<FadiState>("idle");
+  const [state, setState] = useState<FadiState>("ready");
   const [nudge, setNudge] = useState<FadiNudge | null>(null);
   const [focus, setFocus] = useState<FadiFocus | null>(null);
   const [speaking, setSpeaking] = useState(false);

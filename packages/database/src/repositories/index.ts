@@ -24,6 +24,7 @@ export * from "./linkedin-profiles.repository";
 export * from "./mcp-connections.repository";
 export * from "./mcp-tokens.repository";
 export * from "./portfolio.repository";
+export * from "./practice-receipts.repository";
 export * from "./product-events.repository";
 export * from "./profiles.repository";
 export * from "./project-runs.repository";

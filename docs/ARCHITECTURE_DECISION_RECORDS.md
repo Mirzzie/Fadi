@@ -14,6 +14,7 @@ ADRs capture durable decisions that affect ownership, trust boundaries, storage,
 | [0011](adr/0011-lab-resources-and-evidence-capture.md) | Lab resources and evidence capture | Accepted |
 | [0012](adr/0012-local-machine-permission-broker.md) | Local machine permission broker | Accepted |
 | [0013](adr/0013-unified-work-surface-and-multimodal-agent-runtime.md) | Unified work surface and multimodal agent runtime | Proposed |
+| [0014](adr/0014-domain-neutral-practice-runtime.md) | Domain-neutral practice runtime | Proposed |
 
 The earlier framework, auth, ORM, provider, and PostgreSQL decisions predate the numbered files. Their current state is documented in [Architecture](ARCHITECTURE.md), [Authentication](AUTHENTICATION_ARCHITECTURE.md), and [PostgreSQL architecture](POSTGRES_FIRST_ARCHITECTURE.md). Create a retrospective ADR only when a new decision changes one of them.
 

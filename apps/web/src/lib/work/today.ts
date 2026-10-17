@@ -13,6 +13,7 @@ import {
 import { getDatabase } from "@/lib/database/client";
 import { getSetupState } from "@/lib/guidance/setup";
 import { planSteps, proposedPlan, runningPlan } from "./run-plan";
+import { projectAttention } from "./attention";
 import type { CareerMode } from "@/app/dashboard/mode";
 
 /**
@@ -238,29 +239,10 @@ export async function getToday(
         }
       : null);
 
-  const decisions: TodayDecision[] = [
-    ...(pendingReview > 0
-      ? [
-          {
-            id: "evidence-review",
-            title:
-              pendingReview === 1
-                ? "One import is waiting on you"
-                : `${pendingReview} imports are waiting on you`,
-            detail: "Fadi could not tell whether these are the same thing you already have.",
-            href: "/dashboard/evidence",
-            cta: "Review them",
-          },
-        ]
-      : []),
-    ...labRequests.map((request) => ({
-      id: request.id,
-      title: "Fadi is asking to run something",
-      detail: request.summary,
-      href: "/dashboard/learning",
-      cta: "Decide",
-    })),
-  ];
+  const decisions: TodayDecision[] = projectAttention({
+    evidenceReviewCount: pendingReview,
+    labRequests,
+  }).map(({ id, title, detail, href, cta }) => ({ id, title, detail, href, cta }));
 
   const planStepViews: TodayPlanStep[] = planRows.map((row) => ({
     id: row.id,

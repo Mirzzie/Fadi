@@ -28,13 +28,14 @@ describe("what a finished project can honestly say", () => {
       [2, "result recorded"],
       [3, "checked"],
     ]);
+    expect(review.lines.every((line) => line.receiptId === null)).toBe(true);
   });
 
   it("a ticked step with nothing recorded never becomes an outcome in the summary", () => {
     const review = completionReview("Harden nginx", steps);
     expect(review.summary).not.toMatch(/Install nginx/);
     expect(review.summary).toMatch(/Configure TLS: nginx -t: syntax is ok/);
-    expect(review.summary).toMatch(/Check headers \(checked in the lab: HSTS present\)/);
+    expect(review.summary).toMatch(/Check headers \(verified: HSTS present\)/);
     expect(review.shownCount).toBe(2);
   });
 
@@ -44,7 +45,7 @@ describe("what a finished project can honestly say", () => {
       steps.map((s) => ({ ...s, artifact: null, completion: "attested" }))
     );
     expect(review.shownCount).toBe(0);
-    expect(review.summary).toBe('Worked through "Harden nginx" in a local lab.');
+    expect(review.summary).toBe('Completed practical work for "Harden nginx".');
   });
 
   it("a check's result shows what was found, not Fadi's command", () => {
@@ -59,9 +60,69 @@ describe("what a finished project can honestly say", () => {
     ]);
     expect(review.lines[0].result).toBe("syntax is ok");
     expect(review.summary).toBe(
-      'Worked through "Harden nginx" in a local lab.\n- Validate config (checked in the lab: syntax is ok)'
+      'Completed practical work for "Harden nginx".\n- Validate config (verified: syntax is ok)'
     );
     expect(review.summary).not.toMatch(/grep/);
+  });
+
+  it("does not invent a lab for browser, document or external work", () => {
+    const review = completionReview("Write an incident brief", [
+      {
+        ordinal: 1,
+        title: "Submit the brief",
+        place: "browser",
+        status: "done",
+        artifact: "brief.pdf",
+        completion: "evidenced",
+      },
+    ]);
+    expect(review.summary).toBe(
+      'Completed practical work for "Write an incident brief".\n- Submit the brief: brief.pdf'
+    );
+    expect(review.summary).not.toMatch(/lab|machine|terminal/i);
+  });
+
+  it("uses the newest passing receipt instead of a copied artifact string", () => {
+    const review = completionReview(
+      "Operate a service",
+      [
+        {
+          id: "step-1",
+          ordinal: 1,
+          title: "Verify it",
+          status: "done",
+          artifact: "old copied output",
+          completion: "verified",
+        },
+      ],
+      [
+        {
+          id: "failed",
+          stepId: "step-1",
+          verdict: "fail",
+          strength: "verified",
+          assessmentKind: "machine_predicate",
+          evidence: { seen: "Stopped" },
+          observedAt: "2026-10-17T10:00:00Z",
+        },
+        {
+          id: "passed",
+          stepId: "step-1",
+          verdict: "pass",
+          strength: "verified",
+          assessmentKind: "machine_predicate",
+          evidence: { seen: "Running", excerpt: "WazuhSvc Running" },
+          observedAt: "2026-10-17T10:05:00Z",
+        },
+      ]
+    );
+
+    expect(review.lines[0]).toMatchObject({
+      proof: "checked",
+      result: "WazuhSvc Running",
+      receiptId: "passed",
+    });
+    expect(review.summary).not.toContain("old copied output");
   });
 
   it("a typed result is never called an attachment", () => {
@@ -101,8 +162,22 @@ describe("what a saved project can become", () => {
 describe("setup is not the person's work (16 Oct 2026)", () => {
   it("leaves out steps Fadi did, so 'Start Wazuh containers' never reaches a résumé", () => {
     const review = completionReview("SIEM", [
-      { ordinal: 1, title: "Start Wazuh containers", place: "fadi", status: "done", artifact: null, completion: "attested" },
-      { ordinal: 2, title: "Install the agent", place: "lab", status: "done", artifact: "WazuhSvc Running", completion: "verified" },
+      {
+        ordinal: 1,
+        title: "Start Wazuh containers",
+        place: "fadi",
+        status: "done",
+        artifact: null,
+        completion: "attested",
+      },
+      {
+        ordinal: 2,
+        title: "Install the agent",
+        place: "lab",
+        status: "done",
+        artifact: "WazuhSvc Running",
+        completion: "verified",
+      },
     ]);
     expect(review.lines.map((line) => line.title)).toEqual(["Install the agent"]);
     expect(review.summary).not.toContain("Start Wazuh containers");

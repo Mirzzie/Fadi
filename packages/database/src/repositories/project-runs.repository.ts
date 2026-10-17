@@ -17,7 +17,7 @@ import { createWorkItemsRepository } from "./work-items.repository";
  * Decide whether a run is finished from its steps. Done means every step done, from a nonempty
  * set; a skipped step is not a met requirement; reopening reopens. Abandoned runs are left alone.
  */
-async function settleRun(db: DbOrTx, runId: string, status: string): Promise<void> {
+export async function settleRun(db: DbOrTx, runId: string, status: string): Promise<void> {
   if (status === "abandoned") return;
   const steps = await db
     .select({ status: projectSteps.status })
@@ -38,7 +38,7 @@ async function settleRun(db: DbOrTx, runId: string, status: string): Promise<voi
 }
 
 /** Keep Today's project action aligned with the project record that owns its truth. */
-async function settleProjectWork(
+export async function settleProjectWork(
   db: DbOrTx,
   userId: string,
   runId: string,
@@ -186,8 +186,11 @@ export function createProjectRunsRepository(db: Database) {
       patch: {
         status: "pending" | "done" | "skipped";
         artifact?: string | null;
-        /** attested | evidenced | verified — see the schema comment. Null when reopened. */
-        completion?: "attested" | "evidenced" | "verified" | null;
+        /**
+         * A person can attest or record a result here. `verified` is deliberately absent: only
+         * the atomic assessment-receipt path may make that stronger claim. Null when reopened.
+         */
+        completion?: "attested" | "evidenced" | null;
       }
     ): Promise<ProjectStep | null> {
       return db.transaction(async (tx) => {
@@ -619,3 +622,5 @@ export function createProjectRunsRepository(db: Database) {
     },
   };
 }
+
+export type ProjectRunsRepository = ReturnType<typeof createProjectRunsRepository>;

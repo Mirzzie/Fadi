@@ -1542,6 +1542,69 @@ export const projectSteps = pgTable(
 export type ProjectStep = typeof projectSteps.$inferSelect;
 
 /**
+ * An immutable assessment receipt for one completed Practice step.
+ *
+ * The source execution remains authoritative for approval and operational history. This row is
+ * the bounded, portable statement a completion review can cite: which versioned assessment ran,
+ * what it concluded, what Fadi actually observed and how strong that conclusion is. It keeps its
+ * labels if the temporary project is later removed, like `work_executions` keeps its work label.
+ */
+export const practiceReceipts = pgTable(
+  "practice_receipts",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    runId: uuid("run_id").references(() => projectRuns.id, { onDelete: "set null" }),
+    stepId: uuid("step_id").references(() => projectSteps.id, { onDelete: "set null" }),
+    runLabel: text("run_label").notNull(),
+    stepLabel: text("step_label").notNull(),
+    /** machine_predicate | submission | rubric | scenario_outcome | external_credential | reflection | attestation */
+    assessmentKind: text("assessment_kind").notNull(),
+    /** Stable catalogue id and the exact version whose semantics produced the verdict. */
+    assessmentId: text("assessment_id").notNull(),
+    assessmentVersion: text("assessment_version").notNull(),
+    /** pass | fail | unknown. Unknown is never rewritten as failure. */
+    verdict: text("verdict").notNull(),
+    /** self_reported | recorded | observed | verified */
+    strength: text("strength").notNull(),
+    /** lab_action_request | work_execution | external | user */
+    sourceKind: text("source_kind").notNull(),
+    /** Id in the source authority. One source can produce at most one receipt. */
+    sourceRefId: text("source_ref_id").notNull(),
+    observerId: text("observer_id").notNull(),
+    observerVersion: text("observer_version").notNull(),
+    /** Bounded by the repository: human summary plus optional excerpt and typed output refs. */
+    evidence: jsonb("evidence")
+      .$type<{
+        seen: string;
+        excerpt?: string;
+        outputs?: Array<{ kind: string; ref: string }>;
+      }>()
+      .notNull(),
+    observedAt: timestamp("observed_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("practice_receipts_source_unique").on(
+      table.userId,
+      table.sourceKind,
+      table.sourceRefId
+    ),
+    index("practice_receipts_run_idx").on(table.userId, table.runId, table.observedAt),
+    index("practice_receipts_step_idx").on(table.userId, table.stepId, table.observedAt),
+    check("practice_receipts_verdict_check", sql`${table.verdict} in ('pass', 'fail', 'unknown')`),
+    check(
+      "practice_receipts_strength_check",
+      sql`${table.strength} in ('self_reported', 'recorded', 'observed', 'verified')`
+    ),
+  ]
+);
+
+export type PracticeReceipt = typeof practiceReceipts.$inferSelect;
+
+/**
  * Every plan a project has had, kept.
  *
  * A project's steps get replaced — re-planned, started over, a step corrected by Fadi — and the

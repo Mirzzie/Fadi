@@ -1,4 +1,5 @@
 import type { GroqVoiceState } from "./use-groq-voice";
+import type { FadiRuntimeState } from "@/lib/agent/state";
 
 export type VoiceSessionPhase =
   | "idle"
@@ -40,3 +41,23 @@ export const VOICE_SESSION_LABEL: Record<VoiceSessionPhase, string> = {
   ready: "Answer ready",
   error: "Needs attention",
 };
+
+/** Keep speech-engine detail local while the rest of Fadi sees one semantic state language. */
+export function voicePhaseToFadiState(phase: VoiceSessionPhase): FadiRuntimeState {
+  switch (phase) {
+    case "requesting":
+      return "waiting_for_approval";
+    case "speaking":
+      return "speaking";
+    case "listening":
+      return "listening";
+    case "transcribing":
+    case "thinking":
+      return "understanding";
+    case "error":
+      return "blocked";
+    case "idle":
+    case "ready":
+      return "ready";
+  }
+}

@@ -11,7 +11,7 @@ import {
   subscribeFadiVoiceProblem,
 } from "@/lib/voice/fadi-speech";
 import { parseVoiceCommand, VOICE_HELP, type VoiceCommand } from "@/lib/voice/commands";
-import { resolveVoiceSessionPhase } from "@/lib/voice/session-state";
+import { resolveVoiceSessionPhase, voicePhaseToFadiState } from "@/lib/voice/session-state";
 import { speakable } from "@/lib/voice/speakable";
 import {
   openThingAction,
@@ -269,13 +269,7 @@ export function useVoiceMode() {
   }, [on, busy, listening, speaking, awaitingSpeech, voiceState, start]);
 
   useEffect(() => {
-    setState(
-      phase === "thinking" || phase === "transcribing" || phase === "requesting"
-        ? "thinking"
-        : phase === "listening"
-          ? "listening"
-          : "idle"
-    );
+    setState(voicePhaseToFadiState(phase));
   }, [phase, setState]);
 
   // Speech has finished when it started and then stopped.

@@ -76,6 +76,11 @@ export async function projectFinishAction(input: {
   const project = await runs.getWithSteps(user.id, id.data);
   if (!project) return { ok: false, message: "That project is unavailable." };
   const savedEvidenceId = project.run.evidenceItemId ?? null;
+  const { createPracticeReceiptsRepository } = await import("@careeros/database");
+  const receipts = await createPracticeReceiptsRepository(getDatabase()).listForRun(
+    user.id,
+    project.run.id
+  );
   const [recordStatus, onPortfolio] = savedEvidenceId
     ? await Promise.all([
         recordStatusOf(user.id, savedEvidenceId),
@@ -89,7 +94,7 @@ export async function projectFinishAction(input: {
       savedEvidenceId,
       recordStatus,
       onPortfolio,
-      review: completionReview(project.run.title, project.steps),
+      review: completionReview(project.run.title, project.steps, receipts),
     },
   };
 }
@@ -296,7 +301,9 @@ async function savedRecord(
     scenario = project.run.detail?.split(/\n{2,}/)[0]?.trim() || null;
     steps = [...project.steps].sort((a, b) => a.ordinal - b.ordinal).map((step) => step.title);
     repoUrl = project.run.repoUrl ?? null;
-    shown = completionReview(project.run.title, project.steps).lines.filter(
+    const { createPracticeReceiptsRepository } = await import("@careeros/database");
+    const receipts = await createPracticeReceiptsRepository(db).listForRun(userId, project.run.id);
+    shown = completionReview(project.run.title, project.steps, receipts).lines.filter(
       (line) => line.proof !== "self-reported"
     );
   } else {
@@ -329,7 +336,7 @@ async function savedRecord(
     evidence.metrics ?? "",
     ...shown.map((line) =>
       line.proof === "checked"
-        ? `${line.title} (checked in the lab: ${line.result ?? "passed"})`
+        ? `${line.title} (verified: ${line.result ?? "passed"})`
         : `${line.title}: ${line.result ?? ""}`
     ),
   ].join("\n");
@@ -487,13 +494,13 @@ export type PostDraft = {
   warnings: string[];
 };
 
-const POST_SYSTEM = `You draft a short LinkedIn post for a person who finished a hands-on practice project.
+const POST_SYSTEM = `You draft a short LinkedIn post for a person who finished a practical activity.
 Use ONLY the facts in their saved evidence and step results. Structure, in plain first person:
-1) what they set out to practise (one sentence, say "in my home lab" or "in a local lab");
+1) what they set out to practise, without inventing where it happened;
 2) one or two concrete things they actually did, naming the real tools;
 3) what they observed or produced;
 4) ONLY IF the evidence records a difficulty or limitation, one sentence about it. Never invent a challenge; if none is recorded, end with what they will practise next only if the evidence says so, otherwise stop.
-A line marked "(checked in the lab: …)" means Fadi confirmed that result — write it as a confirmed result ("confirmed the configuration is valid"), never as a command the person ran.
+A line marked "(verified: …)" means an assessment confirmed that result — write it as a confirmed result, without inventing who or what performed the assessment.
 Rules: 60–150 words. No invented numbers, business impact, production use, employers, clients or mastery claims.
 No hashtags walls (at most 3 relevant hashtags at the end). No emoji. No exclamation marks. No "thrilled", "excited to share", "journey", "delve".
 Write it as work done ("I tested", "I built", "I found"), never as studying ("I'm learning", "I started learning", "my journey") — the same facts read as a practitioner, not a student.

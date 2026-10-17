@@ -77,7 +77,9 @@ export function completionAfterCheck(
   check: StepCheck,
   artifact: string | null,
   unverified: boolean
-): { ok: true; completion: Completion } | { ok: false; reason: "check_failed" | "check_waiting" } {
+):
+  | { ok: true; completion: "attested" | "evidenced" }
+  | { ok: false; reason: "check_failed" | "check_waiting" } {
   if (check.state === "waiting" && !unverified) return { ok: false, reason: "check_waiting" };
   if (check.state === "failed") {
     return unverified
@@ -88,7 +90,7 @@ export function completionAfterCheck(
 }
 
 /** What a step becomes when it is completed with (or without) something recorded. */
-export function completionFor(artifact: string | null | undefined): Completion {
+export function completionFor(artifact: string | null | undefined): "attested" | "evidenced" {
   return artifact && artifact.trim() ? "evidenced" : "attested";
 }
 
