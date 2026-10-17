@@ -577,7 +577,11 @@ function CurrentStep({
 
   const script = stepScript(step.instruction);
   const inLab = !step.place || step.place === "lab";
-  const canRun = canCheck && inLab && Boolean(script) && Boolean(step.check);
+  // A LEARNING step is the person's to do; Fadi checks it. Fadi runs only its own setup work
+  // (place "fadi"). The owner, 17 Oct 2026: "it must not be like I click, copy-paste commands,
+  // then ok ok ok, done — that negates the whole purpose." Run in lab on a learning step was
+  // exactly that, so it is gone; the commands stay as guidance the person types themselves.
+  const canRun = canCheck && step.place === "fadi" && Boolean(script) && Boolean(step.check);
   // Fadi checks inside the lab only. A browser step's result is on the person's screen.
   const canCheckHere = canCheck && inLab;
   const failed = check.state === "failed";
