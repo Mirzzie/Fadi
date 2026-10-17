@@ -559,3 +559,17 @@ export async function cleanSnapshotOf(
   const { cleanSnapshotFor } = await import("./vmware-snapshot");
   return cleanSnapshotFor(names, runId);
 }
+
+/**
+ * Whether the machine has this project's OWN clean start, only an older shared one (present for
+ * information only), or none. Undefined when VMware didn't answer. Only "own" is a reset target.
+ */
+export async function baselineStateOf(
+  vmxPath: string,
+  runId: string
+): Promise<import("./vmware-snapshot").BaselineState | undefined> {
+  const names = await listSnapshots(vmxPath);
+  if (names === null) return undefined;
+  const { baselineStateFor } = await import("./vmware-snapshot");
+  return baselineStateFor(names, runId);
+}

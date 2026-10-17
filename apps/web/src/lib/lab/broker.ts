@@ -9,12 +9,13 @@ import {
   createLabActionsRepository,
   createLabGrantsRepository,
   createLabResourcesRepository,
+  createProjectRunsRepository,
 } from "@careeros/database";
 
 import { composeDockerfile, validateImageSpec } from "./image";
 import { formatMemory } from "./sizes";
 import { describeChanges, validMachineChanges, type MachineChanges } from "./vmware-config";
-import { CLEAN_SNAPSHOT, CLEAN_SNAPSHOT_RE } from "./vmware-snapshot";
+import { CLEAN_SNAPSHOT, CLEAN_SNAPSHOT_RE, projectSnapshot } from "./vmware-snapshot";
 import { CHECK_DID_NOT_PASS } from "./completion";
 import {
   powershellCheck,
@@ -1986,11 +1987,16 @@ function isRecipe(value: string): value is RecipeId {
   return (RECIPE_IDS as readonly string[]).includes(value);
 }
 
-/** Resolve machine-specific parameters from an owner-scoped resource record. */
-async function hydrateRecipeParams(
+/**
+ * Resolve machine-specific parameters from an owner-scoped resource record. Exported so the
+ * run/resource/snapshot binding — the security boundary for snapshot writes — can be tested
+ * directly (Codex re-review, 17 Oct 2026), not only through the full propose/approve path.
+ */
+export async function hydrateRecipeParams(
   userId: string,
   recipe: RecipeId,
-  params: RecipeParams
+  params: RecipeParams,
+  runId: string | null
 ): Promise<RecipeParams | null> {
   if (
     ![
@@ -2013,9 +2019,10 @@ async function hydrateRecipeParams(
   const resourceId = String(params.resourceId ?? "");
   const resource = await createLabResourcesRepository(getDatabase()).get(userId, resourceId);
   if (!resource?.endpoint) return null;
+  let vmxPath: string;
   try {
     const endpoint = new URL(resource.endpoint);
-    const vmxPath = decodeURIComponent(endpoint.pathname);
+    vmxPath = decodeURIComponent(endpoint.pathname);
     if (
       endpoint.protocol !== "vmware:" ||
       (endpoint.hostname && endpoint.hostname !== "local") ||
@@ -2024,10 +2031,26 @@ async function hydrateRecipeParams(
     ) {
       return null;
     }
-    return { ...params, label: resource.label, vmxPath };
   } catch {
     return null;
   }
+  let bound: RecipeParams = { ...params, label: resource.label, vmxPath };
+
+  // THE SNAPSHOT IS DERIVED FROM THE RUN, NOT TAKEN FROM THE CALLER (Codex VM-safety review,
+  // 17 Oct 2026). A reset or a clean-start snapshot must be bound to the run it belongs to and to
+  // that run's machine: otherwise a caller could pass another run's id, another owned machine, or
+  // a hand-written "Fadi clean start …" name and revert a different project's snapshot. So we load
+  // the owner's run, require it to own this resource, and overwrite the snapshot name server-side
+  // with this run's full-id snapshot — ignoring whatever was supplied. Repeated here means it is
+  // re-checked at approval too, since both propose and approve pass through this function.
+  if (recipe === "vmware.snapshot" || recipe === "project.reset") {
+    if (!runId) return null;
+    const project = await createProjectRunsRepository(getDatabase()).getWithSteps(userId, runId);
+    if (!project || project.run.resourceId !== resourceId) return null;
+    bound = { ...bound, snapshot: projectSnapshot(project.run.id) };
+  }
+
+  return bound;
 }
 
 /**
@@ -2098,7 +2121,7 @@ export async function proposeAction(input: {
     });
     return { ok: false, message: "Those aren't parameters Fadi can express safely." };
   }
-  params = await hydrateRecipeParams(input.userId, input.recipe, params);
+  params = await hydrateRecipeParams(input.userId, input.recipe, params, input.runId ?? null);
   if (!params) {
     await audit.record({
       userId: input.userId,
@@ -2536,9 +2559,12 @@ async function runStackStep(step: StackStep): Promise<StepResult> {
 
 /** A check inside the person's VMware machine, over SSH to the address VMware reports. */
 async function runGuestCheck(userId: string, step: GuestCheckStep): Promise<StepResult> {
-  const resolved = await hydrateRecipeParams(userId, "vmware.memory", {
-    resourceId: step.resourceId,
-  });
+  const resolved = await hydrateRecipeParams(
+    userId,
+    "vmware.memory",
+    { resourceId: step.resourceId },
+    null
+  );
   if (!resolved || resolved.vmxPath !== step.vmx) {
     throw new Error("That machine's settings file changed since you approved this.");
   }
@@ -2585,9 +2611,12 @@ async function runGuestCheck(userId: string, step: GuestCheckStep): Promise<Step
 
 /** Change or move a registered VMware machine, after resolving its path again. */
 async function runMachineStep(userId: string, step: MachineStep): Promise<StepResult> {
-  const resolved = await hydrateRecipeParams(userId, "vmware.memory", {
-    resourceId: step.resourceId,
-  });
+  const resolved = await hydrateRecipeParams(
+    userId,
+    "vmware.memory",
+    { resourceId: step.resourceId },
+    null
+  );
   if (!resolved || resolved.vmxPath !== step.vmx) {
     throw new Error("That machine's settings file changed since you approved this.");
   }
@@ -2630,9 +2659,12 @@ async function runMachineStep(userId: string, step: MachineStep): Promise<StepRe
 
 /** Turn on a registered VMware machine's screen, after resolving its path again. */
 async function runScreenStep(userId: string, step: ScreenStep): Promise<StepResult> {
-  const resolved = await hydrateRecipeParams(userId, "vmware.start", {
-    resourceId: step.resourceId,
-  });
+  const resolved = await hydrateRecipeParams(
+    userId,
+    "vmware.start",
+    { resourceId: step.resourceId },
+    null
+  );
   if (!resolved || resolved.vmxPath !== step.vmx) {
     throw new Error("That machine's settings file changed since you approved this.");
   }
@@ -2821,7 +2853,7 @@ export async function approveAndRun(input: {
     });
     return { ok: false, message: "Fadi couldn't re-check that request, so it didn't run it." };
   }
-  params = await hydrateRecipeParams(input.userId, row.recipe, params);
+  params = await hydrateRecipeParams(input.userId, row.recipe, params, row.runId ?? null);
   if (!params) {
     await requests.finish(input.userId, row.id, {
       status: "failed",

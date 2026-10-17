@@ -43,15 +43,18 @@ export function requirementsFor(spec: LabSpec): Requirement[] {
   }
 
   const vmware = spec.placement === "vmware";
-  // Room on this computer, before anything writes to it: the services' data, plus headroom for
-  // a VM snapshot (VMware) or a lab disk copied from its base (Fadi's lab). With 1.3 GB free the
-  // owner's next Wazuh start would simply have failed, and nothing said why (17 Oct 2026).
-  const needGb =
-    spec.services.reduce((sum, s) => sum + (s.diskGb ?? 0), 0) + (vmware ? 10 : 12);
+  // Room on this computer, before anything writes to it — split by the disk each thing lands on
+  // (Codex VM-safety review, 17 Oct 2026): the services' data and Fadi's own lab disk go to
+  // Docker's data-root; a VM snapshot goes beside the .vmx. With 1.3 GB free the owner's next
+  // Wazuh start would simply have failed, and nothing said why (17 Oct 2026).
+  const serviceGb = spec.services.reduce((sum, s) => sum + (s.diskGb ?? 0), 0);
+  const vmGb = vmware ? 10 : 0;
+  const dockerGb = serviceGb + (vmware ? 0 : 12);
+  const needGb = vmGb + dockerGb;
   add({
     id: "host-disk",
     predicate: "host.disk_room",
-    params: { gb: needGb },
+    params: { gb: needGb, vmGb, dockerGb },
     dependsOn: ["lab-spec"],
     blocking: "hard",
     remedy: { kind: "manual", id: "host.disk_room" },

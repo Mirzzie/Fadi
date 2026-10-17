@@ -6,6 +6,7 @@ import { networkInterfaces } from "node:os";
 import { promisify } from "node:util";
 
 import type { PredicateId, Requirement, Verdict } from "./contract";
+import type { DiskTarget } from "./disk";
 
 /**
  * THE FIXED OBSERVERS (G-1). One per predicate; each read-only, bounded in time, owner-scoped
@@ -97,6 +98,24 @@ export async function vmwareNatGateway(): Promise<string | null> {
   return ip ?? null;
 }
 
+/**
+ * Where Docker actually keeps its images and volumes on this computer — asked of the daemon, not
+ * assumed to be /var/lib/docker: it can be a configured data-root (/srv/docker) or a rootless
+ * tree (~/.local/share/docker). Null when Docker doesn't answer or returns no absolute path.
+ */
+export async function dockerDataRoot(): Promise<string | null> {
+  try {
+    const { stdout } = await run("docker", ["info", "--format", "{{.DockerRootDir}}"], {
+      timeout: 8000,
+      maxBuffer: 64 * 1024,
+    });
+    const path = stdout.trim();
+    return path.startsWith("/") ? path : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Per evaluation: the channel and the lab-facts probe are asked once, then shared. */
 export function createObserver(context: ObserveContext) {
   let channel: Promise<Channel | null> | null = null;
@@ -164,29 +183,56 @@ export function createObserver(context: ObserveContext) {
       }
 
       case "host.disk_room": {
-        // Where VMs live (the home disk) and where Docker keeps images and volumes.
-        const { statfs } = await import("node:fs/promises");
-        const { homedir } = await import("node:os");
-        const freeGb = async (path: string) => {
+        // Each disk the lab actually WRITES to, measured for free space AND filesystem identity so
+        // targets that share a disk are summed, not double-counted (Codex re-review, 17 Oct 2026).
+        // A VM lands beside its .vmx; Docker's stacks and Fadi's lab disk land in Docker's
+        // data-root. A required target Fadi can't resolve or read is "unknown", never a pass.
+        const { statfs, stat } = await import("node:fs/promises");
+        const { dirname } = await import("node:path");
+        const { diskRoomVerdict } = await import("./disk");
+        const GIB = 1024 ** 3;
+        const measure = async (
+          path: string
+        ): Promise<{ freeBytes: number | null; fsId: string | null }> => {
           try {
-            const s = await statfs(path);
-            return Math.floor((s.bavail * s.bsize) / 1024 ** 3);
+            const [sf, st] = await Promise.all([statfs(path), stat(path)]);
+            return { freeBytes: sf.bavail * sf.bsize, fsId: String(st.dev) };
           } catch {
-            return null;
+            return { freeBytes: null, fsId: null };
           }
         };
-        const [home, docker] = await Promise.all([freeGb(homedir()), freeGb("/var/lib")]);
-        const need = requirement.params.gb ?? 10;
-        const known = [home, docker].filter((v): v is number => v !== null);
-        if (!known.length) return said("unknown", "Fadi can't read how much space is free.");
-        const least = Math.min(...known);
-        const where =
-          home !== null && docker !== null && home !== docker
-            ? `${home} GB free where your VMs live, ${docker} GB where Docker keeps its data`
-            : `${least} GB free`;
-        return least >= need
-          ? said("pass", `${where} — enough for about ${need} GB.`, { home, docker, need })
-          : said("fail", `${where}; this lab needs about ${need} GB.`, { home, docker, need });
+        const vmware = context.placement === "vmware";
+        // Split (new); fall back to the old single `gb` so an un-migrated requirement still works.
+        const vmGb = requirement.params.vmGb ?? (vmware ? (requirement.params.gb ?? 10) : 0);
+        const dockerGb =
+          requirement.params.dockerGb ?? (vmware ? 0 : (requirement.params.gb ?? 12));
+        const targets: DiskTarget[] = [];
+        if (vmGb > 0) {
+          const path = context.vmx ? dirname(context.vmx) : null;
+          const m = path ? await measure(path) : { freeBytes: null, fsId: null };
+          targets.push({
+            role: "vm",
+            label: "the VM's disk",
+            path,
+            needBytes: vmGb * GIB,
+            freeBytes: m.freeBytes,
+            fsId: m.fsId,
+          });
+        }
+        if (dockerGb > 0) {
+          const path = await dockerDataRoot();
+          const m = path ? await measure(path) : { freeBytes: null, fsId: null };
+          targets.push({
+            role: "docker",
+            label: "Docker's data",
+            path,
+            needBytes: dockerGb * GIB,
+            freeBytes: m.freeBytes,
+            fsId: m.fsId,
+          });
+        }
+        const result = diskRoomVerdict(targets);
+        return said(result.verdict, result.seen, result.evidence);
       }
 
       case "host.firewall_allows": {
@@ -213,13 +259,36 @@ export function createObserver(context: ObserveContext) {
 
       case "machine.baseline": {
         if (!context.vmx) return said("unknown", "No VMware machine is chosen.");
-        const { cleanSnapshotOf } = await import("../vmware");
-        const snapshot = await cleanSnapshotOf(context.vmx, context.runId);
-        return snapshot === undefined
-          ? said("unknown", "VMware didn't answer, so Fadi can't list the machine's snapshots.")
-          : snapshot
-            ? said("pass", `Starting over returns the machine to “${snapshot}”.`, { snapshot })
-            : said("fail", "This project has no clean start saved on the machine yet.");
+        const { baselineStateOf } = await import("../vmware");
+        const state = await baselineStateOf(context.vmx, context.runId);
+        if (state === undefined) {
+          return said(
+            "unknown",
+            "VMware didn't answer, so Fadi can't list the machine's snapshots."
+          );
+        }
+        // Only the project's OWN snapshot is a reset target. The older shared "Fadi clean start"
+        // is never reverted to (it would wipe other projects) and is not copied into a baseline
+        // either — Fadi can't know it is this project's intended start (Codex re-review, 17 Oct).
+        const { projectSnapshot } = await import("../vmware-snapshot");
+        switch (state) {
+          case "own":
+            return said(
+              "pass",
+              `Starting over returns the machine to this project's clean start.`,
+              { snapshot: projectSnapshot(context.runId), baseline: state }
+            );
+          case "legacy_present":
+            return said(
+              "fail",
+              "This machine has an older shared clean start, but not one for this project — and Fadi won't reset to the shared one. With the machine in the state this project should begin from, save its own clean start.",
+              { baseline: state }
+            );
+          case "missing":
+            return said("fail", "This project has no clean start saved on the machine yet.", {
+              baseline: state,
+            });
+        }
       }
 
       case "machine.running": {

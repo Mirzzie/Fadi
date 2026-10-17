@@ -26,6 +26,9 @@ const findLive = vi.fn();
 const proposed: Record<string, unknown>[] = [];
 let pendingCapabilityResult: unknown = null;
 const record = vi.fn();
+// Owner-scoped lookups used by the snapshot write binding (see the binding tests at the end).
+const resourceGet = vi.fn();
+const runGetWithSteps = vi.fn();
 
 vi.mock("node:child_process", () => ({
   // promisify looks for this symbol; without it the promisified call gets a callback
@@ -52,6 +55,8 @@ vi.mock("@careeros/database", () => ({
     get: async () => null,
     executedLastHour: async () => 0,
   }),
+  createLabResourcesRepository: () => ({ get: resourceGet }),
+  createProjectRunsRepository: () => ({ getWithSteps: runGetWithSteps }),
 }));
 
 beforeEach(() => {
@@ -276,5 +281,76 @@ describe("permission is asked at the trigger, not stockpiled in advance", () => 
     // Recorded, but as an ask rather than an incident.
     expect(record.mock.calls.some((c) => c[0].decision === "asked")).toBe(true);
     expect(record.mock.calls.some((c) => c[0].decision === "denied")).toBe(false);
+  });
+});
+
+/**
+ * THE SECURITY BOUNDARY FOR SNAPSHOT WRITES (Codex VM-safety review + re-review, 17 Oct 2026).
+ *
+ * A snapshot or project reset must be bound to the run that owns the machine, and the snapshot
+ * name is derived server-side from that run — never trusted from the caller. hydrateRecipeParams
+ * runs at BOTH propose and approval, so these tests exercise the function directly for the cases
+ * Codex asked for: mismatched run/resource, a caller-supplied snapshot override, a missing run,
+ * and reassignment between proposal and approval.
+ */
+describe("snapshot writes are bound to the run that owns the machine", () => {
+  const RUN = "df3e6d83-fca4-4848-9782-0e3b04a87eda";
+  const OWN_SNAPSHOT = "Fadi clean start df3e6d83fca4484897820e3b04a87eda";
+  const RESOURCE = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
+  const OTHER = "ffffffff-1111-4222-8333-444444444444";
+
+  beforeEach(() => {
+    resourceGet.mockReset();
+    runGetWithSteps.mockReset();
+    resourceGet.mockResolvedValue({
+      id: RESOURCE,
+      label: "Win11",
+      endpoint: "vmware://local/home/u/vms/win11.vmx",
+    });
+    runGetWithSteps.mockResolvedValue({ run: { id: RUN, resourceId: RESOURCE }, steps: [] });
+  });
+
+  it("overwrites a caller-supplied snapshot name with the run's own full-id snapshot", async () => {
+    const { hydrateRecipeParams } = await import("./broker");
+    const out = await hydrateRecipeParams(
+      "u1",
+      "vmware.snapshot",
+      // A caller trying to name another project's (or a hand-crafted) snapshot.
+      { resourceId: RESOURCE, snapshot: "Fadi clean start deadbeef" },
+      RUN
+    );
+    expect(out?.snapshot).toBe(OWN_SNAPSHOT);
+  });
+
+  it("rejects when the run does not own the named resource", async () => {
+    runGetWithSteps.mockResolvedValue({ run: { id: RUN, resourceId: OTHER }, steps: [] });
+    const { hydrateRecipeParams } = await import("./broker");
+    expect(
+      await hydrateRecipeParams("u1", "project.reset", { resourceId: RESOURCE, name: "x" }, RUN)
+    ).toBeNull();
+  });
+
+  it("rejects a snapshot write with no run to bind to", async () => {
+    const { hydrateRecipeParams } = await import("./broker");
+    expect(
+      await hydrateRecipeParams("u1", "vmware.snapshot", { resourceId: RESOURCE }, null)
+    ).toBeNull();
+  });
+
+  it("re-checks at approval: a resource reassigned after the proposal is refused on the second pass", async () => {
+    const { hydrateRecipeParams } = await import("./broker");
+    // Proposal time: the run owns the resource, so it binds.
+    const proposed = await hydrateRecipeParams(
+      "u1",
+      "vmware.snapshot",
+      { resourceId: RESOURCE },
+      RUN
+    );
+    expect(proposed?.snapshot).toBe(OWN_SNAPSHOT);
+    // Between proposal and approval the run is reassigned to a different machine.
+    runGetWithSteps.mockResolvedValue({ run: { id: RUN, resourceId: OTHER }, steps: [] });
+    expect(
+      await hydrateRecipeParams("u1", "vmware.snapshot", { resourceId: RESOURCE }, RUN)
+    ).toBeNull();
   });
 });

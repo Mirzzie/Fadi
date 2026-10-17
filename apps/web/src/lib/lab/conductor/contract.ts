@@ -55,7 +55,15 @@ export type Requirement = {
   id: string;
   predicate: PredicateId;
   /** Typed parameters; only numbers and closed keys, never free text. */
-  params: { ports?: number[]; iface?: string; stack?: string; gb?: number };
+  params: {
+    ports?: number[];
+    iface?: string;
+    stack?: string;
+    gb?: number;
+    /** host.disk_room: bytes needed beside the .vmx (VM) and in Docker's data-root, in GB. */
+    vmGb?: number;
+    dockerGb?: number;
+  };
   dependsOn: string[];
   /** A hard requirement holds the plan back; a soft one is shown but does not. */
   blocking: "hard" | "soft";
@@ -93,7 +101,9 @@ export const PREDICATES: Record<PredicateId, PredicateDefinition> = {
   },
   "host.disk_room": {
     id: "host.disk_room",
-    version: 1,
+    // v2: measures the real write targets (beside the .vmx; Docker's data-root), not /var/lib
+    // and $HOME, so older observations are re-taken (Codex VM-safety review, 17 Oct 2026).
+    version: 2,
     place: "host",
     scope: "host",
     freshnessMs: 2 * 60_000,
@@ -162,6 +172,8 @@ export function paramsKey(params: Requirement["params"]): string {
     (params.ports ?? []).join(","),
     params.stack ?? "",
     params.gb ? `${params.gb}gb` : "",
+    params.vmGb ? `vm${params.vmGb}` : "",
+    params.dockerGb ? `dk${params.dockerGb}` : "",
   ]
     .filter(Boolean)
     .join(":");
