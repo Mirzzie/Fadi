@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { evaluatePracticePack, type PracticePack } from "./pack";
+import type { PracticeReleaseContext } from "./release";
 
 const adapter = (id: string) => ({ id, version: "1.0.0" });
+const digest = `sha256:${"a".repeat(64)}`;
+const packDigest = `sha256:${"c".repeat(64)}`;
 
 function pack(overrides: Partial<PracticePack> = {}): PracticePack {
   return {
@@ -44,9 +47,64 @@ function pack(overrides: Partial<PracticePack> = {}): PracticePack {
   };
 }
 
+function release(overrides: Partial<PracticeReleaseContext> = {}): PracticeReleaseContext {
+  return {
+    adapters: [
+      {
+        schemaVersion: 1,
+        id: "rubric.incident-brief",
+        version: "1.0.0",
+        digest,
+        kind: "assessment",
+        supports: ["rubric"],
+        operations: [],
+        trust: "reviewed",
+        review: { reviewedBy: "maintainer@example.test", reviewedAt: "2026-10-17T12:00:00Z" },
+      },
+    ],
+    checks: [
+      {
+        schemaVersion: 1,
+        packId: "incident-brief",
+        packVersion: "1.0.0",
+        packDigest,
+        activityId: "brief",
+        verdict: "pass",
+        adapterDigests: [{ id: "rubric.incident-brief", version: "1.0.0", digest }],
+        environmentFingerprint: "fadi:test:document-v1",
+        stages: ["prepare", "execute", "assess", "cleanup"].map((stage) => ({
+          stage,
+          verdict: "pass",
+          seen: `${stage} passed`,
+        })),
+        verifiedAt: "2026-10-17T12:00:00Z",
+        expiresAt: "2027-01-17T12:00:00Z",
+      },
+    ],
+    environmentFingerprint: "fadi:test:document-v1",
+    packDigest,
+    now: new Date("2026-10-18T12:00:00Z"),
+    ...overrides,
+  };
+}
+
 describe("Practice pack evaluation", () => {
   it("allows a reviewed non-technical pack to be recommended", () => {
-    expect(evaluatePracticePack(pack())).toEqual({ valid: true, recommendable: true, issues: [] });
+    expect(evaluatePracticePack(pack(), release())).toEqual({
+      valid: true,
+      recommendable: true,
+      issues: [],
+    });
+  });
+
+  it("does not confuse a human-reviewed file with a working release", () => {
+    const result = evaluatePracticePack(pack());
+    expect(result.valid).toBe(true);
+    expect(result.recommendable).toBe(false);
+    expect(result.issues.map((issue) => issue.code)).toEqual([
+      "adapter_unavailable",
+      "release_check_missing",
+    ]);
   });
 
   it("keeps an otherwise valid experimental pack visibly experimental", () => {
@@ -90,5 +148,83 @@ describe("Practice pack evaluation", () => {
     const result = evaluatePracticePack(pack({ review: null }));
     expect(result.valid).toBe(false);
     expect(result.issues[0]?.code).toBe("invalid_pack");
+  });
+
+  it("requires the rehearsal to bind the exact installed adapter digest", () => {
+    const context = release();
+    const check = context.checks[0] as { adapterDigests: Array<{ digest: string }> };
+    check.adapterDigests[0].digest = `sha256:${"b".repeat(64)}`;
+    const result = evaluatePracticePack(pack(), context);
+    expect(result.recommendable).toBe(false);
+    expect(result.issues.map((issue) => issue.code)).toContain("release_adapter_mismatch");
+  });
+
+  it("requires the rehearsal to bind the exact pack content, not only its name and version", () => {
+    const context = release({ packDigest: `sha256:${"d".repeat(64)}` });
+    const result = evaluatePracticePack(pack(), context);
+    expect(result.recommendable).toBe(false);
+    expect(result.issues.map((issue) => issue.code)).toContain("release_content_mismatch");
+  });
+
+  it("does not accept an adapter with the right name but the wrong role", () => {
+    const context = release();
+    context.adapters = [
+      {
+        ...(context.adapters[0] as Record<string, unknown>),
+        kind: "environment",
+        supports: ["document"],
+        operations: [],
+      },
+    ];
+    const result = evaluatePracticePack(pack(), context);
+    expect(result.recommendable).toBe(false);
+    expect(result.issues.map((issue) => issue.code)).toContain("adapter_kind_mismatch");
+  });
+
+  it("preserves a failed rehearsal and refuses to recommend the release", () => {
+    const context = release();
+    context.checks = [
+      {
+        ...(context.checks[0] as Record<string, unknown>),
+        verdict: "fail",
+        stages: ["prepare", "execute", "assess", "cleanup"].map((stage) => ({
+          stage,
+          verdict: stage === "assess" ? "fail" : "pass",
+          seen: stage === "assess" ? "Expected output absent" : `${stage} passed`,
+        })),
+      },
+    ];
+    const result = evaluatePracticePack(pack(), context);
+    expect(result.recommendable).toBe(false);
+    expect(result.issues.map((issue) => issue.code)).toContain("release_check_failed");
+  });
+
+  it("does not silently fall back to an older pass when matching release evidence is malformed", () => {
+    const context = release();
+    context.checks.push({
+      packId: "incident-brief",
+      packVersion: "1.0.0",
+      activityId: "brief",
+      verdict: "pass",
+      verifiedAt: "later but incomplete",
+    });
+    const result = evaluatePracticePack(pack(), context);
+    expect(result.recommendable).toBe(false);
+    expect(result.issues.map((issue) => issue.code)).toContain("release_check_invalid");
+  });
+
+  it("expires a rehearsal and refuses one from a different environment", () => {
+    const result = evaluatePracticePack(
+      pack(),
+      release({
+        now: new Date("2028-01-01T00:00:00Z"),
+        environmentFingerprint: "fadi:production:document-v2",
+      })
+    );
+    expect(result.recommendable).toBe(false);
+    expect(result.issues.map((issue) => issue.code)).toEqual([
+      "release_check_expired",
+      "release_environment_mismatch",
+    ]);
   });
 });

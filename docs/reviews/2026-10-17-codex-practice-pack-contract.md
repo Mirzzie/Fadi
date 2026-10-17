@@ -67,6 +67,32 @@ lint is clean, and the full web suite passes with bounded concurrency: **183 fil
 skipped; 1,682 tests passed, 187 skipped**. The default high-concurrency run still starves the known
 five-second cold import in `data-sources/providers.test.ts`; that file passes alone.
 
+## V4 release gate: reviewed content is not yet a working activity
+
+The first evaluator called a reviewed pack recommendable as soon as its JSON was structurally
+valid. That contradicted its own warning that adapter tests happen separately: a pack could name an
+adapter that was absent, changed or never exercised and still receive `recommendable: true`.
+
+The evaluator now needs three different facts before it recommends an activity:
+
+1. the pack version has a named content review;
+2. every exact environment and assessment adapter is installed, reviewed, supports the declared
+   kind, and has the implementation digest the rehearsal used;
+3. that exact pack/activity version has a current passing end-to-end release check for the current
+   environment fingerprint.
+
+`release.ts` defines the distribution boundary. Adapter manifests contain closed operation ids,
+bounded timeouts, risk and approval capabilities, a versioned success assessment, and rollback or
+cleanup references. They contain no argv, scripts or model prose. Release checks keep prepare,
+execute, assess and cleanup outcomes and preserve failed/unknown rehearsals as diagnoses. They are
+quality records for an activity release; they can never become a learner's career evidence.
+
+This remains a pure contract with no new table or UI. Focused contract/evaluator tests now pass
+32/32, including wrong adapter role, changed pack/adapter digest, malformed release evidence,
+expired/different environment, missing approval, unbounded execution, missing rollback and failed
+rehearsal cases. The full web suite
+passes with bounded concurrency: **184 files passed, 38 skipped; 1,700 tests passed, 187 skipped**.
+
 ## Next slice
 
 Do not add a pack browser yet. Claude's first document-plus-rubric work simulation should consume

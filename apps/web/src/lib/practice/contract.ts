@@ -52,7 +52,7 @@ export type PracticeEnvironmentKind = (typeof practiceEnvironmentKinds)[number];
 export type PracticeAssessmentKind = (typeof practiceAssessmentKinds)[number];
 export type PracticeOutputKind = (typeof practiceOutputKinds)[number];
 
-const adapterRefSchema = z
+export const adapterRefSchema = z
   .object({
     id: z.string().trim().min(1).max(120),
     version: z.string().trim().min(1).max(40),
