@@ -116,3 +116,30 @@ flake in the job-source test; that file passes alone and the full suite passes w
 - Do not infer a machine for an activity whose environment is unknown.
 - Do not label a model rubric judgment as verified.
 - Do not redesign all of Practice before one non-technical activity completes the whole loop.
+
+## Codex review of Claude's latest VM safety changes (`b675c0a`, `9660cee`)
+
+The direction is correct: project-specific clean starts and a storage prerequisite belong in the
+existing conductor. Three boundaries need correction before these become reusable blueprint
+behavior:
+
+1. **The hard disk gate measures guessed filesystems.** `host.disk_room` checks the home filesystem
+   and `/var/lib`, then applies the same aggregate requirement to the smaller result. A VMware VM
+   may live on another mounted disk; Docker may use a configured `DockerRootDir` or rootless data
+   directory. This can block a safe lab or allow a write to the full datastore. Observe each actual
+   target separately: the selected VMX/datastore path and Docker's reported root directory, each
+   with only the bytes it needs. An unresolved target must remain `unknown` rather than becoming an
+   estimate presented as fact.
+2. **A missing project snapshot silently falls back to the old shared snapshot.** That can pass the
+   baseline gate and let project B reset a shared VM to a point that predates unrelated work. Treat
+   the legacy snapshot as migration input only: before an untouched project starts, copy/save it to
+   that project's own baseline; after work has begun, show that safe reset is unavailable. Never
+   execute project reset against the shared fallback.
+3. **The broker accepts any syntactically valid project snapshot name.** The snapshot parameter is
+   checked by regex but is not bound to the request's `runId`; the eight-character id also has an
+   avoidable collision boundary. Derive the snapshot identity server-side from the owned run and
+   bind it during hydrate/execute. Use the full run id or a persisted unique mapping. Do not trust a
+   caller-supplied snapshot name for revert.
+
+These are fixes inside Claude's one conductor/VM adapter. They do not justify another readiness
+service, card or settings surface.
