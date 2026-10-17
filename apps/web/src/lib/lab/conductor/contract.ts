@@ -18,6 +18,7 @@ export type PredicateId =
   | "lab_spec.exists"
   | "host.vmnet_dns"
   | "host.firewall_allows"
+  | "host.disk_room"
   | "machine.baseline"
   | "machine.running"
   | "machine.check_channel"
@@ -41,7 +42,12 @@ export type RemedyRef =
   | { kind: "recipe"; id: "lab.start" | "vmware.snapshot" | "stack.start" }
   | {
       kind: "manual";
-      id: "host.vmnet_dns" | "host.firewall_vmnet" | "lab.dns_forwarder" | "lab.dns_client";
+      id:
+        | "host.vmnet_dns"
+        | "host.firewall_vmnet"
+        | "host.disk_room"
+        | "lab.dns_forwarder"
+        | "lab.dns_client";
     }
   | { kind: "flow"; id: "checks.setup" | "plan.create" | "machine.choose" };
 
@@ -49,7 +55,7 @@ export type Requirement = {
   id: string;
   predicate: PredicateId;
   /** Typed parameters; only numbers and closed keys, never free text. */
-  params: { ports?: number[]; iface?: string; stack?: string };
+  params: { ports?: number[]; iface?: string; stack?: string; gb?: number };
   dependsOn: string[];
   /** A hard requirement holds the plan back; a soft one is shown but does not. */
   blocking: "hard" | "soft";
@@ -84,6 +90,13 @@ export const PREDICATES: Record<PredicateId, PredicateDefinition> = {
     place: "host",
     scope: "host",
     freshnessMs: 10 * 60_000,
+  },
+  "host.disk_room": {
+    id: "host.disk_room",
+    version: 1,
+    place: "host",
+    scope: "host",
+    freshnessMs: 2 * 60_000,
   },
   "host.firewall_allows": {
     id: "host.firewall_allows",
@@ -144,7 +157,12 @@ export const PREDICATES: Record<PredicateId, PredicateDefinition> = {
 };
 
 export function paramsKey(params: Requirement["params"]): string {
-  return [params.iface ?? "", (params.ports ?? []).join(","), params.stack ?? ""]
+  return [
+    params.iface ?? "",
+    (params.ports ?? []).join(","),
+    params.stack ?? "",
+    params.gb ? `${params.gb}gb` : "",
+  ]
     .filter(Boolean)
     .join(":");
 }

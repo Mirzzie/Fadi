@@ -89,6 +89,7 @@ async function contextFor(userId: string, runId: string): Promise<ObserveContext
       key,
       label: stack.label,
       agentPorts: stack.agentPorts,
+      diskGb: stack.diskGb,
       project: stackProject(labName, key),
       probe: `${host}:${stack.agentPorts[stack.agentPorts.length - 1]}`,
     };

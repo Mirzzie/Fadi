@@ -163,6 +163,32 @@ export function createObserver(context: ObserveContext) {
               );
       }
 
+      case "host.disk_room": {
+        // Where VMs live (the home disk) and where Docker keeps images and volumes.
+        const { statfs } = await import("node:fs/promises");
+        const { homedir } = await import("node:os");
+        const freeGb = async (path: string) => {
+          try {
+            const s = await statfs(path);
+            return Math.floor((s.bavail * s.bsize) / 1024 ** 3);
+          } catch {
+            return null;
+          }
+        };
+        const [home, docker] = await Promise.all([freeGb(homedir()), freeGb("/var/lib")]);
+        const need = requirement.params.gb ?? 10;
+        const known = [home, docker].filter((v): v is number => v !== null);
+        if (!known.length) return said("unknown", "Fadi can't read how much space is free.");
+        const least = Math.min(...known);
+        const where =
+          home !== null && docker !== null && home !== docker
+            ? `${home} GB free where your VMs live, ${docker} GB where Docker keeps its data`
+            : `${least} GB free`;
+        return least >= need
+          ? said("pass", `${where} — enough for about ${need} GB.`, { home, docker, need })
+          : said("fail", `${where}; this lab needs about ${need} GB.`, { home, docker, need });
+      }
+
       case "host.firewall_allows": {
         const { firewallVerdict } = await import("./firewall");
         const read = (path: string) => readFile(path, "utf8").catch(() => null);

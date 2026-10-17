@@ -14,7 +14,7 @@ export type LabSpec = {
   placement: "vmware" | "fadi-container" | "none";
   /** A plan can be made at all (a lab template or a chosen machine exists). */
   hasSpec: boolean;
-  services: Array<{ key: string; label: string; agentPorts: number[] }>;
+  services: Array<{ key: string; label: string; agentPorts: number[]; diskGb?: number }>;
   /**
    * The project already has finished steps. Then a snapshot is no longer a clean start — the
    * machine has the project's changes in it — so it is advice, not a gate: it held the owner's
@@ -43,6 +43,21 @@ export function requirementsFor(spec: LabSpec): Requirement[] {
   }
 
   const vmware = spec.placement === "vmware";
+  // Room on this computer, before anything writes to it: the services' data, plus headroom for
+  // a VM snapshot (VMware) or a lab disk copied from its base (Fadi's lab). With 1.3 GB free the
+  // owner's next Wazuh start would simply have failed, and nothing said why (17 Oct 2026).
+  const needGb =
+    spec.services.reduce((sum, s) => sum + (s.diskGb ?? 0), 0) + (vmware ? 10 : 12);
+  add({
+    id: "host-disk",
+    predicate: "host.disk_room",
+    params: { gb: needGb },
+    dependsOn: ["lab-spec"],
+    blocking: "hard",
+    remedy: { kind: "manual", id: "host.disk_room" },
+    title: `This computer has room for the lab (about ${needGb} GB)`,
+    why: "Snapshots, lab disks and the services' data all need space; without it they fail halfway.",
+  });
   if (vmware) {
     add({
       id: "host-dns",
@@ -71,7 +86,7 @@ export function requirementsFor(spec: LabSpec): Requirement[] {
       id: "baseline",
       predicate: "machine.baseline",
       params: {},
-      dependsOn: ["lab-spec"],
+      dependsOn: ["lab-spec", "host-disk"],
       blocking: spec.progressed ? "soft" : "hard",
       // Once the project has changed the machine, a snapshot would not be a clean start: offer
       // none (16 Oct 2026 — one was saved mid-project and the reset brought the session back).
@@ -85,7 +100,7 @@ export function requirementsFor(spec: LabSpec): Requirement[] {
     id: "machine",
     predicate: "machine.running",
     params: {},
-    dependsOn: vmware && !spec.progressed ? ["baseline"] : ["lab-spec"],
+    dependsOn: vmware && !spec.progressed ? ["baseline"] : ["lab-spec", "host-disk"],
     blocking: "hard",
     remedy: { kind: "recipe", id: "lab.start" },
     title: "The lab machine is running",
@@ -120,7 +135,7 @@ export function requirementsFor(spec: LabSpec): Requirement[] {
       id: running,
       predicate: "service.running",
       params: { stack: service.key },
-      dependsOn: vmware && spec.services.length ? ["host-firewall"] : ["lab-spec"],
+      dependsOn: vmware && spec.services.length ? ["host-firewall", "host-disk"] : ["host-disk"],
       blocking: "hard",
       remedy: { kind: "recipe", id: "stack.start" },
       title: `${service.label} is running`,

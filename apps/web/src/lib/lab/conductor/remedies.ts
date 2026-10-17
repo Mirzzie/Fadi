@@ -85,6 +85,16 @@ export function remedyView(
           "Clear-DnsClientCache",
         ],
       };
+    case "host.disk_room":
+      return {
+        kind: "manual",
+        id: remedy.id,
+        label: "Free some space",
+        place: "host",
+        explain:
+          "Fadi deletes nothing of yours. The usual big items are virtual machines you no longer use, package caches (paru -Sc, yay -Sc) and Docker images no lab uses (docker image prune). Fadi's own lab folders are listed under Environment → Details.",
+        commands: [],
+      };
     case "host.firewall_vmnet": {
       const ports = requirement.params.ports ?? [];
       const range =

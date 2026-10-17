@@ -11,9 +11,10 @@ const siemOnVmware: LabSpec = {
   services: [{ key: "wazuh", label: "Wazuh 4.14.9 SIEM", agentPorts: [1514, 1515] }],
 };
 
+// Room on the computer is assumed unless a test says otherwise.
 const seen = (verdicts: Record<string, Observation["verdict"]>) =>
   new Map(
-    Object.entries(verdicts).map(([requirementId, verdict]) => [
+    Object.entries({ "host-disk": "pass" as const, ...verdicts }).map(([requirementId, verdict]) => [
       requirementId,
       {
         requirementId,
@@ -31,6 +32,7 @@ describe("the requirement graph", () => {
   it("orders a SIEM on VMware the way Codex set: computer, baseline, machine, service, reach, plan", () => {
     expect(orderRequirements(requirementsFor(siemOnVmware)).map((r) => r.id)).toEqual([
       "lab-spec",
+      "host-disk",
       "host-dns",
       "host-firewall",
       "baseline",
@@ -227,5 +229,20 @@ describe("no 'clean start' offered for a machine the project has already changed
     expect(fresh.remedy).toMatchObject({ id: "vmware.snapshot" });
     const begun = requirementsFor({ ...siemOnVmware, progressed: true }).find((r) => r.id === "baseline")!;
     expect(begun.remedy).toBeNull();
+  });
+});
+
+describe("room on this computer (17 Oct 2026: 1.3 GB free)", () => {
+  it("comes before anything that writes: the snapshot, the machine and the services wait for it", () => {
+    const all = requirementsFor({
+      ...siemOnVmware,
+      services: [{ key: "wazuh", label: "Wazuh", agentPorts: [1514, 1515], diskGb: 6 }],
+    });
+    expect(all.find((r) => r.id === "host-disk")?.params.gb).toBe(16);
+    const result = conduct(all, seen({ "lab-spec": "pass", "host-disk": "fail" }));
+    expect(result.next?.requirement.id).toBe("host-disk");
+    for (const id of ["baseline", "service-wazuh"]) {
+      expect(result.items.find((i) => i.requirement.id === id)?.state).toBe("waiting");
+    }
   });
 });
