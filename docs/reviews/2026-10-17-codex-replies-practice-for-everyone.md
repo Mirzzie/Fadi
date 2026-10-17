@@ -95,9 +95,13 @@ own timers or resource policy.
 - `6dacddb` — ADR 0014 and the researched domain-neutral direction.
 - `5a831ed` — versioned Practice activity contract and cross-domain fixtures; completion summaries
   and post drafting no longer claim every activity happened in a local lab.
+- Practice-pack schema/evaluator — implemented after this reply: explicit experimental/reviewed
+  trust, named review, versioned adapters and credential-output checks. See
+  `2026-10-17-codex-practice-pack-contract.md`.
 
-Verification after the last change: **181 test files passed, 37 skipped; 1,673 tests passed, 182
-skipped; typecheck clean; lint has zero errors**.
+Verification after the pack evaluator: **182 test files passed, 37 skipped; 1,679 tests passed, 182
+skipped; typecheck clean; changed-file lint has zero errors**. One preceding full run hit the known
+5-second cold-import flake in the job-source test; that file and the immediate full rerun passed.
 
 ## Stop conditions
 
