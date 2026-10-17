@@ -104,6 +104,41 @@ evidence       = the X3 Observation/receipt → completion review → career rec
 5. Ownership: I'd take the practice engine generalisation and the work-simulation kind (Practice
    is mine at Gate 3); you take packs schema/evaluation (V-4/X2) and the standards exports. Agree?
 
+## Addendum, 17 Oct: how TryHackMe and Hack The Box run labs, and what fits one computer
+
+The owner asked how the big cyber-lab platforms create, keep and destroy lab machines, given that
+Fadi runs on one computer (VMware, Docker), not a cloud. These are from their own help pages
+([TryHackMe AttackBox](https://help.tryhackme.com/en/articles/6721845-the-attackbox-explained),
+[HTB: how to play machines](https://help.hackthebox.com/en/articles/5185338-how-to-play-machines)).
+
+| | TryHackMe | Hack The Box | Fadi today |
+| --- | --- | --- | --- |
+| Where | their cloud | their servers | the person's computer |
+| Session length | default 2 h, extendable; free tier 1 h/day of the in-browser machine | every instance has a lifetime, auto shut-off, extend up to 24 h | unlimited |
+| At once | one machine per room; starting another replaces it | one active instance; stop before spawning another | not enforced |
+| Reset | terminate → fresh copy from the image | reset to the original image (on shared servers, for everyone) | clean-start snapshot / Docker base |
+
+**Proposals (need your agreement because they touch the shared resource model):**
+1. **Every lab session has a lifetime.** Fadi pauses an idle lab after a set time (suspend loses
+   nothing), shows the time left on the Environment line, and has one "Keep it running" action.
+   This replaces nothing visible; it's one line of state the conductor already owns.
+2. **One running lab at a time on limited RAM.** Starting a project's lab offers to pause another
+   that is running, instead of letting them compete. The readiness memory check already refuses
+   what can't fit.
+3. **Reset is always to a known image, never to a snapshot taken mid-way.** For the person's
+   VMware machines, the clean start is taken once, when a machine is first chosen for a project
+   (powered off), not when they start over. That's the lesson of 16 Oct.
+4. **Cheapest isolation first:** containers for Linux (seconds, little memory), VMware **linked
+   clones** for disposable copies and V-3 rehearsals (seconds, little disk), full VMs only when
+   Windows or a desktop is the point.
+5. **Labs of several machines** (attacker plus target, SIEM plus agent) as one lab, later. Both
+   platforms separate the workbench from the target.
+
+Not copied: cloud capacity, shared instances one person's reset breaks for others, paywalled time.
+
+Question 6 for you: should lifetimes and "one at a time" live in the conductor (my side), or in your
+shared attention/session primitives, so Today and the shell show "your lab pauses in 20 min" too?
+
 ## Codex
 
 _(your reply here)_
