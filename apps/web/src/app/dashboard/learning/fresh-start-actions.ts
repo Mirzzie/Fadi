@@ -27,13 +27,14 @@ async function freshStartPlan(userId: string, runId: string, keepMachine = false
   const { existsSync } = await import("node:fs");
   const name = labNameForRun(project.run.id);
 
-  let vmware: { resourceId: string; label: string } | null = null;
+  let vmware: { resourceId: string; label: string; snapshot: string } | null = null;
   if (project.run.resourceId) {
     const resource = await createLabResourcesRepository(db).get(userId, project.run.resourceId);
-    const { hasCleanSnapshot, vmxPathOf } = await import("@/lib/lab/vmware");
+    const { cleanSnapshotOf, vmxPathOf } = await import("@/lib/lab/vmware");
     const vmx = vmxPathOf(resource?.endpoint);
     if (resource && vmx && !keepMachine) {
-      if ((await hasCleanSnapshot(vmx)) !== true) {
+      const snapshot = await cleanSnapshotOf(vmx, project.run.id);
+      if (!snapshot) {
         // Saving a "clean start" now would save this project's own changes as the clean start —
         // what happened on 16 Oct 2026: the reset then put back the very session it was meant to
         // clear. Once a project has begun, the honest choices are to keep the machine as it is,
@@ -48,7 +49,7 @@ async function freshStartPlan(userId: string, runId: string, keepMachine = false
             : `${resource.label} has no clean start to return to yet. If it is as every fresh start should begin, “Save clean start” first.`,
         };
       }
-      vmware = { resourceId: resource.id, label: resource.label };
+      vmware = { resourceId: resource.id, label: resource.label, snapshot };
     }
   }
   const container = Boolean(await containerState(name));
@@ -87,7 +88,9 @@ export async function proposeFreshStartAction(input: {
       container: plan.container,
       disk: plan.disk,
       stacks: plan.stacks,
-      ...(plan.vmware ? { resourceId: plan.vmware.resourceId } : {}),
+      ...(plan.vmware
+        ? { resourceId: plan.vmware.resourceId, snapshot: plan.vmware.snapshot }
+        : {}),
     },
     actor: "user",
     origin: "dashboard:project_reset",
@@ -117,11 +120,23 @@ export async function proposeCleanSnapshotAction(input: {
       message: `The machine already has this project's work in it (${done} step${done === 1 ? "" : "s"} done), so saving it now wouldn't be a clean start — a reset would bring that work back. Save a clean start before a project begins.`,
     };
   }
+  // This project's own clean start, taken with the machine off (shut down first if it runs).
+  const resource = await createLabResourcesRepository(getDatabase()).get(
+    user.id,
+    project.run.resourceId
+  );
+  const { runningVmxPaths, vmxPathOf } = await import("@/lib/lab/vmware");
+  const vmx = vmxPathOf(resource?.endpoint);
+  const { projectSnapshot } = await import("@/lib/lab/vmware-snapshot");
   const { proposeAction } = await import("@/lib/lab/broker");
   const proposal = await proposeAction({
     userId: user.id,
     recipe: "vmware.snapshot",
-    params: { resourceId: project.run.resourceId },
+    params: {
+      resourceId: project.run.resourceId,
+      snapshot: projectSnapshot(project.run.id),
+      stopFirst: Boolean(vmx && (await runningVmxPaths())?.has(vmx)),
+    },
     actor: "user",
     origin: "dashboard:project_reset",
     runId: project.run.id,

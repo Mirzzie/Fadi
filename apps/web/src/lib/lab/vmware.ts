@@ -530,7 +530,7 @@ export async function applyMachineChanges(
 /** The snapshot a project reset returns a VMware machine to. */
 export { CLEAN_SNAPSHOT };
 
-export async function hasCleanSnapshot(vmxPath: string): Promise<boolean | null> {
+export async function listSnapshots(vmxPath: string): Promise<string[] | null> {
   try {
     const { stdout } = await run("vmrun", ["-T", "ws", "listSnapshots", vmxPath], {
       timeout: 15_000,
@@ -538,9 +538,24 @@ export async function hasCleanSnapshot(vmxPath: string): Promise<boolean | null>
     });
     return stdout
       .split("\n")
+      .slice(1)
       .map((line) => line.trim())
-      .includes(CLEAN_SNAPSHOT);
+      .filter(Boolean);
   } catch {
     return null;
   }
+}
+
+/**
+ * The snapshot this project's fresh start returns the machine to: its own, else the machine's
+ * older shared one. Null when there is none; undefined when VMware didn't answer.
+ */
+export async function cleanSnapshotOf(
+  vmxPath: string,
+  runId: string
+): Promise<string | null | undefined> {
+  const names = await listSnapshots(vmxPath);
+  if (names === null) return undefined;
+  const { cleanSnapshotFor } = await import("./vmware-snapshot");
+  return cleanSnapshotFor(names, runId);
 }

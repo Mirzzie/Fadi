@@ -187,13 +187,13 @@ export function createObserver(context: ObserveContext) {
 
       case "machine.baseline": {
         if (!context.vmx) return said("unknown", "No VMware machine is chosen.");
-        const { hasCleanSnapshot, CLEAN_SNAPSHOT } = await import("../vmware");
-        const has = await hasCleanSnapshot(context.vmx);
-        return has === null
+        const { cleanSnapshotOf } = await import("../vmware");
+        const snapshot = await cleanSnapshotOf(context.vmx, context.runId);
+        return snapshot === undefined
           ? said("unknown", "VMware didn't answer, so Fadi can't list the machine's snapshots.")
-          : has
-            ? said("pass", `The machine has the snapshot “${CLEAN_SNAPSHOT}”.`)
-            : said("fail", `The machine has no “${CLEAN_SNAPSHOT}” snapshot yet.`);
+          : snapshot
+            ? said("pass", `Starting over returns the machine to “${snapshot}”.`, { snapshot })
+            : said("fail", "This project has no clean start saved on the machine yet.");
       }
 
       case "machine.running": {

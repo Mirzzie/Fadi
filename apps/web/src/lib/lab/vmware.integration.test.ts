@@ -237,12 +237,14 @@ suite("a project on your own VMware machine", () => {
 
   it("a fresh start returns the machine to its clean start and clears the project", async () => {
     const { proposeAction, approveAndRun } = await import("./broker");
-    const { hasCleanSnapshot } = await import("./vmware");
+    const { cleanSnapshotOf } = await import("./vmware");
+    const { projectSnapshot } = await import("./vmware-snapshot");
     const { labNameForRun } = await import("./templates");
+    // This project's OWN clean start: another project on the same machine keeps its own.
     const snap = await proposeAction({
       userId,
       recipe: "vmware.snapshot",
-      params: { resourceId },
+      params: { resourceId, snapshot: projectSnapshot(runId) },
       actor: "user",
       origin: "test",
       runId,
@@ -250,17 +252,25 @@ suite("a project on your own VMware machine", () => {
     expect(snap.ok && snap.policy.confirm).toBe("click");
     if (!snap.ok) return;
     expect(await approveAndRun({ userId, requestId: snap.requestId })).toMatchObject({ ok: true });
-    expect(await hasCleanSnapshot(vmx)).toBe(true);
+    expect(await cleanSnapshotOf(vmx, runId)).toBe(projectSnapshot(runId));
+    // A different project on the same machine has none of its own yet.
+    expect(await cleanSnapshotOf(vmx, "00000000-0000-4000-8000-000000000000")).toBeNull();
 
     const reset = await proposeAction({
       userId,
       recipe: "project.reset",
-      params: { name: labNameForRun(runId), stacks: [], resourceId },
+      params: {
+        name: labNameForRun(runId),
+        stacks: [],
+        resourceId,
+        snapshot: projectSnapshot(runId),
+      },
       actor: "user",
       origin: "test",
       runId,
     });
     expect(reset.ok && reset.policy.confirm).toBe("type-name");
+    expect(reset.ok && reset.argv.flat()).toContain(projectSnapshot(runId));
     if (!reset.ok) return;
     expect(
       await approveAndRun({ userId, requestId: reset.requestId, confirmation: reset.confirmToken })

@@ -14,7 +14,7 @@ import {
 import { composeDockerfile, validateImageSpec } from "./image";
 import { formatMemory } from "./sizes";
 import { describeChanges, validMachineChanges, type MachineChanges } from "./vmware-config";
-import { CLEAN_SNAPSHOT } from "./vmware-snapshot";
+import { CLEAN_SNAPSHOT, CLEAN_SNAPSHOT_RE } from "./vmware-snapshot";
 import { CHECK_DID_NOT_PASS } from "./completion";
 import {
   powershellCheck,
@@ -1031,27 +1031,45 @@ export const RECIPES: Record<RecipeId, Recipe> = {
    */
   "vmware.snapshot": {
     blast: "vm",
-    reversibility: "reversible",
+    // Shutting a running machine down first interrupts whatever runs in it: disruptive, still
+    // one click (vm). Taken while off, a reset boots fresh — no open windows coming back.
+    reversibility: "disruptive",
     confirmToken: (p) => String(p.label ?? p.resourceId),
     validate: (raw) => {
       const resourceId = str(raw.resourceId);
       if (!resourceId || !zUuid(resourceId)) return null;
+      const snapshot = typeof raw.snapshot === "string" ? raw.snapshot : CLEAN_SNAPSHOT;
+      if (!CLEAN_SNAPSHOT_RE.test(snapshot)) return null;
       return {
         resourceId,
+        snapshot,
+        stopFirst: raw.stopFirst === true,
         label: typeof raw.label === "string" ? raw.label : undefined,
         vmxPath: typeof raw.vmxPath === "string" ? raw.vmxPath : undefined,
       };
     },
     summary: (p) =>
-      `Save ${p.label ?? "your VMware machine"} as it is now as its "${CLEAN_SNAPSHOT}" snapshot. ` +
-      "Resetting a project on it returns the machine to exactly this state — if it is running, " +
-      "to this running moment, open windows and all. For a clean boot, shut it down first.",
-    reversal: () => `Delete the "${CLEAN_SNAPSHOT}" snapshot in VMware.`,
+      (p.stopFirst
+        ? `Shut ${p.label ?? "your VMware machine"} down properly, then save it, switched off, `
+        : `Save ${p.label ?? "your VMware machine"}, switched off, `) +
+      `as this project's clean start ("${p.snapshot}"). Starting this project over returns the ` +
+      "machine to exactly this point and boots it fresh. Other projects on this machine keep their own.",
+    reversal: (p) => `Delete the "${p.snapshot}" snapshot in VMware.`,
     render: (p) => [
+      ...(p.stopFirst
+        ? [
+            {
+              id: "vmware-stop",
+              cmd: "vmrun",
+              args: ["-T", "ws", "stop", String(p.vmxPath), "soft"],
+              timeoutMs: 240_000,
+            },
+          ]
+        : []),
       {
         id: "vmware-snapshot",
         cmd: "vmrun",
-        args: ["-T", "ws", "snapshot", String(p.vmxPath), CLEAN_SNAPSHOT],
+        args: ["-T", "ws", "snapshot", String(p.vmxPath), String(p.snapshot)],
         timeoutMs: 180_000,
       },
     ],
@@ -1133,8 +1151,12 @@ export const RECIPES: Record<RecipeId, Recipe> = {
       if (!stacks.every(isStackKey)) return null;
       const resourceId = str(raw.resourceId);
       if (resourceId && !zUuid(resourceId)) return null;
+      // The project's own clean start (or the machine's older shared one) — never another name.
+      const snapshot = typeof raw.snapshot === "string" ? raw.snapshot : CLEAN_SNAPSHOT;
+      if (!CLEAN_SNAPSHOT_RE.test(snapshot)) return null;
       return {
         name,
+        snapshot,
         container: raw.container === true,
         disk: raw.disk === true,
         stacks,
@@ -1145,7 +1167,7 @@ export const RECIPES: Record<RecipeId, Recipe> = {
     },
     summary: (p) => {
       const parts: string[] = [];
-      if (p.vmxPath) parts.push(`return ${p.label ?? "your VMware machine"} to its "${CLEAN_SNAPSHOT}" snapshot`);
+      if (p.vmxPath) parts.push(`return ${p.label ?? "your VMware machine"} to this project's clean start ("${p.snapshot}")`);
       if (p.container || p.disk) parts.push(`delete ${NAME_PREFIX}${p.name} and its disk (the next start copies your saved base — no download)`);
       for (const key of (p.stacks as StackKey[]) ?? []) parts.push(`remove ${STACKS[key].label} and everything it stored`);
       return (
@@ -1162,7 +1184,7 @@ export const RECIPES: Record<RecipeId, Recipe> = {
               {
                 id: "vmware-revert",
                 cmd: "vmrun",
-                args: ["-T", "ws", "revertToSnapshot", String(p.vmxPath), CLEAN_SNAPSHOT],
+                args: ["-T", "ws", "revertToSnapshot", String(p.vmxPath), String(p.snapshot)],
                 timeoutMs: 180_000,
               },
             ]
