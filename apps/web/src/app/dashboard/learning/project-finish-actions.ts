@@ -76,6 +76,11 @@ export async function projectFinishAction(input: {
   const project = await runs.getWithSteps(user.id, id.data);
   if (!project) return { ok: false, message: "That project is unavailable." };
   const savedEvidenceId = project.run.evidenceItemId ?? null;
+  const { createPracticeReceiptsRepository } = await import("@careeros/database");
+  const receipts = await createPracticeReceiptsRepository(getDatabase()).listForRun(
+    user.id,
+    project.run.id
+  );
   const [recordStatus, onPortfolio] = savedEvidenceId
     ? await Promise.all([
         recordStatusOf(user.id, savedEvidenceId),
@@ -89,7 +94,7 @@ export async function projectFinishAction(input: {
       savedEvidenceId,
       recordStatus,
       onPortfolio,
-      review: completionReview(project.run.title, project.steps),
+      review: completionReview(project.run.title, project.steps, receipts),
     },
   };
 }
@@ -296,7 +301,9 @@ async function savedRecord(
     scenario = project.run.detail?.split(/\n{2,}/)[0]?.trim() || null;
     steps = [...project.steps].sort((a, b) => a.ordinal - b.ordinal).map((step) => step.title);
     repoUrl = project.run.repoUrl ?? null;
-    shown = completionReview(project.run.title, project.steps).lines.filter(
+    const { createPracticeReceiptsRepository } = await import("@careeros/database");
+    const receipts = await createPracticeReceiptsRepository(db).listForRun(userId, project.run.id);
+    shown = completionReview(project.run.title, project.steps, receipts).lines.filter(
       (line) => line.proof !== "self-reported"
     );
   } else {

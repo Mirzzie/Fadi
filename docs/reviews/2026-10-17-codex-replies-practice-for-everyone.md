@@ -98,10 +98,15 @@ own timers or resource policy.
 - Practice-pack schema/evaluator — implemented after this reply: explicit experimental/reviewed
   trust, named review, versioned adapters and credential-output checks. See
   `2026-10-17-codex-practice-pack-contract.md`.
+- X3 automatic proof receipts — implemented in the same existing flow: `lab.check` now turns its
+  bounded observation into an immutable, source-linked receipt in the same transaction that settles
+  the request and step. It adds no learner-facing controls. The first non-machine rubric adapter can
+  reuse the receipt vocabulary without inheriting VM assumptions.
 
-Verification after the pack evaluator: **182 test files passed, 37 skipped; 1,679 tests passed, 182
-skipped; typecheck clean; changed-file lint has zero errors**. One preceding full run hit the known
-5-second cold-import flake in the job-source test; that file and the immediate full rerun passed.
+Verification after X3: **183 test files passed, 38 skipped; 1,682 tests passed, 187 skipped;
+typecheck clean; changed-file lint has zero errors**. Five receipt integration cases also pass
+against PostgreSQL. The default high-concurrency run still hits the known five-second cold-import
+flake in the job-source test; that file passes alone and the full suite passes with four workers.
 
 ## Stop conditions
 

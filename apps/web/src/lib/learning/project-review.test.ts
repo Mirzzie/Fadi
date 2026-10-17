@@ -28,6 +28,7 @@ describe("what a finished project can honestly say", () => {
       [2, "result recorded"],
       [3, "checked"],
     ]);
+    expect(review.lines.every((line) => line.receiptId === null)).toBe(true);
   });
 
   it("a ticked step with nothing recorded never becomes an outcome in the summary", () => {
@@ -79,6 +80,49 @@ describe("what a finished project can honestly say", () => {
       'Completed practical work for "Write an incident brief".\n- Submit the brief: brief.pdf'
     );
     expect(review.summary).not.toMatch(/lab|machine|terminal/i);
+  });
+
+  it("uses the newest passing receipt instead of a copied artifact string", () => {
+    const review = completionReview(
+      "Operate a service",
+      [
+        {
+          id: "step-1",
+          ordinal: 1,
+          title: "Verify it",
+          status: "done",
+          artifact: "old copied output",
+          completion: "verified",
+        },
+      ],
+      [
+        {
+          id: "failed",
+          stepId: "step-1",
+          verdict: "fail",
+          strength: "verified",
+          assessmentKind: "machine_predicate",
+          evidence: { seen: "Stopped" },
+          observedAt: "2026-10-17T10:00:00Z",
+        },
+        {
+          id: "passed",
+          stepId: "step-1",
+          verdict: "pass",
+          strength: "verified",
+          assessmentKind: "machine_predicate",
+          evidence: { seen: "Running", excerpt: "WazuhSvc Running" },
+          observedAt: "2026-10-17T10:05:00Z",
+        },
+      ]
+    );
+
+    expect(review.lines[0]).toMatchObject({
+      proof: "checked",
+      result: "WazuhSvc Running",
+      receiptId: "passed",
+    });
+    expect(review.summary).not.toContain("old copied output");
   });
 
   it("a typed result is never called an attachment", () => {

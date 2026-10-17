@@ -15,10 +15,21 @@ import { isFacilitatorPlace } from "@/lib/practice/contract";
  */
 
 export type ReviewStep = CompletableStep & {
+  id?: string;
   ordinal: number;
   title: string;
   /** Legacy delivery place. "fadi" steps were setup — not the person's work. */
   place?: string | null;
+};
+
+export type ReviewReceipt = {
+  id: string;
+  stepId: string | null;
+  verdict: string;
+  strength: string;
+  assessmentKind: string;
+  evidence: { seen: string; excerpt?: string };
+  observedAt: Date | string;
 };
 
 export type ReviewLine = {
@@ -26,6 +37,8 @@ export type ReviewLine = {
   title: string;
   proof: "checked" | "result recorded" | "self-reported";
   result: string | null;
+  /** The immutable assessment receipt behind a checked line, if there is one. */
+  receiptId: string | null;
 };
 
 export type CompletionReview = {
@@ -36,23 +49,32 @@ export type CompletionReview = {
   shownCount: number;
 };
 
-export function completionReview(title: string, steps: ReviewStep[]): CompletionReview {
+export function completionReview(
+  title: string,
+  steps: ReviewStep[],
+  receipts: ReviewReceipt[] = []
+): CompletionReview {
+  const passedReceipt = newestPassingReceiptByStep(receipts);
   const lines: ReviewLine[] = [...steps]
     // Setup is not learning: "Start Wazuh containers" is not something to claim on a résumé.
     .filter((step) => !isFacilitatorPlace(step.place))
     .sort((a, b) => a.ordinal - b.ordinal)
     .map((step) => {
       const kind = completionOf(step);
+      const receipt = step.id ? passedReceipt.get(step.id) : undefined;
       return {
         ordinal: step.ordinal,
         title: step.title,
         proof:
-          kind === "verified"
+          receipt?.strength === "verified" || (!receipt && kind === "verified")
             ? "checked"
             : kind === "evidenced"
               ? "result recorded"
               : "self-reported",
-        result: readableResult(step.artifact),
+        result: receipt
+          ? receipt.evidence.excerpt?.trim() || receipt.evidence.seen.trim() || null
+          : readableResult(step.artifact),
+        receiptId: receipt?.id ?? null,
       };
     });
 
@@ -67,6 +89,18 @@ export function completionReview(title: string, steps: ReviewStep[]): Completion
   ].join("\n");
 
   return { lines, summary, shownCount: shown.length };
+}
+
+function newestPassingReceiptByStep(receipts: ReviewReceipt[]): Map<string, ReviewReceipt> {
+  const latest = new Map<string, ReviewReceipt>();
+  for (const receipt of receipts) {
+    if (!receipt.stepId || receipt.verdict !== "pass") continue;
+    const held = latest.get(receipt.stepId);
+    if (!held || new Date(receipt.observedAt).getTime() > new Date(held.observedAt).getTime()) {
+      latest.set(receipt.stepId, receipt);
+    }
+  }
+  return latest;
 }
 
 /**

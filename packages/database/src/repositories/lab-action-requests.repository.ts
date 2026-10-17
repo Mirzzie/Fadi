@@ -247,3 +247,5 @@ export function createLabActionRequestsRepository(db: Database) {
     },
   };
 }
+
+export type LabActionRequestsRepository = ReturnType<typeof createLabActionRequestsRepository>;

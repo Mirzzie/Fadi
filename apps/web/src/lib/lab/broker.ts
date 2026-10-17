@@ -2914,21 +2914,31 @@ export async function approveAndRun(input: {
       : verdict.passed
         ? `Check passed: found "${params.expect}".`
         : `${CHECK_DID_NOT_PASS}: "${params.expect}" was not in the output${verdict.exit !== null ? ` (exit ${verdict.exit})` : ""}.`;
-    if (verdict.passed && !stopped && row.stepId) {
-      const { createProjectRunsRepository } = await import("@careeros/database");
-      await createProjectRunsRepository(db).setStepStatus(input.userId, row.stepId, {
-        status: "done",
-        completion: "verified",
-        artifact: `${params.script ? "Ran in the lab and checked" : "Checked in the lab"}: ${String(params.command)} → ${verdict.excerpt}`.slice(
+    if (!row.runId || !row.stepId) {
+      throw new Error("This check is no longer attached to a project step.");
+    }
+    const { redactPracticeProof } = await import("@/lib/practice/proof");
+    const storedDetail = redactPracticeProof(detail).slice(0, 400);
+    const storedOutput = redactPracticeProof(out.join("\n")).slice(-8_000);
+    const storedExcerpt = redactPracticeProof(verdict.excerpt).slice(0, 4_000);
+    const storedCommand = redactPracticeProof(String(params.command));
+    const { createPracticeReceiptsRepository } = await import("@careeros/database");
+    await createPracticeReceiptsRepository(db).completeMachineCheck(input.userId, {
+      requestId: row.id,
+      runId: row.runId,
+      stepId: row.stepId,
+      verdict: verdict.passed && !stopped ? "pass" : "fail",
+      detail: storedDetail,
+      output: storedOutput,
+      artifact:
+        `${params.script ? "Ran in the lab and checked" : "Checked in the lab"}: ${storedCommand} → ${storedExcerpt}`.slice(
           0,
           1_000
         ),
-      });
-    }
-    await requests.finish(input.userId, row.id, {
-      status: "executed",
-      detail: detail.slice(0, 400),
-      output: out.join("\n"),
+      evidence: {
+        seen: storedDetail,
+        excerpt: storedExcerpt,
+      },
     });
     await audit.record({
       userId: input.userId,
