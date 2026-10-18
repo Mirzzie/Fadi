@@ -1429,6 +1429,18 @@ export const projectRuns = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    /**
+     * Set when this project is a Practice-pack activity rather than an AI-planned project: the
+     * exact pack version and activity it runs, and the per-run seed its case data is generated
+     * from (so the case can be regenerated, and nobody's answers fit another person's case).
+     * Null for every other project. ADR 0014: the run stays the one work record.
+     */
+    practice: jsonb("practice").$type<{
+      packId: string;
+      packVersion: string;
+      activityId: string;
+      seed: string;
+    }>(),
     /** The learning commitment this came from, if any. */
     commitmentId: uuid("commitment_id"),
     /**
@@ -1603,6 +1615,39 @@ export const practiceReceipts = pgTable(
 );
 
 export type PracticeReceipt = typeof practiceReceipts.$inferSelect;
+
+/**
+ * What a person handed in for a document step — every attempt kept, never edited, so a review
+ * always refers to the exact text it read and resubmitting after feedback leaves the history
+ * intact (Udacity-style "not yet, revise"). The rubric review's receipt points at one attempt.
+ */
+export const practiceSubmissions = pgTable(
+  "practice_submissions",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    runId: uuid("run_id")
+      .notNull()
+      .references(() => projectRuns.id, { onDelete: "cascade" }),
+    stepId: uuid("step_id")
+      .notNull()
+      .references(() => projectSteps.id, { onDelete: "cascade" }),
+    /** 1, 2, 3… per step. */
+    attempt: integer("attempt").notNull(),
+    body: text("body").notNull(),
+    /** Hints the person opened before this attempt; the receipt records it (guided vs unaided). */
+    hintsUsed: integer("hints_used").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("practice_submissions_step_attempt_idx").on(table.stepId, table.attempt),
+    index("practice_submissions_run_idx").on(table.userId, table.runId),
+  ]
+);
+
+export type PracticeSubmission = typeof practiceSubmissions.$inferSelect;
 
 /**
  * Every plan a project has had, kept.

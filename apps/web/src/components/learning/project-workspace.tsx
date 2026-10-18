@@ -51,6 +51,8 @@ import { MachineSettings } from "@/components/learning/machine-settings";
 import { PlanHistory } from "@/components/learning/plan-history";
 import { ProjectBrief } from "@/components/learning/project-brief";
 import { Checked, ProjectNext } from "@/components/learning/project-next";
+import { DocumentStep, ReviewResult } from "@/components/learning/document-step";
+import type { ReviewView } from "@/lib/practice/document-sim";
 import { conductorAction } from "@/app/dashboard/learning/conductor-actions";
 import type { ConductorView } from "@/lib/lab/conductor/evaluate";
 import { stepScript } from "@/lib/learning/instruction-blocks";
@@ -70,6 +72,8 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
   const [runtime, setRuntime] = useState<ProjectRuntimeView | undefined>(undefined);
   const [conductor, setConductor] = useState<ConductorView | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  // A work-simulation step just passed: its review (and example answer) stays once above the next.
+  const [passed, setPassed] = useState<{ title: string; review: ReviewView } | null>(null);
   const [labMessage, setLabMessage] = useState<string | null>(null);
   const [environmentOpen, setEnvironmentOpen] = useState(false);
   const [tick, setTick] = useState(0);
@@ -275,6 +279,20 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
             hasLab ? null : (
               <FreshStart runId={runId} onPlanned={refreshProject} />
             )
+          ) : current && current.place === "document" ? (
+            <>
+              {passed ? <PassedNote passed={passed} onClose={() => setPassed(null)} /> : null}
+              <DocumentStep
+                key={current.id}
+                runId={runId}
+                step={current}
+                brief={caseOf(run.detail)}
+                onPassed={(review, title) => {
+                  setPassed({ title, review });
+                  void refreshProject();
+                }}
+              />
+            </>
           ) : current ? (
             <CurrentStep
               key={current.id}
@@ -327,7 +345,8 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
                     })
                   }
                 />
-                <Replan runId={runId} onReplanned={refresh} />
+                {/* Re-planning a work simulation would hand its pack steps to the AI planner. */}
+                {run.isPractice ? null : <Replan runId={runId} onReplanned={refresh} />}
                 <PlanHistory
                   runId={runId}
                   stepsKey={run.steps.map((s) => `${s.id}:${s.status}`).join()}
@@ -341,7 +360,8 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
           ) : null}
 
           <ProjectBrief
-            detail={run.detail}
+            // A work simulation's case is shown in the step; here, only its outcome.
+            detail={run.isPractice ? outcomeOf(run.detail) : run.detail}
             runsOn={
               hasLab
                 ? run.target.kind === "local-docker"
@@ -1123,6 +1143,42 @@ function FreshStart({ runId, onPlanned }: { runId: string; onPlanned: () => Prom
         {busy ? "Planning…" : "Plan the steps"}
       </Button>
       {note ? <p className="mt-2 text-xs text-amber-600">{note}</p> : null}
+    </section>
+  );
+}
+
+/** A work simulation's run detail is its outcome, a blank line, then the case. */
+function outcomeOf(detail: string | null): string | null {
+  return detail?.split(/\n{2,}/)[0] ?? null;
+}
+
+function caseOf(detail: string | null): string | null {
+  if (!detail) return null;
+  const at = detail.search(/\n{2,}/);
+  return at < 0 ? null : detail.slice(at).trim();
+}
+
+/** The review of the step that just passed, once, above the next step. */
+function PassedNote({
+  passed,
+  onClose,
+}: {
+  passed: { title: string; review: ReviewView };
+  onClose: () => void;
+}) {
+  return (
+    <section className="rounded-2xl border border-emerald-500/30 bg-card px-5 py-4">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-medium">“{passed.title}” passed.</p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-xs text-muted-foreground hover:text-foreground"
+        >
+          Close
+        </button>
+      </div>
+      <ReviewResult review={passed.review} />
     </section>
   );
 }

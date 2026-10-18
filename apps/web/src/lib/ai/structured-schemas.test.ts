@@ -44,6 +44,7 @@ const SCHEMA_FILES = [
   "jobs/fit.ts",
   "resilience/autopsy.ts",
   "intelligence/application-quality.ts",
+  "practice/rubric.ts",
 ];
 
 /**
