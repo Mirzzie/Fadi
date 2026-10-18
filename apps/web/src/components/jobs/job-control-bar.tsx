@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, ChevronDown, Moon, Radio } from "lucide-react";
+import { Check, Moon, Radio } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { saveJobPreferences } from "@/app/dashboard/jobs/actions";
@@ -106,7 +106,6 @@ export function JobControlBar({
   const [autoSearch, setAutoSearch] = useState(initialAutoSearch);
   const [saved, setSaved] = useState(false);
   const [pending, startTransition] = useTransition();
-  const [sourcesOpen, setSourcesOpen] = useState(false);
 
   // Hide the server-side scraper sources unless they're actually enabled: off, they can't
   // return jobs (blocked server-side) and only prompt "why is this off?". The real scraping
@@ -134,7 +133,7 @@ export function JobControlBar({
   }
 
   return (
-    <section className="rounded-xl border bg-card/40">
+    <section>
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-2.5">
         {/* Left — background auto-search, inline */}
         <div className="flex items-center gap-2 text-sm">
@@ -167,13 +166,7 @@ export function JobControlBar({
           ) : null}
         </div>
 
-        {/* Right — live source status, expandable */}
-        <button
-          type="button"
-          onClick={() => setSourcesOpen((o) => !o)}
-          className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
-          aria-expanded={sourcesOpen}
-        >
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Radio className="size-3.5 text-primary" aria-hidden="true" />
           {lastRunAt ? (
             <>
@@ -183,38 +176,30 @@ export function JobControlBar({
           ) : (
             <>{configured} sources ready · search to check</>
           )}
-          <ChevronDown
-            className={cn("size-3.5 transition-transform", sourcesOpen && "rotate-180")}
-            aria-hidden="true"
-          />
-        </button>
+        </div>
       </div>
 
-      {sourcesOpen ? (
-        <div className="space-y-1.5 border-t px-4 py-3">
-          {visible.map((s) => {
-            const h = healthOf(s);
-            return (
-              <div key={s.id} className="flex items-center justify-between gap-3 text-sm">
-                <span className="flex items-center gap-2">
-                  <span className={cn("size-2 shrink-0 rounded-full", DOT[h])} aria-hidden="true" />
-                  <span className={cn(!s.configured && "text-muted-foreground")}>{s.name}</span>
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {sourceLine(s, boardCount(s.id, onBoard), h)}
-                </span>
-              </div>
-            );
-          })}
-          <p className="pt-1 text-xs text-muted-foreground">
-            &ldquo;On your board&rdquo; is what survived matching — the number that matters.
-            &ldquo;Returned&rdquo; is what the source sent back before filtering. A source can
-            answer with plenty and still give you nothing, which is why both are shown. Walled sites
-            (LinkedIn/Indeed) aren&rsquo;t here — the browser extension reads those in your own
-            session.
-          </p>
-        </div>
-      ) : null}
+      <div className="space-y-1.5 border-t px-4 py-3">
+        {visible.map((s) => {
+          const h = healthOf(s);
+          return (
+            <div key={s.id} className="flex items-center justify-between gap-3 text-sm">
+              <span className="flex items-center gap-2">
+                <span className={cn("size-2 shrink-0 rounded-full", DOT[h])} aria-hidden="true" />
+                <span className={cn(!s.configured && "text-muted-foreground")}>{s.name}</span>
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {sourceLine(s, boardCount(s.id, onBoard), h)}
+              </span>
+            </div>
+          );
+        })}
+        <p className="pt-1 text-xs text-muted-foreground">
+          &ldquo;On your board&rdquo; is what survived matching. &ldquo;Returned&rdquo; is what the
+          source sent before filtering. LinkedIn and Indeed are read through the browser extension
+          in your own session.
+        </p>
+      </div>
     </section>
   );
 }

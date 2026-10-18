@@ -3,8 +3,8 @@ import { BriefcaseBusiness, CalendarClock, Info, Layers, MapPin, Signal, Wallet 
 import { JobActions } from "@/components/jobs/job-actions";
 import { JobDescription } from "@/components/jobs/job-description";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { matchAccent } from "@/lib/jobs/match-accent";
+import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { presentOpportunityFit, type FitPresentation } from "@/lib/jobs/presentation";
 import type { RecommendedJob } from "@/lib/jobs/types";
 
 type JobsShellProps = {
@@ -40,36 +40,16 @@ export function JobsShell({
   searchOutcome,
 }: JobsShellProps) {
   return (
-    <div className="mx-auto max-w-shell space-y-6">
-      <section className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -right-16 -top-24 size-72 rounded-full opacity-[0.12] blur-3xl [background:var(--aurora-1)]"
-        />
-        <div className="relative space-y-5">
-          <div className="max-w-3xl">
-            <Badge variant="secondary">Live job discovery</Badge>
-            <div className="mt-4 space-y-3">
-              <h2 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
-                Recommended{" "}
-                <span className="bg-gradient-to-r from-primary to-[oklch(0.7_0.17_230)] bg-clip-text text-transparent">
-                  jobs
-                </span>
-              </h2>
-              <p className="text-muted-foreground">
-                Live postings from the sources that cover your market — company career pages,
-                the open web, Jooble, Reed and Fadi&rsquo;s own search — matched to{" "}
-                {activeRole ? (
-                  <span className="text-foreground">your active direction: {activeRole}</span>
-                ) : (
-                  "your profile"
-                )}
-                . Each card links to the original posting so you can apply directly.
-              </p>
-            </div>
-          </div>
+    <div className="mx-auto max-w-shell space-y-4">
+      <header className="flex flex-wrap items-end justify-between gap-2">
+        <div>
+          <h1 className="text-xl font-semibold">Roles for {activeRole ?? "your direction"}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {jobs.length} current {jobs.length === 1 ? "role" : "roles"}, ordered by the
+            evidence in your career record.
+          </p>
         </div>
-      </section>
+      </header>
 
       {/* CACHED RESULTS SAY SO. The board reads stored postings, which can be hours old; without
           a time on them, a stale list is indistinguishable from a fresh pull. */}
@@ -89,52 +69,51 @@ export function JobsShell({
       ) : null}
 
       {jobs.length > 0 ? (
-        <section className="space-y-4">
-          {jobs.map((job) => (
-            <Card key={job.id}>
-              <CardHeader className="gap-3">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="flex items-start gap-3">
-                    <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-primary to-[oklch(0.5_0.2_285)] font-heading text-base font-bold text-primary-foreground">
-                      {job.company?.slice(0, 1)?.toUpperCase() ?? "?"}
-                    </span>
-                    <div className="space-y-1">
-                      <CardTitle>{job.title}</CardTitle>
-                      <CardDescription>{job.company}</CardDescription>
+        <section className="divide-y rounded-xl border bg-card">
+          {jobs.map((job) => {
+            const fit = presentOpportunityFit(job);
+            return (
+              <article key={job.id} className="p-4 sm:p-5">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="font-semibold">{job.title}</h2>
+                      <FitBadge fit={fit} />
+                      {job.applicationStatus ? (
+                        <Badge variant="outline" className="capitalize">{job.applicationStatus}</Badge>
+                      ) : null}
                     </div>
+                    <p className="mt-0.5 text-sm text-muted-foreground">
+                      {job.company} · {job.location ?? "Location not listed"} · {postedAgo(job.postedAt)}
+                    </p>
+                    <p className="mt-2 line-clamp-2 text-sm text-foreground/85">{fit.reason}</p>
+                    <details className="mt-2 text-sm">
+                      <summary className="cursor-pointer text-xs text-muted-foreground hover:text-foreground">
+                        Role details
+                      </summary>
+                      <div className="mt-3 space-y-3 border-l border-border/70 pl-3">
+                        <JobMeta job={job} />
+                        <JobDescription text={job.description} />
+                        {job.matchedKeywords.length > 0 ? (
+                          <div className="flex flex-wrap gap-1.5">
+                            {job.matchedKeywords.map((keyword) => (
+                              <Badge key={`${job.id}-${keyword}`} variant="outline">{keyword}</Badge>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    </details>
                   </div>
-                  <div
-                    style={matchAccent(job.matchScore).style}
-                    className="shrink-0 rounded-md border border-dynamic bg-dynamic-soft px-3 py-2 text-sm font-medium tabular-nums text-dynamic"
-                  >
-                    {job.matchScore}% match
-                  </div>
+                  <JobActions
+                    jobId={job.id}
+                    isSaved={job.isSaved}
+                    applicationStatus={job.applicationStatus}
+                    url={job.url}
+                  />
                 </div>
-                <JobMeta job={job} />
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <JobDescription text={job.description} />
-                <div className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">
-                  {job.matchReason}
-                </div>
-                {job.matchedKeywords.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                    {job.matchedKeywords.map((keyword) => (
-                      <Badge key={`${job.id}-${keyword}`} variant="outline">
-                        {keyword}
-                      </Badge>
-                    ))}
-                  </div>
-                ) : null}
-                <JobActions
-                  jobId={job.id}
-                  isSaved={job.isSaved}
-                  applicationStatus={job.applicationStatus}
-                  url={job.url}
-                />
-              </CardContent>
-            </Card>
-          ))}
+              </article>
+            );
+          })}
         </section>
       ) : (
         <Card>
@@ -174,6 +153,21 @@ export function JobsShell({
         </Card>
       )}
     </div>
+  );
+}
+
+const FIT_TONE: Record<FitPresentation["tone"], string> = {
+  strong: "border-emerald-500/35 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300",
+  possible: "border-primary/35 bg-primary/10 text-primary",
+  caution: "border-amber-500/35 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  muted: "border-border bg-muted/50 text-muted-foreground",
+};
+
+function FitBadge({ fit }: { fit: FitPresentation }) {
+  return (
+    <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${FIT_TONE[fit.tone]}`}>
+      {fit.label}
+    </span>
   );
 }
 
