@@ -123,20 +123,27 @@ export default async function JobsPage({
           selectedVisa={visa}
           selectedKeywords={keywords}
         />
-        <JobControlBar
-          sources={sourcesHealth.sources}
-          // What each source actually put in front of them, after matching and filtering. A
-          // source's own pull count answers "did the API reply"; this answers "did it help".
-          onBoard={jobs.reduce<Record<string, number>>((counts, job) => {
-            for (const source of job.sources) counts[source] = (counts[source] ?? 0) + 1;
-            return counts;
-          }, {})}
-          lastRunAt={sourcesHealth.lastRunAt}
-          activeModes={modes}
-          activeTypes={types}
-          autoSearch={Boolean(prefs.autoSearch)}
-        />
         <JobSearchProgress status={syncStatus} />
+        <details className="rounded-xl border border-border/60 bg-card/40">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground">
+            Search details
+          </summary>
+          <div className="border-t border-border/60">
+            <JobControlBar
+              sources={sourcesHealth.sources}
+              // What each source actually put in front of them, after matching and filtering. A
+              // source's own pull count answers "did the API reply"; this answers "did it help".
+              onBoard={jobs.reduce<Record<string, number>>((counts, job) => {
+                for (const source of job.sources) counts[source] = (counts[source] ?? 0) + 1;
+                return counts;
+              }, {})}
+              lastRunAt={sourcesHealth.lastRunAt}
+              activeModes={modes}
+              activeTypes={types}
+              autoSearch={Boolean(prefs.autoSearch)}
+            />
+          </div>
+        </details>
       </div>
       <JobsShell
         observedAt={
