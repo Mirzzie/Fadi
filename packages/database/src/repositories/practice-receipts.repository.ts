@@ -4,6 +4,7 @@ import type { Database } from "../client";
 import {
   labActionRequests,
   practiceReceipts,
+  practiceSubmissions,
   projectRuns,
   projectSteps,
   type PracticeReceipt,
@@ -194,6 +195,127 @@ export function createPracticeReceiptsRepository(db: Database) {
             sourceKind: "lab_action_request",
             sourceRefId: input.requestId,
             observerId: "fadi.lab-broker",
+            observerVersion: "1",
+            evidence,
+            observedAt,
+          })
+          .returning();
+
+        if (input.verdict === "pass") {
+          await settleRun(tx, row.run.id, row.run.status);
+          const [settled] = await tx
+            .select({ status: projectRuns.status })
+            .from(projectRuns)
+            .where(eq(projectRuns.id, row.run.id))
+            .limit(1);
+          if (settled) await settleProjectWork(tx, userId, row.run.id, settled.status);
+        }
+        return { receipt, step };
+      });
+    },
+
+    /**
+     * Record Fadi's rubric review of one submitted attempt. As narrow as `completeMachineCheck`:
+     * the source is the person's own submission (owner, run and step checked under lock), one
+     * attempt yields at most one receipt, and the strength is ALWAYS `observed` — a model scored
+     * it, so it can never claim `verified` (Codex, 17 Oct 2026). On pass, the step completes as
+     * `evidenced` (a recorded result, reviewed), in the same transaction, and the run settles.
+     */
+    async recordRubricReview(
+      userId: string,
+      input: {
+        submissionId: string;
+        assessmentId: string;
+        assessmentVersion: string;
+        verdict: "pass" | "fail";
+        met: number;
+        total: number;
+        evidence: ReceiptEvidence;
+        observedAt?: Date;
+      }
+    ): Promise<{ receipt: PracticeReceipt; step: ProjectStep }> {
+      const evidence = checkedEvidence(input.evidence);
+      if (!Number.isInteger(input.met) || !Number.isInteger(input.total) || input.met > input.total) {
+        throw new Error("Review counts are invalid.");
+      }
+      return db.transaction(async (tx) => {
+        const [submission] = await tx
+          .select()
+          .from(practiceSubmissions)
+          .where(
+            and(
+              eq(practiceSubmissions.id, input.submissionId),
+              eq(practiceSubmissions.userId, userId)
+            )
+          )
+          .for("update")
+          .limit(1);
+        if (!submission) throw new Error("Submission is unavailable.");
+
+        const [row] = await tx
+          .select({ run: projectRuns, step: projectSteps })
+          .from(projectSteps)
+          .innerJoin(projectRuns, eq(projectRuns.id, projectSteps.runId))
+          .where(
+            and(
+              eq(projectSteps.id, submission.stepId),
+              eq(projectRuns.id, submission.runId),
+              eq(projectRuns.userId, userId)
+            )
+          )
+          .for("update")
+          .limit(1);
+        if (!row) throw new Error("Practice step is unavailable.");
+
+        const [existing] = await tx
+          .select()
+          .from(practiceReceipts)
+          .where(
+            and(
+              eq(practiceReceipts.userId, userId),
+              eq(practiceReceipts.sourceKind, "practice_submission"),
+              eq(practiceReceipts.sourceRefId, submission.id)
+            )
+          )
+          .limit(1);
+        if (existing) return { receipt: existing, step: row.step };
+
+        const observedAt = input.observedAt ?? new Date();
+        let step = row.step;
+        if (input.verdict === "pass" && row.step.status === "pending") {
+          [step] = await tx
+            .update(projectSteps)
+            .set({
+              status: "done",
+              completion: "evidenced",
+              artifact:
+                `Reviewed against the rubric: ${input.met} of ${input.total} criteria met (attempt ${submission.attempt}).`.slice(
+                  0,
+                  1_000
+                ),
+              completedAt: observedAt,
+              updatedAt: observedAt,
+            })
+            .where(eq(projectSteps.id, row.step.id))
+            .returning();
+        }
+
+        const [receipt] = await tx
+          .insert(practiceReceipts)
+          .values({
+            userId,
+            runId: row.run.id,
+            stepId: row.step.id,
+            runLabel: row.run.title,
+            stepLabel: row.step.title,
+            assessmentKind: "rubric",
+            assessmentId: input.assessmentId,
+            assessmentVersion: input.assessmentVersion,
+            verdict: input.verdict,
+            strength: "observed",
+            sourceKind: "practice_submission",
+            sourceRefId: submission.id,
+            observerId: "fadi.rubric-review",
             observerVersion: "1",
             evidence,
             observedAt,

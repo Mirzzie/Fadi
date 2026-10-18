@@ -265,6 +265,8 @@ export type StepView = {
 export type RunView = {
   /** The current step's latest check — one answer for the whole page (project view only). */
   currentCheck?: StepCheck;
+  /** A Practice-pack work simulation (document steps reviewed against a rubric), not a lab. */
+  isPractice: boolean;
   id: string;
   title: string;
   detail: string | null;
@@ -359,7 +361,8 @@ function toRunView(
   resolveTarget: typeof import("@/lib/lab/target").resolveTarget
 ): RunView {
   const honesty = runHonesty(steps);
-  const template = templateForProject({ title: r.title, detail: r.detail });
+  // A Practice-pack activity says what environment it needs; it is never guessed from keywords.
+  const template = r.practice ? null : templateForProject({ title: r.title, detail: r.detail });
   const resource = r.resourceId ? resourcesById.get(r.resourceId) : undefined;
   const resolved = resolveTarget(
     r,
@@ -391,6 +394,7 @@ function toRunView(
     })),
     doneCount: honesty.done,
     evidencedCount: honesty.evidenced,
+    isPractice: Boolean(r.practice),
     labTemplate: template,
     labLabel: template ? LAB_TEMPLATES[template].label : null,
     // Fadi's own lab account and shell belong to its container labs; the person's own VMware

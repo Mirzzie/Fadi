@@ -153,6 +153,8 @@ export function createProjectRunsRepository(db: Database) {
         careerProfileId?: string | null;
         resourceId?: string | null;
         resourceLabel?: string | null;
+        /** A Practice-pack activity: its exact pack version, activity and per-run seed. */
+        practice?: ProjectRun["practice"];
       },
       steps: Array<Omit<NewProjectStep, "id" | "runId" | "createdAt" | "updatedAt">>
     ): Promise<{ run: ProjectRun; steps: ProjectStep[] }> {
@@ -167,6 +169,7 @@ export function createProjectRunsRepository(db: Database) {
             careerProfileId: run.careerProfileId ?? null,
             resourceId: run.resourceId ?? null,
             resourceLabel: run.resourceLabel ?? null,
+            practice: run.practice ?? null,
             status: "running",
           })
           .returning();

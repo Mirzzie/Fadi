@@ -35,7 +35,8 @@ export type ReviewReceipt = {
 export type ReviewLine = {
   ordinal: number;
   title: string;
-  proof: "checked" | "result recorded" | "self-reported";
+  /** How it was established. "reviewed" = Fadi's rubric review: observed, never verified. */
+  proof: "checked" | "reviewed" | "result recorded" | "self-reported";
   result: string | null;
   /** The immutable assessment receipt behind a checked line, if there is one. */
   receiptId: string | null;
@@ -68,11 +69,16 @@ export function completionReview(
         proof:
           receipt?.strength === "verified" || (!receipt && kind === "verified")
             ? "checked"
-            : kind === "evidenced"
-              ? "result recorded"
-              : "self-reported",
+            : receipt?.assessmentKind === "rubric"
+              ? "reviewed"
+              : kind === "evidenced"
+                ? "result recorded"
+                : "self-reported",
+        // A rubric receipt's one-line account ("3 of 3 criteria met, unaided"), not its criteria list.
         result: receipt
-          ? receipt.evidence.excerpt?.trim() || receipt.evidence.seen.trim() || null
+          ? receipt.assessmentKind === "rubric"
+            ? receipt.evidence.seen.trim() || null
+            : receipt.evidence.excerpt?.trim() || receipt.evidence.seen.trim() || null
           : readableResult(step.artifact),
         receiptId: receipt?.id ?? null,
       };
@@ -84,7 +90,9 @@ export function completionReview(
     ...shown.map((line) =>
       line.proof === "checked"
         ? `- ${line.title} (verified${line.result ? `: ${line.result}` : ""})`
-        : `- ${line.title}${line.result ? `: ${line.result}` : ""}`
+        : line.proof === "reviewed"
+          ? `- ${line.title} (reviewed against a rubric${line.result ? `: ${line.result}` : ""})`
+          : `- ${line.title}${line.result ? `: ${line.result}` : ""}`
     ),
   ].join("\n");
 
