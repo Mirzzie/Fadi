@@ -1,6 +1,7 @@
 import "server-only";
 
 import { randomBytes } from "node:crypto";
+import { and, eq, sql } from "drizzle-orm";
 
 import {
   createCareerProfilesRepository,
@@ -8,6 +9,8 @@ import {
   createPracticeReceiptsRepository,
   createPracticeSubmissionsRepository,
   createProjectRunsRepository,
+  insertProjectRunWithSteps,
+  projectRuns,
 } from "@careeros/database";
 
 import { getDatabase } from "@/lib/database/client";
@@ -42,49 +45,60 @@ export async function startPracticeActivity(
   const runtime = activityRuntime(input.packId, input.activityId);
   if (!runtime) return { ok: false, message: "That activity isn't installed." };
   const db = getDatabase();
-  const runs = createProjectRunsRepository(db);
-
-  // One run of an activity at a time: Continue it rather than starting a second copy.
-  const existing = (await runs.listForUser(userId)).find(
-    (run) =>
-      run.practice?.packId === input.packId &&
-      run.practice.activityId === input.activityId &&
-      run.status === "running"
-  );
-  if (existing) return { ok: true, runId: existing.id };
-
   const { pack, activity } = runtime;
   const track = await createCareerProfilesRepository(db).getActiveForUser(userId);
-  const commitment = await createLearningCommitmentsRepository(db).createForUser(userId, {
-    careerProfileId: track?.id ?? null,
-    gap: activity.competencies[0] ?? pack.domain.label,
-    title: activity.title,
-    detail: activity.outcome,
-    kind: "project",
-    searchQuery: null,
-  });
-  // A strong per-run seed: the case is regenerated from it, never chosen by a model.
-  const seed = randomBytes(16).toString("hex");
-  const { run } = await runs.createWithSteps(
-    userId,
-    {
-      title: activity.title,
-      detail: `${activity.outcome}\n\n${runtime.brief(seed)}`,
-      commitmentId: commitment.id,
+  const run = await db.transaction(async (tx) => {
+    // A missing row cannot be locked. Serialize the start decision by activity and owner so two
+    // tabs cannot both observe "none" and create duplicate commitments and runs.
+    const lockKey = `practice:${userId}:${pack.id}:${activity.id}`;
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`);
+    const [existing] = await tx
+      .select()
+      .from(projectRuns)
+      .where(
+        and(
+          eq(projectRuns.userId, userId),
+          eq(projectRuns.status, "running"),
+          sql`${projectRuns.practice}->>'packId' = ${pack.id}`,
+          sql`${projectRuns.practice}->>'activityId' = ${activity.id}`
+        )
+      )
+      .limit(1);
+    if (existing) return existing;
+
+    const commitment = await createLearningCommitmentsRepository(tx).createForUser(userId, {
       careerProfileId: track?.id ?? null,
-      practice: { packId: pack.id, packVersion: pack.version, activityId: activity.id, seed },
-    },
-    activity.steps.map((step, index) => ({
-      ordinal: index + 1,
-      title: step.title,
-      instruction: step.instruction,
-      verify: "Fadi reviews what you write against the criteria for this step.",
-      produces: "Your written answer",
-      place: "document",
-      checkCommand: null,
-      checkExpect: null,
-    }))
-  );
+      gap: activity.competencies[0] ?? pack.domain.label,
+      title: activity.title,
+      detail: activity.outcome,
+      kind: "project",
+      searchQuery: null,
+    });
+    // A strong per-run seed: the case is regenerated from it, never chosen by a model.
+    const seed = randomBytes(16).toString("hex");
+    const created = await insertProjectRunWithSteps(
+      tx,
+      userId,
+      {
+        title: activity.title,
+        detail: `${activity.outcome}\n\n${runtime.brief(seed)}`,
+        commitmentId: commitment.id,
+        careerProfileId: track?.id ?? null,
+        practice: { packId: pack.id, packVersion: pack.version, activityId: activity.id, seed },
+      },
+      activity.steps.map((step, index) => ({
+        ordinal: index + 1,
+        title: step.title,
+        instruction: step.instruction,
+        verify: "Fadi reviews what you write against the criteria for this step.",
+        produces: "Your written answer",
+        place: "document",
+        checkCommand: null,
+        checkExpect: null,
+      }))
+    );
+    return created.run;
+  });
   logger.info("practice.activity_started", { userId, packId: pack.id, activityId: activity.id });
   return { ok: true, runId: run.id };
 }

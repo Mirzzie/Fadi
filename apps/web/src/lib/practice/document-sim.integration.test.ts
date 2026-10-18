@@ -58,19 +58,27 @@ suite("a document work simulation, end to end", () => {
     return (await createProjectRunsRepository(holder.db as never).getWithSteps(owner, runId))!;
   };
 
-  it("starts from the pack — its steps, its per-run case — and continues rather than duplicating", async () => {
+  it("starts from the pack once even when two tabs start together", async () => {
     const { startPracticeActivity } = await import("./document-sim");
-    const started = await startPracticeActivity(userId, {
-      packId: "fadi.customer-success",
-      activityId: "churn-review",
-    });
+    const request = { packId: "fadi.customer-success", activityId: "churn-review" };
+    const [started, racing] = await Promise.all([
+      startPracticeActivity(userId, request),
+      startPracticeActivity(userId, request),
+    ]);
     expect(started.ok).toBe(true);
     runId = started.ok ? started.runId : "";
-    const again = await startPracticeActivity(userId, {
-      packId: "fadi.customer-success",
-      activityId: "churn-review",
-    });
-    expect(again).toEqual({ ok: true, runId });
+    expect(racing).toEqual({ ok: true, runId });
+
+    const counts = await pool.query(
+      `select
+         (select count(*)::int from project_runs
+          where user_id = $1 and status = 'running'
+            and practice->>'packId' = $2 and practice->>'activityId' = $3) as runs,
+         (select count(*)::int from learning_commitments
+          where user_id = $1 and title = $4 and status = 'committed') as commitments`,
+      [userId, request.packId, request.activityId, "Quarterly churn review for a B2B software company"]
+    );
+    expect(counts.rows[0]).toEqual({ runs: 1, commitments: 1 });
 
     const { run, steps } = await project();
     expect(run.practice).toMatchObject({ packId: "fadi.customer-success", packVersion: "0.1.0" });

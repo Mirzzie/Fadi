@@ -94,6 +94,55 @@ async function keepPlan(tx: DbOrTx, userId: string, runId: string, reason: PlanR
   });
 }
 
+export type CreateProjectRunInput = {
+  title: string;
+  detail?: string | null;
+  commitmentId?: string | null;
+  careerProfileId?: string | null;
+  resourceId?: string | null;
+  resourceLabel?: string | null;
+  /** A Practice-pack activity: its exact pack version, activity and per-run seed. */
+  practice?: ProjectRun["practice"];
+};
+
+export type CreateProjectStepInput = Omit<
+  NewProjectStep,
+  "id" | "runId" | "createdAt" | "updatedAt"
+>;
+
+/**
+ * Insert one run and all of its steps using the caller's transaction. Cross-domain starts use
+ * this so the commitment and the runnable project either both exist or neither does.
+ */
+export async function insertProjectRunWithSteps(
+  db: DbOrTx,
+  userId: string,
+  run: CreateProjectRunInput,
+  steps: CreateProjectStepInput[]
+): Promise<{ run: ProjectRun; steps: ProjectStep[] }> {
+  const [created] = await db
+    .insert(projectRuns)
+    .values({
+      userId,
+      title: run.title,
+      detail: run.detail ?? null,
+      commitmentId: run.commitmentId ?? null,
+      careerProfileId: run.careerProfileId ?? null,
+      resourceId: run.resourceId ?? null,
+      resourceLabel: run.resourceLabel ?? null,
+      practice: run.practice ?? null,
+      status: "running",
+    })
+    .returning();
+  const inserted = steps.length
+    ? await db
+        .insert(projectSteps)
+        .values(steps.map((step) => ({ ...step, runId: created.id })))
+        .returning()
+    : [];
+  return { run: created, steps: inserted };
+}
+
 export function createProjectRunsRepository(db: Database) {
   return {
     async listForUser(userId: string): Promise<ProjectRun[]> {
@@ -146,41 +195,10 @@ export function createProjectRunsRepository(db: Database) {
      */
     async createWithSteps(
       userId: string,
-      run: {
-        title: string;
-        detail?: string | null;
-        commitmentId?: string | null;
-        careerProfileId?: string | null;
-        resourceId?: string | null;
-        resourceLabel?: string | null;
-        /** A Practice-pack activity: its exact pack version, activity and per-run seed. */
-        practice?: ProjectRun["practice"];
-      },
-      steps: Array<Omit<NewProjectStep, "id" | "runId" | "createdAt" | "updatedAt">>
+      run: CreateProjectRunInput,
+      steps: CreateProjectStepInput[]
     ): Promise<{ run: ProjectRun; steps: ProjectStep[] }> {
-      return db.transaction(async (tx) => {
-        const [created] = await tx
-          .insert(projectRuns)
-          .values({
-            userId,
-            title: run.title,
-            detail: run.detail ?? null,
-            commitmentId: run.commitmentId ?? null,
-            careerProfileId: run.careerProfileId ?? null,
-            resourceId: run.resourceId ?? null,
-            resourceLabel: run.resourceLabel ?? null,
-            practice: run.practice ?? null,
-            status: "running",
-          })
-          .returning();
-        const inserted = steps.length
-          ? await tx
-              .insert(projectSteps)
-              .values(steps.map((s) => ({ ...s, runId: created.id })))
-              .returning()
-          : [];
-        return { run: created, steps: inserted };
-      });
+      return db.transaction((tx) => insertProjectRunWithSteps(tx, userId, run, steps));
     },
 
     async setStepStatus(
