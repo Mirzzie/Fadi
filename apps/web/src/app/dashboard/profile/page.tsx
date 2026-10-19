@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { UserRoundCog } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { ActiveSessions } from "@/components/profile/active-sessions";
@@ -34,30 +33,15 @@ export default async function ProfilePage() {
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-3xl space-y-6">
-        <section className="relative overflow-hidden rounded-xl border bg-card p-6">
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -right-16 -top-20 size-64 rounded-full opacity-[0.12] blur-3xl"
-            style={{ background: "oklch(0.66 0.22 285)" }}
-          />
-          <div className="relative flex items-start gap-4">
-            <div className="glow-primary grid size-10 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-primary to-[oklch(0.66_0.22_285)]">
-              <UserRoundCog className="size-5 text-primary-foreground" aria-hidden="true" />
-            </div>
-            <div>
-              <h2 className="font-heading text-xl font-semibold tracking-tight">
-                Your{" "}
-                <span className="bg-gradient-to-r from-primary to-[oklch(0.7_0.17_230)] bg-clip-text text-transparent">
-                  profile
-                </span>
-              </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                This is what Fadi reasons from. Keep it current — accurate inputs mean sharper advice.
-              </p>
-            </div>
-          </div>
-        </section>
+      <div className="mx-auto max-w-3xl space-y-8 pb-12">
+        <header className="border-b border-border pb-8 pt-3">
+          <p className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Account</p>
+          <h1 className="font-heading text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Your profile.</h1>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+            The facts Fadi uses when it reasons about your direction. Keep them current so advice
+            stays relevant.
+          </p>
+        </header>
 
         <ProfileForm
           email={user.email ?? ""}
@@ -72,8 +56,8 @@ export default async function ProfilePage() {
         />
 
         {/* Security */}
-        <div className="space-y-2 pt-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <div className="space-y-2 border-t border-border pt-8">
+          <h2 className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             Security
           </h2>
         </div>
