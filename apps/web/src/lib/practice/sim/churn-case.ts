@@ -210,7 +210,9 @@ export function citedSignals(text: string, account: Account, all: Account[]): st
     .map((at) => text.slice(at, otherStarts.find((o) => o > at) ?? text.length))
     .join(" ");
   const has = (n: number) => new RegExp(`(?<![\\d.])${n}(?![\\d])`).test(window);
-  const change = Math.abs(Math.round(((account.activeNow - account.active90) / account.active90) * 100));
+  const change = Math.abs(
+    Math.round(((account.activeNow - account.active90) / account.active90) * 100)
+  );
   const signals: string[] = [];
   if (has(change) && /%|percent|halv/i.test(window)) signals.push("usage change");
   else if (has(account.activeNow) && has(account.active90)) signals.push("usage change");
@@ -219,6 +221,7 @@ export function citedSignals(text: string, account: Account, all: Account[]): st
   }
   if (has(account.renewalDays) && /day|renew/i.test(window)) signals.push("renewal timing");
   if (has(account.arrK) && /k\b|\$|arr|revenue/i.test(window)) signals.push("revenue");
-  if (account.sponsorLeft && /sponsor|champion|executive/i.test(window)) signals.push("sponsor change");
+  if (account.sponsorLeft && /sponsor|champion|executive/i.test(window))
+    signals.push("sponsor change");
   return signals;
 }

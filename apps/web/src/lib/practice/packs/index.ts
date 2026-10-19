@@ -1,6 +1,6 @@
 import type { PracticeActivity } from "../contract";
 import type { PracticePack } from "../pack";
-import type { Criterion } from "../rubric";
+import type { ChoiceField, Criterion } from "../rubric";
 import {
   CHURN_REVIEW_ASSETS,
   CUSTOMER_SUCCESS_PACK,
@@ -22,7 +22,12 @@ export type ActivityRuntime = {
   caseFor: (seed: string) => unknown;
   assets: Record<
     string,
-    { criteria: Criterion<unknown>[]; exampleAnswer: (theCase: unknown) => string }
+    {
+      criteria: Criterion<unknown>[];
+      exampleAnswer: (theCase: unknown) => string;
+      choices?: (theCase: unknown) => ChoiceField[];
+      hints: string[];
+    }
   >;
 };
 

@@ -27,12 +27,60 @@ export type QualityCriterion = {
   strong: string;
 };
 
+/**
+ * What a person hands in: their writing, and — on steps that ask for a decision — the choices
+ * they picked from the case (Codex P1, 18 Oct 2026: a decision is checked exactly from a choice,
+ * not guessed from keywords; the writing that explains it is judged separately).
+ */
+export type Answer = { text: string; choices: Record<string, string> };
+
+/** A decision the step asks for, picked from options computed from the person's own case. */
+export type ChoiceField = { id: string; label: string; options: string[] };
+
+/**
+ * The stored attempt: the choices as plain "Label: value" lines above the writing. One immutable
+ * text, readable as it stands on the record; `parseAnswer` reads it back exactly.
+ */
+export function composeAnswer(fields: ChoiceField[], answer: Answer): string {
+  const lines = fields
+    .filter((field) => answer.choices[field.id])
+    .map((field) => `${field.label}: ${answer.choices[field.id]}`);
+  return lines.length ? `${lines.join("\n")}\n\n${answer.text.trim()}` : answer.text.trim();
+}
+
+export function parseAnswer(fields: ChoiceField[], body: string): Answer {
+  const choices: Record<string, string> = {};
+  if (!fields.length) return { text: body, choices };
+  const lines = body.split("\n");
+  let at = 0;
+  for (; at < lines.length; at++) {
+    const line = lines[at]!;
+    const field = fields.find((f) => line.startsWith(`${f.label}: `));
+    if (!field || choices[field.id]) break;
+    const value = line.slice(field.label.length + 2).trim();
+    // Only a value the case offered counts; anything else is just writing.
+    if (!field.options.includes(value)) break;
+    choices[field.id] = value;
+  }
+  return { text: lines.slice(at).join("\n").trim(), choices };
+}
+
+/** The person's picks, kept only where each is one of the case's own options. */
+export function validChoices(fields: ChoiceField[], picked: Record<string, string> | undefined) {
+  const choices: Record<string, string> = {};
+  for (const field of fields) {
+    const value = picked?.[field.id];
+    if (value && field.options.includes(value)) choices[field.id] = value;
+  }
+  return choices;
+}
+
 export type FactCriterion<Case> = {
   id: string;
   kind: "fact";
   label: string;
   /** Decided in code. `seen` says what was found, in the person's language. */
-  check: (submission: string, theCase: Case) => { met: boolean; seen: string };
+  check: (answer: Answer, theCase: Case) => { met: boolean; seen: string };
 };
 
 export type Criterion<Case> = QualityCriterion | FactCriterion<Case>;
@@ -86,6 +134,10 @@ export function containsRubricGaming(text: string): boolean {
     /^\s*(?:system|assistant|developer)\s*:/im,
     /\b(?:level|rating|grade|verdict)\s*["“']?\s*(?:strong|meets|pass)\b/i,
     /\bdo not (?:mark|score|rate)\b/i,
+    // A note addressed to the marker, or a claim that a criterion is already met (rubric-eval
+    // v2 on gemma3:4b, 19 Oct 2026: "Note to the reviewer: … satisfied automatically" passed).
+    /\b(?:note|message|instructions?|comment)\s+(?:to|for)\s+(?:the\s+)?(?:reviewer|grader|assessor|marker|examiner)\b/i,
+    /\b(?:criterion|criteria)\b.{0,40}\b(?:satisfied|met|passed|fulfilled)\b/i,
   ].some((pattern) => pattern.test(text));
 }
 
@@ -98,14 +150,17 @@ export function quoteIsGenuine(quote: string | null, submission: string): boolea
 
 export function reviewSubmission<Case>(
   criteria: Criterion<Case>[],
-  submission: string,
+  answer: Answer | string,
   theCase: Case,
   scores: RubricScores | null
 ): RubricReview {
+  const given = typeof answer === "string" ? { text: answer, choices: {} } : answer;
+  // Praise must point at the person's own WRITING — never at a choice they picked from a list.
+  const submission = given.text;
   const rubricGaming = containsRubricGaming(submission);
   const results = criteria.map((criterion): CriterionResult => {
     if (criterion.kind === "fact") {
-      const { met, seen } = criterion.check(submission, theCase);
+      const { met, seen } = criterion.check(given, theCase);
       return {
         id: criterion.id,
         label: criterion.label,
@@ -167,7 +222,13 @@ export function rubricPrompt(input: {
   task: string;
   criteria: QualityCriterion[];
   submission: string;
+  /** The decisions they picked, shown so the writing can be judged as explaining them. */
+  choices?: Array<{ label: string; value: string }>;
 }): { system: string; user: string } {
+  const picked = input.choices?.length
+    ? // Outside the untrusted block: every value was checked against the case's own options.
+      `THEIR CHOICES (picked from a list; quote only from the written submission, never from these)\n${input.choices.map((c) => `- ${c.label}: ${c.value}`).join("\n")}`
+    : null;
   return {
     system: [
       "You review one piece of work against named criteria, as a demanding but fair senior colleague.",
@@ -185,6 +246,7 @@ export function rubricPrompt(input: {
       ...input.criteria.map(
         (c) => `- id: ${c.id}\n  ${c.label}\n  meets: ${c.meets}\n  strong: ${c.strong}`
       ),
+      ...(picked ? [picked] : []),
       `BEGIN UNTRUSTED SUBMISSION\n${input.submission}\nEND UNTRUSTED SUBMISSION`,
     ].join("\n\n"),
   };

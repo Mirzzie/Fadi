@@ -58,30 +58,75 @@ describe("a case per run (per-learner values)", () => {
   });
 });
 
-describe("fact criteria are decided in code from the person's own case", () => {
+describe("the decisions are picked, and checked exactly (Codex P1, 19 Oct 2026)", () => {
   const c = churnCase("seed-a");
   const criteria = CHURN_REVIEW_ASSETS.diagnose!.criteria;
-  const review = (text: string) =>
-    reviewSubmission(criteria as never, text, c, { criteria: [] }).results;
+  const fields = CHURN_REVIEW_ASSETS.diagnose!.choices!(c);
+  const review = (choices: Record<string, string>, text = "My analysis of the accounts.") =>
+    reviewSubmission(criteria as never, { text, choices }, c, { criteria: [] }).results;
+  const level = (results: ReturnType<typeof review>, id: string) =>
+    results.find((r) => r.id === id)?.level;
 
-  it("credits naming both real risks and seeing the decoy is seasonal", () => {
-    const text = `${c.atRisk[0]} and ${c.atRisk[1]} are at risk. ${c.decoy}'s drop is seasonal — their busy season is later.`;
-    const results = review(text);
-    expect(results.find((r) => r.id === "names-risks")?.level).toBe("meets");
-    expect(results.find((r) => r.id === "spots-decoy")?.level).toBe("meets");
+  it("offers this case's own accounts, and 'none' for the false alarm", () => {
+    const names = c.accounts.map((a) => a.name);
+    expect(fields.map((f) => f.id)).toEqual(["risk-1", "risk-2", "false-alarm"]);
+    expect(fields[0]!.options).toEqual(names);
+    expect(fields[2]!.options).toEqual([...names, "None of them"]);
   });
 
-  it("fails a copied answer from someone else's case", () => {
+  it("credits picking both real risks — either order — and the real false alarm", () => {
+    const results = review({
+      "risk-1": c.atRisk[1],
+      "risk-2": c.atRisk[0],
+      "false-alarm": c.decoy,
+    });
+    expect(level(results, "names-risks")).toBe("meets");
+    expect(level(results, "spots-decoy")).toBe("meets");
+  });
+
+  it("isn't fooled by the right words in the writing: the picks decide", () => {
+    const wrong = c.accounts.find((a) => !c.atRisk.includes(a.name) && a.name !== c.decoy)!;
+    const results = review(
+      { "risk-1": wrong.name, "risk-2": c.atRisk[0], "false-alarm": "None of them" },
+      `${c.atRisk[0]} and ${c.atRisk[1]} are at risk. ${c.decoy}'s drop is seasonal.`
+    );
+    expect(level(results, "names-risks")).toBe("not_yet");
+    expect(level(results, "spots-decoy")).toBe("not_yet");
+  });
+
+  it("says when the false alarm picked is another account, without naming the right one", () => {
+    const results = review({
+      "risk-1": c.atRisk[0],
+      "risk-2": c.atRisk[1],
+      "false-alarm": c.atRisk[0],
+    });
+    const feedback = results.find((r) => r.id === "spots-decoy")!.feedback;
+    expect(feedback).toMatch(/isn't the false alarm/);
+    expect(feedback).not.toContain(c.decoy);
+  });
+
+  it("fails picks copied from someone else's case", () => {
     const other = churnCase("someone-else");
-    const copied = `${other.atRisk[0]} and ${other.atRisk[1]} are at risk; ${other.decoy} is seasonal.`;
     const overlap = other.atRisk.filter((n) => c.atRisk.includes(n)).length;
-    const results = review(copied);
-    if (overlap < 2) expect(results.find((r) => r.id === "names-risks")?.level).toBe("not_yet");
+    const results = review({ "risk-1": other.atRisk[0], "risk-2": other.atRisk[1] });
+    if (overlap < 2) expect(level(results, "names-risks")).toBe("not_yet");
   });
 
-  it("calls out treating the seasonal account as churn", () => {
-    const results = review(`${c.decoy} is the biggest risk: usage collapsed.`);
-    expect(results.find((r) => r.id === "spots-decoy")?.feedback).toMatch(/CRM notes/);
+  it("leaves the explanation to the rubric review", () => {
+    expect(criteria.find((k) => k.id === "explains")?.kind).toBe("quality");
+  });
+});
+
+describe("the hint ladder", () => {
+  const c = churnCase("seed-a");
+  it("has three hints per step, none naming an account or giving the answer", () => {
+    for (const step of CUSTOMER_SUCCESS_PACK.activities[0]!.steps) {
+      const hints = CHURN_REVIEW_ASSETS[step.id]!.hints;
+      expect(hints).toHaveLength(3);
+      for (const hint of hints) {
+        for (const account of c.accounts) expect(hint).not.toContain(account.name.split(" ")[0]);
+      }
+    }
   });
 });
 
@@ -89,7 +134,9 @@ describe("backing each at-risk account with its own figures — checked exactly 
   const c = churnCase("seed-a");
   const evidence = CHURN_REVIEW_ASSETS.diagnose!.criteria.find((x) => x.id === "evidence")!;
   const check = (text: string) =>
-    evidence.kind === "fact" ? evidence.check(text, c) : { met: false, seen: "" };
+    evidence.kind === "fact"
+      ? evidence.check({ text, choices: { "risk-1": c.atRisk[0], "risk-2": c.atRisk[1] } }, c)
+      : { met: false, seen: "" };
   const row = (name: string) => c.accounts.find((a) => a.name === name)!;
   const describe = (name: string) => {
     const a = row(name);
@@ -106,6 +153,20 @@ describe("backing each at-risk account with its own figures — checked exactly 
     expect(
       check(`${c.atRisk[0]} and ${c.atRisk[1]} are at risk because things look bad.`).met
     ).toBe(false);
+  });
+
+  it("never names an account the person didn't pick (it would give the answer away)", () => {
+    const wrong = c.accounts.find((a) => !c.atRisk.includes(a.name) && a.name !== c.decoy)!;
+    const missed = c.atRisk[1];
+    const result =
+      evidence.kind === "fact"
+        ? evidence.check(
+            { text: "They look bad.", choices: { "risk-1": c.atRisk[0], "risk-2": wrong.name } },
+            c
+          )
+        : { met: true, seen: "" };
+    expect(result.met).toBe(false);
+    expect(result.seen).not.toContain(missed);
   });
 
   it("doesn't credit figures from someone else's case", () => {

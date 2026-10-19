@@ -96,14 +96,30 @@ suite("a document work simulation, end to end", () => {
     expect(counts.rows[0]).toEqual({ runs: 1, commitments: 1 });
 
     const { run, steps } = await project();
-    expect(run.practice).toMatchObject({ packId: "fadi.customer-success", packVersion: "0.1.0" });
+    expect(run.practice).toMatchObject({ packId: "fadi.customer-success", packVersion: "0.2.0" });
     expect(run.practice!.seed).toMatch(/^[0-9a-f]{32}$/);
     expect(run.commitmentId).not.toBeNull();
     expect(steps.map((s) => s.place)).toEqual(["document", "document", "document"]);
     expect(run.detail).toContain("| Account |");
   });
 
-  it("'not yet' when the facts are wrong — however well written — with no example answer to copy", async () => {
+  it("refuses step 1 without its picks, and keeps nothing", async () => {
+    const { submitForReview } = await import("./document-sim");
+    const { steps } = await project();
+    const result = await submitForReview(userId, {
+      runId,
+      stepId: steps[0]!.id,
+      body: "A careful analysis of every account in the table, with figures for each one.",
+    });
+    expect(result).toMatchObject({ ok: false, message: expect.stringMatching(/every choice/) });
+    const count = await pool.query(
+      "select count(*)::int as count from practice_submissions where step_id = $1",
+      [steps[0]!.id]
+    );
+    expect(count.rows[0]).toEqual({ count: 0 });
+  });
+
+  it("'not yet' when the picks are wrong — however well written — with no example answer to copy", async () => {
     const { churnCase } = await import("./sim/churn-case");
     const { submitForReview } = await import("./document-sim");
     const { run, steps } = await project();
@@ -112,7 +128,9 @@ suite("a document work simulation, end to end", () => {
     const result = await submitForReview(userId, {
       runId,
       stepId: steps[0]!.id,
-      body: `${wrong.name} is clearly the biggest risk because its renewal is coming up and usage looks soft across the quarter.`,
+      // The right names in the writing don't count: the picks decide.
+      choices: { "risk-1": wrong.name, "risk-2": c.atRisk[0], "false-alarm": "None of them" },
+      body: `${wrong.name} is clearly the biggest risk because its renewal is coming up; ${c.atRisk[1]} too.`,
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -133,6 +151,7 @@ suite("a document work simulation, end to end", () => {
     const result = await submitForReview(userId, {
       runId,
       stepId: steps[0]!.id,
+      choices: { "risk-1": c.atRisk[0], "risk-2": c.atRisk[1], "false-alarm": c.decoy },
       // Each at-risk account backed by two of its own figures — checked exactly since 19 Oct 2026.
       body: `${c.atRisk
         .map((name) => {
@@ -144,6 +163,13 @@ suite("a document work simulation, end to end", () => {
     });
     expect(result.ok && result.review).toMatchObject({ verdict: "pass", attempt: 2 });
     expect(result.ok && result.review.exampleAnswer).toContain(c.atRisk[0]);
+    // The attempt is one immutable text: the picks above the writing.
+    const { createPracticeSubmissionsRepository } = await import("@careeros/database");
+    const kept = await createPracticeSubmissionsRepository(holder.db as never).latestForStep(
+      userId,
+      steps[0]!.id
+    );
+    expect(kept!.body.split("\n")[0]).toBe(`Most at risk: ${c.atRisk[0]}`);
 
     const step = (await project()).steps[0]!;
     expect(step).toMatchObject({ status: "done", completion: "evidenced" });
@@ -252,6 +278,31 @@ suite("a document work simulation, end to end", () => {
     expect(count.rows[0]).toEqual({ count: 1 });
   });
 
+  it("records a hint on the step, so the next attempt says 'with 1 hint' — and a reload can't undo it", async () => {
+    const { revealHint, submitForReview, documentStepState } = await import("./document-sim");
+    const { steps } = await project();
+    const step3 = steps[2]!;
+    expect(await revealHint(userId, { runId, stepId: steps[0]!.id })).toMatchObject({ ok: false });
+    expect(await revealHint(strangerId, { runId, stepId: step3.id })).toMatchObject({ ok: false });
+    const opened = await revealHint(userId, { runId, stepId: step3.id });
+    expect(opened.ok && opened.hints).toHaveLength(1);
+    const state = await documentStepState(userId, { runId, stepId: step3.id });
+    expect(state).toMatchObject({ hints: [expect.any(String)], hintsAvailable: 3 });
+
+    const result = await submitForReview(userId, {
+      runId,
+      stepId: step3.id,
+      body: "A blanket discount gives away revenue on accounts renewing anyway and fixes neither cause; I'd fix service and find a new sponsor instead.",
+    });
+    expect(result.ok && result.review.verdict).toBe("pass");
+    const { createPracticeReceiptsRepository } = await import("@careeros/database");
+    const receipts = await createPracticeReceiptsRepository(holder.db as never).listForStep(
+      userId,
+      step3.id
+    );
+    expect(receipts[0]!.evidence.seen).toMatch(/with 1 hint/);
+  });
+
   it("the existing finish review says how it was established: reviewed against a rubric", async () => {
     const { createPracticeReceiptsRepository } = await import("@careeros/database");
     const { completionReview } = await import("@/lib/learning/project-review");
@@ -279,5 +330,42 @@ suite("a document work simulation, end to end", () => {
     expect(await createProjectRunsRepository(db).remove(userId, runId)).toBe(false);
     expect(await createPracticeSubmissionsRepository(db).get(userId, source!.id)).toEqual(source);
     expect(await createPracticeSubmissionsRepository(db).get(strangerId, source!.id)).toBeNull();
+  });
+
+  it("starts over with a new case: the old attempt is closed and kept, not deleted", async () => {
+    const { startPracticeActivity, restartPracticeActivity, submitForReview } =
+      await import("./document-sim");
+    const { createProjectRunsRepository } = await import("@careeros/database");
+    const runs = createProjectRunsRepository(holder.db as never);
+    const first = await startPracticeActivity(strangerId, {
+      packId: "fadi.customer-success",
+      activityId: "churn-review",
+    });
+    if (!first.ok) throw new Error(first.message);
+    const before = (await runs.getWithSteps(strangerId, first.runId))!;
+    await submitForReview(strangerId, {
+      runId: first.runId,
+      stepId: before.steps[0]!.id,
+      choices: { "risk-1": "x", "risk-2": "y", "false-alarm": "z" },
+      body: "Not a real answer, and its picks aren't from the case either.",
+    });
+
+    expect(await restartPracticeActivity(userId, { runId: first.runId })).toMatchObject({
+      ok: false,
+    });
+    const restarted = await restartPracticeActivity(strangerId, { runId: first.runId });
+    if (!restarted.ok) throw new Error(restarted.message);
+    expect(restarted.runId).not.toBe(first.runId);
+
+    const old = (await runs.getWithSteps(strangerId, first.runId))!;
+    const fresh = (await runs.getWithSteps(strangerId, restarted.runId))!;
+    expect(old.run.status).toBe("abandoned");
+    expect(fresh.run).toMatchObject({ status: "running", commitmentId: before.run.commitmentId });
+    expect(fresh.run.practice!.seed).not.toBe(before.run.practice!.seed);
+    expect(fresh.steps.every((s) => s.status === "pending")).toBe(true);
+    // Closed, so it can't be started over twice.
+    expect(await restartPracticeActivity(strangerId, { runId: first.runId })).toMatchObject({
+      ok: false,
+    });
   });
 });

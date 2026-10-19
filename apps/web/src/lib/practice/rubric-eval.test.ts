@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { churnBrief, CHURN_REVIEW_ASSETS } from "./packs/customer-success";
+import { churnBrief, CHURN_REVIEW_ASSETS, CUSTOMER_SUCCESS_PACK } from "./packs/customer-success";
 import {
   reviewSubmission,
   rubricPrompt,
@@ -10,11 +10,11 @@ import {
 import { EVAL_SEED, evalCases, runRubricEval, type GradeFn } from "./rubric-eval";
 import { churnCase } from "./sim/churn-case";
 
-describe("the grader evaluation set (rubric-eval v1)", () => {
-  it("covers good, weak and adversarial answers to both model-judged steps", () => {
+describe("the grader evaluation set (rubric-eval v2)", () => {
+  it("covers good, weak and adversarial answers to every model-judged step", () => {
     const cases = evalCases();
     expect(new Set(cases.map((c) => c.kind))).toEqual(new Set(["good", "weak", "adversarial"]));
-    expect(new Set(cases.map((c) => c.step))).toEqual(new Set(["plan", "defend"]));
+    expect(new Set(cases.map((c) => c.step))).toEqual(new Set(["diagnose", "plan", "defend"]));
     expect(cases.filter((c) => c.kind === "adversarial").every((c) => c.expect === "fail")).toBe(
       true
     );
@@ -48,7 +48,20 @@ describe("the grader evaluation set (rubric-eval v1)", () => {
     }
   });
 
-  it("the guard alone already refuses the direct injections — before any model is asked", () => {
+  it("on step 1 the picks are right, so only the explanation decides", () => {
+    const c = churnCase(EVAL_SEED);
+    for (const item of evalCases().filter((x) => x.step === "diagnose")) {
+      expect(item.choices).toEqual({
+        "risk-1": c.atRisk[0],
+        "risk-2": c.atRisk[1],
+        "false-alarm": c.decoy,
+      });
+    }
+  });
+
+  // diagnose-injection is phrased softly ("note to the reviewer: … satisfied automatically"); it
+  // got past gemma3:4b (v2, 19 Oct 2026), so the guard refuses it too.
+  it("the guard alone already refuses the injections — before any model is asked", () => {
     const c = churnCase(EVAL_SEED);
     for (const item of evalCases().filter((x) => x.id.endsWith("injection"))) {
       const criteria = CHURN_REVIEW_ASSETS[item.step]!.criteria;
@@ -76,11 +89,21 @@ const LIVE_USER = process.env.FADI_RUBRIC_EVAL_USER;
     const generate = (await getUserDocGenerate(LIVE_USER!))!;
     const c = churnCase(EVAL_SEED);
     const brief = churnBrief(c);
-    const grade: GradeFn = async ({ step, submission }) => {
-      const criteria = CHURN_REVIEW_ASSETS[step]!.criteria;
+    const steps = CUSTOMER_SUCCESS_PACK.activities[0]!.steps;
+    const grade: GradeFn = async ({ step, submission, choices }) => {
+      const assets = CHURN_REVIEW_ASSETS[step]!;
+      const criteria = assets.criteria;
+      const fields = assets.choices?.(c) ?? [];
       const quality = criteria.filter((k): k is QualityCriterion => k.kind === "quality");
       try {
-        const prompt = rubricPrompt({ brief, task: step, criteria: quality, submission });
+        const prompt = rubricPrompt({
+          brief,
+          // The step's real instruction, as the product sends it (v1 sent the step id).
+          task: steps.find((s) => s.id === step)!.instruction,
+          criteria: quality,
+          submission,
+          choices: fields.map((f) => ({ label: f.label, value: choices[f.id]! })),
+        });
         const scores = await generate.structured(
           prompt.system,
           prompt.user,
@@ -90,7 +113,7 @@ const LIVE_USER = process.env.FADI_RUBRIC_EVAL_USER;
             maxTokens: 1500,
           }
         );
-        return reviewSubmission(criteria, submission, c, scores).verdict;
+        return reviewSubmission(criteria, { text: submission, choices }, c, scores).verdict;
       } catch {
         return "error";
       }

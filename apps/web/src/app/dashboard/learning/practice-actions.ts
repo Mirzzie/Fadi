@@ -34,6 +34,8 @@ export async function submitPracticeWorkAction(input: {
   runId: string;
   stepId: string;
   body: string;
+  /** Picks for steps that ask for a decision; checked against the case's options on the server. */
+  choices?: Record<string, string>;
 }): Promise<SubmitResult> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
@@ -41,7 +43,12 @@ export async function submitPracticeWorkAction(input: {
     .object({
       runId: z.string().uuid(),
       stepId: z.string().uuid(),
-      body: z.string().trim().min(40).max(MAX_SUBMISSION_CHARS),
+      body: z
+        .string()
+        .trim()
+        .min(40)
+        .max(MAX_SUBMISSION_CHARS - 600),
+      choices: z.record(z.string().max(80), z.string().max(160)).optional(),
     })
     .safeParse(input);
   if (!parsed.success) {
@@ -63,4 +70,31 @@ export async function documentStepStateAction(input: {
   if (!parsed.success) return null;
   const { documentStepState } = await import("@/lib/practice/document-sim");
   return documentStepState(user.id, parsed.data);
+}
+
+export async function revealHintAction(input: {
+  runId: string;
+  stepId: string;
+}): Promise<{ ok: true; hints: string[] } | { ok: false; message: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  const parsed = z.object({ runId: z.string().uuid(), stepId: z.string().uuid() }).safeParse(input);
+  if (!parsed.success) return { ok: false, message: "Unknown step." };
+  const { revealHint } = await import("@/lib/practice/document-sim");
+  return revealHint(user.id, parsed.data);
+}
+
+/** A new case for the same activity; the attempt in progress stays on its record. */
+export async function restartPracticeActivityAction(input: {
+  runId: string;
+}): Promise<{ ok: true; runId: string } | { ok: false; message: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  if (!z.string().uuid().safeParse(input.runId).success) {
+    return { ok: false, message: "Unknown simulation." };
+  }
+  const { restartPracticeActivity } = await import("@/lib/practice/document-sim");
+  const result = await restartPracticeActivity(user.id, input);
+  if (result.ok) revalidatePath("/dashboard/learning");
+  return result;
 }

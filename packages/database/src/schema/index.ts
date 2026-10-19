@@ -1545,6 +1545,12 @@ export const projectSteps = pgTable(
     completion: text("completion"),
     /** The user's own note, or a path/link to what they produced. */
     artifact: text("artifact"),
+    /**
+     * Hints the person has opened on this step (the hint ladder: nudge → concept → structure).
+     * Kept here, not in the browser, so a reload can't turn "with hints" back into "unaided";
+     * each attempt copies it into its submission.
+     */
+    hintsRevealed: integer("hints_revealed").notNull().default(0),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     ...timestamps,
   },
