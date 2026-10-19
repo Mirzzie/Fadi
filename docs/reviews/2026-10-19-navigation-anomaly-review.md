@@ -1,0 +1,36 @@
+# Navigation anomaly review — 19 October 2026
+
+## Evidence
+
+The decision uses the live REA structure and viewport captures for Pipecat and Paperclip:
+
+- Pipecat: `ev_66687714758c19f7ecc2215ba7b5f66220818bebc5edf9f613ff259c66b7b4c3`,
+  `ev_e2aec54f97bc5a6411251656bc688a5580c8247df220fa10b0ff160cf2cb9bc8`
+- Paperclip: `ev_26ad3b66dfc011bdbba8a71bad9d302da51e45283409dc258d3aa43232b42ef4`,
+  `ev_be87dfc65404fc84d8f5df5ea9eb57727362147ca95d606a0ed5d39e33c8a609`
+- Fadi public structure: `ev_cf73d23f41e73c07a487bb8606b05a21bb4f7dfe385d643c06d0b447cf9b8d07`
+
+The authenticated screenshots supplied by the owner provide visual evidence for the private shell;
+REA cannot attach to that browser because it has no exposed CDP endpoint.
+
+## Anomalies
+
+- Three simultaneous navigation layers: utility bar, section row, and destination dock.
+- The section caption repeated the active bottom destination (`Practice` above `Learning`).
+- `Fadi ready` spent horizontal space communicating the normal state.
+- The full-width section row consumed about one additional control-bar height on every desktop page.
+- The floating dock could cover controls near the viewport bottom.
+- The glowing briefing was visually inconsistent with the new neutral system.
+
+## Resolution
+
+- Keep the top bar because it owns global direction, search, approvals, activity, theme, and account.
+- On wide screens, place destination-local tabs in the center of that same bar.
+- Retain the separate section row only below the `xl` breakpoint, where centering tabs between global
+  controls would create collisions.
+- Collapse the ordinary ready state to its green status dot; show text only for work, waiting,
+  blocked, or offline states.
+- Give the bottom dock an explicit hide/show control.
+- Flatten the briefing into a neutral ruled surface and remove its animated glow.
+
+No navigation route, global state owner, or action was removed.

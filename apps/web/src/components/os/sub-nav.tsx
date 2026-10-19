@@ -24,7 +24,7 @@ export function SubNav() {
   return (
     <nav
       aria-label={`${destination.label} sections`}
-      className="mx-auto mb-5 flex max-w-shell flex-wrap items-center gap-x-5 border-b border-border"
+      className="mx-auto mb-5 flex max-w-shell flex-wrap items-center gap-x-5 border-b border-border xl:hidden"
     >
       {showCaption ? (
         <span className="mr-1 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">

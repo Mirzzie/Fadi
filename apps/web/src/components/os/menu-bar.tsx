@@ -1,6 +1,8 @@
 "use client";
 
 import { Search } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import { FadiLogo } from "@/components/brand/fadi-logo";
 import { FADI_STATE_LABEL } from "@/lib/agent/state";
@@ -10,12 +12,16 @@ import { ApprovalCenter } from "./approval-center";
 import { useFadi, type FadiState } from "./fadi-presence";
 import { TrackSwitcher } from "./track-switcher";
 import { UserMenu } from "./user-menu";
+import { areaFor, destinationFor } from "./navigation";
 
 /** Top menu bar — the OS's persistent identity strip: brand, track, live Fadi
  *  state, the ⌘K spotlight, "Hey Fadi", clock, and the user menu. Fadi is
  *  ambient now, so there's no Desk/Fadi mode toggle. */
 export function MenuBar({ working = null }: { working?: string | null } = {}) {
   const { displayState } = useFadi();
+  const pathname = usePathname();
+  const destination = destinationFor(pathname);
+  const currentArea = areaFor(pathname);
   return (
     <header className="sticky top-0 z-40 flex h-12 items-center justify-between border-b border-border bg-background/95 px-3 text-xs backdrop-blur-md duration-300 animate-in fade-in slide-in-from-top-2">
       {/* Brand + live Fadi state */}
@@ -23,9 +29,34 @@ export function MenuBar({ working = null }: { working?: string | null } = {}) {
         <FadiLogo className="size-5" />
         <span className="font-semibold tracking-tight">Fadi</span>
         <FadiStateChip state={displayState} working={working} />
-        <span className="text-muted-foreground/50">/</span>
         <TrackSwitcher />
       </div>
+
+      {destination && destination.areas.length > 1 ? (
+        <nav
+          aria-label={`${destination.label} sections`}
+          className="absolute left-1/2 hidden h-full -translate-x-1/2 items-stretch xl:flex"
+        >
+          {destination.areas.map((area) => {
+            const active = currentArea?.href === area.href;
+            return (
+              <Link
+                key={area.href}
+                href={area.href}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "relative flex items-center px-3 text-xs transition-colors",
+                  active
+                    ? "font-medium text-foreground after:absolute after:inset-x-3 after:bottom-0 after:h-px after:bg-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {area.label}
+              </Link>
+            );
+          })}
+        </nav>
+      ) : null}
 
       {/* Work controls only. Voice lives on the Fadi control; time lives in the OS. */}
       <div className="flex items-center gap-2">
@@ -57,6 +88,7 @@ export function MenuBar({ working = null }: { working?: string | null } = {}) {
 /** Live status dot + label reflecting Fadi's ambient state. */
 function FadiStateChip({ state, working }: { state: FadiState; working: string | null }) {
   const busy = !["ready", "offline"].includes(state);
+  const showLabel = state !== "ready" || Boolean(working);
   const { openFadi } = useFadi();
   // The state is also the way in: in lab focus the floating orb steps aside, so Fadi opens here.
   return (
@@ -64,7 +96,8 @@ function FadiStateChip({ state, working }: { state: FadiState; working: string |
       type="button"
       onClick={() => openFadi()}
       title="Talk to Fadi"
-      className="hidden items-center gap-1.5 rounded-md px-1 text-muted-foreground hover:text-foreground sm:flex"
+      aria-label={state === "ready" && !working ? "Fadi ready — open conversation" : undefined}
+      className="hidden items-center gap-1.5 px-0.5 text-muted-foreground hover:text-foreground sm:flex"
     >
       <span
         className={cn(
@@ -82,9 +115,11 @@ function FadiStateChip({ state, working }: { state: FadiState; working: string |
       />
       {/* What it is doing beats what it is. "Fadi active" on every screen of a product that
           runs plans is a light that is always on. */}
-      <span className="max-w-[16rem] truncate">
-        {state === "ready" && working ? `On: ${working}` : `Fadi ${FADI_STATE_LABEL[state].toLowerCase()}`}
-      </span>
+      {showLabel ? (
+        <span className="max-w-[16rem] truncate">
+          {state === "ready" && working ? `On: ${working}` : `Fadi ${FADI_STATE_LABEL[state].toLowerCase()}`}
+        </span>
+      ) : null}
     </button>
   );
 }

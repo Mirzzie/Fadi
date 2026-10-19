@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { ChevronDown, ChevronUp } from "lucide-react";
+import { useState } from "react";
 
 import { cn } from "@/lib/utils";
 import { DESTINATIONS, destinationFor } from "./navigation";
 
 /**
- * Four destinations. On desktop this is a quiet left rail; on mobile it becomes the bottom bar.
+ * Four destinations in a floating bottom dock. It reserves no layout width and can collapse when
+ * the person needs the bottom edge for work.
  *
  * It used to hold ten icons, re-ordered by the career phase, with labels that appeared on
  * hover. Hover is not available on a phone and hover-only text carries no meaning anywhere —
@@ -16,6 +19,22 @@ import { DESTINATIONS, destinationFor } from "./navigation";
 export function Dock() {
   const pathname = usePathname();
   const active = destinationFor(pathname);
+  const [hidden, setHidden] = useState(false);
+
+  if (hidden) {
+    return (
+      <div className="pointer-events-none fixed inset-x-0 bottom-3 z-40 flex justify-center">
+        <button
+          type="button"
+          onClick={() => setHidden(false)}
+          aria-label="Show navigation"
+          className="pointer-events-auto grid size-8 place-items-center rounded-md border border-border bg-background/95 text-muted-foreground shadow-lg backdrop-blur hover:text-foreground"
+        >
+          <ChevronUp className="size-4" aria-hidden="true" />
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-3 z-40 flex justify-center px-3">
@@ -44,6 +63,15 @@ export function Dock() {
             </Link>
           );
         })}
+        <button
+          type="button"
+          onClick={() => setHidden(true)}
+          aria-label="Hide navigation"
+          title="Hide navigation"
+          className="grid w-8 shrink-0 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+        >
+          <ChevronDown className="size-4" aria-hidden="true" />
+        </button>
       </nav>
     </div>
   );
