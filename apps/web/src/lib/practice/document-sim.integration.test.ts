@@ -9,13 +9,20 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 const URL = process.env.FADI_TEST_DATABASE_URL;
 const suite = URL ? describe : describe.skip;
 
-const holder = vi.hoisted(() => ({ db: null as unknown }));
+const holder = vi.hoisted(() => ({ db: null as unknown, failReviews: 0 }));
 vi.mock("@/lib/database/client", () => ({ getDatabase: () => holder.db }));
 vi.mock("@/lib/ai/user-generate", () => ({
   getUserDocGenerate: async () => ({
     // A fair reviewer: every quality criterion "meets", quoting the first 40 characters written.
     structured: async (_system: string, user: string) => {
-      const submission = user.split('"""')[1]!.trim();
+      if (holder.failReviews > 0) {
+        holder.failReviews -= 1;
+        throw new Error("provider unavailable");
+      }
+      const submission = user
+        .split("BEGIN UNTRUSTED SUBMISSION")[1]!
+        .split("END UNTRUSTED SUBMISSION")[0]!
+        .trim();
       const ids = [...user.matchAll(/- id: (\S+)/g)].map((m) => m[1]!);
       return {
         criteria: ids.map((id) => ({
@@ -169,6 +176,61 @@ suite("a document work simulation, end to end", () => {
     expect(closed.ok).toBe(false);
   });
 
+  it("refuses future steps and submissions to abandoned runs", async () => {
+    const { createPracticeSubmissionsRepository } = await import("@careeros/database");
+    const submissions = createPracticeSubmissionsRepository(holder.db as never);
+    const { steps } = await project();
+    // Step 1 is complete, so step 2 is current and step 3 must remain unreachable.
+    expect(
+      await submissions.submit(userId, {
+        runId,
+        stepId: steps[2]!.id,
+        body: "This direct call must not skip over the current retention-plan step.",
+      })
+    ).toBeNull();
+
+    const { startPracticeActivity } = await import("./document-sim");
+    const abandoned = await startPracticeActivity(strangerId, {
+      packId: "fadi.customer-success",
+      activityId: "churn-review",
+    });
+    expect(abandoned.ok).toBe(true);
+    if (!abandoned.ok) return;
+    // project() refers to the primary run, so load the abandoned run explicitly.
+    const { createProjectRunsRepository } = await import("@careeros/database");
+    const owned = await createProjectRunsRepository(holder.db as never).getWithSteps(
+      strangerId,
+      abandoned.runId
+    );
+    expect(owned).not.toBeNull();
+    await pool.query("update project_runs set status = 'abandoned' where id = $1", [abandoned.runId]);
+    expect(
+      await submissions.submit(strangerId, {
+        runId: abandoned.runId,
+        stepId: owned!.steps[0]!.id,
+        body: "An abandoned simulation must remain closed to new assessed submissions.",
+      })
+    ).toBeNull();
+  });
+
+  it("retries the same immutable attempt after a provider failure", async () => {
+    const { churnCase } = await import("./sim/churn-case");
+    const { submitForReview } = await import("./document-sim");
+    const { run, steps } = await project();
+    const c = churnCase(run.practice!.seed);
+    const body = `${c.atRisk[0]}: support owns the breached-ticket recovery this week. ${c.atRisk[1]}: I own finding a new sponsor within ten days. We will measure tickets within SLA and a renewal meeting booked. We will not spend this month on ${c.decoy} because its dip is seasonal.`;
+    holder.failReviews = 1;
+    const failed = await submitForReview(userId, { runId, stepId: steps[1]!.id, body });
+    expect(failed).toMatchObject({ ok: false });
+    const retried = await submitForReview(userId, { runId, stepId: steps[1]!.id, body });
+    expect(retried.ok && retried.review).toMatchObject({ attempt: 1 });
+    const count = await pool.query(
+      "select count(*)::int as count from practice_submissions where step_id = $1",
+      [steps[1]!.id]
+    );
+    expect(count.rows[0]).toEqual({ count: 1 });
+  });
+
   it("the existing finish review says how it was established: reviewed against a rubric", async () => {
     const { createPracticeReceiptsRepository } = await import("@careeros/database");
     const { completionReview } = await import("@/lib/learning/project-review");
@@ -178,5 +240,21 @@ suite("a document work simulation, end to end", () => {
     expect(review.lines[0]).toMatchObject({ proof: "reviewed" });
     expect(review.lines[0]!.result).toMatch(/criteria met on attempt 2, unaided/);
     expect(review.summary).toContain("reviewed against a rubric");
+  });
+
+  it("keeps assessed source text by refusing hard deletion of a practice run", async () => {
+    const { createPracticeSubmissionsRepository, createProjectRunsRepository } = await import(
+      "@careeros/database"
+    );
+    const db = holder.db as never;
+    const { steps } = await project();
+    const source = await createPracticeSubmissionsRepository(db).latestForStep(
+      userId,
+      steps[0]!.id
+    );
+    expect(source?.body).toContain("tickets past SLA");
+    expect(await createProjectRunsRepository(db).remove(userId, runId)).toBe(false);
+    expect(await createPracticeSubmissionsRepository(db).get(userId, source!.id)).toEqual(source);
+    expect(await createPracticeSubmissionsRepository(db).get(strangerId, source!.id)).toBeNull();
   });
 });

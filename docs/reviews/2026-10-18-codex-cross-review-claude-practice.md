@@ -45,30 +45,30 @@ one committed learning commitment. This test fails against the reviewed implemen
 - The worked example is withheld until the step passes.
 - The UI keeps one primary action for each state and removes machine controls from document work.
 
-## Gates before this can be called released
+## Follow-up hardening completed on 19 October
 
-### P0 — Preserve assessment sources
+- Submission creation now requires an active run and the current earliest pending step. Direct
+  repository calls can no longer submit future steps or add attempts to abandoned runs.
+- A provider failure no longer consumes another attempt: an identical saved answer without a
+  receipt is reviewed again under the same immutable submission id. An already-reviewed duplicate
+  is refused.
+- Common rubric-injection and planted-quote instructions fail closed before model scoring. The
+  prompt also marks the learner response as untrusted data. This is a guardrail, not a substitute
+  for the broader adversarial evaluation required for release.
+- Runs with practice submissions cannot be hard-deleted. They may still be abandoned, preserving
+  the receipt's source text and ownership boundary.
+- The final passed review and worked example remain visible beside the finish action.
+- Learning now links to the simulation in a clearly labelled experimental section, so it can be
+  tested without pretending that it is released or practitioner-reviewed.
 
-`practice_submissions` currently cascade-delete with a project run or step, while receipts refer to
-them through `practice_submission:<id>`. Deleting a project can therefore erase the source text and
-leave a dangling receipt reference. Before these receipts feed public credentials or portable
-records, keep the submitted work and assessment snapshot for the retention period, or make deletion
-explicitly withdraw the resulting evidence and preserve a tombstoned audit record.
+## Remaining release gates
 
-### P0 — Adversarial rubric evaluation
+### P0 — Broader adversarial rubric evaluation
 
-Fact grading is code-owned, but writing-quality grading is still model-owned and the submission is
-untrusted text inside its prompt. Run an adversarial evaluation set for prompt injection, fake
-quotes, rubric gaming, irrelevant fluent prose and conflicting instructions. Until it passes, keep
-the activity experimental and keep model-reviewed claims at `observed`.
-
-### P1 — Retry the same interrupted assessment
-
-The submission row is written before the model call. If the provider fails, the person's work is
-preserved, which is correct, but the next click creates another attempt rather than resuming review
-of the unreviewed submission. Add an explicit `pending_review` state and retry the same immutable
-attempt idempotently. The interface should say that the answer was saved and the review can be
-retried.
+The deterministic injection guard covers the known direct attacks, but it is intentionally narrow.
+Run a versioned adversarial evaluation set for indirect prompt injection, obfuscation, fake quotes,
+irrelevant fluent prose and conflicting instructions. Until it passes, keep the activity
+experimental and keep model-reviewed claims at `observed`.
 
 ### P1 — Replace the decoy keyword heuristic
 
@@ -86,10 +86,10 @@ listening, interruption and provenance contract.
 
 - Changed-file ESLint: clean.
 - Full monorepo typecheck: clean.
-- Pure practice tests: 37 passed across five focused files.
-- Real PostgreSQL integration: 11 passed, including simultaneous start, revision, ownership and
-  closed-step enforcement.
-- Full web suite: 1,759 passed, 193 skipped.
+- Pure and real-PostgreSQL focused checks: 64 passed across seven files, including simultaneous
+  start, revision, ownership, closed/out-of-order/abandoned-step enforcement, provider retry and
+  provenance-preserving deletion refusal.
+- Full web suite: 1,760 passed, 196 skipped.
 - `git diff --check`: clean.
 
 The signed-in browser journey remains the last integration check after migration 0069 is applied to

@@ -119,7 +119,16 @@ async function contextFor(
   const project = await createProjectRunsRepository(getDatabase()).getWithSteps(userId, runId);
   const practice = project?.run.practice;
   const step = project?.steps.find((s) => s.id === stepId);
-  if (!project || !practice || !step) return null;
+  const current = project?.steps.find((candidate) => candidate.status === "pending");
+  if (
+    !project ||
+    project.run.status !== "running" ||
+    !practice ||
+    !step ||
+    current?.id !== step.id
+  ) {
+    return null;
+  }
   const runtime = activityRuntime(practice.packId, practice.activityId, practice.packVersion);
   const packStep = runtime?.activity.steps[step.ordinal - 1];
   if (!runtime || !packStep) return null;
@@ -154,6 +163,24 @@ export async function submitForReview(
   const assets = context.runtime.assets[context.packStepId];
   if (!assets) return { ok: false, message: "This step has no review criteria." };
 
+  const db = getDatabase();
+  const submissions = createPracticeSubmissionsRepository(db);
+  const receipts = createPracticeReceiptsRepository(db);
+  const body = input.body.trim();
+  const latest = await submissions.latestForStep(userId, input.stepId);
+  const latestReceipt = latest
+    ? (await receipts.listForStep(userId, input.stepId)).find(
+        (receipt) => receipt.sourceKind === "practice_submission" && receipt.sourceRefId === latest.id
+      )
+    : null;
+  if (latest?.body === body && latestReceipt) {
+    return {
+      ok: false,
+      message:
+        "This exact attempt was already reviewed. Reload the page to see its recorded result before revising.",
+    };
+  }
+
   const { getUserDocGenerate } = await import("@/lib/ai/user-generate");
   const generate = await getUserDocGenerate(userId);
   if (!generate) {
@@ -164,8 +191,11 @@ export async function submitForReview(
     };
   }
 
-  const db = getDatabase();
-  const submission = await createPracticeSubmissionsRepository(db).submit(userId, input);
+  // A provider failure leaves an immutable, unreviewed attempt. Retrying unchanged work reviews
+  // that same attempt instead of inflating the attempt count; changed work intentionally creates
+  // a new attempt.
+  const submission =
+    latest?.body === body && !latestReceipt ? latest : await submissions.submit(userId, input);
   if (!submission) {
     return { ok: false, message: "That step is closed, or the text is empty or too long." };
   }
@@ -205,7 +235,7 @@ export async function submitForReview(
     (r) =>
       `${r.level === "not_yet" ? "✗" : "✓"} ${r.label} (${r.level.replace("_", " ")}): ${r.feedback}`
   );
-  const { receipt } = await createPracticeReceiptsRepository(db).recordRubricReview(userId, {
+  const { receipt } = await receipts.recordRubricReview(userId, {
     submissionId: submission.id,
     assessmentId: "fadi.rubric",
     assessmentVersion: "1",

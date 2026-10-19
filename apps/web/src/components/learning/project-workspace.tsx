@@ -318,7 +318,10 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
               }}
             />
           ) : (
-            <FinishReview runId={runId} stepsKey={run.steps.map((s) => s.status).join()} />
+            <>
+              {passed ? <PassedNote passed={passed} onClose={() => setPassed(null)} /> : null}
+              <FinishReview runId={runId} stepsKey={run.steps.map((s) => s.status).join()} />
+            </>
           )}
 
           {run.steps.length > 0 ? (

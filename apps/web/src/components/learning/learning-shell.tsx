@@ -120,6 +120,27 @@ export function LearningShell({
         />
       </section>
 
+      <section className="rounded-2xl border border-primary/25 bg-card p-4 sm:p-5">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+          Work simulation · experimental
+        </p>
+        <div className="mt-1 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="max-w-2xl">
+            <h2 className="text-base font-semibold">Try a Customer Success churn review</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Analyse a book of accounts, write a 30-day retention plan and defend your priorities.
+              Fadi reviews your own case against named criteria. Not yet practitioner-reviewed.
+            </p>
+          </div>
+          <Link
+            href="/dashboard/learning/practice/fadi.customer-success/churn-review"
+            className="inline-flex h-9 shrink-0 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Review simulation
+          </Link>
+        </div>
+      </section>
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <Panel title="Also in progress" count={inProgressCount}>
           {inProgressCount === 0 ? (

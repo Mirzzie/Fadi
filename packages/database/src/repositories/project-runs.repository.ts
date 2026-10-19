@@ -3,6 +3,7 @@ import { and, asc, desc, eq, ne } from "drizzle-orm";
 import type { Database, DbOrTx } from "../client";
 import {
   labObservations,
+  practiceSubmissions,
   projectPlanVersions,
   projectRuns,
   projectSteps,
@@ -406,6 +407,15 @@ export function createProjectRunsRepository(db: Database) {
      */
     async remove(userId: string, runId: string): Promise<boolean> {
       return db.transaction(async (tx) => {
+        // An assessed submission is the immutable source behind a surviving Practice receipt.
+        // Refuse hard deletion rather than leave `practice_submission:<id>` dangling. The normal
+        // "Drop it" path remains available and keeps the run as abandoned history.
+        const [assessed] = await tx
+          .select({ id: practiceSubmissions.id })
+          .from(practiceSubmissions)
+          .where(and(eq(practiceSubmissions.userId, userId), eq(practiceSubmissions.runId, runId)))
+          .limit(1);
+        if (assessed) return false;
         const work = createWorkItemsRepository(tx);
         const linked = await work.listForRef(userId, { type: "project_run", id: runId });
         const rows = await tx

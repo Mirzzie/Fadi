@@ -1,4 +1,4 @@
-import { and, desc, eq, max } from "drizzle-orm";
+import { and, asc, desc, eq, max } from "drizzle-orm";
 
 import type { Database } from "../client";
 import {
@@ -37,7 +37,21 @@ export function createPracticeSubmissionsRepository(db: Database) {
           )
           .for("update")
           .limit(1);
-        if (!row || !row.run.practice || row.step.status !== "pending") return null;
+        if (
+          !row ||
+          !row.run.practice ||
+          row.run.status !== "running" ||
+          row.step.status !== "pending"
+        ) {
+          return null;
+        }
+        const [current] = await tx
+          .select({ id: projectSteps.id })
+          .from(projectSteps)
+          .where(and(eq(projectSteps.runId, input.runId), eq(projectSteps.status, "pending")))
+          .orderBy(asc(projectSteps.ordinal))
+          .limit(1);
+        if (!current || current.id !== input.stepId) return null;
         const [{ last }] = await tx
           .select({ last: max(practiceSubmissions.attempt) })
           .from(practiceSubmissions)
