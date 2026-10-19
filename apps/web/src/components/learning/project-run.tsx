@@ -110,7 +110,7 @@ function RunCard({
 
   return (
     <article
-      className={`rounded-2xl border bg-card p-4 sm:p-5 ${featured ? "border-primary/30" : "border-border"}`}
+      className={`border-y bg-card p-4 sm:p-5 ${featured ? "border-primary/30" : "border-border"}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
         <h3 className="min-w-0 font-semibold">{run.title}</h3>

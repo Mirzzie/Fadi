@@ -112,18 +112,9 @@ export function DashboardShell({
 
       {/* Mission Control hero — greeting + the live opportunities Fadi has lined up.
           Theme-aware, on Fadi's indigo signal field. */}
-      <section className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
-        {/* Soft aurora identity — quiet, so it never fights the content. */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -right-16 -top-24 size-72 rounded-full opacity-[0.12] blur-3xl [background:var(--aurora-2)]"
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -bottom-24 -left-10 size-64 rounded-full opacity-[0.10] blur-3xl [background:var(--aurora-1)]"
-        />
-        <div className="relative">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
+      <section className="border-y border-border bg-card px-1 py-7 sm:py-9">
+        <div>
+          <span className="inline-flex items-center gap-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
             <Sparkles className="size-3 text-primary" aria-hidden="true" />
             Mission Control
           </span>
@@ -142,7 +133,7 @@ export function DashboardShell({
                 <Link
                   key={`${opp.label}-${opp.detail}-${i}`}
                   href={opp.href}
-                  className="group rounded-xl border border-border bg-muted/40 p-3 text-left transition-colors hover:border-primary/40 hover:bg-muted"
+                  className="group border-t border-border bg-muted/20 p-3 text-left transition-colors hover:bg-muted"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-primary">
@@ -159,7 +150,7 @@ export function DashboardShell({
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <Link
               href="#career-report"
-              className={cn(buttonVariants({ size: "lg" }), "h-10 rounded-full px-5 text-sm font-semibold")}
+              className={cn(buttonVariants({ size: "lg" }), "h-10 px-5 text-sm font-semibold")}
             >
               Generate report
               <ArrowRight className="size-4" aria-hidden="true" />
@@ -168,7 +159,7 @@ export function DashboardShell({
               href="/dashboard/jobs"
               className={cn(
                 buttonVariants({ variant: "outline", size: "lg" }),
-                "h-10 rounded-full px-5 text-sm font-semibold",
+                "h-10 px-5 text-sm font-semibold",
               )}
             >
               Browse jobs
@@ -185,7 +176,7 @@ export function DashboardShell({
       {openBuilds > 0 ? (
         <Link
           href="/dashboard/learning"
-          className="group flex items-center justify-between gap-3 rounded-2xl border border-primary/25 bg-primary/5 p-4 transition-colors hover:bg-primary/10"
+          className="group flex items-center justify-between gap-3 border-y border-primary/25 bg-primary/5 px-1 py-4 transition-colors hover:bg-primary/10"
         >
           <div className="flex items-center gap-3">
             <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
@@ -211,7 +202,7 @@ export function DashboardShell({
           prepare for interviews. One clear thing to do in each. */}
       <section className="grid gap-4 lg:grid-cols-3">
         {/* Add an application */}
-        <div className="flex flex-col rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="flex flex-col border-y border-border bg-card p-5">
           <h3 className="font-heading text-base font-semibold">Add an application</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             Paste a job URL to save it straight to your tracker.
@@ -228,7 +219,7 @@ export function DashboardShell({
         </div>
 
         {/* Tracker stats */}
-        <div className="flex flex-col rounded-2xl border border-border bg-card p-5 shadow-sm">
+        <div className="flex flex-col border-y border-border bg-card p-5">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Quality applications · this {momentum.cadencePeriod}
           </p>
@@ -240,7 +231,7 @@ export function DashboardShell({
           </div>
           <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full rounded-full bg-gradient-to-r from-primary to-[oklch(0.66_0.22_285)]"
+              className="h-full rounded-full bg-primary"
               style={{
                 width: `${Math.min(100, Math.round(((momentum.qualityApplicationsThisPeriod ?? 0) / Math.max(momentum.cadenceTarget ?? 0, 1)) * 100))}%`,
               }}
@@ -258,7 +249,7 @@ export function DashboardShell({
         </div>
 
         {/* Prepare for interviews — accent card */}
-        <div className="flex flex-col rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/12 to-[oklch(0.55_0.2_285)]/10 p-5 shadow-sm">
+        <div className="flex flex-col border-y border-primary/20 bg-primary/5 p-5">
           <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-primary/25 bg-card/60 px-2.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-primary">
             Next up
           </span>
@@ -466,7 +457,7 @@ export function DashboardShell({
                   className="flex flex-col rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40"
                 >
                   <div className="flex items-start gap-3">
-                    <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-primary to-[oklch(0.5_0.2_285)] font-heading text-sm font-bold text-primary-foreground">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-md bg-primary font-heading text-sm font-bold text-primary-foreground">
                       {job.company?.slice(0, 1)?.toUpperCase() ?? "?"}
                     </span>
                     <div className="min-w-0 flex-1">
@@ -650,7 +641,7 @@ function StatCard({
           <p className="mt-1 text-sm font-medium">{label}</p>
           <p className="text-xs capitalize text-muted-foreground">{sub}</p>
         </div>
-        <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-primary/20 to-[oklch(0.66_0.22_285)]/15 text-primary ring-1 ring-primary/15">
+        <div className="grid size-10 shrink-0 place-items-center rounded-md bg-muted text-foreground ring-1 ring-border">
           <Icon className="size-5" aria-hidden="true" />
         </div>
       </div>
