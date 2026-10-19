@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 import { areaFor, DESTINATIONS, destinationFor } from "./navigation";
@@ -22,6 +22,22 @@ export function Dock() {
   const activeArea = areaFor(pathname);
   const [hidden, setHidden] = useState(false);
   const [sectionsOpen, setSectionsOpen] = useState(false);
+  const dockRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function closeSections(event: MouseEvent) {
+      if (!dockRef.current?.contains(event.target as Node)) setSectionsOpen(false);
+    }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setSectionsOpen(false);
+    }
+    document.addEventListener("pointerdown", closeSections);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeSections);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
 
   if (hidden) {
     return (
@@ -39,33 +55,7 @@ export function Dock() {
   }
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-3 z-40 flex flex-col items-center gap-2 px-3">
-      {sectionsOpen && active ? (
-        <nav
-          aria-label={`${active.label} views`}
-          className="pointer-events-auto flex max-w-[calc(100vw-1.5rem)] gap-1 overflow-x-auto rounded-lg border border-border bg-background/95 p-1 shadow-lg backdrop-blur-xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        >
-          {active.areas.map((area) => {
-            const current = activeArea?.href === area.href;
-            return (
-              <Link
-                key={area.href}
-                href={area.href}
-                onClick={() => setSectionsOpen(false)}
-                aria-current={current ? "page" : undefined}
-                className={cn(
-                  "shrink-0 rounded-md px-3 py-2 text-xs transition-colors",
-                  current
-                    ? "bg-muted font-medium text-foreground"
-                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                )}
-              >
-                {area.label}
-              </Link>
-            );
-          })}
-        </nav>
-      ) : null}
+    <div ref={dockRef} className="pointer-events-none fixed inset-x-0 bottom-3 z-40 flex justify-center px-3">
       <nav
         aria-label="Sections"
         className="pointer-events-auto flex w-full max-w-xl items-stretch justify-around rounded-xl border border-border bg-background/95 p-1.5 shadow-[0_18px_50px_-24px_rgb(0_0_0/0.55)] backdrop-blur-xl duration-300 animate-in fade-in slide-in-from-bottom-2"
@@ -74,23 +64,53 @@ export function Dock() {
           const isActive = active?.href === destination.href;
           if (isActive) {
             return (
-              <button
-                key={destination.href}
-                type="button"
-                onClick={() => setSectionsOpen((open) => !open)}
-                aria-expanded={sectionsOpen}
-                aria-label={`${destination.label} — choose a view`}
-                className="flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md border border-border bg-muted px-2 py-2 text-center text-foreground transition-colors hover:bg-muted/80 sm:gap-2 sm:px-4"
-              >
-                <destination.icon className="size-4 shrink-0 text-primary" aria-hidden="true" />
-                <span className="hidden text-xs font-medium whitespace-nowrap min-[420px]:inline">
-                  {destination.label}
-                </span>
-                <ChevronUp
-                  className={cn("size-3 shrink-0 transition-transform", sectionsOpen && "rotate-180")}
-                  aria-hidden="true"
-                />
-              </button>
+              <div key={destination.href} className="relative flex min-w-0 flex-1">
+                {sectionsOpen ? (
+                  <div
+                    role="menu"
+                    aria-label={`${active.label} views`}
+                    className="pointer-events-auto absolute bottom-[calc(100%+0.65rem)] left-1/2 flex w-52 -translate-x-1/2 flex-col gap-1 rounded-lg border border-border bg-background/98 p-1.5 shadow-xl backdrop-blur-xl"
+                  >
+                    {active.areas.map((area) => {
+                      const current = activeArea?.href === area.href;
+                      return (
+                        <Link
+                          key={area.href}
+                          href={area.href}
+                          role="menuitem"
+                          onClick={() => setSectionsOpen(false)}
+                          aria-current={current ? "page" : undefined}
+                          className={cn(
+                            "rounded-md px-3 py-2 text-xs transition-colors",
+                            current
+                              ? "bg-muted font-medium text-foreground"
+                              : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                          )}
+                        >
+                          {area.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={() => setSectionsOpen((open) => !open)}
+                  aria-expanded={sectionsOpen}
+                  aria-haspopup="menu"
+                  aria-label={`${destination.label} — choose a view`}
+                  className="flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md border border-border bg-muted px-2 py-2 text-center text-foreground transition-colors hover:bg-muted/80 sm:gap-2 sm:px-4"
+                >
+                  <destination.icon className="size-4 shrink-0 text-primary" aria-hidden="true" />
+                  <span className="hidden text-xs font-medium whitespace-nowrap min-[420px]:inline">
+                    {destination.label}
+                  </span>
+                  <ChevronUp
+                    className={cn("size-3 shrink-0 transition-transform", sectionsOpen && "rotate-180")}
+                    aria-hidden="true"
+                  />
+                </button>
+              </div>
             );
           }
           return (

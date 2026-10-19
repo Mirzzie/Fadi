@@ -94,14 +94,14 @@ export function UnifiedJobSearch({
           </span>
         ) : null}
       </div>
-      <p className="mt-1 text-xs text-muted-foreground">
+      <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
         Say where and how you want to work — Fadi pulls it fresh and matches it to your direction.
         e.g. &ldquo;graduate IT support in Dublin, remote&rdquo;.
       </p>
 
-      <div className="mt-5 flex gap-2 border-b-2 border-foreground pb-2">
+      <div className="mt-5 flex min-w-0 flex-col gap-2 border-b-2 border-foreground pb-2 sm:flex-row">
         <Input
-          className="h-12 border-0 bg-transparent px-0 text-base shadow-none focus-visible:ring-0"
+          className="h-12 min-w-0 border-0 bg-transparent px-0 text-base shadow-none focus-visible:ring-0"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={(e) => {
@@ -110,7 +110,7 @@ export function UnifiedJobSearch({
           placeholder="e.g. graduate IT support in Dublin, remote"
           aria-label="Search jobs in plain language"
         />
-        <Button className="h-11 rounded-md px-5" onClick={run} disabled={pending || !prompt.trim()}>
+        <Button className="h-11 w-full rounded-md px-5 sm:w-auto" onClick={run} disabled={pending || !prompt.trim()}>
           {pending ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
           {pending ? "Searching…" : "Search"}
         </Button>

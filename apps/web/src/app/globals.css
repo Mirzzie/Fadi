@@ -172,9 +172,9 @@
   body {
     @apply bg-background text-foreground;
     background-image:
-      linear-gradient(to right, color-mix(in srgb, var(--foreground) 3%, transparent) 1px, transparent 1px),
-      linear-gradient(to bottom, color-mix(in srgb, var(--foreground) 3%, transparent) 1px, transparent 1px);
-    background-size: 32px 32px;
+      linear-gradient(to right, color-mix(in srgb, var(--foreground) 1.5%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in srgb, var(--foreground) 1.5%, transparent) 1px, transparent 1px);
+    background-size: 48px 48px;
     background-attachment: fixed;
   }
   html {

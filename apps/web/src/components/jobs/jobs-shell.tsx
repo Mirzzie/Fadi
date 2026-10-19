@@ -40,7 +40,7 @@ export function JobsShell({
   searchOutcome,
 }: JobsShellProps) {
   return (
-    <div className="mx-auto max-w-shell space-y-6 pb-12">
+    <div className="mx-auto max-w-6xl space-y-6 pb-12">
       <header className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Live board</p>
@@ -117,7 +117,7 @@ export function JobsShell({
           })}
         </section>
       ) : (
-        <Card className="rounded-none border-x-0 shadow-none">
+        <Card className="max-w-2xl rounded-lg border-border/80 bg-card/70 shadow-none">
           <CardHeader>
             <CardTitle>
               {searchOutcome?.keywords.length

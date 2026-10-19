@@ -82,10 +82,10 @@ export function LearningShell({
   ];
 
   return (
-    <div className="mx-auto w-full max-w-shell space-y-10 pb-12">
+    <div className="mx-auto w-full max-w-6xl space-y-8 pb-12">
       <header className="border-b border-border pb-8 pt-3">
         <p className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Practice</p>
-        <h1 className="max-w-4xl font-heading text-4xl font-semibold tracking-[-0.045em] sm:text-6xl">
+        <h1 className="max-w-4xl font-heading text-4xl font-semibold tracking-[-0.045em] md:text-5xl">
           Get better by doing the work.
         </h1>
         <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
