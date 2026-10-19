@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     default: "Fadi",
     template: "%s | Fadi",
   },
-  description: "The career mentor that tells you the truth — honest job search, no ghost jobs, no hype.",
+  description: "Plan career moves, prepare applications, practise the work, and keep a useful record.",
 };
 
 export const viewport: Viewport = {

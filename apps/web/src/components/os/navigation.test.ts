@@ -33,7 +33,7 @@ describe("four destinations", () => {
     expect(destinationFor("/onboarding")).toBeNull();
   });
 
-  it("names the area you are in, so the sub-navigation can mark it", () => {
+  it("names the area you are in, so the dock tray can mark it", () => {
     expect(areaFor("/dashboard/portfolio/manage")?.label).toBe("Portfolio");
     expect(areaFor("/dashboard")?.label).toBe("Today");
     expect(areaFor("/dashboard/settings")).toBeNull();

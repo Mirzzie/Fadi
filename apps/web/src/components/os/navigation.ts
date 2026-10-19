@@ -15,15 +15,15 @@ import {
  * switch. Ten peers is not a structure — it is a list you re-read every time, and a label you
  * have to hover for is a label nobody has.
  *
- * Each destination names its areas. The areas are what the sub-navigation shows once you are
- * inside, and what decides which destination is lit: a route belongs to exactly one.
+ * Each destination names its areas. The active destination exposes those areas from the dock,
+ * and they decide which destination is lit: a route belongs to exactly one.
  */
 export type NavArea = { href: string; label: string };
 
 export type Destination = {
   href: string;
   label: string;
-  /** What the person expects to find here, in their words — used as the sub-nav caption. */
+  /** What the person expects to find here, in their words. */
   blurb: string;
   icon: LucideIcon;
   areas: NavArea[];

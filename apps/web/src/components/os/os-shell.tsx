@@ -10,7 +10,6 @@ import { MenuBar } from "./menu-bar";
 import { CommandBar } from "./command-bar";
 import { FadiPresenceProvider } from "./fadi-presence";
 import { PendingActionsProvider } from "./pending-actions";
-import { SubNav } from "./sub-nav";
 
 /**
  * The chrome that wraps every authenticated screen: a top menu bar, four-destination rail,
@@ -69,7 +68,6 @@ function OsShellInner({
       <main
         className={`flex-1 ${focusWorkspace ? "px-2 pb-3 pt-3 sm:px-3" : "px-3 pb-24 pt-4 sm:px-6 md:px-8 md:pt-5"}`}
       >
-        {focusWorkspace ? null : <SubNav />}
         {/* Keyed by route + active direction + phase. Any of the three changing remounts the
             page so its content follows — client state re-seeds and the switch is felt. The
             transition (fade + a small rise) matches the shell's own dock/menu motion. */}

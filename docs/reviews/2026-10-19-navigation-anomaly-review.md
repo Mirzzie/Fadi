@@ -29,8 +29,11 @@ REA cannot attach to that browser because it has no exposed CDP endpoint.
 - Keep the top bar because it owns global direction, search, approvals, activity, theme, and account.
 - Keep the global bar limited to identity, active direction, search, decisions, activity, theme, and
   account. Destination-local categories are not global controls and no longer appear there.
-- Place sibling-page links in one compact segmented switcher inside the page canvas at every width.
-  It scrolls horizontally on a narrow viewport instead of wrapping or occupying a full-width row.
+- Do not render sibling-page links as a persistent horizontal row. The first in-canvas revision still
+  read as a second top navigation bar, despite no longer sharing the global header.
+- Put sibling pages behind the active item in the floating dock. Selecting the current destination
+  opens a small upward tray; selecting a sibling closes it. This keeps those routes available without
+  permanently taking space from the page.
 - Collapse the ordinary ready state to its green status dot; show text only for work, waiting,
   blocked, or offline states.
 - Give the bottom dock an explicit hide/show control.
@@ -41,8 +44,17 @@ No navigation route, global state owner, or action was removed.
 ## Correction after owner review
 
 The first revision put `My record`, `CVs and letters`, and `Portfolio` in the persistent header on
-wide screens. That reduced vertical space but gave content categories the same visual authority as
-global product controls. The owner correctly rejected that hierarchy. The revised shell follows the
-reference distinction observed in Paperclip: the persistent header is global; local categories stay
-with their page content. This is an inference from the observed reference structure, not a claim that
-Fadi duplicates Paperclip's information architecture.
+wide screens. Moving them just below the header still looked like a second top bar, so the final
+revision removes that row entirely. The revised shell follows the reference distinction observed in
+Paperclip: the persistent header is global, while the floating navigation reveals destination detail
+only when requested. This is a design inference from the observed reference structure, not a claim
+that Fadi duplicates Paperclip's information architecture.
+
+## Landing copy correction
+
+The previous public hero repeatedly asserted honesty (`tells you the truth`, `no hype`, `never
+invented`) and displayed fictional career scores, albeit labelled as a sample. That sounded defensive
+and asked the visitor to trust claims before seeing the product. The replacement describes concrete
+work and replaces the score theatre with the four product destinations. REA observed the revised
+local page at `ev_73600f3878260bc998eed9b96c850017cae9b8d830e3caf191e8dc88b3e0ca99` and captured its
+visible viewport at `ev_9b66e0950edc90a9f03af1e85dab96988d4651afcaede02bfe6436afba43c285`.
