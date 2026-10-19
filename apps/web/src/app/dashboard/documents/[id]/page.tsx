@@ -84,7 +84,7 @@ export default async function DocumentEditorPage({ params }: { params: Promise<{
           }}
         />
         <FreshnessNote documentId={doc.id} freshness={freshness} />
-        <TruthReport findings={truthFindings} />
+        {doc.kind === "resume" ? null : <TruthReport findings={truthFindings} />}
 
         {doc.kind === "resume" ? (
           <ResumeEditor
@@ -95,6 +95,7 @@ export default async function DocumentEditorPage({ params }: { params: Promise<{
             initialVersion={doc.version}
             hasJob={Boolean(job)}
             freshnessAsk={freshnessAsk}
+            initialTruthFindings={truthFindings}
             experienceLevel={careerProfile?.experienceLevel ?? null}
             customTemplates={savedTemplates.map((t) => ({
               id: t.id,

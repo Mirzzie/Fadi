@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import {
   createDocumentsRepository,
+  createJobsRepository,
   createResumeTemplatesRepository,
   type DocumentKind,
 } from "@careeros/database";
@@ -17,8 +18,11 @@ import { rawTextToResumeContent, structureResumeText } from "@/lib/documents/imp
 import { fromJsonResume, parseJsonResume } from "@/lib/documents/json-resume";
 import { serializeResume } from "@/lib/documents/resume";
 import { logger } from "@/lib/observability/logger";
+import { checkDocumentTruth } from "@/lib/documents/corpus";
+import type { TruthFinding } from "@/lib/documents/truth-gate";
 
 const MAX_IMPORT_BYTES = 8 * 1024 * 1024; // 8 MB — resumes are small
+const MAX_CLAIM_CHECK_CHARS = 200_000;
 
 type Result = {
   ok: boolean;
@@ -35,6 +39,35 @@ const DEFAULT_TITLES: Record<string, string> = {
   value_proposition: "Untitled value proposition",
   note: "Untitled note",
 };
+
+/**
+ * Re-check the exact résumé text currently in the editor against the canonical career record.
+ * This is a projection of the existing truth gate, not a second claim store. Ownership is checked
+ * through the document before any supplied content is examined.
+ */
+export async function checkResumeClaimsAction(
+  documentId: string,
+  content: string,
+): Promise<{ ok: true; findings: TruthFinding[] } | { ok: false; message: string }> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  if (content.length > MAX_CLAIM_CHECK_CHARS) {
+    return { ok: false, message: "This résumé is too large to check safely." };
+  }
+
+  const db = getDatabase();
+  const document = await createDocumentsRepository(db).getForUser(user.id, documentId);
+  if (!document || document.kind !== "resume") {
+    return { ok: false, message: "That résumé is unavailable." };
+  }
+  const job = document.jobId
+    ? await createJobsRepository(db).findByIdForUser(user.id, document.jobId)
+    : null;
+  return {
+    ok: true,
+    findings: await checkDocumentTruth(user.id, content, job?.description ?? null),
+  };
+}
 
 export async function createDocumentAction(input: {
   kind: DocumentKind;

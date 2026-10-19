@@ -19,9 +19,12 @@ import {
 import { AccentPicker } from "@/components/ui/accent-picker";
 import { SelectMenu } from "@/components/ui/select-menu";
 import {
+  checkResumeClaimsAction,
   deleteResumeTemplateAction,
   saveResumeTemplateAction,
 } from "@/app/dashboard/documents/actions";
+import { TruthReport } from "@/components/documents/truth-report";
+import type { TruthFinding } from "@/lib/documents/truth-gate";
 import {
   newId,
   parseResume,
@@ -87,6 +90,7 @@ export function ResumeEditor({
   customTemplates = [],
   hasJob = false,
   freshnessAsk = null,
+  initialTruthFindings = [],
 }: {
   id: string;
   initialTitle: string;
@@ -99,6 +103,7 @@ export function ResumeEditor({
   hasJob?: boolean;
   /** When the person's record has moved on, the one-click way to act on it. */
   freshnessAsk?: string | null;
+  initialTruthFindings?: TruthFinding[];
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
@@ -111,12 +116,22 @@ export function ResumeEditor({
       : "classic",
   );
   const { status, markDirty, save: saveVersion } = useVersionedDocumentSave(id, initialVersion);
+  const [truthFindings, setTruthFindings] = useState(initialTruthFindings);
+  const [claimCheckError, setClaimCheckError] = useState<string | null>(null);
   const dirty = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const save = useCallback(async () => {
-    await saveVersion({ title, content: serializeResume(data), template });
-  }, [saveVersion, title, data, template]);
+    const content = serializeResume(data);
+    await saveVersion({ title, content, template });
+    const checked = await checkResumeClaimsAction(id, content);
+    if (checked.ok) {
+      setTruthFindings(checked.findings);
+      setClaimCheckError(null);
+    } else {
+      setClaimCheckError(checked.message);
+    }
+  }, [saveVersion, title, data, template, id]);
 
   useEffect(() => {
     if (!dirty.current) return;
@@ -531,6 +546,15 @@ export function ResumeEditor({
 
       {/* Honest reads-human check across the resume's prose */}
       <AiTellCheck text={proseText} />
+
+      {/* The same truth authority as export, refreshed after every autosave so a typed claim does
+          not keep the green state from the server render. */}
+      <TruthReport findings={truthFindings} />
+      {claimCheckError ? (
+        <p role="alert" className="text-xs text-amber-300">
+          Claim check unavailable: {claimCheckError}
+        </p>
+      ) : null}
 
       {/* Ask for a change and get the change — applied here, autosaved as a new version. */}
       <ImproveBox
