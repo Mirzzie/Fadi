@@ -20,8 +20,10 @@ describe("four destinations", () => {
   it("lights the destination a page belongs to, not the one with the shortest route", () => {
     expect(destinationFor("/dashboard")?.label).toBe("Today");
     expect(destinationFor("/dashboard/overview")?.label).toBe("Today");
-    expect(destinationFor("/dashboard/documents")?.label).toBe("My career");
-    expect(destinationFor("/dashboard/documents/abc-123")?.label).toBe("My career");
+    // The document library and its editor belong to Applications without becoming dock links.
+    expect(destinationFor("/dashboard/documents")?.label).toBe("Opportunities");
+    expect(destinationFor("/dashboard/documents/abc-123")?.label).toBe("Opportunities");
+    expect(areaFor("/dashboard/documents/abc-123")?.label).toBe("Applications");
     expect(destinationFor("/dashboard/applications/1/workspace")?.label).toBe("Opportunities");
     expect(destinationFor("/dashboard/interview")?.label).toBe("Practice");
   });

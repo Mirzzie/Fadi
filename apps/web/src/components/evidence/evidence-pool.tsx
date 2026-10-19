@@ -99,7 +99,7 @@ export function EvidencePool({
   }
 
   return (
-    <div className="mx-auto w-full max-w-4xl space-y-8 p-4 sm:p-6 lg:py-10">
+    <div className="mx-auto w-full max-w-4xl space-y-8 pb-12 lg:pt-5">
       <header className="max-w-3xl space-y-3">
         <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
           <Layers className="size-4" aria-hidden="true" />

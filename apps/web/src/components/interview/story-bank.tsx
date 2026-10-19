@@ -60,7 +60,7 @@ export function StoryBank({ stories: initial }: { stories: StoryView[] }) {
   }
 
   return (
-    <div className="mx-auto w-full space-y-6 p-4 sm:p-6">
+    <div className="mx-auto w-full space-y-6 pb-12">
       <header className="space-y-1.5">
         <div className="flex items-center gap-2">
           <MessageSquareQuote className="size-5 text-primary" aria-hidden="true" />

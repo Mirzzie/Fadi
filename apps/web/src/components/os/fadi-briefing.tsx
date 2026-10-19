@@ -38,7 +38,7 @@ export function FadiBriefing({ briefing }: { briefing: Briefing }) {
   }
 
   return (
-    <section className="border-y border-border bg-card px-1 py-4 sm:py-5">
+    <section className="border-y border-border bg-card py-4 sm:py-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <span className="grid size-8 shrink-0 place-items-center rounded-md border border-border bg-muted text-foreground">

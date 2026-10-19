@@ -66,7 +66,7 @@ function OsShellInner({
     <div className="relative flex min-h-screen flex-col">
       <MenuBar working={working} />
       <main
-        className={`flex-1 ${focusWorkspace ? "px-2 pb-3 pt-3 sm:px-3" : "px-3 pb-24 pt-4 sm:px-6 md:px-8 md:pt-5"}`}
+        className={`flex-1 ${focusWorkspace ? "px-2 pb-3 pt-3 sm:px-3" : "px-4 pb-24 pt-4 md:pt-5"}`}
       >
         {/* Keyed by route + active direction + phase. Any of the three changing remounts the
             page so its content follows — client state re-seeds and the switch is felt. The

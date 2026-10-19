@@ -19,7 +19,7 @@ export default async function LearningProjectsPage() {
     <AppShell>
       <main className="mx-auto max-w-shell space-y-6">
         <LearningNavigation />
-        <h1 className="font-heading text-xl font-semibold">Projects</h1>
+        <h1 className="font-heading text-3xl font-semibold tracking-tight">Projects</h1>
         <ProjectRuns mode="all" />
       </main>
     </AppShell>

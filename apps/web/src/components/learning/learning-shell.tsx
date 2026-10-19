@@ -106,7 +106,7 @@ export function LearningShell({
         )}
       </section>
 
-      <section className="border-y border-border bg-card px-1 py-6">
+      <section className="border-y border-border bg-card py-6">
         <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           Work simulation · experimental
         </p>

@@ -135,12 +135,12 @@ function drawCard(canvas: HTMLCanvasElement, card: PostDraft["card"]) {
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
   const { width, height } = canvas;
-  ctx.fillStyle = "#0b1416";
+  ctx.fillStyle = "#0a0a0a";
   ctx.fillRect(0, 0, width, height);
-  ctx.fillStyle = "#14b8a6";
+  ctx.fillStyle = "#584dfc";
   ctx.fillRect(0, 0, 12, height);
 
-  ctx.fillStyle = "#5eead4";
+  ctx.fillStyle = "#c7d2fe";
   ctx.font = "600 28px system-ui, sans-serif";
   ctx.fillText(card.kind === "course" ? "COURSE COMPLETE" : "PROJECT COMPLETE", 80, 110);
 
@@ -155,7 +155,7 @@ function drawCard(canvas: HTMLCanvasElement, card: PostDraft["card"]) {
   ctx.font = "400 32px system-ui, sans-serif";
   y += 20;
   for (const item of card.lines) {
-    ctx.fillStyle = "#5eead4";
+    ctx.fillStyle = "#c7d2fe";
     ctx.fillText("✓", 80, y);
     ctx.fillStyle = "#cbd5e1";
     ctx.fillText(wrap(ctx, item, width - 220)[0] ?? item, 124, y);

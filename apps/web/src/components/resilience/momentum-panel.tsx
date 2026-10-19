@@ -64,7 +64,7 @@ export function MomentumPanel({ momentum }: { momentum: MomentumView }) {
 
   return (
     <section
-      className="glow-dynamic relative overflow-hidden rounded-xl border border-dynamic bg-card transition-shadow duration-700"
+      className="relative overflow-hidden border border-dynamic bg-card"
       style={{ "--accent-dynamic": BAND_META[momentum.band].color } as CSSProperties}
     >
       <div className="grid gap-px bg-border md:grid-cols-[auto_1fr]">

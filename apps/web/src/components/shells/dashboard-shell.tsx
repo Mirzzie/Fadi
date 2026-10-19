@@ -112,7 +112,7 @@ export function DashboardShell({
 
       {/* Mission Control hero — greeting + the live opportunities Fadi has lined up.
           Theme-aware, on Fadi's indigo signal field. */}
-      <section className="border-y border-border bg-card px-1 py-7 sm:py-9">
+      <section className="border-y border-border bg-card py-7 sm:py-9">
         <div>
           <span className="inline-flex items-center gap-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
             <Sparkles className="size-3 text-primary" aria-hidden="true" />
@@ -176,7 +176,7 @@ export function DashboardShell({
       {openBuilds > 0 ? (
         <Link
           href="/dashboard/learning"
-          className="group flex items-center justify-between gap-3 border-y border-primary/25 bg-primary/5 px-1 py-4 transition-colors hover:bg-primary/10"
+          className="group flex items-center justify-between gap-3 border-y border-primary/25 bg-primary/5 py-4 transition-colors hover:bg-primary/10"
         >
           <div className="flex items-center gap-3">
             <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">

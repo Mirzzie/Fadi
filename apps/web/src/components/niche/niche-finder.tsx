@@ -79,9 +79,8 @@ export function NicheFinder() {
         <p className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Direction</p>
         <h1 className="font-heading text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Choose with evidence.</h1>
         <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          Torn between paths? Tell me where you stand. I&apos;ll pull live demand data and give you the
-          honest reality on each option — demand, pay, competition, the real time and money to break
-          in, and your odds — so you stop guessing.
+          Compare possible directions using demand, pay ranges, competition, and the time and cost
+          involved. Review the inputs before choosing where to focus.
         </p>
       </header>
 

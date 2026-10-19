@@ -66,7 +66,7 @@ export default async function DocumentEditorPage({ params }: { params: Promise<{
           missed each other by 28px on every document — and on a wide screen both sat in a narrow
           column with the preview cramped. Reported as "spacing and alignments". The editors below
           now fill this container instead of centring themselves at their own widths. */}
-      <div className="mx-auto w-full max-w-[100rem] space-y-3 px-3 pb-4 sm:px-5">
+      <div className="mx-auto w-full max-w-[100rem] space-y-3 pb-4">
         <TailoringPanel
           documentId={doc.id}
           job={

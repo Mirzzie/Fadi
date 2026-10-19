@@ -115,7 +115,7 @@ export function DocumentEditor({
       </div>
 
       {/* Page */}
-      <div className="fadi-glow-sm flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/60 bg-card">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden border border-border bg-card">
         <input
           value={title}
           onChange={(e) => onChange({ title: e.target.value })}

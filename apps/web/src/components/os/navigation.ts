@@ -18,7 +18,12 @@ import {
  * Each destination names its areas. The active destination exposes those areas from the dock,
  * and they decide which destination is lit: a route belongs to exactly one.
  */
-export type NavArea = { href: string; label: string };
+export type NavArea = {
+  href: string;
+  label: string;
+  /** Routes owned by this area but reached as a focused workspace rather than a dock link. */
+  aliases?: string[];
+};
 
 export type Destination = {
   href: string;
@@ -48,7 +53,11 @@ export const DESTINATIONS: Destination[] = [
     icon: BriefcaseBusiness,
     areas: [
       { href: "/dashboard/jobs", label: "Roles" },
-      { href: "/dashboard/applications", label: "Applications" },
+      {
+        href: "/dashboard/applications",
+        label: "Applications",
+        aliases: ["/dashboard/documents"],
+      },
       { href: "/dashboard/network", label: "People" },
     ],
   },
@@ -69,7 +78,6 @@ export const DESTINATIONS: Destination[] = [
     icon: Layers,
     areas: [
       { href: "/dashboard/evidence", label: "My record" },
-      { href: "/dashboard/documents", label: "CVs and letters" },
       { href: "/dashboard/portfolio", label: "Portfolio" },
       // No "Directions" entry: /dashboard/tracks has actions and no page, and switching or
       // creating a direction already lives in the switcher at the top of every screen. A
@@ -78,14 +86,14 @@ export const DESTINATIONS: Destination[] = [
   },
 ];
 
-/** Longest matching area wins, so /dashboard/documents is not swallowed by /dashboard. */
+/** Longest matching area wins, so nested workspaces keep their owning destination. */
 export function destinationFor(pathname: string): Destination | null {
   let best: { destination: Destination; length: number } | null = null;
   for (const destination of DESTINATIONS) {
     for (const area of destination.areas) {
-      const matches = area.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(area.href);
-      if (matches && (!best || area.href.length > best.length)) {
-        best = { destination, length: area.href.length };
+      const matchedPrefix = matchingPrefix(area, pathname);
+      if (matchedPrefix && (!best || matchedPrefix.length > best.length)) {
+        best = { destination, length: matchedPrefix.length };
       }
     }
   }
@@ -99,10 +107,23 @@ export function areaFor(pathname: string): NavArea | null {
   if (!destination) return null;
   let best: { area: NavArea; length: number } | null = null;
   for (const area of destination.areas) {
-    const matches = area.href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(area.href);
-    if (matches && (!best || area.href.length > best.length)) best = { area, length: area.href.length };
+    const matchedPrefix = matchingPrefix(area, pathname);
+    if (matchedPrefix && (!best || matchedPrefix.length > best.length)) {
+      best = { area, length: matchedPrefix.length };
+    }
   }
   return best?.area ?? null;
+}
+
+function matchingPrefix(area: NavArea, pathname: string): string | null {
+  const prefixes = [area.href, ...(area.aliases ?? [])];
+  return (
+    prefixes
+      .filter((prefix) =>
+        prefix === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(prefix)
+      )
+      .sort((a, b) => b.length - a.length)[0] ?? null
+  );
 }
 
 /**

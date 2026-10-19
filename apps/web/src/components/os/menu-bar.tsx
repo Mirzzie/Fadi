@@ -17,7 +17,7 @@ import { UserMenu } from "./user-menu";
 export function MenuBar({ working = null }: { working?: string | null } = {}) {
   const { displayState } = useFadi();
   return (
-    <header className="sticky top-0 z-40 flex h-12 items-center justify-between border-b border-border bg-background/95 px-3 text-xs backdrop-blur-md duration-300 animate-in fade-in slide-in-from-top-2">
+    <header className="sticky top-0 z-40 flex h-12 items-center justify-between border-b border-border bg-background/95 px-4 text-xs backdrop-blur-md duration-300 animate-in fade-in slide-in-from-top-2">
       {/* Brand + live Fadi state */}
       <div className="flex items-center gap-2">
         <FadiLogo className="size-5" />
