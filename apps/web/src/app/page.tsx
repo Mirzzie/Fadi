@@ -218,7 +218,7 @@ export default async function Home() {
                 </p>
                 <h1
                   className="text-[3.25rem] font-semibold leading-[0.94] tracking-[-0.045em] text-foreground sm:text-7xl lg:text-[5.5rem]"
-                  style={{ fontFamily: "var(--font-display)" }}
+                  style={{ fontFamily: "var(--font-inter-tight)" }}
                 >
                   The career mentor
                   <br />
@@ -275,7 +275,7 @@ export default async function Home() {
                         {!personalized || s.realTrend ? <Sparkline bars={s.bars} /> : null}
                         <span
                           className="min-w-[3.5rem] text-right text-3xl font-light tabular-nums text-foreground sm:text-4xl"
-                          style={{ fontFamily: "var(--font-display)" }}
+                          style={{ fontFamily: "var(--font-inter-tight)" }}
                         >
                           {s.value}
                         </span>
