@@ -207,3 +207,6 @@ Dublin" → "I found 6 roles for Dublin, Ireland. The best are …"; "save the s
 same context → held as the second role named, confirmed, saved. "How am I doing" → three short
 sentences (was a paragraph with "0 quality applications"). "Stripe rejected me" → held task with
 the marker above. Tests: 264 pass (new: positions, spoken helpers, marker).
+
+### Buddy Codex S7 — contextual service routing / browser transport
+Owner now requests unaddressed career requests and hands-free foreground Fadi UI navigation/click/selection. Buddy implements an optional capability router, preserving Fadi A2A held-change policies, plus an owner-paired local-origin browser extension/bridge for actual UI transport. FADI source remains untouched. The bridge sends no cookies/passwords/input values/screenshots, and clicks/selections get exact readback/confirmation. Browser action receipts describe interaction, not peer database effects. The existing `NOT_BY_VOICE open_page` remains appropriate until a versioned UI delivery/result contract exists. Future Fadi handoff: stable route/capability metadata, a typed page/selection context contract and UI navigation receipts would avoid coupling to DOM layout. Do not interpret Buddy DOM control numbers as Fadi voice-result reference numbers. See Buddy docs/BROWSER_CONTROL.md and its shared plan for validation/install limits.
