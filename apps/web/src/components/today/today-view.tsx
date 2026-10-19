@@ -41,9 +41,15 @@ export function TodayView({ today }: { today: Today }) {
   }
 
   return (
-    <div className="mx-auto max-w-shell space-y-4 pb-10">
-      <header className="pt-1">
-        <h1 className="text-xl font-semibold tracking-tight">Hey {today.firstName}.</h1>
+    <div className="mx-auto max-w-5xl pb-10">
+      <header className="border-b border-border pb-10 pt-4 sm:pb-14 sm:pt-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Today</p>
+        <h1 className="mt-3 font-heading text-4xl font-semibold tracking-[-0.04em] sm:text-6xl">
+          Hey {today.firstName}.
+        </h1>
+        <p className="mt-4 max-w-xl text-muted-foreground">
+          One goal, one next move, and a clear record of what Fadi has done.
+        </p>
       </header>
 
       <Working today={today} pending={pending} onRun={run} />
@@ -56,7 +62,7 @@ export function TodayView({ today }: { today: Today }) {
 
       {error ? <p className="text-sm text-destructive">{error}</p> : null}
 
-      <p className="pt-1 text-xs text-muted-foreground">
+      <p className="border-t border-border pt-6 text-xs text-muted-foreground">
         <Link href="/dashboard/overview" className="underline underline-offset-4">
           See the full picture
         </Link>{" "}
@@ -78,14 +84,14 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-xl border border-border bg-card/40 p-5">
+    <section className="border-b border-border py-7 sm:py-9">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
           {title}
         </h2>
         {aside}
       </div>
-      <div className="mt-3">{children}</div>
+      <div className="mt-4">{children}</div>
     </section>
   );
 }
@@ -193,8 +199,8 @@ function NextAction({ today, pending, onRun }: { today: Today; pending: boolean;
       }
     >
       {action ? (
-        <div className="rounded-lg border border-border/60 bg-background/40 p-4">
-          <p className="text-base font-medium">{action.title}</p>
+        <div className="border-l-2 border-primary pl-4 sm:pl-6">
+          <p className="text-xl font-medium tracking-tight">{action.title}</p>
           {action.reason ? (
             <p className="mt-1 text-sm text-muted-foreground">{action.reason}</p>
           ) : null}
@@ -263,7 +269,7 @@ function NextAction({ today, pending, onRun }: { today: Today; pending: boolean;
           {today.alsoOpen.map((step) => (
             <li
               key={step.id}
-              className="flex items-center justify-between gap-3 rounded-lg px-1 py-1.5 text-sm"
+            className="flex items-center justify-between gap-3 border-t border-border px-1 py-2.5 text-sm"
             >
               <span className="min-w-0 truncate">{step.title}</span>
               <span className="flex shrink-0 items-center gap-1">
@@ -475,7 +481,7 @@ function Decisions({ today }: { today: Today }) {
         {today.decisions.map((decision) => (
           <li
             key={decision.id}
-            className="flex flex-col gap-2 rounded-lg border border-border/60 bg-background/40 p-3 sm:flex-row sm:items-center sm:justify-between"
+            className="flex flex-col gap-2 border-t border-border py-3 first:border-t-0 sm:flex-row sm:items-center sm:justify-between"
           >
             <div className="min-w-0">
               <p className="text-sm font-medium">{decision.title}</p>
