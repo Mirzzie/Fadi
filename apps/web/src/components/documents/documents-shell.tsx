@@ -13,7 +13,6 @@ import {
 import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
@@ -78,32 +77,24 @@ export function DocumentsShell({ documents }: { documents: DocView[] }) {
   }
 
   return (
-    <div className="mx-auto max-w-shell space-y-6">
-      <section className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute -right-16 -top-24 size-72 rounded-full opacity-[0.12] blur-3xl [background:var(--aurora-1)]"
-        />
-        <div className="relative space-y-4">
+    <div className="mx-auto max-w-shell space-y-10 pb-12 pt-4">
+      <section className="border-b border-border/70 pb-8">
+        <div className="space-y-5">
           <div>
-            <Badge variant="secondary">Document studio</Badge>
-            <h2 className="mt-3 font-heading text-2xl font-semibold tracking-tight">
-              Your{" "}
-              <span className="bg-gradient-to-r from-primary to-[oklch(0.7_0.17_230)] bg-clip-text text-transparent">
-                documents
-              </span>
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Resumes, cover letters, emails and value propositions — saved, editable, and tied to
-              the roles you&apos;re chasing. Fadi can draft any of these for you.
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-primary">Document studio</p>
+            <h2 className="text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Words ready to send.</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+              Resumes, letters, emails and value propositions—editable, versioned, and connected to
+              the opportunity they support.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 border-t border-border/60 pt-5">
             {KINDS.map((k) => (
               <Button
                 key={k.kind}
-                variant="outline"
+                variant={k.kind === "resume" ? "default" : "outline"}
                 size="sm"
+                className="rounded-md"
                 disabled={pending}
                 onClick={() => create(k.kind)}
               >
@@ -115,6 +106,7 @@ export function DocumentsShell({ documents }: { documents: DocView[] }) {
             <Button
               variant="outline"
               size="sm"
+              className="rounded-md"
               disabled={pending}
               onClick={() => fileInput.current?.click()}
               title="Import a CV from PDF, DOCX, DOC, TXT, or JSON Resume"
@@ -134,53 +126,47 @@ export function DocumentsShell({ documents }: { documents: DocView[] }) {
         </div>
       </section>
 
-      {/* unimad-style gallery: a "New" tile leads, then each document as a card with a
-          faux paper-preview header — scannable at a glance. */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <section>
+        <div className="mb-3 flex items-baseline justify-between gap-4">
+          <h3 className="text-xl font-semibold tracking-tight">Library</h3>
+          <span className="text-xs text-muted-foreground">{documents.length} saved</span>
+        </div>
+        <div className="divide-y border-y border-border/80">
         <button
           type="button"
           onClick={() => create("resume")}
           disabled={pending}
-          className="group flex min-h-50 flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-card/40 text-muted-foreground transition-colors hover:border-primary/50 hover:text-primary"
+          className="group flex w-full items-center gap-4 py-5 text-left text-muted-foreground transition-colors hover:bg-muted/30 hover:text-primary sm:px-2"
         >
-          <span className="grid size-12 place-items-center rounded-full border border-border bg-muted/50 transition-colors group-hover:border-primary/40 group-hover:bg-primary/10">
-            <Plus className="size-6" aria-hidden="true" />
+          <span className="grid size-9 place-items-center border border-border bg-muted/30 transition-colors group-hover:border-primary/40 group-hover:bg-primary/10">
+            <Plus className="size-4" aria-hidden="true" />
           </span>
-          <span className="text-sm font-medium">New document</span>
+          <span>
+            <span className="block text-sm font-medium text-foreground">New resume</span>
+            <span className="mt-0.5 block text-xs">Start from your career record</span>
+          </span>
         </button>
 
         {documents.map((doc) => {
           const meta = KIND_META[doc.kind] ?? { label: doc.kind, icon: FileText };
           return (
-            <div
-              key={doc.id}
-              className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm transition-colors hover:border-primary/40"
-            >
+            <div key={doc.id} className="group relative transition-colors hover:bg-muted/30">
               <button
                 type="button"
                 onClick={() => router.push(`/dashboard/documents/${doc.id}`)}
-                className="block w-full text-left"
+                className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 py-5 pr-12 text-left sm:px-2 sm:pr-14"
               >
-                {/* faux page preview */}
-                <div className="h-32 overflow-hidden border-b border-border/60 bg-gradient-to-b from-muted/50 to-card px-4 py-3">
-                  <p className="line-clamp-5 text-[0.6rem] leading-relaxed text-muted-foreground/70">
-                    {doc.preview || "Empty — open to start writing."}
-                  </p>
-                </div>
-                <div className="p-4">
-                  <div className="flex items-center gap-2">
-                    <span className="grid size-6 place-items-center rounded-md bg-primary/10 text-primary">
-                      <meta.icon className="size-3.5" aria-hidden="true" />
-                    </span>
-                    <span className="text-[0.65rem] uppercase tracking-wide text-muted-foreground">
-                      {meta.label}
-                    </span>
+                <span className="grid size-9 place-items-center bg-primary/10 text-primary">
+                  <meta.icon className="size-4" aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <div className="flex items-baseline gap-2">
+                    <p className="truncate text-sm font-semibold">{doc.title}</p>
+                    <span className="shrink-0 text-[0.65rem] uppercase tracking-wide text-muted-foreground">{meta.label}</span>
                   </div>
-                  <p className="mt-1.5 truncate font-heading text-sm font-semibold">{doc.title}</p>
-                  <p className="mt-1 text-[0.7rem] text-muted-foreground">
-                    Updated {formatDay(doc.updatedAt)}
-                  </p>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">{doc.preview || "Empty — open to start writing."}</p>
                 </div>
+                <p className="hidden text-xs text-muted-foreground sm:block">Updated {formatDay(doc.updatedAt)}</p>
               </button>
               <button
                 type="button"
@@ -188,7 +174,7 @@ export function DocumentsShell({ documents }: { documents: DocView[] }) {
                 onClick={() => remove(doc.id)}
                 disabled={pending}
                 className={cn(
-                  "absolute right-2 top-2 grid size-7 place-items-center rounded-md bg-card/80 text-muted-foreground opacity-0 backdrop-blur-sm transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100",
+                  "absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 focus:opacity-100",
                 )}
               >
                 <Trash2 className="size-3.5" aria-hidden="true" />
@@ -196,7 +182,8 @@ export function DocumentsShell({ documents }: { documents: DocView[] }) {
             </div>
           );
         })}
-      </div>
+        </div>
+      </section>
     </div>
   );
 }
