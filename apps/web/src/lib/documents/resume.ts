@@ -87,7 +87,7 @@ export type ResumeTemplate = "classic" | "modern" | "compact" | "ats" | "executi
 export const RESUME_TEMPLATES: { id: ResumeTemplate; label: string; hint?: string }[] = [
   { id: "ats", label: "ATS", hint: "Maximum parse-safety — single column, plain, no color" },
   { id: "classic", label: "Classic", hint: "Centered, traditional" },
-  { id: "modern", label: "Modern", hint: "Left-aligned with a teal accent" },
+  { id: "modern", label: "Modern", hint: "Left-aligned with an indigo accent" },
   { id: "executive", label: "Executive", hint: "Refined serif, centered" },
   { id: "compact", label: "Compact", hint: "Tighter spacing to fit more" },
 ];

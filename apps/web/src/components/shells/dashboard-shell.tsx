@@ -111,7 +111,7 @@ export function DashboardShell({
       {briefing ? <FadiBriefing briefing={briefing} /> : null}
 
       {/* Mission Control hero — greeting + the live opportunities Fadi has lined up.
-          Theme-aware, on Fadi's own teal/aurora (was a heavy dark violet banner). */}
+          Theme-aware, on Fadi's indigo signal field. */}
       <section className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
         {/* Soft aurora identity — quiet, so it never fights the content. */}
         <div

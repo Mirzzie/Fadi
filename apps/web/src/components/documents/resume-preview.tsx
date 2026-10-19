@@ -25,9 +25,9 @@ const TEMPLATES: Record<ResumeTemplate, TemplateStyle> = {
   },
   modern: {
     root: "space-y-4",
-    header: "border-l-4 border-teal-600 pl-3",
+    header: "border-l-4 border-indigo-600 pl-3",
     name: "text-2xl font-bold tracking-tight text-zinc-900",
-    sectionHeader: "mb-1.5 text-[12px] font-bold uppercase tracking-wider text-teal-700",
+    sectionHeader: "mb-1.5 text-[12px] font-bold uppercase tracking-wider text-indigo-700",
   },
   compact: {
     root: "space-y-2.5 text-[12px]",

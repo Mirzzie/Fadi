@@ -77,7 +77,7 @@ export function JobSearchProgress({ status }: { status: SyncProgress | null }) {
       aria-live="polite"
       className={`flex flex-col gap-1 rounded-lg border px-4 py-3 text-sm ${
         running
-          ? "border-teal-500/30 bg-teal-500/5 text-teal-50"
+          ? "border-primary/30 bg-primary/5 text-foreground"
           : failed || partial
             ? "border-amber-500/30 bg-amber-500/5 text-amber-50"
             : "border-emerald-500/30 bg-emerald-500/5 text-emerald-50"
@@ -87,7 +87,7 @@ export function JobSearchProgress({ status }: { status: SyncProgress | null }) {
         {running ? (
           <span
             aria-hidden
-            className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-teal-400 motion-reduce:animate-none"
+            className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-primary motion-reduce:animate-none"
           />
         ) : (
           <span
@@ -101,13 +101,13 @@ export function JobSearchProgress({ status }: { status: SyncProgress | null }) {
             : completion}
         </span>
         {running && status.total > 0 && (
-          <span className="text-teal-200/70">
+          <span className="text-muted-foreground">
             {status.done}/{status.total} sources scanned · {fetchedSoFar} fetched
           </span>
         )}
       </div>
       {running && (
-        <p className="pl-4.5 text-xs text-teal-200/60">
+        <p className="pl-4.5 text-xs text-muted-foreground">
           This runs in the background and can take a minute. The board updates once the search
           finishes — results are deduplicated and ranked first. No need to wait.
         </p>
