@@ -84,3 +84,36 @@ describe("fact criteria are decided in code from the person's own case", () => {
     expect(results.find((r) => r.id === "spots-decoy")?.feedback).toMatch(/CRM notes/);
   });
 });
+
+describe("backing each at-risk account with its own figures — checked exactly (19 Oct 2026)", () => {
+  const c = churnCase("seed-a");
+  const evidence = CHURN_REVIEW_ASSETS.diagnose!.criteria.find((x) => x.id === "evidence")!;
+  const check = (text: string) =>
+    evidence.kind === "fact" ? evidence.check(text, c) : { met: false, seen: "" };
+  const row = (name: string) => c.accounts.find((a) => a.name === name)!;
+  const describe = (name: string) => {
+    const a = row(name);
+    const change = Math.round(((a.activeNow - a.active90) / a.active90) * 100);
+    return `${name}: weekly users ${change}% over 90 days, renewal in ${a.renewalDays} days, $${a.arrK}k ARR.`;
+  };
+
+  it("credits an answer that cites two of each account's figures, wherever they are named first", () => {
+    const text = `${c.atRisk[0]} and ${c.atRisk[1]} are at risk. ${describe(c.atRisk[0])} ${describe(c.atRisk[1])}`;
+    expect(check(text).met).toBe(true);
+  });
+
+  it("doesn't credit names without figures", () => {
+    expect(
+      check(`${c.atRisk[0]} and ${c.atRisk[1]} are at risk because things look bad.`).met
+    ).toBe(false);
+  });
+
+  it("doesn't credit figures from someone else's case", () => {
+    const other = churnCase("someone-else");
+    const borrowed = other.accounts.find(
+      (a) => !c.accounts.some((b) => b.renewalDays === a.renewalDays || b.arrK === a.arrK)
+    )!;
+    const text = `${c.atRisk[0]}: renewal in ${borrowed.renewalDays} days, $${borrowed.arrK}k ARR. ${describe(c.atRisk[1])}`;
+    expect(check(text).met).toBe(false);
+  });
+});

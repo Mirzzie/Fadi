@@ -135,60 +135,72 @@ export function DocumentStep({
 
 /** The case: its situation as text, its figures as a real table. */
 function CaseView({ brief }: { brief: string }) {
-  const lines = brief.split("\n");
-  const tableLines = lines.filter((line) => line.trim().startsWith("|"));
-  const prose = lines
-    .filter((line) => !line.trim().startsWith("|"))
-    .join("\n")
-    .trim();
-  const rows = tableLines
-    .filter((line) => !/^\|\s*-/.test(line.trim()))
-    .map((line) =>
-      line
-        .trim()
-        .replace(/^\||\|$/g, "")
-        .split("|")
-        .map((cell) => cell.trim())
-    );
-  const [head, ...body] = rows;
+  // Text and table in the order the case was written: the situation first, then the figures,
+  // then the CRM notes (the browser pass showed the intro landing after the table, 19 Oct 2026).
+  const blocks: Array<{ kind: "text"; text: string } | { kind: "table"; rows: string[][] }> = [];
+  for (const line of brief.split("\n")) {
+    const isRow = line.trim().startsWith("|");
+    const last = blocks[blocks.length - 1];
+    if (isRow) {
+      if (/^\|\s*-/.test(line.trim())) continue;
+      const cells = line.trim().replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim());
+      if (last?.kind === "table") last.rows.push(cells);
+      else blocks.push({ kind: "table", rows: [cells] });
+    } else if (last?.kind === "text") last.text += `\n${line}`;
+    else blocks.push({ kind: "text", text: line });
+  }
   return (
     <details open className="mt-4 rounded-lg border border-border/70">
       <summary className="cursor-pointer px-3 py-2 text-sm font-medium">The case</summary>
       <div className="space-y-3 border-t border-border/70 px-3 py-3">
-        {head ? (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead>
-                <tr>
-                  {head.map((cell) => (
-                    <th key={cell} className="whitespace-nowrap px-2 py-1 font-medium">
-                      {cell}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {body.map((row) => (
-                  <tr key={row[0]} className="border-t border-border/50">
-                    {row.map((cell, index) => (
-                      <td key={index} className="whitespace-nowrap px-2 py-1 text-muted-foreground">
-                        {cell}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : null}
-        {prose ? (
-          <StepText
-            text={prose}
-            className="space-y-2 text-sm leading-relaxed text-muted-foreground"
-          />
-        ) : null}
+        {blocks.map((block, index) =>
+          block.kind === "table" ? (
+            <CaseTable key={index} rows={block.rows} />
+          ) : block.text.trim() ? (
+            <StepText
+              key={index}
+              text={block.text.trim()}
+              className="space-y-2 text-sm leading-relaxed text-muted-foreground"
+            />
+          ) : null
+        )}
       </div>
     </details>
+  );
+}
+
+/** Every column visible: cells wrap rather than run off the card (no clipped "Exec sponsor"). */
+function CaseTable({ rows }: { rows: string[][] }) {
+  const [head, ...body] = rows;
+  if (!head) return null;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full table-auto text-left text-xs">
+        <thead>
+          <tr>
+            {head.map((cell) => (
+              <th key={cell} className="px-2 py-1 align-bottom font-medium">
+                {cell}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {body.map((row) => (
+            <tr key={row[0]} className="border-t border-border/50 align-top">
+              {row.map((cell, index) => (
+                <td
+                  key={index}
+                  className={`px-2 py-1 text-muted-foreground ${index === 0 ? "font-medium text-foreground" : ""}`}
+                >
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 

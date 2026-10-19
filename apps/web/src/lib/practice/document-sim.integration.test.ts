@@ -49,8 +49,11 @@ suite("a document work simulation, end to end", () => {
     holder.db = drizzle(pool) as never;
     const stamp = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const user = async (tag: string) =>
-      (await pool.query("insert into users (email) values ($1) returning id", [`${tag}-${stamp}@example.test`]))
-        .rows[0].id as string;
+      (
+        await pool.query("insert into users (email) values ($1) returning id", [
+          `${tag}-${stamp}@example.test`,
+        ])
+      ).rows[0].id as string;
     userId = await user("sim");
     strangerId = await user("sim-other");
   });
@@ -83,7 +86,12 @@ suite("a document work simulation, end to end", () => {
             and practice->>'packId' = $2 and practice->>'activityId' = $3) as runs,
          (select count(*)::int from learning_commitments
           where user_id = $1 and title = $4 and status = 'committed') as commitments`,
-      [userId, request.packId, request.activityId, "Quarterly churn review for a B2B software company"]
+      [
+        userId,
+        request.packId,
+        request.activityId,
+        "Quarterly churn review for a B2B software company",
+      ]
     );
     expect(counts.rows[0]).toEqual({ runs: 1, commitments: 1 });
 
@@ -125,7 +133,14 @@ suite("a document work simulation, end to end", () => {
     const result = await submitForReview(userId, {
       runId,
       stepId: steps[0]!.id,
-      body: `${c.atRisk[0]} is most urgent: tickets past SLA and weekly active users down sharply before renewal. ${c.atRisk[1]} is next because its executive sponsor left. ${c.decoy} only looks bad: the drop is seasonal, their busy season is later.`,
+      // Each at-risk account backed by two of its own figures — checked exactly since 19 Oct 2026.
+      body: `${c.atRisk
+        .map((name) => {
+          const a = c.accounts.find((x) => x.name === name)!;
+          const change = Math.round(((a.activeNow - a.active90) / a.active90) * 100);
+          return `${name}: weekly users ${change}% in 90 days, renewal in ${a.renewalDays} days, $${a.arrK}k ARR.`;
+        })
+        .join(" ")} ${c.decoy} only looks bad: the drop is seasonal, their busy season is later.`,
     });
     expect(result.ok && result.review).toMatchObject({ verdict: "pass", attempt: 2 });
     expect(result.ok && result.review.exampleAnswer).toContain(c.atRisk[0]);
@@ -134,16 +149,20 @@ suite("a document work simulation, end to end", () => {
     expect(step).toMatchObject({ status: "done", completion: "evidenced" });
 
     const { createPracticeReceiptsRepository } = await import("@careeros/database");
-    const receipts = await createPracticeReceiptsRepository(holder.db as never).listForStep(userId, step.id);
+    const receipts = await createPracticeReceiptsRepository(holder.db as never).listForStep(
+      userId,
+      step.id
+    );
     expect(receipts.map((r) => r.verdict).sort()).toEqual(["fail", "pass"]);
     expect(new Set(receipts.map((r) => r.strength))).toEqual(new Set(["observed"]));
-    expect(receipts.every((r) => r.assessmentKind === "rubric" && r.sourceKind === "practice_submission")).toBe(true);
+    expect(
+      receipts.every((r) => r.assessmentKind === "rubric" && r.sourceKind === "practice_submission")
+    ).toBe(true);
   });
 
   it("one attempt, one receipt — recording the same review again changes nothing", async () => {
-    const { createPracticeReceiptsRepository, createPracticeSubmissionsRepository } = await import(
-      "@careeros/database"
-    );
+    const { createPracticeReceiptsRepository, createPracticeSubmissionsRepository } =
+      await import("@careeros/database");
     const db = holder.db as never;
     const { steps } = await project();
     const last = await createPracticeSubmissionsRepository(db).latestForStep(userId, steps[0]!.id);
@@ -203,7 +222,9 @@ suite("a document work simulation, end to end", () => {
       abandoned.runId
     );
     expect(owned).not.toBeNull();
-    await pool.query("update project_runs set status = 'abandoned' where id = $1", [abandoned.runId]);
+    await pool.query("update project_runs set status = 'abandoned' where id = $1", [
+      abandoned.runId,
+    ]);
     expect(
       await submissions.submit(strangerId, {
         runId: abandoned.runId,
@@ -235,7 +256,10 @@ suite("a document work simulation, end to end", () => {
     const { createPracticeReceiptsRepository } = await import("@careeros/database");
     const { completionReview } = await import("@/lib/learning/project-review");
     const { run, steps } = await project();
-    const receipts = await createPracticeReceiptsRepository(holder.db as never).listForRun(userId, run.id);
+    const receipts = await createPracticeReceiptsRepository(holder.db as never).listForRun(
+      userId,
+      run.id
+    );
     const review = completionReview(run.title, steps, receipts);
     expect(review.lines[0]).toMatchObject({ proof: "reviewed" });
     expect(review.lines[0]!.result).toMatch(/criteria met on attempt 2, unaided/);
@@ -243,16 +267,15 @@ suite("a document work simulation, end to end", () => {
   });
 
   it("keeps assessed source text by refusing hard deletion of a practice run", async () => {
-    const { createPracticeSubmissionsRepository, createProjectRunsRepository } = await import(
-      "@careeros/database"
-    );
+    const { createPracticeSubmissionsRepository, createProjectRunsRepository } =
+      await import("@careeros/database");
     const db = holder.db as never;
     const { steps } = await project();
     const source = await createPracticeSubmissionsRepository(db).latestForStep(
       userId,
       steps[0]!.id
     );
-    expect(source?.body).toContain("tickets past SLA");
+    expect(source?.body).toContain("only looks bad");
     expect(await createProjectRunsRepository(db).remove(userId, runId)).toBe(false);
     expect(await createPracticeSubmissionsRepository(db).get(userId, source!.id)).toEqual(source);
     expect(await createPracticeSubmissionsRepository(db).get(strangerId, source!.id)).toBeNull();

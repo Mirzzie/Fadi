@@ -1,6 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { chmodSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir } from "node:os";
 import path from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -19,7 +19,9 @@ describe("what a VM move does next, from its journal (Codex scan P1)", () => {
   const base = { sourceDir: "/hdd/vms/ws", targetDir: "/ssd/vmware/ws" };
 
   it("copies when nothing is there yet", () => {
-    expect(moveDecision({ ...base, targetExists: false, journal: null })).toEqual({ kind: "fresh" });
+    expect(moveDecision({ ...base, targetExists: false, journal: null })).toEqual({
+      kind: "fresh",
+    });
   });
 
   it("discards its own copy that was cut short, instead of refusing forever", () => {
@@ -61,14 +63,22 @@ disk("moving a VM, interrupted and resumed, on disk", () => {
   let fast: string;
 
   beforeEach(() => {
-    root = path.join(tmpdir(), `fadi-move-${process.pid}-${Math.random().toString(36).slice(2)}`);
+    // On the home disk, not /tmp: the move keeps 10 GB of headroom, and a small tmpfs can be just
+    // under that, which made these tests depend on how full /tmp happened to be (19 Oct 2026).
+    root = path.join(
+      process.env.FADI_TEST_DISK_DIR ?? path.join(homedir(), ".cache"),
+      `fadi-move-${process.pid}-${Math.random().toString(36).slice(2)}`
+    );
     source = path.join(root, "hdd", "ws");
     fast = path.join(root, "ssd");
     vmx = path.join(source, "ws.vmx");
     inventory = path.join(root, "library", "inventory.vmls");
     mkdirSync(source, { recursive: true });
     mkdirSync(path.dirname(inventory), { recursive: true });
-    writeFileSync(vmx, 'displayName = "ws"\nuuid.bios = "56 4d 11 22 33 44 55 66-77 88 99 aa bb cc dd ee"\n');
+    writeFileSync(
+      vmx,
+      'displayName = "ws"\nuuid.bios = "56 4d 11 22 33 44 55 66-77 88 99 aa bb cc dd ee"\n'
+    );
     writeFileSync(path.join(source, "disk.vmdk"), Buffer.alloc(1024 * 1024, 7));
     writeFileSync(inventory, `vmlist1.config = "${vmx}"\n`);
     process.env.FADI_FAST_VM_DIR = fast;

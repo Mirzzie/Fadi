@@ -54,14 +54,19 @@ const NAMES = [
   "Cobalt Engineering",
   "Willow Education",
 ];
-const INDUSTRIES = [
-  "logistics",
-  "healthcare",
-  "retail",
-  "manufacturing",
-  "legal services",
-  "education",
-];
+/** Each account's industry follows from its name — "Northwind Logistics" is in logistics. */
+const INDUSTRY_OF: Record<string, string> = {
+  "Northwind Logistics": "logistics",
+  "Halcyon Health": "healthcare",
+  "Brightwater Retail": "retail",
+  "Kestrel Manufacturing": "manufacturing",
+  "Juniper Legal": "legal services",
+  "Atlas Freight": "logistics",
+  "Meridian Clinics": "healthcare",
+  "Saffron Foods": "food & beverage",
+  "Cobalt Engineering": "engineering",
+  "Willow Education": "education",
+};
 const COMPANIES = ["Relay", "Tessellate", "Ledgerline", "Orbitly"];
 
 /** A small deterministic stream of numbers from the seed (SHA-256 counter mode). */
@@ -104,7 +109,9 @@ export function churnCase(seed: string): ChurnCase {
     const active90 = 40 + Math.floor(next() * 160);
     const base = {
       name,
-      industry: pick(INDUSTRIES),
+      // The draw stays (discarded) so every seed's figures and facts are exactly what they were;
+      // only the shown industry changed, and now matches the name (browser pass, 19 Oct 2026).
+      industry: (next(), INDUSTRY_OF[name] ?? "services"),
       arrK: 30 + Math.floor(next() * 220),
       renewalDays: 20 + Math.floor(next() * 150),
       active90,
@@ -157,7 +164,7 @@ export function churnCase(seed: string): ChurnCase {
 export function caseTable(c: ChurnCase): string {
   const rows = c.accounts.map((a) => {
     const change = Math.round(((a.activeNow - a.active90) / a.active90) * 100);
-    return `| ${a.name} | ${a.industry} | $${a.arrK}k | ${a.renewalDays} days | ${a.activeNow} (${change >= 0 ? "+" : ""}${change}% vs 90 days ago) | ${a.tickets30} (${a.ticketsBreached} past SLA) | ${a.sponsorLeft ? "Left last quarter" : "In place"} |`;
+    return `| ${a.name} | ${a.industry} | $${a.arrK}k | ${a.renewalDays} days | ${a.activeNow} (${change >= 0 ? "+" : ""}${change}% in 90 days) | ${a.tickets30} (${a.ticketsBreached} past SLA) | ${a.sponsorLeft ? "Left last quarter" : "In place"} |`;
   });
   const seasonalNote = c.accounts
     .filter((a) => a.seasonal)
@@ -166,7 +173,7 @@ export function caseTable(c: ChurnCase): string {
         `- ${a.name}'s account notes: "Usage always drops in this period; their busy season is the other half of the year."`
     );
   return [
-    "| Account | Industry | ARR | Renewal in | Weekly active users | Tickets (30 days) | Executive sponsor |",
+    "| Account | Industry | ARR | Renewal in | Weekly users | Tickets, 30 days | Exec sponsor |",
     "|---|---|---|---|---|---|---|",
     ...rows,
     "",
@@ -180,4 +187,38 @@ export function caseTable(c: ChurnCase): string {
 export function mentions(text: string, account: string): boolean {
   const first = account.split(" ")[0]!;
   return new RegExp(`\\b${first}\\b`, "i").test(text);
+}
+
+/**
+ * Which of THIS account's own figures the text cites near its name — from where the account is
+ * named to where the next account is named. Exact, model-free, and specific to the person's case:
+ * the numbers from someone else's case don't match (browser pass, 19 Oct 2026: a 4B local model
+ * said an answer full of figures had none, three times out of three).
+ */
+export function citedSignals(text: string, account: Account, all: Account[]): string[] {
+  const firstWord = (name: string) => name.split(" ")[0]!;
+  const starts = (name: string) =>
+    [...text.matchAll(new RegExp(`\\b${firstWord(name)}\\b`, "gi"))].map((m) => m.index!);
+  const own = starts(account.name);
+  if (own.length === 0) return [];
+  const otherStarts = all
+    .filter((a) => a.name !== account.name)
+    .flatMap((a) => starts(a.name))
+    .sort((x, y) => x - y);
+  // Every passage about this account: from each mention to the next mention of another account.
+  const window = own
+    .map((at) => text.slice(at, otherStarts.find((o) => o > at) ?? text.length))
+    .join(" ");
+  const has = (n: number) => new RegExp(`(?<![\\d.])${n}(?![\\d])`).test(window);
+  const change = Math.abs(Math.round(((account.activeNow - account.active90) / account.active90) * 100));
+  const signals: string[] = [];
+  if (has(change) && /%|percent|halv/i.test(window)) signals.push("usage change");
+  else if (has(account.activeNow) && has(account.active90)) signals.push("usage change");
+  if (account.ticketsBreached > 0 && has(account.ticketsBreached) && /sla/i.test(window)) {
+    signals.push("tickets past SLA");
+  }
+  if (has(account.renewalDays) && /day|renew/i.test(window)) signals.push("renewal timing");
+  if (has(account.arrK) && /k\b|\$|arr|revenue/i.test(window)) signals.push("revenue");
+  if (account.sponsorLeft && /sponsor|champion|executive/i.test(window)) signals.push("sponsor change");
+  return signals;
 }

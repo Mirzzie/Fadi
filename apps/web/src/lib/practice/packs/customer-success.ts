@@ -1,4 +1,4 @@
-import { caseTable, churnCase, mentions, type ChurnCase } from "../sim/churn-case";
+import { caseTable, churnCase, citedSignals, mentions, type ChurnCase } from "../sim/churn-case";
 import type { PracticePack } from "../pack";
 import type { Criterion } from "../rubric";
 
@@ -131,12 +131,21 @@ export const CHURN_REVIEW_ASSETS: Record<string, StepAssets> = {
       },
       {
         id: "evidence",
-        kind: "quality",
-        label: "Backs each judgement with specific figures from the table",
-        meets:
-          "Each at-risk account is supported by at least two concrete signals from the data (e.g. usage change, tickets past SLA, sponsor change, renewal timing).",
-        strong:
-          "Weighs the signals against each other and explains why the order is what it is (urgency of renewal versus severity).",
+        kind: "fact",
+        label: "Backs each at-risk account with figures from the table",
+        // Checked exactly, not judged: a small model said an answer full of figures had none.
+        check: (text, c) => {
+          const short = c.atRisk
+            .map((name) => c.accounts.find((a) => a.name === name)!)
+            .map((account) => ({ account, cited: citedSignals(text, account, c.accounts) }))
+            .filter(({ cited }) => cited.length < 2);
+          return short.length === 0
+            ? { met: true, seen: "Each at-risk account is backed by at least two of its own figures." }
+            : {
+                met: false,
+                seen: `Back ${short.map(({ account }) => account.name).join(" and ")} with at least two of its figures from the table (usage change, tickets past SLA, renewal timing, revenue or sponsor).`,
+              };
+        },
       },
     ],
     exampleAnswer: (c) =>

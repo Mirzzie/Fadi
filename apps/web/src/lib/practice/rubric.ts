@@ -81,6 +81,11 @@ export function containsRubricGaming(text: string): boolean {
     /quote (?:this|the following|exactly)/i,
     /(?:return|output|respond with) .{0,30}(?:json|criterion|criteria)/i,
     /(?:criterion|criteria)[ _-]?id/i,
+    // Instructions addressed to the grader itself (found by rubric-eval v1, 19 Oct 2026).
+    /\b(?:grading|grader|reviewer|rubric|scoring|assessor)\b.{0,20}\b(?:instructions?|note|override|updated|has been changed)\b/i,
+    /^\s*(?:system|assistant|developer)\s*:/im,
+    /\b(?:level|rating|grade|verdict)\s*["“']?\s*(?:strong|meets|pass)\b/i,
+    /\bdo not (?:mark|score|rate)\b/i,
   ].some((pattern) => pattern.test(text));
 }
 
