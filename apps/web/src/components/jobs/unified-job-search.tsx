@@ -84,7 +84,7 @@ export function UnifiedJobSearch({
   }
 
   return (
-    <div className="rounded-xl border border-border/60 bg-card p-4">
+    <div>
       <div className="flex items-center gap-2">
         <Search className="size-4 text-primary" aria-hidden="true" />
         <h3 className="text-sm font-semibold">Search jobs</h3>
@@ -99,8 +99,9 @@ export function UnifiedJobSearch({
         e.g. &ldquo;graduate IT support in Dublin, remote&rdquo;.
       </p>
 
-      <div className="mt-3 flex gap-2">
+      <div className="mt-5 flex gap-2 border-b-2 border-foreground pb-2">
         <Input
+          className="h-12 border-0 bg-transparent px-0 text-base shadow-none focus-visible:ring-0"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={(e) => {
@@ -109,7 +110,7 @@ export function UnifiedJobSearch({
           placeholder="e.g. graduate IT support in Dublin, remote"
           aria-label="Search jobs in plain language"
         />
-        <Button onClick={run} disabled={pending || !prompt.trim()}>
+        <Button className="h-11 rounded-md px-5" onClick={run} disabled={pending || !prompt.trim()}>
           {pending ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
           {pending ? "Searching…" : "Search"}
         </Button>
@@ -133,7 +134,7 @@ export function UnifiedJobSearch({
         </div>
       ) : null}
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
         <label className="flex cursor-pointer items-center gap-2">
           <input type="checkbox" checked={worldwide} onChange={toggleWorldwide} className="size-3.5 accent-primary" />
           <Globe className="size-3.5" aria-hidden="true" />

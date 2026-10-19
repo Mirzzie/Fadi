@@ -113,7 +113,18 @@ export default async function JobsPage({
 
   return (
     <AppShell>
-      <div className="mx-auto mb-4 max-w-shell space-y-3">
+      <div className="mx-auto mb-10 max-w-shell border-b border-border/70 pb-8 pt-3">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+          Opportunities
+        </p>
+        <h1 className="max-w-4xl text-4xl font-semibold tracking-[-0.045em] sm:text-6xl">
+          Find work worth pursuing.
+        </h1>
+        <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
+          Search the live market in plain language. Fadi ranks what comes back against the evidence
+          already in your career record.
+        </p>
+        <div className="mt-8 space-y-3">
         <UnifiedJobSearch
           activeRole={profile?.targetRole ?? null}
           selectedCountry={worldwide ? "any" : (getCountry(country)?.code ?? null)}
@@ -124,11 +135,11 @@ export default async function JobsPage({
           selectedKeywords={keywords}
         />
         <JobSearchProgress status={syncStatus} />
-        <details className="rounded-xl border border-border/60 bg-card/40">
-          <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground">
+        <details className="border-t border-border/70">
+          <summary className="cursor-pointer py-3 text-sm font-medium text-muted-foreground hover:text-foreground">
             Search details
           </summary>
-          <div className="border-t border-border/60">
+          <div className="border-t border-border/60 pt-3">
             <JobControlBar
               sources={sourcesHealth.sources}
               // What each source actually put in front of them, after matching and filtering. A
@@ -144,6 +155,7 @@ export default async function JobsPage({
             />
           </div>
         </details>
+        </div>
       </div>
       <JobsShell
         observedAt={
