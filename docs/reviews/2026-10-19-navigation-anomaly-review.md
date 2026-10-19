@@ -9,6 +9,8 @@ The decision uses the live REA structure and viewport captures for Pipecat and P
 - Paperclip: `ev_26ad3b66dfc011bdbba8a71bad9d302da51e45283409dc258d3aa43232b42ef4`,
   `ev_be87dfc65404fc84d8f5df5ea9eb57727362147ca95d606a0ed5d39e33c8a609`
 - Fadi public structure: `ev_cf73d23f41e73c07a487bb8606b05a21bb4f7dfe385d643c06d0b447cf9b8d07`
+- Paperclip product page target and passive page inspection: `ev_9657c37fcc7d028be5e0bb296bffe32356e2a8645ae40cb87dd7c36216be5142`,
+  `ev_d2cb3b4a20327ece243400d134217e2d6138942bbca63cf56811683363f64998`
 
 The authenticated screenshots supplied by the owner provide visual evidence for the private shell;
 REA cannot attach to that browser because it has no exposed CDP endpoint.
@@ -25,12 +27,22 @@ REA cannot attach to that browser because it has no exposed CDP endpoint.
 ## Resolution
 
 - Keep the top bar because it owns global direction, search, approvals, activity, theme, and account.
-- On wide screens, place destination-local tabs in the center of that same bar.
-- Retain the separate section row only below the `xl` breakpoint, where centering tabs between global
-  controls would create collisions.
+- Keep the global bar limited to identity, active direction, search, decisions, activity, theme, and
+  account. Destination-local categories are not global controls and no longer appear there.
+- Place sibling-page links in one compact segmented switcher inside the page canvas at every width.
+  It scrolls horizontally on a narrow viewport instead of wrapping or occupying a full-width row.
 - Collapse the ordinary ready state to its green status dot; show text only for work, waiting,
   blocked, or offline states.
 - Give the bottom dock an explicit hide/show control.
 - Flatten the briefing into a neutral ruled surface and remove its animated glow.
 
 No navigation route, global state owner, or action was removed.
+
+## Correction after owner review
+
+The first revision put `My record`, `CVs and letters`, and `Portfolio` in the persistent header on
+wide screens. That reduced vertical space but gave content categories the same visual authority as
+global product controls. The owner correctly rejected that hierarchy. The revised shell follows the
+reference distinction observed in Paperclip: the persistent header is global; local categories stay
+with their page content. This is an inference from the observed reference structure, not a claim that
+Fadi duplicates Paperclip's information architecture.
