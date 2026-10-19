@@ -24,10 +24,10 @@ export function SubNav() {
   return (
     <nav
       aria-label={`${destination.label} sections`}
-      className="mx-auto mb-7 flex max-w-shell flex-wrap items-center gap-x-5 border-b border-border"
+      className="mx-auto mb-5 flex max-w-shell flex-wrap items-center gap-x-5 border-b border-border"
     >
       {showCaption ? (
-        <span className="mr-1 pb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+        <span className="mr-1 pb-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           {destination.label}
         </span>
       ) : null}
@@ -39,7 +39,7 @@ export function SubNav() {
             href={area.href}
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "-mb-px border-b-2 px-0.5 pb-3 text-sm transition-colors",
+              "-mb-px border-b-2 px-0.5 pb-2 text-xs transition-colors",
               isActive
                 ? "border-primary font-medium text-foreground"
                 : "border-transparent text-muted-foreground hover:text-foreground"
