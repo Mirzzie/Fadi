@@ -13,8 +13,8 @@ import { PendingActionsProvider } from "./pending-actions";
 import { SubNav } from "./sub-nav";
 
 /**
- * The chrome that wraps every authenticated screen: a top menu bar, a bottom dock
- * for navigation, a calm background, a ⌘K spotlight, and the ambient Fadi mentor.
+ * The chrome that wraps every authenticated screen: a top menu bar, four-destination rail,
+ * calm canvas, a ⌘K spotlight, and the ambient Fadi mentor.
  * Deliberately understated — the usefulness is the point, not the UI.
  */
 export function OsShell({
@@ -63,13 +63,15 @@ function OsShellInner({
 
   return (
     <div className="relative flex min-h-screen flex-col">
-      {/* Calm background — a single soft wash, no grid/scanlines. */}
+      {/* Neutral canvas. Product work supplies the hierarchy; decoration stays out of its way. */}
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 -z-10 bg-background">
-        <div className="absolute inset-0 bg-[radial-gradient(120%_70%_at_50%_-10%,oklch(0.66_0.22_285/0.08),transparent_60%)]" />
+        <div className="absolute inset-x-0 top-0 h-64 bg-[linear-gradient(180deg,color-mix(in_oklab,var(--primary)_5%,transparent),transparent)]" />
       </div>
 
       <MenuBar working={working} />
-      <main className={`flex-1 px-3 pt-4 sm:px-6 ${labFocus ? "pb-4" : "pb-28"}`}>
+      <main
+        className={`flex-1 px-3 pt-4 sm:px-6 md:pl-[16.5rem] md:pr-8 md:pt-7 ${labFocus ? "pb-4 md:pl-8" : "pb-24 md:pb-12"}`}
+      >
         <SubNav />
         {/* Keyed by route + active direction + phase. Any of the three changing remounts the
             page so its content follows — client state re-seeds and the switch is felt. The

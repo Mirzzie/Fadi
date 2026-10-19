@@ -136,13 +136,10 @@ async function buildSignals(): Promise<{ signals: Signal[]; personalized: boolea
   return { signals, personalized: true };
 }
 
-// Aurora mesh — magenta left, blue crown, amber floor, violet corner.
+// Quiet signal field: the landing demonstrates the product instead of performing a brand effect.
 const HERO_MESH =
-  "radial-gradient(115% 130% at 0% 38%, oklch(0.52 0.24 332) 0%, transparent 44%)," +
-  "radial-gradient(120% 115% at 100% -10%, oklch(0.56 0.21 264) 0%, transparent 50%)," +
-  "radial-gradient(95% 95% at -6% 110%, oklch(0.63 0.14 56) 0%, transparent 46%)," +
-  "radial-gradient(88% 98% at 108% 112%, oklch(0.52 0.24 312) 0%, transparent 50%)," +
-  "oklch(0.14 0.04 295)";
+  "radial-gradient(70% 90% at 84% 6%, color-mix(in oklab, var(--primary) 12%, transparent), transparent 68%)," +
+  "linear-gradient(180deg, color-mix(in oklab, var(--background) 94%, var(--primary)), var(--background))";
 
 const navLinks = [
   { label: "Features", href: "#features" },
@@ -154,24 +151,20 @@ export default async function Home() {
   const { signals, personalized } = await buildSignals();
 
   return (
-    // The marketing page is authored as a fixed dark experience (white text on a
-    // dark mesh). Scope `dark` to it so it renders correctly even when the user's
-    // saved theme is light — otherwise bg-background turns white and the white
-    // text disappears. App screens still follow the global theme.
-    <div className="dark min-h-screen bg-background text-foreground">
-      {/* ── Framed mesh hero ───────────────────────────────────────────────── */}
-      <div className="p-2.5 sm:p-3.5">
+    <div className="min-h-screen bg-background text-foreground">
+      {/* ── Editorial product hero ──────────────────────────────────────────── */}
+      <div>
         <section
-          className="relative overflow-hidden rounded-[1.75rem] ring-1 ring-white/12"
+          className="relative overflow-hidden border-b border-border"
           style={{ backgroundImage: HERO_MESH }}
         >
           {/* Dotted texture, faded toward the centre-right */}
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 opacity-[0.14]"
+            className="pointer-events-none absolute inset-0 opacity-[0.16]"
             style={{
-              backgroundImage: "radial-gradient(oklch(1 0 0 / 0.7) 1px, transparent 1.4px)",
-              backgroundSize: "18px 18px",
+              backgroundImage: "radial-gradient(currentColor 0.7px, transparent 0.8px)",
+              backgroundSize: "22px 22px",
               maskImage: "radial-gradient(65% 75% at 72% 42%, black, transparent 75%)",
               WebkitMaskImage: "radial-gradient(65% 75% at 72% 42%, black, transparent 75%)",
             }}
@@ -179,22 +172,22 @@ export default async function Home() {
           {/* Top sheen */}
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent"
+            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent"
           />
 
           <div className="relative">
             {/* Nav */}
-            <nav className="flex items-center justify-between px-6 py-5 sm:px-10">
+            <nav className="mx-auto flex max-w-[90rem] items-center justify-between px-5 py-5 sm:px-8 lg:px-12">
               <Link href="/" className="flex items-center gap-2.5">
                 <FadiLogo className="glow-primary size-8" />
-                <span className="font-semibold tracking-tight text-white">Fadi</span>
+                <span className="font-semibold tracking-tight">Fadi</span>
               </Link>
               <div className="hidden items-center gap-8 md:flex">
                 {navLinks.map((link) => (
                   <a
                     key={link.href}
                     href={link.href}
-                    className="text-sm text-white/70 transition-colors hover:text-white"
+                    className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                   >
                     {link.label}
                   </a>
@@ -203,13 +196,13 @@ export default async function Home() {
               <div className="flex items-center gap-5">
                 <Link
                   href="/auth/sign-in"
-                  className="text-sm text-white/70 transition-colors hover:text-white"
+                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                 >
                   Login
                 </Link>
                 <Link
                   href="/auth/sign-up"
-                  className="text-sm font-medium text-white/90 transition-colors hover:text-white"
+                  className="rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background transition-opacity hover:opacity-85"
                 >
                   Register
                 </Link>
@@ -217,18 +210,21 @@ export default async function Home() {
             </nav>
 
             {/* Top: headline + signals panel */}
-            <div className="grid gap-10 px-6 pb-4 pt-10 sm:px-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-6 lg:pt-16">
+            <div className="mx-auto grid max-w-[90rem] gap-12 px-5 pb-16 pt-16 sm:px-8 lg:grid-cols-[1.12fr_0.88fr] lg:gap-16 lg:px-12 lg:pb-24 lg:pt-28">
               {/* Left */}
-              <div className="max-w-xl">
+              <div className="max-w-3xl">
+                <p className="mb-5 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                  One honest career system
+                </p>
                 <h1
-                  className="text-[2.9rem] font-extrabold leading-[0.95] tracking-tight text-white sm:text-6xl lg:text-7xl"
+                  className="text-[3.25rem] font-semibold leading-[0.94] tracking-[-0.045em] text-foreground sm:text-7xl lg:text-[5.5rem]"
                   style={{ fontFamily: "var(--font-display)" }}
                 >
                   The career mentor
                   <br />
                   that tells you the truth
                 </h1>
-                <p className="mt-6 max-w-md text-base leading-relaxed text-white/65">
+                <p className="mt-7 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
                   No ghost jobs. No spray-and-pray. No AI hype. Fadi surfaces roles you can actually
                   get, tells you honestly whether each one fits, and keeps you sane through a brutal
                   market — grounded in your real experience, never invented.
@@ -236,13 +232,13 @@ export default async function Home() {
                 <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                   <Link
                     href="/auth/sign-up"
-                    className="inline-flex items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-[oklch(0.64_0.25_350)] to-[oklch(0.55_0.24_300)] px-6 py-3 text-sm font-semibold text-white shadow-[0_8px_30px_-6px_oklch(0.6_0.25_330_/_0.6)] transition-transform hover:-translate-y-0.5"
+                    className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
                   >
                     Sign Up Now
                   </Link>
                   <Link
                     href="#features"
-                    className="inline-flex items-center justify-center rounded-full border border-white/25 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+                    className="inline-flex items-center justify-center rounded-md border border-border bg-background/50 px-6 py-3 text-sm font-semibold transition-colors hover:bg-muted"
                   >
                     Learn More
                   </Link>
@@ -250,8 +246,8 @@ export default async function Home() {
               </div>
 
               {/* Right — career signals panel */}
-              <div className="lg:pl-4">
-                <p className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-white/55">
+              <div className="border-t border-border pt-6 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-2">
+                <p className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
                   Your career signals
                   {personalized ? (
                     <span className="inline-flex items-center gap-1 text-emerald-300/90">
@@ -259,18 +255,18 @@ export default async function Home() {
                       Live
                     </span>
                   ) : (
-                    <span className="rounded-full border border-white/20 px-1.5 py-0.5 text-[0.6rem] font-medium tracking-normal text-white/50">
+                    <span className="rounded-full border border-border px-1.5 py-0.5 text-[0.6rem] font-medium tracking-normal text-muted-foreground">
                       Sample
                     </span>
                   )}
                 </p>
-                <div className="divide-y divide-white/10">
+                <div className="divide-y divide-border">
                   {signals.map((s) => (
                     <div
                       key={s.label}
                       className="flex items-center justify-between gap-4 py-5"
                     >
-                      <span className="text-xs uppercase tracking-wide text-white/55">
+                      <span className="text-xs uppercase tracking-wide text-muted-foreground">
                         {s.label}
                       </span>
                       <div className="flex items-center gap-5">
@@ -278,7 +274,7 @@ export default async function Home() {
                             for a live viewer, only show a sparkline that's a real trend. */}
                         {!personalized || s.realTrend ? <Sparkline bars={s.bars} /> : null}
                         <span
-                          className="min-w-[3.5rem] text-right text-3xl font-light tabular-nums text-white sm:text-4xl"
+                          className="min-w-[3.5rem] text-right text-3xl font-light tabular-nums text-foreground sm:text-4xl"
                           style={{ fontFamily: "var(--font-display)" }}
                         >
                           {s.value}
@@ -291,7 +287,7 @@ export default async function Home() {
             </div>
 
             {/* Bottom: three feature columns */}
-            <div className="mt-6 grid border-t border-white/12 sm:grid-cols-3 sm:divide-x sm:divide-white/12">
+            <div className="mx-auto grid max-w-[90rem] border-t border-border sm:grid-cols-3 sm:divide-x sm:divide-border">
               {[
                 {
                   title: "From Profile to Plan: A Career Read Honestly",
@@ -307,8 +303,8 @@ export default async function Home() {
                 },
               ].map((col) => (
                 <div key={col.title} className="px-6 py-8 sm:px-8">
-                  <h3 className="text-lg font-semibold leading-snug text-white">{col.title}</h3>
-                  <p className="mt-3 text-sm leading-relaxed text-white/60">{col.body}</p>
+                  <h3 className="text-lg font-semibold leading-snug">{col.title}</h3>
+                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{col.body}</p>
                 </div>
               ))}
             </div>
@@ -320,26 +316,24 @@ export default async function Home() {
         {/* Features */}
         <section id="features" className="border-b border-border/60 py-20 sm:py-28">
           <div className="mx-auto max-w-shell px-4 sm:px-6">
-            <div className="mx-auto mb-12 max-w-xl text-center">
-              <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+            <div className="mb-14 grid gap-5 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
+              <h2 className="max-w-xl text-4xl font-semibold tracking-[-0.035em] sm:text-5xl">
                 Everything your career needs in one place.
               </h2>
-              <p className="mt-3 text-muted-foreground">
+              <p className="max-w-xl text-muted-foreground lg:justify-self-end">
                 Fadi connects your profile, the job market, and your learning goals into one
                 intelligent career command center.
               </p>
             </div>
 
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid border-y border-border sm:grid-cols-2">
               {features.map((feature) => (
                 <div
                   key={feature.title}
-                  className="group rounded-xl border border-border/60 bg-card p-5 transition-colors hover:border-primary/30 hover:bg-card"
+                  className="group border-b border-border p-6 sm:odd:border-r lg:p-8"
                 >
-                  <div className="mb-4 inline-flex size-9 items-center justify-center rounded-lg bg-primary/10">
-                    <feature.icon className="size-4.5 text-primary" aria-hidden="true" />
-                  </div>
-                  <h3 className="mb-2 font-semibold">{feature.title}</h3>
+                  <feature.icon className="mb-8 size-5 text-primary" aria-hidden="true" />
+                  <h3 className="mb-2 text-lg font-semibold">{feature.title}</h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     {feature.description}
                   </p>
@@ -352,17 +346,17 @@ export default async function Home() {
         {/* How it works */}
         <section id="how" className="border-b border-border/60 py-20 sm:py-28">
           <div className="mx-auto max-w-shell px-4 sm:px-6">
-            <div className="mx-auto mb-14 max-w-xl text-center">
-              <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">How Fadi works.</h2>
+            <div className="mb-14 max-w-xl">
+              <h2 className="text-4xl font-semibold tracking-[-0.035em] sm:text-5xl">How Fadi works.</h2>
               <p className="mt-3 text-muted-foreground">
                 Four steps from first sign-in to active career momentum.
               </p>
             </div>
 
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid border-t border-border sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-border">
               {howItWorks.map((item) => (
-                <div key={item.step} className="space-y-3">
-                  <div className="text-3xl font-bold text-primary/30">{item.step}</div>
+                <div key={item.step} className="space-y-3 border-b border-border py-7 lg:px-6 lg:first:pl-0 lg:last:pr-0">
+                  <div className="font-mono text-xs font-semibold text-primary">{item.step}</div>
                   <h3 className="font-semibold">{item.title}</h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">{item.body}</p>
                 </div>
