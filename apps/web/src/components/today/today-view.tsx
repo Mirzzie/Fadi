@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import { ArrowRight, Check, CircleDot, Loader2, Plus, Sparkles, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useCareerMode } from "@/components/os/career-mode";
 import { useFadi } from "@/components/os/fadi-presence";
 import {
   addStepAction,
@@ -18,6 +19,7 @@ import {
   switchGoalAction,
 } from "@/app/dashboard/work-actions";
 import type { Today } from "@/lib/work/today";
+import { cn } from "@/lib/utils";
 
 /**
  * The first screen, answering four questions in order: what am I trying to achieve, what do I
@@ -50,6 +52,7 @@ export function TodayView({ today }: { today: Today }) {
         <p className="mt-4 max-w-xl text-muted-foreground">
           One goal, one next move, and a clear record of what Fadi has done.
         </p>
+        <CareerFocus />
       </header>
 
       <Working today={today} pending={pending} onRun={run} />
@@ -68,6 +71,36 @@ export function TodayView({ today }: { today: Today }) {
         </Link>{" "}
         — market signals, momentum and your career report.
       </p>
+    </div>
+  );
+}
+
+function CareerFocus() {
+  const { mode, setMode } = useCareerMode();
+  const choices = [
+    { mode: "apply" as const, label: "Find work" },
+    { mode: "prepare" as const, label: "Build skills" },
+  ];
+  return (
+    <div className="mt-6 flex flex-wrap items-center gap-3">
+      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Today’s focus</span>
+      <div role="tablist" aria-label="Today's career focus" className="inline-flex border border-border bg-background p-0.5">
+        {choices.map((choice) => (
+          <button
+            key={choice.mode}
+            type="button"
+            role="tab"
+            aria-selected={mode === choice.mode}
+            onClick={() => setMode(choice.mode)}
+            className={cn(
+              "px-3 py-1 text-xs font-medium transition-colors",
+              mode === choice.mode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
+            )}
+          >
+            {choice.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

@@ -59,15 +59,17 @@ function OsShellInner({
   // LAB FOCUS: a project's workspace holds a remote machine. The dock and the floating orb sat
   // on top of its taskbar and terminal (16 Oct 2026); there, navigation is the project's own back
   // link and Fadi opens from its state in the menu bar.
-  const labFocus = /^\/dashboard\/learning\/projects\/[0-9a-f-]{36}/.test(pathname);
+  const focusWorkspace =
+    /^\/dashboard\/learning\/projects\/[0-9a-f-]{36}/.test(pathname) ||
+    /^\/dashboard\/learning\/practice\/[^/]+\/[^/]+/.test(pathname);
 
   return (
     <div className="relative flex min-h-screen flex-col">
       <MenuBar working={working} />
       <main
-        className={`flex-1 px-3 pt-4 sm:px-6 md:pl-[13.5rem] md:pr-5 md:pt-5 ${labFocus ? "pb-4 md:pl-5" : "pb-20 md:pb-10"}`}
+        className={`flex-1 ${focusWorkspace ? "px-2 pb-3 pt-3 sm:px-3" : "px-3 pb-24 pt-4 sm:px-6 md:px-8 md:pt-5"}`}
       >
-        <SubNav />
+        {focusWorkspace ? null : <SubNav />}
         {/* Keyed by route + active direction + phase. Any of the three changing remounts the
             page so its content follows — client state re-seeds and the switch is felt. The
             transition (fade + a small rise) matches the shell's own dock/menu motion. */}
@@ -78,9 +80,9 @@ function OsShellInner({
           {children}
         </div>
       </main>
-      {labFocus ? null : <Dock />}
+      {focusWorkspace ? null : <Dock />}
       <CommandBar />
-      <FadiOrb tucked={labFocus} />
+      <FadiOrb tucked={focusWorkspace} />
     </div>
   );
 }

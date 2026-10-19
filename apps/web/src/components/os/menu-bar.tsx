@@ -7,7 +7,6 @@ import { FADI_STATE_LABEL } from "@/lib/agent/state";
 import { cn } from "@/lib/utils";
 import { ActivityCenter } from "./activity-center";
 import { ApprovalCenter } from "./approval-center";
-import { useCareerMode } from "./career-mode";
 import { useFadi, type FadiState } from "./fadi-presence";
 import { TrackSwitcher } from "./track-switcher";
 import { UserMenu } from "./user-menu";
@@ -18,15 +17,14 @@ import { UserMenu } from "./user-menu";
 export function MenuBar({ working = null }: { working?: string | null } = {}) {
   const { displayState } = useFadi();
   return (
-    <header className="sticky top-0 z-40 flex h-12 items-center justify-between border-b border-border bg-background/95 px-3 text-xs backdrop-blur-md duration-300 animate-in fade-in slide-in-from-top-2 md:ml-50">
+    <header className="sticky top-0 z-40 flex h-12 items-center justify-between border-b border-border bg-background/95 px-3 text-xs backdrop-blur-md duration-300 animate-in fade-in slide-in-from-top-2">
       {/* Brand + live Fadi state */}
       <div className="flex items-center gap-2">
-        <FadiLogo className="size-5 md:hidden" />
-        <span className="font-semibold tracking-tight md:hidden">Fadi</span>
+        <FadiLogo className="size-5" />
+        <span className="font-semibold tracking-tight">Fadi</span>
         <FadiStateChip state={displayState} working={working} />
         <span className="text-muted-foreground/50">/</span>
         <TrackSwitcher />
-        <ModeSwitch />
       </div>
 
       {/* Work controls only. Voice lives on the Fadi control; time lives in the OS. */}
@@ -53,37 +51,6 @@ export function MenuBar({ working = null }: { working?: string | null } = {}) {
         <UserMenu />
       </div>
     </header>
-  );
-}
-
-/** Career phase toggle — Apply vs Prepare. Reshapes the whole shell (dock + content). Lives next
- *  to the direction switcher because both are "what am I steering right now" controls. */
-function ModeSwitch() {
-  const { mode, setMode } = useCareerMode();
-  return (
-    <div
-      role="tablist"
-      aria-label="Career phase"
-      className="ml-1 inline-flex border border-border bg-muted/30 p-0.5"
-    >
-      {(["apply", "prepare"] as const).map((m) => (
-        <button
-          key={m}
-          type="button"
-          role="tab"
-          aria-selected={mode === m}
-          onClick={() => setMode(m)}
-          className={cn(
-            "px-2 py-0.5 font-medium capitalize transition-colors",
-            mode === m
-              ? "bg-primary text-primary-foreground"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          {m}
-        </button>
-      ))}
-    </div>
   );
 }
 
