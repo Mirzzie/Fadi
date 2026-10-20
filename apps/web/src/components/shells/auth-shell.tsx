@@ -29,7 +29,7 @@ const signInPoints = [
 
 /**
  * Entering the OS — the sign-in / sign-up surface. Same calm system as the rest of
- * Fadi: a soft aurora wallpaper, one clean card, one clear action. Theme-aware
+ * Fadi: an editorial split, one contained form, one clear action. Theme-aware
  * (follows the visitor's light/dark preference) — simple, modern, for everyone.
  */
 export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
@@ -38,14 +38,13 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-hidden bg-background text-foreground">
-      {/* Soft aurora wallpaper — the ambient Fadi glow, kept quiet so it never fights the form. */}
-      <div aria-hidden="true" className="pointer-events-none fixed inset-0 aurora-bg">
-        <div className="absolute -left-40 top-1/4 size-[520px] rounded-full opacity-[0.10] blur-3xl [background:var(--aurora-1)]" />
-        <div className="absolute -right-32 bottom-0 size-[460px] rounded-full opacity-[0.10] blur-3xl [background:var(--aurora-2)]" />
+      {/* One quiet signal field, kept to the invitation side. */}
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0">
+        <div className="absolute inset-y-0 left-0 hidden w-1/2 bg-[linear-gradient(135deg,color-mix(in_oklab,var(--primary)_10%,var(--background)),var(--background)_70%)] lg:block" />
       </div>
 
       {/* Header */}
-      <header className="relative z-10 px-4 py-5 sm:px-8">
+      <header className="relative z-10 border-b border-border px-5 py-5 sm:px-8">
         <Link href="/" className="inline-flex items-center gap-2.5">
           <FadiLogo className="size-8" />
           <span className="font-heading text-lg font-semibold tracking-tight">Fadi</span>
@@ -53,16 +52,16 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
       </header>
 
       {/* Main */}
-      <main className="relative z-10 flex flex-1 items-center justify-center px-4 py-10 sm:px-6">
-        <div className="grid w-full max-w-4xl gap-12 lg:grid-cols-[1fr_420px] lg:items-center">
+      <main className="relative z-10 flex flex-1 items-stretch">
+        <div className="grid w-full lg:grid-cols-2">
           {/* Left — the invitation */}
-          <div className="hidden flex-col items-start gap-7 lg:flex">
-            <FadiCore state="idle" size={120} />
+          <div className="hidden flex-col items-start justify-center gap-9 border-r border-border px-12 py-16 lg:flex xl:px-20">
+            <FadiCore state="ready" size={120} />
             <div className="space-y-3">
               <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-primary">
                 Your career, as one system
               </p>
-              <h1 className="font-heading text-4xl font-semibold leading-[1.05] tracking-tight text-balance">
+              <h1 className="max-w-xl font-heading text-5xl font-semibold leading-[0.98] tracking-[-0.04em] text-balance xl:text-6xl">
                 {isSignUp ? "Everything you need, in one place." : "Welcome back."}
               </h1>
               <p className="max-w-md leading-relaxed text-muted-foreground">
@@ -86,7 +85,7 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
               ))}
             </ul>
 
-            <div className="rounded-xl border border-border bg-card/60 p-4 shadow-sm">
+            <div className="max-w-lg border-l-2 border-primary pl-4">
               <p className="text-xs leading-relaxed text-muted-foreground">
                 <span className="font-medium text-foreground">Private by default.</span> Every external action —
                 applications, messages, profile updates — needs your explicit sign-off. Nothing leaves the system
@@ -96,9 +95,9 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
           </div>
 
           {/* Right — the form card */}
-          <div className="w-full rounded-2xl border border-border bg-card p-6 shadow-lg">
+          <div className="mx-auto flex w-full max-w-lg flex-col justify-center px-5 py-12 sm:px-10 lg:px-14">
             <div className="mb-4 flex items-center gap-3 lg:hidden">
-              <FadiCore state="idle" size={40} />
+              <FadiCore state="ready" size={40} />
               <span className="font-heading font-semibold tracking-tight">Fadi</span>
             </div>
             <h2 className="font-heading text-xl font-semibold tracking-tight">

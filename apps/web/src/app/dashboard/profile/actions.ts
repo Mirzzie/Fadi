@@ -12,6 +12,7 @@ import { revalidatePath } from "next/cache";
 import { signOutAction } from "@/app/auth/actions";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
+import { preserveThenReplace } from "@/lib/career/sources";
 import { invalidateJobSync } from "@/lib/jobs/sync";
 import { detectDocType, extractDocumentText } from "@/lib/documents/extract-text";
 import { logger } from "@/lib/observability/logger";
@@ -71,8 +72,9 @@ export type UpdateProfileInput = {
   experienceLevel: string;
   careerGoal: string;
   linkedInUrl: string;
-  linkedInText: string;
-  resumeText: string;
+  /** Legacy: Profile no longer carries imported text — intake is Evidence. */
+  linkedInText?: string;
+  resumeText?: string;
 };
 
 export async function updateProfileAction(input: UpdateProfileInput): Promise<Result> {
@@ -102,24 +104,43 @@ export async function updateProfileAction(input: UpdateProfileInput): Promise<Re
     // stale sync window (synonyms were cleared in the repo when it changed).
     await invalidateJobSync(input.targetRole.trim());
 
-    // LinkedIn URL + context and resume text are the richest AI inputs — keep
-    // them editable here too. Only touch them when the user provided something,
-    // so saving the basic fields never wipes an existing import.
+    /**
+     * OMITTED IS NOT EMPTY. (Codex C15-01 — a live data-loss path I introduced.)
+     *
+     * Profile stopped carrying the imported LinkedIn text when intake moved to Evidence, but it
+     * still submits the LinkedIn URL. The old branch read the absent text as "", wrote
+     * rawText: null over the stored history, and skipped preservation because the content was
+     * empty — losing exactly what S2-R1 exists to protect, on an ordinary Save.
+     *
+     * A field the form does not send is a field the person is not editing.
+     */
     const linkedInUrl = input.linkedInUrl.trim();
-    const linkedInText = input.linkedInText.trim();
-    if (linkedInUrl || linkedInText) {
-      await createLinkedInProfilesRepository(db).upsertLatestForUser(user.id, {
-        profileUrl: linkedInUrl || null,
-        rawText: linkedInText || null,
-      });
+    const linkedInEdited = typeof input.linkedInText === "string";
+    const linkedInText = (input.linkedInText ?? "").trim();
+    if (linkedInUrl || linkedInEdited) {
+      const existing = linkedInEdited
+        ? null
+        : await createLinkedInProfilesRepository(db).getLatestForUser(user.id);
+      const rawText = linkedInEdited ? linkedInText || null : (existing?.rawText ?? null);
+      // Keep the pasted history before it replaces what is stored — see lib/career/sources.ts.
+      await preserveThenReplace(
+        user.id,
+        { sourceKind: "linkedin", sourceKey: "self", content: rawText ?? "" },
+        (tx) =>
+          createLinkedInProfilesRepository(tx).upsertLatestForUser(user.id, {
+            profileUrl: linkedInUrl || null,
+            rawText,
+          })
+      );
     }
 
-    const resumeText = input.resumeText.trim();
-    if (resumeText) {
-      await createResumesRepository(db).upsertLatestForTrack(
+    // Same rule for the résumé: only a field the form actually sent is an edit.
+    const resumeText = (input.resumeText ?? "").trim();
+    if (typeof input.resumeText === "string" && resumeText) {
+      await preserveThenReplace(
         user.id,
-        activeTrack?.id ?? null,
-        resumeText
+        { sourceKind: "resume", sourceKey: activeTrack?.id ?? "no-direction", content: resumeText },
+        (tx) => createResumesRepository(tx).upsertLatestForTrack(user.id, activeTrack?.id ?? null, resumeText)
       );
     }
 

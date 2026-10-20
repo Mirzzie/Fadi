@@ -2,26 +2,23 @@
 
 ## Purpose
 
-This guide explains how developers should work in the CareerOS repository. The repository contains the Phase 1 MVP application foundation built on Next.js 16, Better Auth, PostgreSQL, and Drizzle ORM.
+This guide explains how developers should work in the Fadi repository. The application uses Next.js 16, Better Auth, PostgreSQL, and Drizzle ORM.
 
 ## First-Day Onboarding
 
-1. Read `README.md`.
-2. Read `docs/MVP_SCOPE_FREEZE.md`.
-3. Read `docs/MVP_TECH_STACK.md`.
-4. Read `docs/MVP_IMPLEMENTATION_PLAN.md`.
-5. Read `docs/CODING_STANDARDS.md`.
-6. Read `docs/GIT_WORKFLOW.md`.
-7. Read `docs/LOCAL_DEVELOPMENT_DATABASE.md`.
-8. Review open issues before starting work.
+1. Read `README.md` and `docs/README.md`.
+2. Read `docs/FadiOS-Project-Context.md`, `docs/ARCHITECTURE.md`, and `docs/ROADMAP.md`.
+3. Read `docs/CODING_STANDARDS.md` and `docs/GIT_WORKFLOW.md`.
+4. Read `docs/LOCAL_DEVELOPMENT_DATABASE.md`.
+5. Review current work and open issues before starting.
 
-## MVP Engineering Principles
+## Engineering principles
 
-- Build the smallest working version of each MVP feature.
+- Build the smallest coherent slice that completes a user outcome.
 - Prefer boring, reliable technology.
 - Keep product behavior explicit and testable.
 - Do not add infrastructure before it is needed.
-- Do not build future-vision architecture inside MVP code.
+- Do not build future architecture before its current dependency or user need exists.
 - Keep AI usage observable, bounded, and reviewable.
 - Protect user career data as sensitive personal data.
 - Fadi is the product — design features from the user's perspective of interacting with Fadi, not a generic dashboard.
@@ -110,7 +107,7 @@ See `docs/LOCAL_DEVELOPMENT_DATABASE.md` for full database setup and inspection 
 
 A change is done when:
 
-- It fits the MVP scope or has an approved ADR.
+- It fits the current roadmap or has an approved ADR.
 - It has appropriate tests.
 - It handles loading, empty, error, and unauthorized states where applicable.
 - It does not leak secrets or sensitive user data.

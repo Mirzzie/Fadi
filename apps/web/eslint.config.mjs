@@ -24,6 +24,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored noVNC 1.7.0 is upstream source (MPL-2.0), not code maintained here.
+    "public/novnc/**",
   ]),
 ]);
 

@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   createAgentRunsRepository,
+  createWorkItemsRepository,
   createCareerProfilesRepository,
   createJobsRepository,
   createLearningCommitmentsRepository,
@@ -72,6 +73,16 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
     : new Date(Date.now() - FIRST_RUN_WINDOW_MS);
 
   const run = await runsRepo.startRun(userId);
+  // The same pass, told as a receipt: Today shows what Fadi did, and it must come from the
+  // attempt itself rather than from a claim written afterwards.
+  const work = createWorkItemsRepository(db);
+  const execution = await work
+    .startExecution(userId, {
+      action: "Checked your market and your record",
+      surface: "background",
+      risk: "read",
+    })
+    .catch(() => null);
 
   try {
     const relevanceProfile = {
@@ -88,7 +99,7 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
     // Recent findings, for dedupe — never report the same thing twice.
     const recent = await runsRepo.listRecentForUser(userId, 30);
     const seenJobIds = new Set(
-      recent.map((f) => f.data?.jobId).filter((id): id is string => typeof id === "string"),
+      recent.map((f) => f.data?.jobId).filter((id): id is string => typeof id === "string")
     );
     const seenTitles = new Set(recent.map((f) => f.title));
 
@@ -118,7 +129,7 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
           !j.isSaved &&
           !j.applicationStatus &&
           new Date(j.firstSeenAt).getTime() > baseline.getTime() &&
-          !seenJobIds.has(j.id),
+          !seenJobIds.has(j.id)
       )
       .slice(0, MAX_NEW_ROLE_FINDINGS);
 
@@ -144,7 +155,7 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
         (j) =>
           j.status !== "active" &&
           new Date(j.updatedAt).getTime() > baseline.getTime() &&
-          !seenTitles.has(`${j.title} at ${j.company} looks closed`),
+          !seenTitles.has(`${j.title} at ${j.company} looks closed`)
       );
       for (const job of expired) {
         findings.push({
@@ -196,7 +207,7 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
             // Only the ACTIVE direction's commitments — don't nudge about a build
             // that belongs to a track the user isn't currently pursuing.
             c.careerProfileId === (track?.id ?? null) &&
-            Date.now() - new Date(c.createdAt).getTime() > staleMs,
+            Date.now() - new Date(c.createdAt).getTime() > staleMs
         )
         .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())[0];
       if (stale && !seenTitles.has(`Still on “${stale.title}”?`)) {
@@ -229,10 +240,39 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
 
     // 5. Does Fadi's own data still agree with itself? Same ledger as everything
     //    else — no separate panel, no button to remember.
-    findings.push(...(await coherenceFindings(userId, lastRun ? new Date(lastRun.startedAt) : null)));
+    findings.push(
+      ...(await coherenceFindings(userId, lastRun ? new Date(lastRun.startedAt) : null))
+    );
 
     await runsRepo.insertFindings(run.id, userId, findings);
     await runsRepo.finishRun(run.id, { status: "ok", findingsCount: findings.length });
+
+    // The one thing background work is allowed to do beyond telling you: have the paperwork
+    // ready for the strongest new match, unstarted. Bounded to the active goal, one at a time,
+    // and it draws nothing and drafts nothing until the person presses.
+    await proposeForBestMatch(userId, findings).catch(() => {});
+
+    // And take the dead postings off the board. This is the half of "fresh roles" nobody sees:
+    // adding new ones is visible and removing closed ones is not, and a closed posting costs a
+    // fit check, a tailored CV and a cover letter before the site says it is gone.
+    const { maybeRunJobUpkeep, upkeepSummary } = await import("@/lib/jobs/upkeep");
+    const upkeep = await maybeRunJobUpkeep().catch(() => null);
+
+    if (execution) {
+      await work
+        .finishExecution(userId, execution.id, {
+          status: "done",
+          receipt: [
+            findings.length === 0
+              ? "Nothing new worth telling you about."
+              : `Found ${findings.length} thing${findings.length === 1 ? "" : "s"} worth telling you about.`,
+            upkeep ? upkeepSummary(upkeep) : "",
+          ]
+            .filter(Boolean)
+            .join(" "),
+        })
+        .catch(() => {});
+    }
 
     logger.info("agent.run_completed", { userId, findings: findings.length });
     return { ran: true, findings: findings.length };
@@ -241,9 +281,48 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
     await runsRepo
       .finishRun(run.id, { status: "error", findingsCount: 0, error: message })
       .catch(() => {});
+    if (execution) {
+      await work
+        .finishExecution(userId, execution.id, {
+          status: "failed",
+          receipt: "The check did not finish.",
+          error: message,
+        })
+        .catch(() => {});
+    }
     logger.error("agent.run_failed", { userId, error: message });
     return { ran: false, reason: "error" };
   }
+}
+
+/** A match has to be strong to be worth laying a plan out for; anything less is a suggestion. */
+const PLAN_WORTHY_MATCH = 75;
+
+/**
+ * Lay out an apply plan for the best new role this pass found, if one clears the bar.
+ *
+ * Deliberately narrow. It proposes for ONE finding, only `new_role`, only above a match score,
+ * and `proposePlan` refuses if anything is running or already waiting. Everything that would
+ * cost the person money or write in their name is behind the press that starts it.
+ */
+async function proposeForBestMatch(
+  userId: string,
+  findings: Array<{ kind: string; data?: Record<string, unknown> }>
+): Promise<void> {
+  const best = findings
+    .filter((finding) => finding.kind === "new_role")
+    .map((finding) => ({
+      jobId: typeof finding.data?.jobId === "string" ? finding.data.jobId : null,
+      score: typeof finding.data?.matchScore === "number" ? finding.data.matchScore : 0,
+    }))
+    .filter((candidate): candidate is { jobId: string; score: number } => Boolean(candidate.jobId))
+    .sort((a, b) => b.score - a.score)[0];
+
+  if (!best || best.score < PLAN_WORTHY_MATCH) return;
+
+  const { proposePlan } = await import("@/lib/work/run-plan");
+  const proposed = await proposePlan(userId, "apply-to-role", [{ type: "job", id: best.jobId }]);
+  if (proposed.ok) logger.info("work.plan.proposed", { userId, jobId: best.jobId });
 }
 
 /**
@@ -252,7 +331,16 @@ export async function runAgentForUser(userId: string): Promise<AgentRunOutcome> 
  */
 export async function maybeRunAgentForUser(userId: string): Promise<void> {
   try {
-    await runAgentForUser(userId);
+    const outcome = await runAgentForUser(userId);
+
+    // The findings pass is throttled to six hours, and that is right for "here is a new role".
+    // It is wrong for "that role has closed": nobody needs to be told, and every hour a dead
+    // posting stays on the board is an hour someone can lose to it. So upkeep runs on its own
+    // cadence even when the pass itself was skipped.
+    if (!outcome.ran) {
+      const { maybeRunJobUpkeep } = await import("@/lib/jobs/upkeep");
+      await maybeRunJobUpkeep().catch(() => null);
+    }
   } catch (err) {
     logger.error("agent.opportunistic_run_failed", {
       userId,

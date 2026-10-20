@@ -20,7 +20,6 @@ const DASHBOARD_ROUTES = [
   "/dashboard/learning",
   "/dashboard/network",
   "/dashboard/niche-finder",
-  "/dashboard/intelligence",
   "/dashboard/profile",
   "/dashboard/settings",
 ];
@@ -29,7 +28,9 @@ test.describe.configure({ mode: "serial" });
 
 test("public pages render", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByText("The career mentor", { exact: false }).first()).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 1, name: "Turn your next career move into a plan." })
+  ).toBeVisible();
 
   await page.goto("/auth/sign-in");
   await expect(page.locator("#email")).toBeVisible();
@@ -60,12 +61,12 @@ test("golden path: sign up → onboard → every route → workspace", async ({ 
   await page
     .locator("#linkedin-profile")
     .fill(
-      "IT professional with two years of hands-on experience in desktop support, ticket queues, Windows and Linux administration, and user onboarding. Comfortable troubleshooting hardware, networking basics, and Microsoft 365 issues for teams of 100+ users across two offices.",
+      "IT professional with two years of hands-on experience in desktop support, ticket queues, Windows and Linux administration, and user onboarding. Comfortable troubleshooting hardware, networking basics, and Microsoft 365 issues for teams of 100+ users across two offices."
     );
   await page
     .locator("#resume-text")
     .fill(
-      "Smoke Tester — IT Support. Resolved 30+ tickets weekly across Windows/Linux estates; maintained laptop fleet; wrote onboarding docs used by the whole team.",
+      "Smoke Tester — IT Support. Resolved 30+ tickets weekly across Windows/Linux estates; maintained laptop fleet; wrote onboarding docs used by the whole team."
     );
   await page.getByRole("button", { name: "Continue" }).click();
 
@@ -78,9 +79,20 @@ test("golden path: sign up → onboard → every route → workspace", async ({ 
 
   // ── Every dashboard route renders without the error boundary ──
   for (const route of DASHBOARD_ROUTES) {
-    await page.goto(route, { waitUntil: "domcontentloaded" });
+    const response = await page.goto(route, { waitUntil: "domcontentloaded" });
+    expect(response?.status(), `${route} must resolve to a working page`).toBeLessThan(400);
     await expect(page.locator("h1, h2").first()).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(BOUNDARY_TEXT)).toHaveCount(0);
+    if (route === "/dashboard/learning") {
+      await page.locator("summary").filter({ hasText: "Explore a work simulation" }).click();
+      await expect(
+        page.getByRole("link", { name: "View simulation", exact: true })
+      ).toHaveAttribute(
+        "href",
+        "/dashboard/learning/practice/fadi.security-operations/suspicious-sign-ins"
+      );
+      await expect(page.getByRole("link", { name: "View simulation", exact: true })).toHaveCount(1);
+    }
   }
 
   // ── Paste a job → open its FULL workspace (the RSC-crash class lives here) ──
@@ -90,15 +102,30 @@ test("golden path: sign up → onboard → every route → workspace", async ({ 
   await page.getByPlaceholder("Company").fill("Smoke Co");
   await page
     .getByPlaceholder(/paste the full job description/i)
-    .fill("We need an IT support specialist for ticket triage, Windows administration, and user hardware support in Dublin.");
+    .fill(
+      "We need an IT support specialist for ticket triage, Windows administration, and user hardware support in Dublin."
+    );
   await page.getByRole("button", { name: "Add", exact: true }).last().click();
 
   await page.getByText("Smoke Role").first().click();
   await page.getByRole("link", { name: /open full workspace/i }).click();
   await page.waitForURL("**/workspace**", { timeout: 30_000 });
 
-  // The six disclosed tool rows must render — this is exactly what crashed once.
-  await expect(page.getByText("Should you apply?")).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText("Red-pen review")).toBeVisible();
+  // The next action leads; secondary tools stay disclosed and document review requires a draft.
+  await expect(
+    page.getByRole("region", { name: "Next: decide whether this role is worth your time" })
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Should you apply?" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Run fit check", exact: true })).toBeEnabled();
+  await expect(page.getByRole("heading", { name: "Application documents" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Draft resume", exact: true })).toBeEnabled();
+  const tools = page
+    .locator("details")
+    .filter({ has: page.locator("summary", { hasText: "Role details and tools" }) });
+  await expect(tools).not.toHaveAttribute("open", "");
+  await expect(page.getByRole("heading", { name: "Red-pen review" })).toHaveCount(0);
+  await tools.locator("summary").click();
+  await expect(tools).toHaveAttribute("open", "");
+  await expect(tools.getByRole("heading", { name: "Research Smoke Co" })).toBeVisible();
   await expect(page.getByText(BOUNDARY_TEXT)).toHaveCount(0);
 });

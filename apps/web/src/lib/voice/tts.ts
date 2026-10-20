@@ -49,8 +49,8 @@ function specFor(id: string): Omit<TtsSpec, "apiKey"> | null {
   if (id === "groq") {
     return {
       base: "https://api.groq.com/openai/v1",
-      model: process.env.FADI_TTS_GROQ_MODEL || "playai-tts",
-      voice: process.env.FADI_TTS_GROQ_VOICE || "Fritz-PlayAI", // male PlayAI voice
+      model: process.env.FADI_TTS_GROQ_MODEL || "canopylabs/orpheus-v1-english",
+      voice: process.env.FADI_TTS_GROQ_VOICE || "troy", // Orpheus voice
       format: "wav",
       contentType: "audio/wav",
     };
@@ -58,10 +58,27 @@ function specFor(id: string): Omit<TtsSpec, "apiKey"> | null {
   return null;
 }
 
+/**
+ * WHY IT DIDN'T SPEAK, IN THE PROVIDER'S OWN WORDS.
+ *
+ * Every backend failure used to be swallowed by `continue`, so the route answered 503 "No TTS
+ * provider" and the browser logged advice about installing a Linux speech engine. Measured on the
+ * owner's account (22 Sep 2026), the real answer had been sitting in a discarded 400:
+ *
+ *   "The model `canopylabs/orpheus-v1-english` requires terms acceptance. Please have the org
+ *    admin accept the terms at https://console.groq.com/playground?model=…"
+ *
+ * One click away, and the person was told to install espeak instead. A provider that explains
+ * itself deserves to be quoted.
+ */
+export type SpeechFailure = { provider: string; status: number; reason: string };
+
 export async function synthesizeFadiSpeech(
   userId: string,
-  text: string,
-): Promise<{ audio: ArrayBuffer; contentType: string } | null> {
+  text: string
+): Promise<
+  { audio: ArrayBuffer; contentType: string } | { failures: SpeechFailure[] } | null
+> {
   const input = text.trim().slice(0, 1200); // keep requests snappy
   if (!input) return null;
 
@@ -79,20 +96,57 @@ export async function synthesizeFadiSpeech(
     }
   }
 
+  const failures: SpeechFailure[] = [];
   for (const spec of specs) {
     try {
       const res = await fetch(`${spec.base}/audio/speech`, {
         method: "POST",
         headers: { Authorization: `Bearer ${spec.apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model: spec.model, voice: spec.voice, input, response_format: spec.format }),
+        body: JSON.stringify({
+          model: spec.model,
+          voice: spec.voice,
+          input,
+          response_format: spec.format,
+        }),
         signal: AbortSignal.timeout(30000), // local CPU TTS can be a touch slower than cloud
       });
-      if (!res.ok) continue;
+      if (!res.ok) {
+        failures.push({
+          provider: nameOf(spec),
+          status: res.status,
+          reason: readReason(await res.text().catch(() => "")),
+        });
+        continue;
+      }
       const audio = await res.arrayBuffer();
       if (audio.byteLength > 0) return { audio, contentType: spec.contentType };
-    } catch {
-      // try the next backend
+      failures.push({ provider: nameOf(spec), status: 200, reason: "returned no audio" });
+    } catch (error) {
+      failures.push({
+        provider: nameOf(spec),
+        status: 0,
+        reason: error instanceof Error ? error.message : "could not be reached",
+      });
     }
   }
-  return null;
+  return failures.length > 0 ? { failures } : null;
+}
+
+/** What to call this backend when explaining why it did not speak. */
+function nameOf(spec: TtsSpec): string {
+  if (spec.base.includes("groq")) return "Groq";
+  if (spec.base.includes("openai")) return "OpenAI";
+  return `local TTS (${spec.base})`;
+}
+
+/** The provider's message, not its JSON envelope. */
+function readReason(body: string): string {
+  try {
+    const parsed = JSON.parse(body) as { error?: { message?: string } };
+    const message = parsed.error?.message;
+    if (typeof message === "string" && message.trim()) return message.trim().slice(0, 400);
+  } catch {
+    /* not JSON */
+  }
+  return body.trim().slice(0, 200) || "no reason given";
 }

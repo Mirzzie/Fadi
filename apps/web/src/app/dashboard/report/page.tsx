@@ -27,7 +27,7 @@ export default async function ReportPage() {
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-shell space-y-6 p-4 sm:p-6">
+      <div className="mx-auto max-w-shell space-y-6 pb-12">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <Link

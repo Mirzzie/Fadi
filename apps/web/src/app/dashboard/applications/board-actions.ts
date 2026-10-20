@@ -15,6 +15,7 @@ import { AiRateLimitError, getUserDocGenerate } from "@/lib/ai/user-generate";
 import { generateCareerDocument, NoHistoryError, type DocKind } from "@/lib/documents/generate";
 import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
+import { syncApplicationWork } from "@/lib/applications/sync-work";
 
 type Result = { ok: boolean; message: string; id?: string };
 
@@ -65,6 +66,7 @@ export async function createApplicationAction(input: {
       careerProfileId: activeTrack?.id ?? null,
       status: "interested",
     });
+    await syncApplicationWork(user.id, app);
     revalidatePath("/dashboard/applications");
     return { ok: true, message: "Added.", id: app.id };
   } catch (error) {
@@ -87,6 +89,7 @@ export async function updateApplicationStatusAction(
       status,
     });
     if (!updated) return { ok: false, message: "Application not found." };
+    await syncApplicationWork(user.id, updated);
     revalidatePath("/dashboard/applications");
     return { ok: true, message: "Updated." };
   } catch (error) {

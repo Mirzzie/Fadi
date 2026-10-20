@@ -4,6 +4,7 @@ import type { PortfolioItemView } from "@careeros/portfolio";
 
 export const SECTION_KEYS = [
   "project",
+  "achievement",
   "experience",
   "education",
   "certification",
@@ -14,6 +15,7 @@ export const SECTION_KEYS = [
 
 export const SECTION_META: Record<string, { label: string; description: string }> = {
   project: { label: "Projects", description: "Case studies & featured work" },
+  achievement: { label: "Achievements", description: "Awards and measurable milestones" },
   experience: { label: "Experience", description: "Jobs, internships, consulting" },
   education: { label: "Education", description: "Degrees & schooling" },
   certification: { label: "Certifications", description: "AWS, security, courses" },
@@ -37,6 +39,7 @@ export const RESUME_KEYS = [
 
 export type ItemForm = {
   id?: string;
+  evidenceItemId?: string;
   section: string;
   title: string;
   subtitle: string;
@@ -71,6 +74,7 @@ export function emptyForm(section = "project"): ItemForm {
 export function toForm(item: PortfolioItemView): ItemForm {
   return {
     id: item.id,
+    evidenceItemId: item.evidenceItemId ?? undefined,
     section: item.section,
     title: item.title,
     subtitle: item.subtitle ?? "",

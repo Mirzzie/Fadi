@@ -1,0 +1,254 @@
+# Labs on the owner's VMware VMs
+
+**Date:** 15 October 2026
+**For:** the owner and Fadi's Codex (review), from Fadi's Claude
+**Asked by the owner:** run project labs on VMware instead of the Docker-wrapped Windows VM;
+share one VM across several projects and the owner's own non-Fadi use; spin up a fresh VM from
+the same image only when a project needs one; reduce manual effort to the minimum.
+
+## Why
+
+A Windows Server 2025 lab (dockurr) was asked by its plan to install Docker Desktop. That
+needs Windows' own hypervisor inside a VM inside a container; after the reboot the guest is in
+a boot loop (Windows Boot Manager restarting, seen in the container log). Two separate
+problems:
+
+1. **The plan was wrong.** Wazuh/Elastic/Kibana are Linux services. A real SME runs the SIEM
+   on Linux and the agent on Windows. The planner chose Docker-in-Windows because a project
+   can only have one machine (C2, multi-service lab stacks, is unbuilt).
+2. **The machine model is too narrow.** One fresh container VM per project, first Windows
+   start ≈ 1 h of Setup, no reuse of VMs the owner already has.
+
+Measured on the owner's laptop (Ryzen 7 4800H, 22 GB): `kvm_amd nested=1`; VMware
+Workstation 26.0.1 with `vmrun`/`vmrest`, `vmnet1` host-only and `vmnet8` NAT; VMs on the
+HDD: Kali 2026.2, Windows 10, Windows 11, Windows Server 2025. **A VMware VM ran with full
+hardware virtualisation (`hv-svm`, nested paging) while the KVM lab was running**
+(throwaway 256 MB probe, deleted), so both engines can coexist.
+
+## What changes
+
+### Removed (on a machine with VMware; dockurr remains the fallback without it)
+
+| Today | Why it goes |
+|---|---|
+| First Windows start installs Windows from an ISO (~1 h) | A clone of an already-installed VM starts in seconds |
+| "Save as base disk" (`lab.saveBase`) for dockurr | Replaced by clean images (below) |
+| Seeding `/oem/install.bat` to enable SSH at Windows Setup | Done once when an image is prepared |
+| Fixed `Docker` / `admin` lab account | The VM's own account, entered once, stored encrypted |
+| Plan steps that put Docker or a hypervisor inside a Windows lab | Services run as containers beside the VM (C2) |
+| The stuck lab `fadi-project-df3e6d83` and its disk | After the owner agrees; its project is re-planned from step 2 |
+
+### Replaced
+
+| Today | Becomes |
+|---|---|
+| Lab target = one dockurr container per project | A **machine**: a shared VMware VM, a fresh clone, a container, or (fallback) dockurr |
+| Screen at the container's `:8006` web viewer | VMware's built-in VNC, shown in the project window (browser VNC), loopback only, per-VM password |
+| `lab.start` / `lab.remove` via Docker | `vmrun start/stop/suspend`, clone, delete — same broker, same receipts |
+| Windows check address from the container port map | `vmrun getGuestIPAddress`, then the C1 SSH check unchanged |
+| Disk report (`disks.ts`) for container disks | Also lists Fadi clones and images, with what each costs |
+
+### Kept
+
+The broker, policy engine, approvals and receipts; `lab.check` and the C1 SSH checks;
+containers for Linux services and the 3 Linux templates; workspace path safety; the
+plan-quality evaluation (X2). Codex's X1 (validation in the lab) and X3 (automatic proof)
+target "a machine" and get a VMware implementation behind the same interface.
+
+## The model
+
+**Shared machines.** The owner's existing VMs, registered once. Many projects use one VM, each
+in its own folder (`C:\Fadi\<project>` / `~/fadi/<project>`); the owner keeps using it in
+VMware for anything else. Fadi never deletes, reverts or reconfigures a shared machine
+without asking. If it is already running, Fadi uses it as it is.
+
+**Images.** One clean master copy per OS in `HDD/vmware/fadi-images/`, prepared once (OpenSSH
+on, VMware Tools present, lab user, snapshot "Fadi base"). Clones depend on that snapshot, so
+it is never the owner's daily VM.
+
+**Fresh machines.** Linked clones of an image, created in seconds, tagged in their `.vmx`
+(`fadi.owner`, `fadi.project`) so cleanup can only touch Fadi's own; removed when the project
+finishes (or kept, as a full clone, on request).
+
+**Networks.** NAT for internet. Attack/defence projects get a private host-only network that
+cannot reach the home LAN; a project's VMs and its service containers meet there.
+
+## Doing it with the least manual effort
+
+| Task | What the owner does | What Fadi does |
+|---|---|---|
+| Register VMs | Tick the ones to use | Reads VMware's library and the HDD folder; shows OS, size, RAM |
+| Make an image | Click "Make a clean image", type the VM's password once | Copies it while off, prepares it inside over VMware Tools, snapshots it |
+| Start a project's lab | One approval per project ("use Server 2025 for this project") | Picks shared vs fresh from the plan, starts or reuses it, opens the screen, joins networks, creates the project folder |
+| Sign in | Nothing, for checks; desktop login optional auto-login in images | Uses the stored credential for checks and setup |
+| Check a step | Click Done | Runs the step's check itself and shows the result |
+| Risky step | Nothing | Takes a snapshot "Fadi: before <project> step N" first; rollback is one click, never automatic |
+| Several VMs | Nothing extra | Starts them in order, on one private network |
+| Leaving a project | Nothing | Offers to suspend its VMs to free memory; resumes on return |
+| Finishing | Confirm in the finish review | Removes clones and the project folder; leaves shared VMs and images |
+| Memory | Nothing | Checks free RAM before start/clone and says what will not fit |
+
+**Still asks, by design:** the first use of a VM in a project; deleting or reverting anything;
+changing a VM's settings (enabling the screen); attack-network creation. Installing VMware
+itself is the owner's.
+
+## Build order (Claude), each with outcome/failure/authorisation tests and live evidence
+
+- **V1** Register shared VMs; start/stop/suspend/reuse; screen in the project window.
+- **V2** Images and fresh linked clones; finish-review cleanup; disk report.
+- **V3** Checks over SSH via the VM's address; snapshots before risky steps; private networks.
+- **C2 + re-plan** Wazuh/Elastic stack as containers on the project network; the SIEM project
+  re-planned from step 2 with Server 2025 as the monitored machine.
+
+**For Codex:** review the shared-machine rules (no revert/delete without consent, per-project
+folders, clone tagging) and the credential storage before V1 lands; X1/X3 against the
+machine interface.
+
+## Status — 15 October 2026 (Claude): V1 landed
+
+Built on the existing VMware slice (register a `.vmx`, `vmware.start` / `vmware.suspend`
+recipes, observer via `vmrun list`), not beside it.
+
+- **Choose the machine in one click.** The project's lab panel shows "Runs on" cards: a fresh
+  lab on this computer, and the machines in the owner's VMware library that fit the project
+  (Windows Server project → the Windows Server VM; read from `~/.vmware/inventory.vmls` and
+  each `.vmx`). Picking one registers it (matched by `.vmx` path; a clashing name gets
+  "(VMware)") and places the project on it (`placeOnResource`). Only machines VMware itself
+  lists can be picked — the browser chooses among them, never types a path.
+- **Starts in the background.** `vmrun -T ws start <vmx> nogui`: VMware's window does not open;
+  Workstation can still attach to the running machine. A machine already running — started by
+  the owner or another project — is used as it is: no request, no second start.
+- **Screen inside the project.** The first start also turns on VMware's VNC on 127.0.0.1 with a
+  per-machine port (5901–5999) and password — a new broker step kind (`ScreenStep`) that
+  re-resolves the path from the owner's resource at execution and refuses while the VM runs.
+  The original is kept as `.vmx.before-fadi`. The browser draws it with noVNC 1.7.0 (MPL-2.0,
+  `public/novnc`, unmodified) through `lib/lab/vnc-bridge.ts`: WebSocket↔TCP on 127.0.0.1:6089,
+  tickets per owner and VM port (30 min), local Origin only, never a port from the browser.
+- **Readiness is observed.** "The operating system has started" passes only when VMware Tools
+  in the guest answers (`checkToolsState`); without Tools the panel says so instead of "ready".
+- **Approval policy change (for Codex's review):** `vm` + reversible/disruptive (start,
+  suspend) is now one click; `vm` + irreversible stays typed. Host and remote unchanged.
+- **Suspend is `hard`.** `soft` waits on VMware Tools to run guest scripts and never returned on
+  a guest without Tools (measured); `hard` still saves memory and disk.
+- Fadi's `Docker`/`admin` sign-in and Docker shell line are hidden for VMware machines.
+
+**Evidence.** `vmware.integration.test.ts` (VMware + DB, `FADI_TEST_VMWARE=1`) on a throwaway
+disk-less VM: one click → screen lines written, backup kept, VM running in the background →
+the project's runtime is VMware with a reachable screen → VNC greets through the bridge →
+suspend with one click → "suspended" → settings of a running VM refused and unchanged. A real
+Chromium session through the dev server drew the VM's firmware screen in `lab-screen.html`
+(connected, 1024×768). Unit: VMX parsing/editing, inventory, port/password, WebSocket framing,
+ticket/Origin refusal, recipe path pinning, policy. 453 lab/learning/AI tests pass.
+
+**Not yet:** "Open in VMware" button; images and fresh linked clones (V2); checks over SSH and
+snapshots before risky steps, private networks (V3); the Wazuh stack and re-plan (C2). The
+owner's own VMs have not been started by Fadi yet — the first real start is theirs to approve.
+
+## Status — 15 October 2026 (Claude): first VMware start fixed; C2 lab stacks (Wazuh)
+
+**The owner's first real start failed** with only "Command failed: vmrun … start … nogui".
+Timestamps: the screen step ran, then the start was killed at the 60s command limit (a 2 GB VM on
+the NTFS HDD creates its memory file before power-on), and the retry hit the half-started VM's
+lock. The same start run by hand succeeded; Windows came up (Tools running, 172.16.89.130). Fix
+(`61e2da4`): VM start/suspend get 180s, and a failed command now says why in the tool's own
+words (`vmrun` prints "Error: …" on stdout) or that Fadi stopped waiting and it may finish.
+
+**C2 — lab stacks, starting with Wazuh 4.14.9** (`lib/lab/stacks.ts`, `stacks/wazuh-files.ts`):
+- A closed catalogue. The files are upstream `wazuh-docker` v4.14.9 `single-node`, generated
+  into a module (GPLv2 attribution in its header). Changed only: indexer/API/dashboard ports on
+  127.0.0.1 (dashboard 5443), agent ports 1514/1515 and syslog on the VMware network address
+  (vmnet8, else vmnet1, else 127.0.0.1) — never the home network; indexer heap 512 MB;
+  `restart: unless-stopped`. Upstream's demo passwords are kept and stated in the approval.
+- Recipes `stack.start` (one click: files → certificates → `docker compose up -d`),
+  `stack.stop` (click), `stack.remove` (`down -v`, typed). A new `StackStep` writes the files at
+  execution from the catalogue into Fadi's own folder (`~/.local/share/fadi/stacks/<project>`),
+  not the workspace — no workspace is set for the owner, and nothing in these files comes from a
+  caller or model. Stop/remove are own-work-only.
+- The project's lab panel shows "Services beside the machine" with state (Compose + the
+  dashboard answering), Start/Stop, the dashboard link, sign-in and the agent address.
+- **Planner**: told which services run beside the lab and where agents connect, that the lab is
+  the owner's own VMware VM (their account, no Fadi lab account), and never to install Docker,
+  WSL or a hypervisor inside it. `nestedVirtualisationViolations` sends such a plan back once,
+  like the OS checks; the step that broke the lab (`winget install … Docker.DockerDesktop`) is
+  the test case.
+
+## Status — 15 October 2026 (Claude): readiness before start; start over; move to SSD
+
+- **Re-plan was refused** ("Nothing you've registered can host this") once the owner's VMware
+  VM was registered: the host search asked whether a Windows Server VM can *host* a Windows
+  Server lab. VMware VMs are labs, not hosts, and are no longer host candidates.
+- **Readiness** (`readiness.ts`, pure; facts from `/proc/meminfo`, `findmnt` + `rotational`,
+  the VM's `.vmx`, VMware Tools, Compose, `docker image inspect`, Docker's free space): memory
+  for what isn't running yet (1.5 GB kept for the host), the VM's memory against its OS's need,
+  the VM on a spinning disk, Tools, service disk and downloads. Shown as "Before you start" in
+  the lab panel, and given to the planner on a re-plan. Owner's project, measured: needs 6.2 GB
+  of 7.9 GB free; VM on the HDD → warn, with a fix button.
+- **Fixes, one click each** (`vmware.memory`, `vmware.move`, re-resolved path, VM must be off):
+  memory from a fixed set (refused while suspended — the saved state is at the old size); move
+  copies to `~/VMs` with btrfs copy-on-write off, compares every file, marks the copy moved
+  (`uuid.action = "keep"`, so a background start is not stopped by VMware's question), points
+  VMware's library and Fadi at it, and leaves the original untouched. Live-tested on a
+  throwaway VM (move → starts in the background → resize → original intact).
+- **Start the project over** (`resetProjectAction`): plans first, then replaces every step,
+  finished ones too; machine and services stay. "Plan these steps again" still keeps finished
+  steps.
+
+## Status — 15 October 2026 (Claude): earlier plans kept; project brief shown
+
+`bd8527b`: before any plan change (re-plan, start over, a step corrected by Fadi) the whole plan
+is saved with each step's status, completion and result (`project_plan_versions`, 0062, same
+transaction). "Earlier plans" shows each in full; "Use this plan again" restores it exactly and
+keeps the one it replaces. Owner-scoped (integration test). The project's description
+(`run.detail`) — stored, never shown — is now "About this project" on the project page.
+Plans replaced before this commit were not kept and cannot be recovered.
+
+## Next, agreed in outline with the owner (15 Oct)
+
+**M — Machine settings, from the project.** One "Machine" panel per VMware VM, every change a
+broker recipe (VM off for hardware; settings file backed up; click for reversible, typed for
+destructive):
+- *Specs*: CPU cores and memory (fixed choices, shown against this computer's free capacity);
+  nested virtualisation (`vhv.enable`) only when a project genuinely needs a hypervisor.
+- *Storage*: disks with size and which physical disk (SSD/HDD); move to SSD (done); add a disk
+  (`vmware-vdiskmanager -c`); grow a disk (`-x`, then the guest extends its partition).
+- *Network*: per adapter — NAT (internet), host-only (this computer only), or the project's
+  private network (no internet; the project's VMs and service containers only). Attack/defence
+  projects default to private.
+- *Snapshots*: list, take, revert (typed) — part of V3.
+
+**P — Prepared before the person opens the project.** On commit, in the background: choose the
+machine (a fitting VMware VM, a fresh clone, or a container) with the reason; decide the
+settings it needs (memory, network, services) from the readiness check; plan the steps with all
+of that; and lay out ONE setup approval listing every change ("give the VM 4 GB, put it on the
+project network, start Wazuh — downloads 7.8 GB"). The learning hub shows each project as
+Planning / Ready to start / Needs your OK (N changes) / Blocked (why). Requires a batch recipe
+composed of existing step kinds, approved once against the exact list.
+
+**H — The learning hub keeps what the person chose.**
+- Flagships: the weekly refresh replaces the list — keep earlier sets and let a flagship be
+  pinned so a refresh never drops it.
+- Deleting a project is permanent — a 30-day "recently deleted".
+- Switching direction hides other directions' projects — show them, not lose them.
+- Restoring an earlier plan leaves evidence already admitted from the newer one in the career
+  record (by design: it happened); the finish review should say which plan produced it.
+
+## Status — 15 October 2026 (Claude): checks in the owner's VM, machine settings, screen typing
+
+- **Typing into the VM** (`326330b`, `08274e0`): VMware's VNC does not carry the clipboard, so the
+  screen page types text as keysyms (Shift for a US layout; never a final Enter). Ctrl+V, "Paste
+  as typing", and "Type into lab" on every step command. Controls sit above the screen and never
+  keep focus — a focused in-screen button had turned every Enter into another paste. Browser
+  test against a recording VNC server.
+- **Checks** (`bfaa7fe`): `lab.check` gains a VMware variant — SSH with Fadi's lab key to the
+  address VMware Tools reports (must be on a vmnet), account stored per machine (0063). Set up
+  by one typed PowerShell line (sshd, Fadi's key in administrators_authorized_keys, firewall
+  rule for this computer's vmnet addresses only). Windows guests only so far.
+- **DNS**: the owner's VM could not resolve anything — VMware's NAT (no `[dns]` in nat.conf)
+  forwarded to the host's `127.0.0.53` stub. Readiness now detects it; the fix needs root
+  (`[dns] nameserver1 = 1.1.1.1` in `/etc/vmware/vmnet8/nat/nat.conf`, restart vmware-networks).
+- **Machine settings** (this commit): CPU, memory, network (NAT / host-only), screen
+  (auto / 1600×900 / 1920×1080 via `svga.autodetect=FALSE` + max size) from a closed set
+  (`MACHINE_CHOICES`), one approval, only while off (CPU/memory not while suspended), settings
+  file kept; plus a proper shutdown through Tools. Live-tested on a throwaway VM.
+- Not yet: disks (add/grow), snapshots, a private per-project network, bridged (deliberately
+  absent for attack labs).

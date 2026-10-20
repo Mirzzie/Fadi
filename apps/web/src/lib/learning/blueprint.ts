@@ -2,6 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 
+import { approvedCareerEvidence } from "@/lib/career/context";
 import { getCareerReportContext } from "@/lib/career-report/data";
 import { getUserDocGenerate } from "@/lib/ai/user-generate";
 import { logger } from "@/lib/observability/logger";
@@ -22,7 +23,7 @@ const blueprintSchema = z.object({
         level: z.string(), // foundational | associate | professional
         why: z.string(),
         effort: z.string(), // e.g. "2–4 weeks study"
-      }),
+      })
     )
     .max(6),
   projects: z
@@ -31,7 +32,7 @@ const blueprintSchema = z.object({
         title: z.string(),
         proves: z.string(),
         deliverable: z.string(),
-      }),
+      })
     )
     .max(5),
   inDemandSkills: z
@@ -39,7 +40,7 @@ const blueprintSchema = z.object({
       z.object({
         skill: z.string(),
         why: z.string(),
-      }),
+      })
     )
     .max(6),
 });
@@ -60,10 +61,12 @@ export async function generateBlueprint(userId: string): Promise<BlueprintResult
   }
 
   const ctx = await getCareerReportContext(userId);
+  const evidence = await approvedCareerEvidence(userId, { directionId: ctx?.careerProfileId });
   if (!ctx?.targetRole) {
     return {
       ok: false,
-      message: "Set up this direction first (a target role, and a bit of your background), then I can map it.",
+      message:
+        "Set up this direction first (a target role, and a bit of your background), then I can map it.",
     };
   }
 
@@ -81,9 +84,9 @@ Ground everything in the candidate's real background below. Never invent their e
     ctx.domain ? `Field: ${ctx.domain}` : "",
     ctx.experienceLevel ? `Experience level: ${ctx.experienceLevel}` : "",
     ctx.careerGoals ? `Goal: ${ctx.careerGoals}` : "",
-    ctx.resumeText
-      ? `Current background (certs, skills, experience):\n${ctx.resumeText.slice(0, 3000)}`
-      : "(no resume for this direction yet — infer from the role, and keep it honest.)",
+    evidence.block
+      ? `Current selected career records:\n${evidence.block}`
+      : "(No accepted career records selected. Suggest starting options; do not assume existing skills or employment.)",
   ]
     .filter(Boolean)
     .join("\n");

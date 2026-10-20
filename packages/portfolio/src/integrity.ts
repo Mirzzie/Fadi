@@ -213,7 +213,12 @@ export function findRewordedDuplicates(items: ItemLike[]): IntegrityFinding[] {
   const byId = new Map(inputs.map((i) => [i.id, i]));
 
   const out: IntegrityFinding[] = [];
-  for (const m of findSameThings(inputs)) {
+  // Loose here, unlike the evidence review. This is the person's OWN portfolio, where a
+  // duplicate arrives when a synced record lands beside an entry they wrote themselves — six of
+  // them in the measured case — and the finding is a suggestion inside a panel they opened, not
+  // a hold on their record. A wrong suggestion costs a dismissal; a missed duplicate ships on
+  // their public page twice.
+  for (const m of findSameThings(inputs, undefined, { requireAnchor: false })) {
     const a = items.find((i) => i.id === m.a);
     const b = items.find((i) => i.id === m.b);
     if (!a || !b || a.section !== b.section) continue;

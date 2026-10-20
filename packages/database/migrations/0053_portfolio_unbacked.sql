@@ -1,0 +1,1 @@
+ALTER TABLE "portfolio_items" ADD COLUMN "unbacked_since" timestamp with time zone;

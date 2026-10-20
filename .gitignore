@@ -40,3 +40,9 @@ claude-backup.tar.gz
 # Playwright
 test-results/
 playwright-report/
+
+# Local agent settings — machine-specific, never shared
+.claude/settings.local.json
+
+# Written by a publish: the export app is built with the owner data baked in.
+apps/portfolio-export/public/fadi-portfolio.json

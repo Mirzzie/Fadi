@@ -22,6 +22,7 @@ import type { FadiTool, FadiToolResult } from "./types";
  */
 export const getWorldShifts: FadiTool = {
   name: "get_world_shifts",
+  risk: "read",
   description:
     "Get the structural global forces (AI disruption, geopolitical fragmentation, inflation, demographics, climate, shock-resilience) ranked for the user's field, plus live news signals scored against their profile. Use when the user asks whether world events should change their career strategy, whether their field is safe/future-proof, about wars/inflation/AI/climate and their career, or for a career direction stress-test.",
   parameters: { type: "object", properties: {} },

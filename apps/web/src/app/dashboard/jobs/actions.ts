@@ -13,6 +13,7 @@ import { z } from "zod";
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
+import { syncApplicationWork } from "@/lib/applications/sync-work";
 import { applyIntentFilter, parseJobPrompt, type JobSearchIntent } from "@/lib/jobs/ai-search";
 import { surfForJobs } from "@/lib/jobs/web-surfer";
 import { isSafeFetchUrl } from "@/lib/security/url-guard";
@@ -239,13 +240,14 @@ export async function updateApplicationStatusAction(
       };
     }
 
-    await applicationsRepository.upsertStatusForUser(user.id, {
+    const application = await applicationsRepository.upsertStatusForUser(user.id, {
       jobId: job.id,
       company: job.company,
       title: job.title,
       url: job.url,
       status: parsedStatus.data,
     });
+    await syncApplicationWork(user.id, application);
 
     revalidatePath("/dashboard");
     revalidatePath("/dashboard/jobs");
@@ -333,11 +335,11 @@ export async function aiJobSearch(
  */
 export async function resolveSearch(
   prompt: string
-): Promise<{ country: string | null; city: string | null; remote: boolean }> {
+): Promise<{ country: string | null; city: string | null; remote: boolean; keywords: string[] }> {
   // Authenticate BEFORE the (server-funded) AI parse — an unauthenticated caller must never be
   // able to spend our model budget. Returns an empty resolution rather than throwing.
   const user = await getCurrentAuthUser();
-  if (!user) return { country: null, city: null, remote: false };
+  if (!user) return { country: null, city: null, remote: false, keywords: [] };
 
   const intent = await parseJobPrompt(prompt);
   // An explicit search should FETCH, not read a 30-min cache. Drop the sync window so the
@@ -352,6 +354,9 @@ export async function resolveSearch(
     country: intent.country ?? null,
     city: intent.city ?? null,
     remote: Boolean(intent.remote),
+    // The words themselves — the board filters on them. Dropping them here is why typing
+    // "graduate IT support in Dublin" only moved the map pin.
+    keywords: intent.keywords.slice(0, 6),
   };
 }
 

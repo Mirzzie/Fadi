@@ -1,7 +1,6 @@
 import {
   compareIdentity,
   rarityIndex,
-  tokens,
   type IdentityInput,
   type Verdict,
 } from "@/lib/identity/resolve";
@@ -72,31 +71,6 @@ export type ReconcileReport = {
   counts: { resume: number; portfolio: number };
 };
 
-/**
- * THE SAME NAME, ACROSS TWO STORES, IS THE SAME THING.
- *
- * `compareIdentity` deliberately refuses to merge on a title alone: inside one pool,
- * two records both called "AWS" are usually two different things, and a thin record
- * with nothing else to go on must not be merged on a coincidence. That guard is right
- * there and wrong here — these are ONE PERSON'S two descriptions of one life, and a
- * résumé line reading "MSc Cybersecurity" against a portfolio entry reading "MSc
- * Cybersecurity" is not a coincidence.
- *
- * Found on real data: without this, the degree that exists on BOTH sides was reported
- * as missing from the portfolio AND as portfolio-only — the same record, in two
- * contradictory buckets, telling the owner to add something they already had.
- *
- * Compared on tokens rather than raw strings so case, punctuation and spacing don't
- * matter; the kinds must still agree, because a skill named "Linux" is not a project.
- */
-function sameName(a: IdentityInput, b: IdentityInput): boolean {
-  if ((a.kind ?? "") !== (b.kind ?? "")) return false;
-  const ta = tokens(a.title);
-  const tb = tokens(b.title);
-  if (ta.length === 0 || ta.length !== tb.length) return false;
-  return ta.join(" ") === tb.join(" ");
-}
-
 const gapOf = (item: IdentityInput, nearest: ReconcileGap["nearest"]): ReconcileGap => ({
   id: item.id,
   title: item.title,
@@ -135,11 +109,10 @@ export function reconcile(
   for (const r of resumeItems) {
     let best: { p: IdentityInput; verdict: Verdict; reasons: string[]; rank: number } | null = null;
     for (const p of portfolioItems) {
-      if (sameName(r, p)) {
-        best = { p, verdict: "same", reasons: ["same title, same kind"], rank: 3 };
-        break;
-      }
-      const m = compareIdentity(r, p, idf);
+      // Loose on purpose: this asks "is this résumé line already on the site?", and a wrong
+      // yes only keeps Fadi quiet. It never holds a record or demands an answer, so it does not
+      // need the anchor the evidence review requires.
+      const m = compareIdentity(r, p, idf, undefined, { requireAnchor: false });
       const rank = m.verdict === "same" ? 2 : m.verdict === "maybe" ? 1 : 0;
       if (rank === 0) continue;
       if (!best || rank > best.rank) best = { p, verdict: m.verdict, reasons: m.reasons, rank };

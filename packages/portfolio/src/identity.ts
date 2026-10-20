@@ -1,49 +1,24 @@
-/**
- * ENTITY RESOLUTION — "is this the same real thing, described differently?"
- *
- * THE BUG THIS EXISTS TO FIX. Fadi conflates two different kinds of object:
- *
- *   · a FACT      — a real thing that happened (an MSc dissertation, an internship,
- *                   a home lab). There is exactly one of each, forever.
- *   · a RENDERING — one description of that fact, worded for an audience.
- *
- * Every ingest path writes a rendering as though it were a new fact. So the moment a
- * user tailors their history for a different role — which is the whole point of the
- * product — the same reality is written again in different words and stored as new
- * evidence, a new project, a new résumé line. The pool inflates with restatements and
- * the person looks scattered to a reader, which is precisely the failure a reviewer
- * flagged on this user's portfolio.
- *
- * Lexical duplicate-detection cannot fix this: "Automated DevSecOps Pipeline
- * Deployment & Runtime Protection" and "Shield-Right DevSecOps" are the same MSc
- * project and share neither a title, an organisation, nor a date string.
- *
- * WHAT SURVIVES REWORDING. Rewriting changes the prose and leaves the world alone —
- * so identity is built only out of things a rewrite cannot touch:
- *
- *   1. ARTEFACTS      a repo, an image, a live URL. The strongest signal there is:
- *                     two records pointing at one artefact are one thing.
- *   2. TIME AND PLACE an organisation plus an overlapping period.
- *   3. RARE TOKENS    the proper nouns a rewrite keeps because they name reality —
- *                     "wazuh", "proxmox", "juice shop", "nextcloud".
- *   4. MEANING        an embedding, for the pure-paraphrase case the above miss.
- *
- * RARITY IS MEASURED AGAINST THE USER'S OWN CORPUS, never a hardcoded vocabulary.
- * A word common across someone's records tells you nothing; a word in two of forty
- * records is a fingerprint. This is what keeps the module career-agnostic: a nurse's
- * "cannulation" and an engineer's "terraform" are found the same way, and no list of
- * technologies is smuggled in (the mistake that made the Learning Hub IT-only).
- *
- * THE OUTPUT IS A VERDICT, NOT AN ACTION. `same` / `maybe` / `different`, with the
- * reasons in plain language. Merging is the caller's decision and the user's click.
+/** Identity suggestions: exact field replay is automatic; inferred similarity needs review.
+ * Kind boundaries separate a job, a project within it, and a qualification.
+ * Lexical and embedding scores retrieve candidates, not proof of shared identity.
  */
-
 export type IdentityInput = {
   id: string;
   title: string;
   organization?: string | null;
+  /**
+   * personal | employment | education | platform | client. Default personal.
+   *
+   * Decides whether `organization` may act as an IDENTITY ANCHOR. A shared employer
+   * plus overlapping years is strong evidence two records describe the same work. A
+   * shared "Raspberry Pi" is evidence of nothing — it is a board two unrelated
+   * projects happen to run on, and treating it as an employer made them look like
+   * colleagues.
+   */
+  attribution?: string | null;
   period?: string | null;
   detail?: string | null;
+  metrics?: string | null;
   url?: string | null;
   imageUrl?: string | null;
   gallery?: string[] | null;
@@ -61,14 +36,28 @@ export type IdentityInput = {
  * A skill or a tag is a label, not an event: it shares vocabulary with the work that
  * demonstrates it by design, so comparing the two produces nothing but false matches.
  */
-const EVENTISH = new Set(["experience", "project", "education", "certification", "achievement", "custom"]);
-
 function comparableKinds(a: IdentityInput, b: IdentityInput): boolean {
-  const ka = a.kind ?? "";
-  const kb = b.kind ?? "";
-  if (!ka || !kb) return true; // unknown kinds: fall back to the evidence itself
-  if (!EVENTISH.has(ka) || !EVENTISH.has(kb)) return false;
-  return true;
+  // Missing classification may produce a question, but different known objects are
+  // not alternate wordings (e.g. a degree and the dissertation completed within it).
+  return !a.kind || !b.kind || a.kind === b.kind;
+}
+
+const normalText = (value?: string | null) =>
+  (value ?? "").normalize("NFC").trim().replace(/\s+/g, " ").toLowerCase();
+
+/** Exact source replay is independent of corpus size, origin and ranking tags. */
+export function identicalRecord(a: IdentityInput, b: IdentityInput): boolean {
+  return (
+    normalText(a.attribution ?? "personal") === normalText(b.attribution ?? "personal") &&
+    JSON.stringify([...(a.gallery ?? [])].sort()) ===
+      JSON.stringify([...(b.gallery ?? [])].sort()) &&
+    Boolean(a.kind && a.kind === b.kind && normalText(a.title)) &&
+    ["title", "organization", "period", "detail", "metrics", "url", "imageUrl"].every(
+      (key) =>
+        normalText(a[key as keyof IdentityInput] as string | null) ===
+        normalText(b[key as keyof IdentityInput] as string | null)
+    )
+  );
 }
 
 export type Verdict = "same" | "maybe" | "different";
@@ -83,10 +72,44 @@ export type IdentityMatch = {
 };
 
 const STOP = new Set([
-  "the", "and", "for", "with", "from", "into", "that", "this", "was", "were", "are",
-  "our", "your", "their", "its", "using", "used", "use", "via", "per", "over", "under",
-  "built", "build", "made", "make", "work", "worked", "working", "role", "project",
-  "experience", "team", "teams", "support", "supported", "managed", "manage",
+  "the",
+  "and",
+  "for",
+  "with",
+  "from",
+  "into",
+  "that",
+  "this",
+  "was",
+  "were",
+  "are",
+  "our",
+  "your",
+  "their",
+  "its",
+  "using",
+  "used",
+  "use",
+  "via",
+  "per",
+  "over",
+  "under",
+  "built",
+  "build",
+  "made",
+  "make",
+  "work",
+  "worked",
+  "working",
+  "role",
+  "project",
+  "experience",
+  "team",
+  "teams",
+  "support",
+  "supported",
+  "managed",
+  "manage",
 ]);
 
 export function tokens(text: string): string[] {
@@ -150,7 +173,7 @@ export function rareTokens(item: IdentityInput, idf: Map<string, number>, top = 
 export function rareOverlap(
   a: IdentityInput,
   b: IdentityInput,
-  idf: Map<string, number>,
+  idf: Map<string, number>
 ): { score: number; shared: string[] } {
   const wa = new Map<string, number>();
   const wb = new Map<string, number>();
@@ -176,6 +199,25 @@ export function rareOverlap(
   };
 }
 
+
+/**
+ * Do these two records NAME the same thing?
+ *
+ * Exact titles rarely survive a rewrite ("CI/CD Pipeline for Node.js Application on AWS" becomes
+ * "Node.js CI/CD pipeline on AWS"), so identity is read from the words of the title itself: most
+ * of the shorter title present in the longer one, and at least two words in common so a single
+ * generic word ("pipeline", "engineer") cannot pair two unrelated records.
+ */
+export function titlesName(a: IdentityInput, b: IdentityInput): boolean {
+  const ta = new Set(tokens(a.title ?? ""));
+  const tb = new Set(tokens(b.title ?? ""));
+  if (ta.size === 0 || tb.size === 0) return false;
+  let shared = 0;
+  for (const t of ta) if (tb.has(t)) shared += 1;
+  if (shared < 2) return false;
+  return shared / Math.min(ta.size, tb.size) >= 0.6;
+}
+
 /** Normalised artefact identity — the same repo written two ways is one artefact. */
 function artefacts(item: IdentityInput): Set<string> {
   const raw = [item.url, item.imageUrl, ...(item.gallery ?? [])].filter(Boolean) as string[];
@@ -187,18 +229,23 @@ function artefacts(item: IdentityInput): Set<string> {
         .replace(/^https?:\/\//, "")
         .replace(/^www\./, "")
         .replace(/[/?#].*$/, (m) => (m.startsWith("/") ? m.replace(/\/+$/, "") : ""))
-        .replace(/\/+$/, ""),
-    ),
+        .replace(/\/+$/, "")
+    )
   );
 }
 
-function orgKey(item: IdentityInput): string {
-  return tokens(item.organization ?? "").sort().join(" ");
-}
+/** Attributions where `organization` names a real institution someone can be "at". */
+const ORG_ATTRIBUTIONS = new Set(["employment", "education", "client"]);
 
-function years(item: IdentityInput): Set<number> {
-  const src = `${item.period ?? ""} ${item.title ?? ""}`;
-  return new Set((src.match(/\b(19|20)\d{2}\b/g) ?? []).map(Number));
+function orgKey(item: IdentityInput): string {
+  // Employment records can use their employer even when older rows lack attribution.
+  // Other kinds need explicit institutional attribution: a shared tool is not a place
+  // of employment. These anchors retrieve a review candidate, not a merge decision.
+  if (!ORG_ATTRIBUTIONS.has(item.attribution ?? "personal") && item.kind !== "experience")
+    return "";
+  return tokens(item.organization ?? "")
+    .sort()
+    .join(" ");
 }
 
 function overlap<T>(a: Set<T>, b: Set<T>): number {
@@ -215,17 +262,61 @@ function overlap<T>(a: Set<T>, b: Set<T>): number {
  * fetched so this stays pure and testable, and so the whole thing still works with no
  * embeddings provider configured — the lexical anchors alone catch the common cases.
  */
+export type IdentityOptions = {
+  /**
+   * Must something NAME the same work before a pair is raised at all?
+   *
+   * True (the default) wherever a pair costs the person an answer: it holds an import out of
+   * their record until they decide. False where a false pair costs nothing — reconciling a
+   * résumé against a portfolio, where the only effect of a wrong match is that Fadi stays quiet
+   * about work it thinks is already shown.
+   */
+  requireAnchor?: boolean;
+};
+
 export function compareIdentity(
   a: IdentityInput,
   b: IdentityInput,
   idf: Map<string, number>,
   similarity?: number,
+  options: IdentityOptions = {}
 ): IdentityMatch {
   const reasons: string[] = [];
   let score = 0;
 
   if (!comparableKinds(a, b)) {
-    return { a: a.id, b: b.id, score: 0, verdict: "different", reasons: ["different kinds of record"] };
+    return {
+      a: a.id,
+      b: b.id,
+      score: 0,
+      verdict: "different",
+      reasons: ["different kinds of record"],
+    };
+  }
+
+  if (identicalRecord(a, b)) {
+    return { a: a.id, b: b.id, score: 1, verdict: "same", reasons: ["identical recorded fields"] };
+  }
+  if (a.kind === "skill" || b.kind === "skill") {
+    return {
+      a: a.id,
+      b: b.id,
+      score: 0,
+      verdict: "different",
+      reasons: ["different skill records"],
+    };
+  }
+
+  // A matching title is a reason to ask even in a two-record corpus. It is
+  // never sufficient to merge, particularly when employer or dates differ.
+  const sameTitle = Boolean(normalText(a.title) && normalText(a.title) === normalText(b.title));
+  const nearTitle = sameTitle || titlesName(a, b);
+  if (sameTitle) {
+    score += 0.55;
+    reasons.push("same title with different recorded fields");
+  } else if (nearTitle) {
+    score += 0.4;
+    reasons.push("nearly the same title");
   }
 
   // A record with almost no words cannot be identified by its words. Requiring a
@@ -239,17 +330,17 @@ export function compareIdentity(
   //    a rewrite never changes which repository the work lives in.
   const sharedArtefact = overlap(artefacts(a), artefacts(b));
   if (sharedArtefact > 0) {
-    // Decisive by itself: a rewrite never changes which file the work lives in.
+    // Shared references can cover several distinct projects; ask, never merge.
     score += 0.9;
     reasons.push("both point at the same file or link");
   }
 
   // 2. Same place, same time.
   const sameOrg = orgKey(a) && orgKey(a) === orgKey(b);
-  const sharedYear = overlap(years(a), years(b)) > 0;
+  const sharedYear = Boolean(normalText(a.period) && normalText(a.period) === normalText(b.period));
   if (sameOrg && sharedYear) {
-    score += 0.45;
-    reasons.push("same organisation, overlapping dates");
+    score += 0.6;
+    reasons.push("same organisation and stated period");
   } else if (sameOrg) {
     score += 0.15;
     reasons.push("same organisation");
@@ -269,14 +360,14 @@ export function compareIdentity(
     reasons.push(
       rare.shared.length > 0
         ? `share distinctive terms (${rare.shared.slice(0, 4).join(", ")})`
-        : "share most of their distinctive wording",
+        : "share most of their distinctive wording"
     );
   } else if (rare.score >= 0.2 || someShared) {
     score += 0.3;
     reasons.push(
       rare.shared.length > 0
         ? `some distinctive terms in common (${rare.shared.slice(0, 3).join(", ")})`
-        : "some wording in common",
+        : "some wording in common"
     );
   }
 
@@ -284,7 +375,7 @@ export function compareIdentity(
   if (typeof similarity === "number") {
     if (similarity >= 0.9) {
       score += 0.5;
-      reasons.push("describe the same thing in different words");
+      reasons.push("similar meaning; identity still needs confirmation");
     } else if (similarity >= 0.8) {
       score += 0.3;
       reasons.push("closely related wording");
@@ -295,20 +386,39 @@ export function compareIdentity(
     }
   }
 
-  // A thin record needs an anchor a rewrite cannot fake — a shared artefact, or the
-  // same place at the same time. Shared words alone are not enough to identify it.
-  const anchored = sharedArtefact > 0 || (sameOrg && sharedYear);
-  if (tooThin && !anchored) {
+  /**
+   * AN ANCHOR, OR NO QUESTION.
+   *
+   * Shared vocabulary cannot identify a record, however much of it there is. Measured on the
+   * owner's real CV (22 Sep 2026): "DevSecOps Pipeline & Security Monitoring", "Automated
+   * WordPress Deployment on AWS" and "CI/CD Pipeline for Node.js Application on AWS" are three
+   * different projects, and Fadi held two of them for review against the first — because
+   * personal projects carry no employer and no dates, so the decision fell entirely to words
+   * like "aws", "pipeline" and "deployment", which every cloud project shares. The person was
+   * asked to adjudicate a question that had no reason to exist.
+   *
+   * An anchor is something that names the same THING rather than the same field: nearly the same
+   * title, the same artefact, or the same place at the same time. Words and embeddings can only
+   * strengthen an anchored candidate now; they can no longer create one. A duplicate that shares
+   * no anchor slips through as a second record, which is visible and deletable — unlike a
+   * question nobody can answer.
+   */
+  const anchored = nearTitle || sharedArtefact > 0 || (sameOrg && sharedYear);
+  if (!anchored && (options.requireAnchor ?? true)) {
     return {
       a: a.id,
       b: b.id,
       score: 0,
       verdict: "different",
-      reasons: ["too little detail to identify"],
+      reasons: [
+        tooThin ? "too little detail to identify" : "nothing anchors these to the same work",
+      ],
     };
   }
 
-  const verdict: Verdict = score >= 0.8 ? "same" : score >= 0.5 ? "maybe" : "different";
+  // Similarity, including an embedding or shared URL, retrieves a REVIEW candidate.
+  // Only exact recorded fields establish an automatic match in this containment pass.
+  const verdict: Verdict = score >= 0.5 ? "maybe" : "different";
   return { a: a.id, b: b.id, score: Number(score.toFixed(3)), verdict, reasons };
 }
 
@@ -322,12 +432,19 @@ export function compareIdentity(
 export function findSameThings(
   items: IdentityInput[],
   similarityOf?: (a: string, b: string) => number | undefined,
+  options: IdentityOptions = {}
 ): IdentityMatch[] {
   const idf = rarityIndex(items);
   const out: IdentityMatch[] = [];
   for (let i = 0; i < items.length; i++) {
     for (let j = i + 1; j < items.length; j++) {
-      const m = compareIdentity(items[i], items[j], idf, similarityOf?.(items[i].id, items[j].id));
+      const m = compareIdentity(
+        items[i],
+        items[j],
+        idf,
+        similarityOf?.(items[i].id, items[j].id),
+        options
+      );
       if (m.verdict !== "different") out.push(m);
     }
   }

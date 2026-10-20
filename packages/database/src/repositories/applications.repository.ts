@@ -154,6 +154,24 @@ export function createApplicationsRepository(db: Database) {
         .where(and(eq(applications.userId, userId), inArray(applications.jobId, jobIds)));
     },
 
+    /**
+     * Applications for a vacancy, whichever board's copy they applied through — same reason as
+     * the saved-jobs lookup: the board shows one row per canonical key, and an application in
+     * progress must not disappear because a different copy won the dedupe.
+     */
+    async listForUserByCanonicalKeys(
+      userId: string,
+      keys: string[]
+    ): Promise<Array<Application & { canonicalKey: string }>> {
+      if (keys.length === 0) return [];
+      const rows = await db
+        .select({ application: applications, canonicalKey: jobs.canonicalKey })
+        .from(applications)
+        .innerJoin(jobs, eq(jobs.id, applications.jobId))
+        .where(and(eq(applications.userId, userId), inArray(jobs.canonicalKey, keys)));
+      return rows.map((row) => ({ ...row.application, canonicalKey: row.canonicalKey }));
+    },
+
     async upsertStatusForUser(
       userId: string,
       input: UpsertApplicationStatusInput

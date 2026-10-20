@@ -1,5 +1,7 @@
 # Architecture assessment — solid pillars or weak ones?
 
+> **Historical investigation (16–20 July 2026).** Measurements and verdicts below describe that tree. Use [Architecture](ARCHITECTURE.md) and [Technical debt](TECHNICAL_DEBT_REGISTER.md) for current state. This file remains because source comments cite its findings.
+
 *Run: 2026-07-16 · measured, not opined. Every number below came from the codebase or
 the live database.*
 

@@ -33,12 +33,29 @@ const TOOL_ANNOTATIONS: Record<string, McpToolAnnotations> = {
   get_relevant_evidence: READ_ONLY,
   answer_behavioral_question: READ_ONLY,
   evaluate_fit: READ_ONLY,
+  project_status: READ_ONLY,
+  // Reads the LOCAL machine rather than a record — still read-only, and it runs nothing
+  // the user has not granted. openWorldHint stays false: this is their own laptop, not
+  // the internet.
+  inspect_machine: READ_ONLY,
+  // Reads the user's own machine registry and does arithmetic on it. No machine is touched.
+  lab_capacity: READ_ONLY,
   // Mutating (create records) — not destructive, not idempotent (a second call
   // adds another). These are the ones a client should confirm before calling.
   draft_referral_outreach: WRITE,
   generate_document: WRITE,
   track_application: WRITE,
   create_career_track: WRITE,
+  plan_project: WRITE,
+  complete_project_step: WRITE,
+  // Writes a REQUEST, not a change. The machine is untouched until a person approves the
+  // exact command, so this is mutating over Fadi's own records and no more than that —
+  // the destructive part, if any, happens behind a prompt this tool cannot reach.
+  propose_lab_action: WRITE,
+  // Same shape as propose_lab_action: each writes a REQUEST, and the machine is untouched
+  // until a person approves the exact command.
+  start_lab_machine: WRITE,
+  build_lab_image: WRITE,
 };
 
 export function getFadiToolAnnotations(name: string): McpToolAnnotations | undefined {

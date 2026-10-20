@@ -35,9 +35,11 @@ const coding = item({
 });
 
 describe("normKind", () => {
-  it("normalizes to a known kind, defaulting to experience", () => {
+  it("normalizes to a known kind, holding an unreadable one for review", () => {
+    // Was: anything unknown became "experience", which wrote a job into someone's history
+    // every time extraction met a word it did not know.
     expect(normKind("project")).toBe("project");
-    expect(normKind("WEIRD")).toBe("experience");
+    expect(normKind("WEIRD")).toBe("unclassified");
   });
 });
 

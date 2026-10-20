@@ -3,16 +3,17 @@
 import { revalidatePath } from "next/cache";
 
 import {
-  createCareerProfilesRepository,
-  createEvidenceRepository,
   createLearningCommitmentsRepository,
+  createProjectRunsRepository,
 } from "@careeros/database";
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
+import { commitToProject } from "@/lib/learning/commit";
+import { kickOutbox } from "@/lib/outbox";
+import { enqueueOutbox } from "@/lib/outbox/topics";
 import { getDatabase } from "@/lib/database/client";
-import { publish } from "@/lib/events/bus";
 import { generateBlueprint, type BlueprintResult } from "@/lib/learning/blueprint";
-import { toCommitmentView, type CommitmentView } from "@/lib/learning/commitments-view";
+import type { CommitmentView } from "@/lib/learning/commitments-view";
 import { suggestProjectsForGap, type SuggestResult } from "@/lib/learning/suggest";
 import { logger } from "@/lib/observability/logger";
 import { recordForwardMotion } from "@/lib/resilience/service";
@@ -28,9 +29,17 @@ const PATH = "/dashboard/learning";
 export async function generateBlueprintAction(): Promise<BlueprintResult> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
-  const rate = await consumeRateLimit({ key: `blueprint:${user.id}`, limit: 8, windowMs: 60 * 60 * 1000 });
+  const rate = await consumeRateLimit({
+    key: `blueprint:${user.id}`,
+    limit: 8,
+    windowMs: 60 * 60 * 1000,
+  });
   if (!rate.allowed) {
-    return { ok: false, message: "A few blueprints in an hour is plenty — sit with this one and pick your next cert or project." };
+    return {
+      ok: false,
+      message:
+        "A few blueprints in an hour is plenty — sit with this one and pick your next cert or project.",
+    };
   }
   return generateBlueprint(user.id);
 }
@@ -42,45 +51,35 @@ export async function suggestForGapAction(input: {
 }): Promise<SuggestResult> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
-  const rate = await consumeRateLimit({ key: `gap-suggest:${user.id}`, limit: 15, windowMs: 60 * 60 * 1000 });
+  const rate = await consumeRateLimit({
+    key: `gap-suggest:${user.id}`,
+    limit: 15,
+    windowMs: 60 * 60 * 1000,
+  });
   if (!rate.allowed) {
-    return { ok: false, message: "That's a lot of project ideas in one hour — pick one and build it. More suggestions unlock shortly." };
+    return {
+      ok: false,
+      message:
+        "That's a lot of project ideas in one hour — pick one and build it. More suggestions unlock shortly.",
+    };
   }
   return suggestProjectsForGap(user.id, input);
 }
 
 /** Commit to a project/course — it appears in "In progress" until completed. */
+
 export async function commitToProjectAction(input: {
   gap: string;
   title: string;
   detail?: string;
   kind?: string;
   searchQuery?: string | null;
-}): Promise<{ ok: boolean; message?: string; commitment?: CommitmentView }> {
+}): Promise<{ ok: boolean; message?: string; commitment?: CommitmentView; runId?: string | null }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
-  if (!input.title.trim()) return { ok: false, message: "The commitment needs a title." };
-
-  try {
-    const db = getDatabase();
-    const track = await createCareerProfilesRepository(db).getActiveForUser(user.id);
-    const row = await createLearningCommitmentsRepository(db).createForUser(user.id, {
-      careerProfileId: track?.id ?? null,
-      gap: input.gap.trim(),
-      title: input.title.trim(),
-      detail: input.detail?.trim() ?? "",
-      kind: input.kind ?? "project",
-      searchQuery: input.searchQuery?.trim() || null,
-    });
-    revalidatePath(PATH);
-    return { ok: true, commitment: toCommitmentView(row) };
-  } catch (error) {
-    logger.error("learning.commit_failed", {
-      userId: user.id,
-      error: error instanceof Error ? error.message : "unknown",
-    });
-    return { ok: false, message: "Couldn't save the commitment. Please try again." };
-  }
+  const result = await commitToProject(user.id, input);
+  if (result.ok) revalidatePath(PATH);
+  return result;
 }
 
 /**
@@ -90,26 +89,16 @@ export async function commitToProjectAction(input: {
  * Honesty rule: no completion without real specifics — we never auto-write
  * achievements the user didn't describe.
  */
-export async function completeCommitmentAction(input: {
-  id: string;
-  whatIBuilt: string;
-}): Promise<{
+export async function completeCommitmentAction(input: { id: string; whatIBuilt: string }): Promise<{
   ok: boolean;
   message: string;
+  /** A hands-on commitment must be finished from its project workspace. */
+  runId?: string;
   /** Present when the completion earned momentum, so the UI can show the gain. */
   momentum?: { value: number; delta: number; band: string };
 }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
-
-  const built = input.whatIBuilt.trim();
-  if (built.length < 20) {
-    return {
-      ok: false,
-      message:
-        "Tell me what you actually built or learned (a sentence or two, real specifics) — that's what goes on the resume, in your words.",
-    };
-  }
 
   try {
     const db = getDatabase();
@@ -118,17 +107,27 @@ export async function completeCommitmentAction(input: {
     if (!commitment) return { ok: false, message: "Commitment not found." };
     if (commitment.status === "completed") return { ok: true, message: "Already completed." };
 
-    // ATOMIC: the evidence insert and the commitment update are one unit.
-    //
-    // Run as two independent writes, a failure between them left the user with an
-    // orphaned evidence item AND a commitment still marked in-progress — so the
-    // obvious retry inserted the evidence a SECOND time. The idempotence guard above
-    // only holds if the status update is guaranteed to land with the insert.
-    // Resolve BEFORE opening the transaction: the read is what needs the whole pool,
-    // and doing it inside would hold the transaction open across it for no benefit.
-    // A finished commitment is very often work the user already recorded by hand while
-    // they were doing it — that is the duplicate this catches.
-    const { admitAgainst, toIdentity, UNCONFIRMED_LINK } = await import("@/lib/identity/admit");
+    // A hands-on project already has its own verified finish path. Completing it here would
+    // bypass its steps, artifacts and review screen, then create a second evidence record.
+    const run = await createProjectRunsRepository(db).getForCommitment(user.id, commitment.id);
+    if (run) {
+      return {
+        ok: false,
+        message: "Finish this from its project workspace so the steps and proof stay together.",
+        runId: run.id,
+      };
+    }
+
+    const built = input.whatIBuilt.trim();
+    if (built.length < 20) {
+      return {
+        ok: false,
+        message:
+          "Tell me what you actually built or learned (a sentence or two, real specifics) — that's what goes on the resume, in your words.",
+      };
+    }
+
+    const { admitEvidence } = await import("@/lib/identity/admit");
     const candidate = {
       kind: commitment.kind === "project" ? "project" : "education",
       title: commitment.title,
@@ -139,38 +138,21 @@ export async function completeCommitmentAction(input: {
       tags: commitment.gap ? [commitment.gap.toLowerCase().trim()] : [],
       origin: "learning",
     };
-    const poolRows = await createEvidenceRepository(db).listForUser(user.id);
-    const metaOf = new Map(
-      poolRows.map((e) => [e.id, { factId: e.factId ?? e.id, origin: e.origin, detail: e.detail }]),
-    );
-    const admission = admitAgainst(
-      candidate,
-      poolRows.map((e) =>
-        toIdentity(
-          { kind: e.kind, title: e.title, organization: e.organization, period: e.period, detail: e.detail, tags: e.tags },
-          e.id,
-        ),
-      ),
-      (id) => metaOf.get(id) ?? { factId: id },
-    );
-
     const evidence = await db.transaction(async (tx) => {
-      const created = await createEvidenceRepository(tx).create(user.id, {
-        ...candidate,
-        ...(admission.decision === "absorb"
-          ? {
-              factId: admission.factId,
-              isCanonical: false,
-              renderingFor: admission.sure ? null : UNCONFIRMED_LINK,
-            }
-          : {}),
-      });
+      const admitted = await admitEvidence(user.id, candidate, { db: tx });
       await createLearningCommitmentsRepository(tx).completeForUser(
         user.id,
         commitment.id,
-        created.id,
+        admitted.insertedId
       );
-      return created;
+      await enqueueOutbox(
+        tx,
+        user.id,
+        "learning.completed",
+        { evidenceItemId: admitted.insertedId, commitmentId: commitment.id },
+        admitted.insertedId
+      );
+      return admitted.row;
     });
 
     // Momentum and the event stay OUTSIDE the transaction on purpose. They are
@@ -189,13 +171,9 @@ export async function completeCommitmentAction(input: {
       metadata: { commitmentId: commitment.id, evidenceItemId: evidence.id, gap: commitment.gap },
     });
 
-    // The career record grew — tell whoever cares (portfolio, and later the
-    // résumé projection) rather than importing them from here.
-    await publish("evidence.changed", {
-      userId: user.id,
-      reason: "learning_completed",
-      evidenceItemId: evidence.id,
-    });
+    // The career record grew. Whoever cares (portfolio, Today, report staleness) hears it
+    // through the outbox row written with the record, delivered from here on.
+    kickOutbox();
     revalidatePath(PATH);
     revalidatePath("/dashboard/evidence");
     logger.info("learning.commitment_completed", {
@@ -207,7 +185,9 @@ export async function completeCommitmentAction(input: {
     return {
       ok: true,
       message:
-        "Done — added to your Evidence, so it now strengthens this direction's resume and every document Fadi drafts. You can edit it any time in Evidence.",
+        evidence.reviewStatus === "pending"
+          ? "Completed and saved for review. Open Your evidence to decide whether this work is already recorded."
+          : "Saved to Your evidence for future drafts. Existing documents have not been changed.",
       momentum: { value: motion.momentum, delta: motion.delta, band: motion.band },
     };
   } catch (error) {

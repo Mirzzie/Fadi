@@ -6,6 +6,7 @@ type ItemLike = {
   section: string;
   title: string;
   subtitle?: string | null;
+  attribution?: string | null;
   dateRange?: string | null;
   description?: string | null;
   bullets?: string[] | null;
@@ -17,6 +18,7 @@ const asCandidate = (i: ItemLike): Candidate => ({
   kind: i.section,
   title: i.title,
   organization: i.subtitle ?? null,
+  attribution: i.attribution ?? null,
   period: i.dateRange ?? null,
   detail: [i.description, ...(i.bullets ?? [])].filter(Boolean).join(" ") || null,
   url: i.url ?? null,

@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Lab screen</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #000;
+        color: #a9b2b9;
+        font: 13px/1.4 system-ui, sans-serif;
+      }
+      #screen {
+        position: absolute;
+        inset: 0;
+      }
+      #status {
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+        max-width: 32rem;
+        padding: 0 1rem;
+      }
+      #status[hidden],
+      #note[hidden] {
+        display: none;
+      }
+      #note {
+        position: absolute;
+        left: 50%;
+        bottom: 10px;
+        transform: translateX(-50%);
+        background: rgba(0, 0, 0, 0.85);
+        color: #e4e8ea;
+        padding: 4px 10px;
+        border-radius: 6px;
+        z-index: 2;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="screen"></div>
+    <p id="status">Connecting to the machine's screen…</p>
+    <p id="note" hidden></p>
+    <script type="module">
+      // A VMware machine's screen, drawn by noVNC (public/novnc, MPL-2.0) through Fadi's bridge
+      // (src/lib/lab/vnc-bridge.ts). The ticket and the screen password arrive in the URL
+      // fragment, which the browser never sends to any server.
+      import RFB from "/novnc/core/rfb.js";
+
+      const params = new URLSearchParams(location.hash.slice(1));
+      // Held in memory only: the ticket and the screen password leave this page's address at
+      // once, so nothing reading the URL later finds them (Codex review, 15 Oct 2026). A dropped
+      // screen gets a fresh ticket from the project page, which reloads this page with it.
+      history.replaceState(null, "", location.pathname + location.search);
+      const status = document.getElementById("status");
+      const say = (text) => {
+        status.textContent = text;
+        status.hidden = !text;
+      };
+      const note = (text) => {
+        const el = document.getElementById("note");
+        el.textContent = text;
+        el.hidden = !text;
+        if (text) setTimeout(() => (el.hidden = true), 3000);
+      };
+
+      // KEYSTROKES FOR TEXT. VMware's screen sharing does not carry the clipboard into the
+      // machine, so text is typed. Keysyms follow X11: Latin-1 is its own code, anything else
+      // 0x01000000 + code point. Characters that need Shift on a US keyboard get it explicitly.
+      const SHIFTED = new Set('~!@#$%^&*()_+{}|:"<>?ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split(""));
+      const SHIFT = 0xffe1;
+      const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      let rfb = null;
+      let typing = Promise.resolve();
+
+      // TYPING IS RUNNING COMMANDS: every line break is an Enter in the machine. A clipboard
+      // still holding a review note was typed in line after line, each one run by PowerShell,
+      // with no way to stop it (16 Oct 2026). So: anything longer than one short line is shown
+      // to the person first; there is a hard limit; and typing can always be stopped (Esc, or
+      // Stop beside the screen). Control characters are never sent.
+      const MAX_TYPE = 4000;
+      const needsConfirm = (text) => text.includes("\n") || text.length > 300;
+      const toParent = (message) => {
+        if (parent !== window) parent.postMessage(message, location.origin);
+      };
+      let inFlight = null;
+      let stopRequested = false;
+      let typingNow = false;
+
+      const typeText = (raw, confirmed) => {
+        if (!rfb || !raw) return;
+        const clean = raw
+          .replace(/\r\n?/g, "\n")
+          .replace(/[^\S\n\t ]/g, " ")
+          .replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "")
+          .replace(/\n+$/, "");
+        if (!clean) return;
+        if (clean.length > MAX_TYPE) {
+          note(`That's ${clean.length.toLocaleString()} characters — too long to type. At most ${MAX_TYPE.toLocaleString()}.`);
+          toParent({ type: "fadi-typing", refused: "too-long", total: clean.length });
+          return;
+        }
+        if (!confirmed && needsConfirm(clean)) {
+          // In its own tab there is no project page to ask on; ask here.
+          if (parent === window) {
+            const lines = clean.split("\n").length;
+            if (!window.confirm(`Type ${lines} line(s) into the machine? Each line runs as its Enter is typed.`)) return;
+          } else {
+            toParent({ type: "fadi-confirm-type", text: clean });
+            return;
+          }
+        }
+        if (inFlight === clean) return; // the same text again while it is still typing: a double press
+        inFlight = clean;
+        // One run at a time, in order. Never presses Enter after the last line: the person
+        // reads the command in the machine before running it.
+        typing = typing
+          .then(async () => {
+            stopRequested = false;
+            typingNow = true;
+            let done = 0;
+            toParent({ type: "fadi-typing", done, total: clean.length });
+            for (const ch of clean) {
+              if (!rfb || stopRequested) break;
+              if (ch === "\n") rfb.sendKey(0xff0d, "Enter");
+              else if (ch === "\t") rfb.sendKey(0xff09, "Tab");
+              else {
+                const code = ch.codePointAt(0);
+                const keysym = code <= 0xff ? code : 0x01000000 + code;
+                const shift = SHIFTED.has(ch);
+                if (shift) rfb.sendKey(SHIFT, "ShiftLeft", true);
+                rfb.sendKey(keysym, null);
+                if (shift) rfb.sendKey(SHIFT, "ShiftLeft", false);
+              }
+              done += 1;
+              if (done % 40 === 0) toParent({ type: "fadi-typing", done, total: clean.length });
+              await pause(6);
+            }
+            const stopped = stopRequested;
+            toParent({ type: "fadi-typing", done, total: clean.length, finished: true, stopped });
+            note(
+              stopped
+                ? `Stopped after ${done} of ${clean.length} characters.`
+                : `Typed ${clean.length} characters — check it, then press Enter in the machine.`
+            );
+          })
+          .finally(() => {
+            inFlight = null;
+            typingNow = false;
+          });
+      };
+
+      const pasteClipboard = async () => {
+        try {
+          typeText(await navigator.clipboard.readText(), false);
+        } catch {
+          note("The browser didn't allow reading the clipboard. Use “Type into lab” on the step.");
+        }
+      };
+
+      // Esc while Fadi is typing stops the typing (and is not sent to the machine).
+      window.addEventListener(
+        "keydown",
+        (event) => {
+          if (event.key === "Escape" && typingNow) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            stopRequested = true;
+          }
+        },
+        true
+      );
+
+      // Ctrl+V types the clipboard, before noVNC would send the keystroke itself.
+      window.addEventListener(
+        "keydown",
+        (event) => {
+          if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "v") {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            void pasteClipboard();
+          }
+        },
+        true
+      );
+
+      // The controls live OUTSIDE the screen, on the project page, and talk to it here. After
+      // each one the keyboard goes back to the machine: a focused button inside the screen
+      // turned every Enter into another paste (15 Oct 2026).
+      const focusMachine = () => document.querySelector("#screen canvas")?.focus();
+      window.addEventListener("message", (event) => {
+        if (event.origin !== location.origin) return;
+        const data = event.data ?? {};
+        if (data.type === "fadi-type" && typeof data.text === "string") {
+          typeText(data.text, data.confirmed === true);
+        } else if (data.type === "fadi-stop-typing") stopRequested = true;
+        else if (data.type === "fadi-ctrl-alt-del") rfb?.sendCtrlAltDel();
+        else if (data.type !== "fadi-focus") return;
+        focusMachine();
+      });
+
+      // Tell the project page the machine's resolution, so its panel takes the same shape.
+      let lastSize = "";
+      setInterval(() => {
+        const canvas = document.querySelector("#screen canvas");
+        if (!canvas || !canvas.width || !canvas.height) return;
+        const size = `${canvas.width}x${canvas.height}`;
+        if (size === lastSize) return;
+        lastSize = size;
+        if (parent !== window) {
+          parent.postMessage(
+            { type: "fadi-screen-size", width: canvas.width, height: canvas.height },
+            location.origin
+          );
+        }
+      }, 1000);
+
+
+      const port = Number(params.get("port"));
+      const ticket = params.get("t") ?? "";
+      if (!port || !ticket) {
+        say("This screen link is incomplete. Open it again from the project.");
+      } else {
+        let attempts = 0;
+        const open = () => {
+          rfb = new RFB(
+            document.getElementById("screen"),
+            `ws://127.0.0.1:${port}/screen?t=${encodeURIComponent(ticket)}`,
+            { credentials: { password: params.get("p") ?? "" }, wsProtocols: ["binary"] }
+          );
+          rfb.scaleViewport = true;
+          rfb.resizeSession = false;
+          rfb.focusOnClick = true;
+          rfb.addEventListener("connect", () => {
+            attempts = 0;
+            say("");
+          });
+          rfb.addEventListener("securityfailure", () =>
+            say("The machine refused the screen password. Turn the screen on again from Fadi.")
+          );
+          rfb.addEventListener("disconnect", () => {
+            rfb = null;
+            attempts += 1;
+            if (attempts > 20) {
+              say("The screen is not answering. Check the machine is running, then reload.");
+              return;
+            }
+            // A VM restarting drops the screen for a moment; come back on our own.
+            say("Screen disconnected — reconnecting…");
+            setTimeout(open, Math.min(1000 * attempts, 5000));
+          });
+        };
+        open();
+      }
+    </script>
+  </body>
+</html>

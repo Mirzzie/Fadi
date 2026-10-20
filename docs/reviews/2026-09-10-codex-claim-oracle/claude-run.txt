@@ -1,0 +1,9 @@
+cases:              46
+exact matches:      15
+FALSE REASSURANCE:  0   (unsupported claim passed as supported)
+WRONG REJECTION:    0   (supported claim blocked)
+deferred/uncertain: 31
+
+false reassurance:
+
+wrong rejection:

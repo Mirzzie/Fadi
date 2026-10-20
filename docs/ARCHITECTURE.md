@@ -1,78 +1,119 @@
-# Fadi — System Architecture (as built)
+# Fadi architecture
 
-> Reviewed 2026-07-04, from the code. Update this when a layer or the drift verdict changes.
-> Positioning: **"Fadi — the honest career mentor. The mentor that tells you the truth."**
-> ("Operating System" framing retired 2026-07.)
+**Status:** Current architecture with named target gaps
 
-## The stack
+**Updated:** 23 September 2026
 
-**1 · Surfaces (client)** — one ambient shell (menu bar, direction switcher, dock, ⌘K,
-Fadi orb+chat with voice). Screens: Home, Jobs board, Application tracker, Job workspace
-(six progressively-disclosed tools: fit gate → quality score → red-pen review → interview
-prep → company brief → outcome), Documents studio, Evidence, Interview, Learning, Network,
-Niche finder, Career Weather, Profile, Settings. Route boundaries: loading / error / 404.
+Fadi is a TypeScript modular monolith. Next.js serves React pages, server actions, HTTP APIs, the agent, and domain services. Drizzle repositories persist identity and product data in PostgreSQL. External model, job-source, publishing, media, voice, and machine providers sit behind adapters.
 
-**2 · Actions & API** — server actions per screen (auth checked per action).
-API: `/api/fadi/chat` (SSE + tool loop), `speak`, `transcribe`, `history`, `activity`;
-`/api/documents/[id]` → DOCX/JSON (scoped by userId+id); `/api/agent/run` (cron);
-`/api/mcp` — Fadi exposed as a tool to other agents (per-user SHA-256-hashed tokens).
+```mermaid
+flowchart TB
+  PERSON[Person] --> SHELL[Web shell: Today and four destinations]
+  PERSON --> VOICE[Voice session]
+  PERSON --> EXT[Browser extension / MCP client]
 
-**3 · Domain core (`lib/`)** — pure, tested cores; AI only where it earns it:
-- `jobs/` — word-boundary scorer + seniority gate + field-related fallback; hybrid
-  semantic ranking (jsonb embeddings, app-side cosine, background embed); liveness
-  detection + sweep ("no longer accepting" → closed, survives re-sync); 7-source sync.
-- `documents/` — pivot-aware generation, red-pen review (all 4 kinds, apply-fixes →
-  redraft), humanizer/AI-tell rails, style + content templates, DOCX export.
-- `guardian/` — per-action mentor verdicts (nudge; confirm only for irreversible) +
-  drift patterns (off-track saves) via the agency.
-- `career/` — shared evidence composition, pivot framing, auto track base-resume.
-- `agents/` — background agency: ledgered runs → findings → digest/briefing/orb nudges.
-- `interview/`, `intelligence/`, `resilience/`, `impact/`, `ai/` (BYOK chain
-  primary→fallback, tools registry, embeddings), `security/` (AES-256-GCM secrets,
-  rate limit, SSRF url-guard).
+  SHELL --> CONTEXT[Context envelope]
+  VOICE --> CONTEXT
+  EXT --> CAP[Capability gateway]
+  CONTEXT --> AGENT[Fadi agent and tool router]
+  AGENT --> CAP
 
-**4 · Data (PostgreSQL + Drizzle, 24 migrations)** — the ownership rule:
-- **Shared truth, stored once:** `linkedin_profiles` (career history), `profiles`.
-- **Per-direction:** `career_profiles` (directions + role synonyms + embeddings),
-  `resumes` (per-direction base, shared fallback; auto-drafted on direction creation),
-  `career_reports`, `documents`.
-- **Shared pool:** `jobs` (+liveness, embeddings; pasted jobs get status `"manual"` so
-  one user's paste never reaches another user's board). Plus `applications`,
-  `saved_jobs`, `evidence_items`, `interview_stories`, `agent_*`, `mcp_tokens`.
+  subgraph CORE[CareerOS modular monolith]
+    CAP --> WORK[Work kernel: goals, plans, steps, executions, outputs]
+    CAP --> CAREER[Career core: sources, canonical records, history, selections]
+    CAP --> OPP[Opportunities: jobs, applications, network]
+    CAP --> PRACTICE[Practice: learning, projects, labs, interview]
+    CAREER --> PROJ[Projections: documents, portfolio, public posts]
+    PRACTICE --> CAREER
+    WORK --> OPP
+    WORK --> PRACTICE
+    WORK --> PROJ
+    CAP --> RECEIPTS[Risk, approvals and action receipts]
+    WORK --> REPO[Typed repositories]
+    CAREER --> REPO
+    OPP --> REPO
+    PRACTICE --> REPO
+    PROJ --> REPO
+    RECEIPTS --> REPO
+  end
 
-**5 · External world (the trust boundary)** — user's AI provider (BYOK, encrypted at
-rest), 7 job sources, GDELT/HN/BLS/FRED signals, TTS/STT, inbound MCP clients. Nothing
-leaves without being consented, keyed, or keyless-public; SSRF guard on outbound fetches.
+  REPO --> DB[(PostgreSQL)]
+  AGENT --> MODELS[Model and speech providers]
+  OPP --> SOURCES[Job sources / SearXNG]
+  PRACTICE --> MACHINES[Docker, VMware and remote machines]
+  PROJ --> PUBLISH[GitHub Pages, Cloudinary, social channels]
+```
 
-## The spine (what makes it Fadi)
+## Current foundations
 
-`shared truth → direction framing → honest output → proof`
-History is stored once; each direction re-frames it (pivot-aware: adjacent-field
-experience adopted, transferable skills tied to evidence); every generated document
-passes honesty rails (never invent; `[ADD REAL NUMBER]`; specific-or-suppress); the
-guardian + impact card close the loop by telling the user the truth about their own
-behaviour and what Fadi actually did.
+### Work kernel
 
-## Ideology-drift audit (2026-07-04)
+`work_items` represents goals, plans, and steps. `work_executions` records consequential attempts and their outcome. `work_outputs` links produced domain objects to the work that created them. Agent messages can be scoped to a work item, so conversation follows the task.
 
-| Ideology | Verdict | Reality |
-|---|---|---|
-| Honest mentor, never fabricate | ✅ aligned | Rails in every prompt; strongest part of the codebase |
-| Privacy / trust boundary | ✅ aligned | BYOK encrypted, locale-only geo, manual-job isolation. Nuance: embeddings use an operator key (disclosed) |
-| Shared truth + per-direction everything | ✅ aligned | Completed 2026-07 (per-track resume/report/docs + pivot framing) |
-| Anti-spray, process over outcome | ✅ aligned | No auto-apply (refused by design); momentum process-scored |
-| "One AI core, all strings through it" | ⚠️ drifted | Fadi is **federated** (orb/tools/guardian/agency seams), not one core; pragmatic — decide deliberately, don't drift further by accretion |
-| Jobs discovery as the center | ⚠️ shifted | Sources thin → center of gravity moved to the document workflow. **User-endorsed pivot**, not decay |
-| Narrow surface | ⚠️ drifted | Workspace fixed (11→6 disclosed); dock still 13 destinations; Learning/Niche/Weather overlap the report |
-| Production-grade reliability | ⚠️ closing | ~~In-memory state~~ (KV seam ✅), ~~CI gates~~ (build+migrations+browser smokes ✅ 2026-07-04). Remaining: AI inline in requests, per-request source fan-out, no error tracking |
+The kernel stores intent and coordination, not copies of domain content. A project remains a project record, a document remains a document, and a career fact remains an evidence item.
 
-## Production-hardening order
+### Career core
 
-1. ~~Redis/Upstash seam~~ ✅ DONE (2026-07-04): `lib/kv/store.ts` — Upstash REST when `UPSTASH_REDIS_REST_URL/TOKEN` set, memory fallback otherwise; rate-limit, liveness cache, and sync TTL (generation-counter invalidation) all ride it
-2. **Queue long AI work** out of request handlers — critical
-3. **Centralized scheduled source sync** (drop per-request fan-out) — high
-4. ~~CI: build + migrations + smoke~~ ✅ DONE (2026-07-04, real-browser golden path); **Sentry/error tracking** still open — high
-5. **DB-side job filtering / pgvector** past ~50k jobs (hybrid-search P3) — later
+Source documents are versioned before replacement. Canonical career records live in `evidence_items`; record versions preserve approved history. Selections express Auto, Include, or Exclude for a direction or job. Context snapshots freeze what a generator received. Documents and portfolio items remain projections.
 
-**Verdict:** the ideology survives in the product logic; the infrastructure hasn't caught
-up to it yet. Fadi is beta-grade infra under production-grade product thinking.
+This foundation exists but legacy rows and external-CV reconciliation are incomplete. Raw source text must not regain authority over reviewed records.
+
+### Agent and capabilities
+
+The active page and work item enter a shared context envelope. The tool router offers only relevant capabilities. Every registered tool declares `read`, `write`, or `external` risk; write and external operations declare their effect. Consequential calls create execution receipts.
+
+The lab approval broker remains a specialised gate. A general policy engine, scoped grants, idempotency, reversibility metadata, and durable approval inbox remain target work.
+
+### User interface
+
+Today is the primary control surface. Navigation has four destinations defined in `apps/web/src/components/os/navigation.ts`. The old overview remains available as “The full picture.” Apply and Prepare are lifecycle phases; hiding routes by phase is retired.
+
+### Events and background work
+
+The current domain event bus is in-process and awaits subscribers. This is useful for local coordination but is not a durable delivery guarantee. Cross-domain side effects that must survive a crash need a transactional outbox and idempotent consumers.
+
+### Voice
+
+The current interview path records an answer, transcribes it after capture, and scores text. A Realtime endpoint exists, but voice is not yet one continuous, work-scoped Fadi session. Until that integration lands, describe the feature as voice input rather than a live voice agent.
+
+## Data-flow rules
+
+1. **Ingest:** preserve the exact source and its version.
+2. **Interpret:** extract candidate facts with provenance and confidence.
+3. **Resolve identity:** link only with strong anchors; otherwise ask or keep separate.
+4. **Approve:** append an accepted record version. Unknown kinds remain unclassified.
+5. **Select:** calculate relevance for a direction or job, then apply explicit overrides.
+6. **Snapshot:** generators receive one immutable, inspectable context.
+7. **Project:** create or update documents, portfolio entries, stories, and posts by stable record identity.
+8. **Publish or act:** apply policy, obtain required approval, execute, and write a receipt.
+9. **Learn:** feed verified outcomes back into work and the canonical record.
+
+No downstream surface may silently create a second source of truth.
+
+## Trust boundaries
+
+- Browser input, imported files, scraped pages, job descriptions, model output, MCP clients, machine output, and published-site content are untrusted.
+- Every user-owned query is scoped by the app user id.
+- Provider credentials and machine credentials stay server-side and encrypted at rest where supported.
+- Model output is data until schema validation, domain validation, and policy checks pass.
+- Machine inspection is read-only unless a scoped capability authorises a mutation.
+- Existing personal VMs are preserved through snapshot or clone workflows before disposable lab work.
+- Social publishing uses separate consent and tokens from social sign-in.
+
+See [security](SECURITY_AND_COMPLIANCE.md) and [agent guardrails](security/AGENT_GUARDRAILS.md).
+
+## Known architectural gaps
+
+The ordered gaps are maintained in [ROADMAP.md](ROADMAP.md) and [TECHNICAL_DEBT_REGISTER.md](TECHNICAL_DEBT_REGISTER.md). The most material are:
+
+- Practice still exposes overlapping planning and completion flows.
+- Interview matching can select a zero-relevance story; delivery coaching is inferred from text.
+- Career legacy repair and external-CV reconciliation are unfinished.
+- Cross-domain delivery is not durable.
+- Voice, UI, and text do not yet share one Realtime session.
+- Direct social publishing and its consent boundary do not exist.
+- Job discovery needs measured source health and recall.
+
+## Change rules
+
+Use a repository/service boundary for database access. Keep pure decision logic separate from I/O. Add an ADR when changing ownership, a trust boundary, a durable delivery mechanism, or an external provider contract. Update this document when an architectural target becomes real or is abandoned.

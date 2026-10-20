@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { canonicalizeUrl, canonicalJobKey } from "@careeros/database";
+import {
+  canonicalizeUrl,
+  canonicalJobKey,
+  canonicalOccurrenceJobKey,
+  stableExternalId,
+} from "@careeros/database";
 
 describe("canonicalJobKey", () => {
   it("collapses legal-suffix and punctuation variants of the same company", () => {
@@ -22,6 +27,30 @@ describe("canonicalJobKey", () => {
     expect(canonicalJobKey("Acme", "Software Engineer", "Dublin")).not.toBe(
       canonicalJobKey("Acme", "Software Engineer", "London")
     );
+  });
+});
+
+describe("canonicalOccurrenceJobKey", () => {
+  it("D12: preserves distinct requisitions with the same company, title and city", () => {
+    const first = canonicalOccurrenceJobKey("Acme", "Support Engineer", "Dublin", "board", "req-1");
+    const second = canonicalOccurrenceJobKey(
+      "Acme",
+      "Support Engineer",
+      "Dublin",
+      "board",
+      "req-2"
+    );
+
+    expect(first).not.toBe(second);
+  });
+
+  it("normalizes the source name but preserves the provider identifier", () => {
+    expect(
+      canonicalOccurrenceJobKey("Acme", "Support Engineer", "Dublin", " Board ", "Req-A")
+    ).toBe(canonicalOccurrenceJobKey("Acme", "Support Engineer", "Dublin", "board", "Req-A"));
+    expect(
+      canonicalOccurrenceJobKey("Acme", "Support Engineer", "Dublin", "board", "Req-A")
+    ).not.toBe(canonicalOccurrenceJobKey("Acme", "Support Engineer", "Dublin", "board", "req-a"));
   });
 });
 
@@ -62,5 +91,41 @@ describe("canonicalizeUrl", () => {
   it("returns the input unchanged when it isn't a parseable http(s) URL", () => {
     expect(canonicalizeUrl("not a url")).toBe("not a url");
     expect(canonicalizeUrl("")).toBeNull();
+  });
+});
+
+describe("stableExternalId", () => {
+  // The same Indeed vacancy, crawled three times on 29 Sep 2026: jk constant, bb/xkcb rotating.
+  const crawls = [
+    "https://ie.indeed.com/rc/clk?jk=bf4164d05911192e&bb=E8jRG66z&xkcb=SoCE67M2&fccid=b07d10a9&vjs=3",
+    "https://ie.indeed.com/rc/clk?jk=bf4164d05911192e&bb=LTiz2OFf&xkcb=SoAU67M2&fccid=b07d10a9&vjs=3",
+    "https://ie.indeed.com/rc/clk?jk=bf4164d05911192e&bb=XGph83r1&xkcb=SoBJ67M2&fccid=b07d10a9&vjs=3",
+  ];
+
+  it("gives a re-crawled link-shaped id the same identity every time", () => {
+    const ids = new Set(crawls.map(stableExternalId));
+    expect([...ids]).toEqual(["https://ie.indeed.com/viewjob?jk=bf4164d05911192e"]);
+    const keys = new Set(
+      crawls.map((id) =>
+        canonicalOccurrenceJobKey(
+          "Indeed",
+          "IT Graduate Programme",
+          "Dublin",
+          "fadi-scraper:indeed",
+          id
+        )
+      )
+    );
+    expect(keys.size).toBe(1);
+  });
+
+  it("keeps two different vacancies apart", () => {
+    expect(stableExternalId("https://ie.indeed.com/rc/clk?jk=aaa&bb=1")).not.toBe(
+      stableExternalId("https://ie.indeed.com/rc/clk?jk=bbb&bb=1")
+    );
+  });
+
+  it("leaves an ordinary provider id alone", () => {
+    expect(stableExternalId(" Req-A ")).toBe("Req-A");
   });
 });
