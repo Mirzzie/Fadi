@@ -7,11 +7,17 @@ import {
   churnBrief,
   churnCaseFor,
 } from "./customer-success";
+import {
+  SECURITY_OPERATIONS_PACK,
+  SUSPICIOUS_SIGNINS_ASSETS,
+  signinBrief,
+  signinCaseFor,
+} from "./security-operations";
 
 /**
  * The Practice activities this Fadi has installed, with the runtime each needs: how its case is
  * made from a run's seed, the brief a person sees, and the rubric adapter's assets per step.
- * One entry today; the shape is what a second pack plugs into. No browsing UI (Codex, Gate 3).
+ * Two packs (20 Oct 2026): Customer Success and Security Operations; more plug in the same way. No browsing UI (Codex, Gate 3).
  */
 export type ActivityRuntime = {
   pack: PracticePack;
@@ -38,6 +44,13 @@ const RUNTIMES: ActivityRuntime[] = [
     brief: (seed) => churnBrief(churnCaseFor(seed)),
     caseFor: (seed) => churnCaseFor(seed),
     assets: CHURN_REVIEW_ASSETS as ActivityRuntime["assets"],
+  },
+  {
+    pack: SECURITY_OPERATIONS_PACK,
+    activity: SECURITY_OPERATIONS_PACK.activities.find((a) => a.id === "suspicious-sign-ins")!,
+    brief: (seed) => signinBrief(signinCaseFor(seed)),
+    caseFor: (seed) => signinCaseFor(seed),
+    assets: SUSPICIOUS_SIGNINS_ASSETS as ActivityRuntime["assets"],
   },
 ];
 
