@@ -40,14 +40,12 @@ export function JobsShell({
   searchOutcome,
 }: JobsShellProps) {
   return (
-    <div className="mx-auto max-w-6xl space-y-6 pb-12">
+    <div className="workspace-page space-y-4 pb-8">
       <header className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Live board</p>
-          <h2 className="mt-2 text-3xl font-semibold tracking-[-0.035em]">Roles for {activeRole ?? "your direction"}</h2>
+          <h2 className="text-xl font-semibold tracking-tight">Roles for {activeRole ?? "your direction"}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            {jobs.length} current {jobs.length === 1 ? "role" : "roles"}, ordered by the
-            evidence in your career record.
+            {jobs.length} {jobs.length === 1 ? "listing" : "listings"} in this view.
           </p>
         </div>
       </header>
@@ -117,14 +115,14 @@ export function JobsShell({
           })}
         </section>
       ) : (
-        <Card className="max-w-2xl rounded-lg border-border/80 bg-card/70 shadow-none">
+        <Card className="rounded-none border-x-0 border-border/80 bg-card/70 shadow-none">
           <CardHeader>
             <CardTitle>
               {searchOutcome?.keywords.length
                 ? `Nothing matched “${searchOutcome.keywords.join(", ")}” here`
                 : "No live jobs for this search"}
             </CardTitle>
-            <CardDescription className="space-y-2">
+            <CardDescription className="max-w-2xl space-y-2">
               <span className="block">
                 {searchOutcome?.keywords.length
                   ? "Clear the words above to see everything in this area, or search a different place."

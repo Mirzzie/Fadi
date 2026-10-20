@@ -82,50 +82,62 @@ export function LearningShell({
   ];
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-8 pb-12">
-      <header className="border-b border-border pb-8 pt-3">
-        <p className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Practice</p>
-        <h1 className="max-w-4xl font-heading text-4xl font-semibold tracking-[-0.045em] md:text-5xl">
-          Get better by doing the work.
+    <div className="workspace-page space-y-6 pb-8">
+      <header className="border-b border-border pb-5 pt-2">
+        <p className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+          Practice
+        </p>
+        <h1 className="max-w-4xl font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
+          Learning and practice
         </h1>
-        <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
-          Build toward {direction} through projects, simulations and evidence you can explain.
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          Build toward {direction}. Continue your work or explore a new project.
         </p>
       </header>
 
-      <section className="space-y-4 border-b border-border pb-10">
-        <SectionHeading icon={MonitorPlay} eyebrow="Continue" title="Where you left off" />
-        {home.continue?.kind === "run" ? (
-          <ProjectCard run={home.continue.run} featured />
-        ) : home.continue?.kind === "commitment" ? (
-          <CommitmentsList commitments={[home.continue.commitment]} heading={null} />
-        ) : (
-          <p className="border-y border-dashed border-border py-5 text-sm text-muted-foreground">
-            Nothing in progress. Take on one of the flagship projects below.
-          </p>
-        )}
-      </section>
-
-      <section className="border-y border-border bg-card py-6">
-        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          Work simulation · experimental
-        </p>
-        <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-          <div className="max-w-2xl">
-            <h2 className="font-heading text-2xl font-semibold tracking-tight">Customer Success churn review</h2>
-            <p className="mt-2 text-sm leading-6 text-muted-foreground">
-              Analyse a book of accounts, write a 30-day retention plan and defend your priorities.
-              Fadi reviews your own case against named criteria. Not yet practitioner-reviewed.
+      {home.continue ? (
+        <section className="space-y-3">
+          <SectionHeading icon={MonitorPlay} eyebrow="Continue" title="Where you left off" />
+          {home.continue?.kind === "run" ? (
+            <ProjectCard run={home.continue.run} featured />
+          ) : home.continue?.kind === "commitment" ? (
+            <CommitmentsList commitments={[home.continue.commitment]} heading={null} />
+          ) : (
+            <p className="border-y border-dashed border-border py-5 text-sm text-muted-foreground">
+              Nothing in progress. Take on one of the flagship projects below.
             </p>
+          )}
+        </section>
+      ) : null}
+
+      <details className="group border-y border-border">
+        <summary className="cursor-pointer py-4 text-sm font-semibold">
+          Explore a work simulation
+        </summary>
+        <section className="border-t border-border bg-card py-5">
+          <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            Work simulation · experimental
+          </p>
+          <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div className="max-w-2xl">
+              <h2 className="font-heading text-2xl font-semibold tracking-tight">
+                Customer Success churn review
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                Analyse a book of accounts, write a 30-day retention plan and defend your
+                priorities. Fadi reviews your own case against named criteria. Not yet
+                practitioner-reviewed.
+              </p>
+            </div>
+            <Link
+              href="/dashboard/learning/practice/fadi.customer-success/churn-review"
+              className="inline-flex h-10 shrink-0 items-center justify-center rounded-md border border-border px-4 text-sm font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
+            >
+              View simulation
+            </Link>
           </div>
-          <Link
-            href="/dashboard/learning/practice/fadi.customer-success/churn-review"
-            className="inline-flex h-9 shrink-0 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            Start simulation
-          </Link>
-        </div>
-      </section>
+        </section>
+      </details>
 
       {/* Two or three substantial projects beat a pile of small ones. Each answers a problem
           organisations are dealing with now, cited, so the finished work reads as someone who
@@ -134,9 +146,10 @@ export function LearningShell({
         <SectionHeading
           icon={Target}
           eyebrow="Flagship projects"
-          title={`Two or three projects worth being known for as a ${direction}`}
+          title={`Projects for ${direction}`}
         />
         <FlagshipProjects
+          secondary={Boolean(home.continue)}
           flagships={flagships?.flagships ?? []}
           ideas={flagships?.ideas ?? []}
           refreshedAt={flagships?.refreshedAt ?? null}
@@ -150,85 +163,87 @@ export function LearningShell({
           <span className="font-mono text-xs font-normal text-muted-foreground group-open:hidden">
             {inProgressCount + gapList.length + browse.finished.length} items
           </span>
-          <span className="hidden font-mono text-xs font-normal text-muted-foreground group-open:inline">Close</span>
+          <span className="hidden font-mono text-xs font-normal text-muted-foreground group-open:inline">
+            Close
+          </span>
         </summary>
         <div className="grid gap-0 border-t border-border md:grid-cols-2 xl:grid-cols-3">
-        <Panel title="Also in progress" count={inProgressCount}>
-          {inProgressCount === 0 ? (
-            <Empty>Nothing else under way. One thing at a time is the point.</Empty>
-          ) : (
-            <div className="space-y-3">
-              {browse.runs.map((run) => (
-                <ProjectCard key={run.id} run={run} />
-              ))}
-              <CommitmentsList commitments={browse.commitments} heading={null} />
-            </div>
-          )}
-        </Panel>
+          <Panel title="Also in progress" count={inProgressCount}>
+            {inProgressCount === 0 ? (
+              <Empty>Nothing else under way. One thing at a time is the point.</Empty>
+            ) : (
+              <div className="space-y-3">
+                {browse.runs.map((run) => (
+                  <ProjectCard key={run.id} run={run} />
+                ))}
+                <CommitmentsList commitments={browse.commitments} heading={null} />
+              </div>
+            )}
+          </Panel>
 
-        <Panel title="Smaller steps: close one gap" count={gapList.length}>
-          {gapList.length === 0 ? (
-            <Empty>
-              {report
-                ? "No other open gaps in your latest report."
-                : "Generate a career report to see the gaps it names."}
-            </Empty>
-          ) : (
-            <div className="space-y-2">
-              {gapList.map((gap) => (
-                <article key={gap.title} className="rounded-xl border border-border/60 p-3">
-                  <h4 className="text-sm font-medium">{gap.title}</h4>
-                  <p className="mt-0.5 text-xs text-muted-foreground">{gap.detail}</p>
-                  <ResourceLinks skill={gap.title} />
-                  <GapGrowth gapTitle={gap.title} gapDetail={gap.detail} />
-                </article>
-              ))}
-            </div>
-          )}
-        </Panel>
+          <Panel title="Smaller steps: close one gap" count={gapList.length}>
+            {gapList.length === 0 ? (
+              <Empty>
+                {report
+                  ? "No other open gaps in your latest report."
+                  : "Generate a career report to see the gaps it names."}
+              </Empty>
+            ) : (
+              <div className="space-y-2">
+                {gapList.map((gap) => (
+                  <article key={gap.title} className="rounded-xl border border-border/60 p-3">
+                    <h4 className="text-sm font-medium">{gap.title}</h4>
+                    <p className="mt-0.5 text-xs text-muted-foreground">{gap.detail}</p>
+                    <ResourceLinks skill={gap.title} />
+                    <GapGrowth gapTitle={gap.title} gapDetail={gap.detail} />
+                  </article>
+                ))}
+              </div>
+            )}
+          </Panel>
 
-        <Panel title="Finished" count={browse.finished.length}>
-          {browse.finished.length === 0 ? (
-            <Empty>Finished projects and courses land here, and on your career record.</Empty>
-          ) : (
-            <ul className="space-y-1 text-sm">
-              {browse.finished.map((title) => (
-                <li key={title} className="text-muted-foreground">
-                  {title}
-                </li>
-              ))}
-            </ul>
-          )}
-          {browse.finished.length > 0 ? (
-            <p className="mt-3 text-xs text-muted-foreground">
-              Three or four strong projects, each with a README, a short walkthrough and a few
-              posts, do more than twenty quiet ones. Package each from its finish review.
-            </p>
-          ) : null}
-          <nav
-            aria-label="More in Learning"
-            className="mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t border-border/60 pt-3 text-xs"
-          >
-            <Link
-              href="/dashboard/learning/projects"
-              className="text-muted-foreground hover:text-foreground"
+          <Panel title="Finished" count={browse.finished.length}>
+            {browse.finished.length === 0 ? (
+              <Empty>Finished projects and courses land here, and on your career record.</Empty>
+            ) : (
+              <ul className="space-y-1 text-sm">
+                {browse.finished.map((title) => (
+                  <li key={title} className="text-muted-foreground">
+                    {title}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {browse.finished.length > 0 ? (
+              <p className="mt-3 text-xs text-muted-foreground">
+                Three or four strong projects, each with a README, a short walkthrough and a few
+                posts, do more than twenty quiet ones. Package each from its finish review.
+              </p>
+            ) : null}
+            <nav
+              aria-label="More in Learning"
+              className="mt-4 flex flex-wrap gap-x-4 gap-y-1 border-t border-border/60 pt-3 text-xs"
             >
-              All projects
-            </Link>
-            <Link
-              href="/dashboard/learning/machines"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Machines
-            </Link>
-            <Link
-              href="/dashboard/learning/activity"
-              className="text-muted-foreground hover:text-foreground"
-            >
-              Activity
-            </Link>
-          </nav>
-        </Panel>
+              <Link
+                href="/dashboard/learning/projects"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                All projects
+              </Link>
+              <Link
+                href="/dashboard/learning/machines"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Machines
+              </Link>
+              <Link
+                href="/dashboard/learning/activity"
+                className="text-muted-foreground hover:text-foreground"
+              >
+                Activity
+              </Link>
+            </nav>
+          </Panel>
         </div>
       </details>
 
@@ -236,7 +251,9 @@ export function LearningShell({
         <summary className="cursor-pointer list-none py-4 marker:hidden">
           <SectionHeading icon={Map} eyebrow="Longer plan" title="Where this leads" />
         </summary>
-        <div className="border-t border-border py-5"><CareerBlueprint role={role} /></div>
+        <div className="border-t border-border py-5">
+          <CareerBlueprint role={role} />
+        </div>
       </details>
     </div>
   );

@@ -118,7 +118,7 @@ function RunCard({
           {run.labLabel ? `${run.labLabel} lab` : "No lab needed"}
         </span>
       </div>
-      <p className="mt-1 truncate text-sm text-muted-foreground">
+      <p className="mt-1 break-words text-sm leading-6 text-muted-foreground">
         {next ? `Step ${next.ordinal} of ${run.steps.length}: ${next.title}` : "Completed"}
       </p>
       <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-border/70" aria-hidden="true">

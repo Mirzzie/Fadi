@@ -113,18 +113,17 @@ export default async function JobsPage({
 
   return (
     <AppShell>
-      <div className="mx-auto mb-8 max-w-6xl border-b border-border/70 pb-7 pt-3">
+      <div className="workspace-page mb-6 pt-2">
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
           Opportunities
         </p>
-        <h1 className="max-w-4xl text-4xl font-semibold tracking-[-0.045em] md:text-5xl">
-          Find work worth pursuing.
+        <h1 className="max-w-4xl font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
+          Find your next role
         </h1>
-        <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
-          Search the live market in plain language. Fadi ranks what comes back against the evidence
-          already in your career record.
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+          Search by role, place or work mode. Compare listings with your career record.
         </p>
-        <div className="mt-7 space-y-3">
+        <div className="mt-6 space-y-3 border-y border-border bg-card py-4">
           <UnifiedJobSearch
             activeRole={profile?.targetRole ?? null}
             selectedCountry={worldwide ? "any" : (getCountry(country)?.code ?? null)}

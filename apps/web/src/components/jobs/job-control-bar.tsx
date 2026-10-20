@@ -6,6 +6,9 @@ import { Check, Moon, Radio } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { saveJobPreferences } from "@/app/dashboard/jobs/actions";
 import type { JobSourceHealth } from "@/lib/data-sources/service";
+import { boardCount } from "@/lib/data-sources/board-count";
+
+export { boardCount } from "@/lib/data-sources/board-count";
 
 // One slim control strip that replaces the two heavy "Background job search" and "Live job
 // sources" cards. The search bar above is the primary action and the board below is the
@@ -55,29 +58,7 @@ const LABEL: Record<Health, string> = {
   "no-coverage": "doesn't cover this country",
 };
 
-/**
- * What to say about one source, in the order a person cares about it: what it put on your
- * board, then what it returned, then how it went.
- *
- * "Returning jobs" was the old line, and it was the wrong fact. A source can answer with two
- * hundred postings and put none in front of you — Arbeitnow did exactly that for months before
- * it was retired — and a row of green dots said everything was fine.
- */
-/**
- * Postings a source put on the board.
- *
- * Not a plain lookup: the scraper registers as `fadi-scraper` but stamps every posting with the
- * board it came from (`fadi-scraper:indeed`), so an exact match reported zero for the single
- * source that has produced more than half of everything this person could apply to.
- */
-export function boardCount(id: string, onBoard: Record<string, number>): number {
-  let total = 0;
-  for (const [source, count] of Object.entries(onBoard)) {
-    if (source === id || source.startsWith(`${id}:`)) total += count;
-  }
-  return total;
-}
-
+/** Say what made it onto the board before describing pre-filter source responses. */
 function sourceLine(source: JobSourceHealth, onBoard: number, health: Health): string {
   if (!source.configured || health === "no-coverage") return LABEL[health];
   const parts: string[] = [];

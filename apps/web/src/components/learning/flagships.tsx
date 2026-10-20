@@ -24,6 +24,7 @@ export function FlagshipProjects({
   ideas = [],
   refreshedAt,
   underWay,
+  secondary = false,
 }: {
   flagships: Flagship[];
   /** New ideas from research and earlier ones — kept, never dropped. */
@@ -31,6 +32,8 @@ export function FlagshipProjects({
   refreshedAt: string | null;
   /** Titles already committed to, so they read as under way rather than offered again. */
   underWay: string[];
+  /** Continuing existing work stays the primary action on Learning. */
+  secondary?: boolean;
 }) {
   const router = useRouter();
   const [busy, start] = useTransition();
@@ -68,12 +71,11 @@ export function FlagshipProjects({
   if (flagships.length === 0) {
     return (
       <div className="border-y border-dashed border-border bg-card/40 p-5">
-        <p className="text-sm text-muted-foreground">
-          Two or three substantial projects, each answering a problem organisations are dealing with
-          right now — researched from this month&apos;s news and matched to your record and the
-          roles you are pursuing.
+        <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
+          Find project ideas based on your career record and recent research. Review the sources
+          and scope before choosing one.
         </p>
-        <Button className="mt-3" size="sm" disabled={busy} onClick={refresh}>
+        <Button className="mt-3" variant={secondary ? "outline" : "default"} size="sm" disabled={busy} onClick={refresh}>
           {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
           {busy ? "Researching…" : "Find my flagship projects"}
         </Button>

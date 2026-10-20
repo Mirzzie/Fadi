@@ -3,9 +3,15 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { areaFor, DESTINATIONS, destinationFor } from "./navigation";
 
 /**
@@ -21,23 +27,6 @@ export function Dock() {
   const active = destinationFor(pathname);
   const activeArea = areaFor(pathname);
   const [hidden, setHidden] = useState(false);
-  const [sectionsOpen, setSectionsOpen] = useState(false);
-  const dockRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function closeSections(event: MouseEvent) {
-      if (!dockRef.current?.contains(event.target as Node)) setSectionsOpen(false);
-    }
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setSectionsOpen(false);
-    }
-    document.addEventListener("pointerdown", closeSections);
-    document.addEventListener("keydown", closeOnEscape);
-    return () => {
-      document.removeEventListener("pointerdown", closeSections);
-      document.removeEventListener("keydown", closeOnEscape);
-    };
-  }, []);
 
   if (hidden) {
     return (
@@ -55,7 +44,7 @@ export function Dock() {
   }
 
   return (
-    <div ref={dockRef} className="pointer-events-none fixed inset-x-0 bottom-3 z-40 flex justify-center px-3">
+    <div className="pointer-events-none fixed inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 flex justify-center px-2 sm:px-3">
       <nav
         aria-label="Sections"
         className="pointer-events-auto flex w-full max-w-xl items-stretch justify-around rounded-xl border border-border bg-background/95 p-1.5 shadow-[0_18px_50px_-24px_rgb(0_0_0/0.55)] backdrop-blur-xl duration-300 animate-in fade-in slide-in-from-bottom-2"
@@ -64,53 +53,45 @@ export function Dock() {
           const isActive = active?.href === destination.href;
           if (isActive) {
             return (
-              <div key={destination.href} className="relative flex min-w-0 flex-1">
-                {sectionsOpen ? (
-                  <div
-                    role="menu"
-                    aria-label={`${active.label} views`}
-                    className="pointer-events-auto absolute bottom-[calc(100%+0.65rem)] left-1/2 flex w-52 -translate-x-1/2 flex-col gap-1 rounded-lg border border-border bg-background/98 p-1.5 shadow-xl backdrop-blur-xl"
-                  >
-                    {active.areas.map((area) => {
-                      const current = activeArea?.href === area.href;
-                      return (
-                        <Link
-                          key={area.href}
-                          href={area.href}
-                          role="menuitem"
-                          onClick={() => setSectionsOpen(false)}
-                          aria-current={current ? "page" : undefined}
-                          className={cn(
-                            "rounded-md px-3 py-2 text-xs transition-colors",
-                            current
-                              ? "bg-muted font-medium text-foreground"
-                              : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                          )}
-                        >
-                          {area.label}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => setSectionsOpen((open) => !open)}
-                  aria-expanded={sectionsOpen}
-                  aria-haspopup="menu"
+              <DropdownMenu key={`${destination.href}:${pathname}`} modal={false}>
+                <DropdownMenuTrigger
                   aria-label={`${destination.label} — choose a view`}
-                  className="flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md border border-border bg-muted px-2 py-2 text-center text-foreground transition-colors hover:bg-muted/80 sm:gap-2 sm:px-4"
+                  className="group flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-md border border-border bg-muted px-1 py-2 text-foreground outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring sm:flex-row sm:gap-2 sm:px-3"
                 >
-                  <destination.icon className="size-4 shrink-0 text-primary" aria-hidden="true" />
-                  <span className="hidden text-xs font-medium whitespace-nowrap min-[420px]:inline">
-                    {destination.label}
-                  </span>
+                  <destination.icon className="size-4 shrink-0" aria-hidden="true" />
+                  <span className="text-[10px] font-medium sm:text-xs">{destination.label}</span>
                   <ChevronUp
-                    className={cn("size-3 shrink-0 transition-transform", sectionsOpen && "rotate-180")}
+                    className="hidden size-3 shrink-0 group-data-popup-open:rotate-180 sm:block"
                     aria-hidden="true"
                   />
-                </button>
-              </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  side="top"
+                  align="center"
+                  sideOffset={10}
+                  aria-label={`${active.label} views`}
+                  className="w-52 max-w-[calc(100vw-1rem)]"
+                >
+                  {active.areas.map((area) => {
+                    const current = activeArea?.href === area.href;
+                    return (
+                      <DropdownMenuItem
+                        key={area.href}
+                        render={<Link href={area.href} />}
+                        aria-current={current ? "page" : undefined}
+                        className={cn(
+                          "min-h-10 rounded-md px-3 py-2 text-sm transition-colors",
+                          current
+                            ? "bg-muted font-medium text-foreground"
+                            : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                        )}
+                      >
+                        {area.label}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
             );
           }
           return (
@@ -118,14 +99,12 @@ export function Dock() {
               key={destination.href}
               href={destination.href}
               className={cn(
-                "flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-2 text-center transition-colors sm:gap-2 sm:px-4",
+                "flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-md border border-transparent px-1 py-2 text-center outline-offset-2 focus-visible:outline-2 focus-visible:outline-ring transition-colors sm:flex-row sm:gap-2 sm:px-3",
                 "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
               )}
             >
               <destination.icon className="size-4 shrink-0" aria-hidden="true" />
-              <span className="hidden text-xs font-medium whitespace-nowrap min-[420px]:inline">
-                {destination.label}
-              </span>
+              <span className="text-[10px] font-medium sm:text-xs">{destination.label}</span>
             </Link>
           );
         })}
