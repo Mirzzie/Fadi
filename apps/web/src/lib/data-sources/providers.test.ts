@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { BlsSource, snapshotToSignal } from "./providers/bls";
 import { LightcastSkillsSource, skillsToSignal } from "./providers/lightcast";
+import { boardCount } from "./board-count";
 
 describe("BLS labor provider", () => {
   it("is keyless (always configured) and labor-market capable", () => {
@@ -118,12 +119,12 @@ describe("the source registry", () => {
  * that produced more than half of this person's usable postings.
  */
 describe("counting what a source put on the board", () => {
-  it("counts postings stamped with a source's sub-board", async () => {
-    const { boardCount } = await import("@/components/jobs/job-control-bar");
+  it("counts postings stamped with a source's sub-board", () => {
     const board = { "fadi-scraper:indeed": 12, "fadi-scraper:totaljobs": 3, jooble: 4 };
 
     expect(boardCount("fadi-scraper", board)).toBe(15);
     expect(boardCount("jooble", board)).toBe(4);
     expect(boardCount("reed", board)).toBe(0);
+    expect(boardCount("fadi", board)).toBe(0);
   });
 });
