@@ -183,6 +183,14 @@
 }
 
 @layer utilities {
+  /* Working pages use available desktop space; prose keeps its own shorter measure. */
+  .workspace-page {
+    width: 100%;
+    max-width: 90rem;
+    margin-inline: auto;
+    padding-inline: clamp(0rem, calc((100vw - 48rem) / 24), 2rem);
+  }
+
   .fadi-glow {
     box-shadow: 0 0 0 1px color-mix(in oklab, var(--primary) 25%, transparent), 0 0 24px color-mix(in oklab, var(--primary) 12%, transparent);
   }

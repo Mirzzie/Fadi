@@ -36,6 +36,7 @@ export function UnifiedJobSearch({
   const router = useRouter();
   const [prompt, setPrompt] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
 
   // Single source of truth: worldwide is simply "the active country is Any". No separate toggle
@@ -64,22 +65,30 @@ export function UnifiedJobSearch({
   }
 
   function run() {
-    if (!prompt.trim()) return;
+    if (!prompt.trim() || pending) return;
+    setError(null);
     start(async () => {
-      const r = await resolveSearch(prompt);
-      // Typing a place overrides worldwide; typing none keeps the current scope. The WORDS are
-      // carried too — the board filters on them, instead of quietly searching the direction.
-      push({
-        country: r.country ?? (worldwide ? "any" : selectedCountry),
-        city: r.city ?? (r.country ? null : selectedCity),
-        modes: r.remote ? Array.from(new Set([...selectedModes, "remote" as WorkMode])) : selectedModes,
-        keywords: r.keywords,
-      });
+      try {
+        const r = await resolveSearch(prompt.trim());
+        // Typing a place overrides worldwide; typing none keeps the current scope. The WORDS are
+        // carried too — the board filters on them, instead of quietly searching the direction.
+        push({
+          country: r.country ?? (worldwide ? "any" : selectedCountry),
+          city: r.city ?? (r.country ? null : selectedCity),
+          modes: r.remote
+            ? Array.from(new Set([...selectedModes, "remote" as WorkMode]))
+            : selectedModes,
+          keywords: r.keywords,
+        });
+      } catch {
+        setError("Search couldn’t complete. Your text is still here; try again.");
+      }
     });
   }
 
   function toggleWorldwide() {
-    if (worldwide) push({ country: null, city: null }); // back to a located search
+    if (worldwide)
+      push({ country: null, city: null }); // back to a located search
     else push({ country: "any", city: null }); // go global
   }
 
@@ -94,14 +103,9 @@ export function UnifiedJobSearch({
           </span>
         ) : null}
       </div>
-      <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
-        Say where and how you want to work — Fadi pulls it fresh and matches it to your direction.
-        e.g. &ldquo;graduate IT support in Dublin, remote&rdquo;.
-      </p>
-
-      <div className="mt-5 flex min-w-0 flex-col gap-2 border-b-2 border-foreground pb-2 sm:flex-row">
+      <div className="mt-3 flex min-w-0 flex-col gap-2 rounded-md border border-input bg-background p-2 sm:flex-row">
         <Input
-          className="h-12 min-w-0 border-0 bg-transparent px-0 text-base shadow-none focus-visible:ring-0"
+          className="h-11 min-w-0 border-0 bg-transparent px-2 text-base shadow-none focus-visible:ring-2"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={(e) => {
@@ -110,11 +114,20 @@ export function UnifiedJobSearch({
           placeholder="e.g. graduate IT support in Dublin, remote"
           aria-label="Search jobs in plain language"
         />
-        <Button className="h-11 w-full rounded-md px-5 sm:w-auto" onClick={run} disabled={pending || !prompt.trim()}>
+        <Button
+          className="h-11 w-full rounded-md px-5 sm:w-auto"
+          onClick={run}
+          disabled={pending || !prompt.trim()}
+        >
           {pending ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
           {pending ? "Searching…" : "Search"}
         </Button>
       </div>
+      {error ? (
+        <p role="alert" className="mt-2 text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
 
       {selectedKeywords.length > 0 ? (
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
@@ -136,7 +149,12 @@ export function UnifiedJobSearch({
 
       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
         <label className="flex cursor-pointer items-center gap-2">
-          <input type="checkbox" checked={worldwide} onChange={toggleWorldwide} className="size-3.5 accent-primary" />
+          <input
+            type="checkbox"
+            checked={worldwide}
+            onChange={toggleWorldwide}
+            className="size-3.5 accent-primary"
+          />
           <Globe className="size-3.5" aria-hidden="true" />
           Search worldwide
         </label>

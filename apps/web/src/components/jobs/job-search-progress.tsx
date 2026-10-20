@@ -79,8 +79,8 @@ export function JobSearchProgress({ status }: { status: SyncProgress | null }) {
         running
           ? "border-primary/30 bg-primary/5 text-foreground"
           : failed || partial
-            ? "border-amber-500/30 bg-amber-500/5 text-amber-50"
-            : "border-emerald-500/30 bg-emerald-500/5 text-emerald-50"
+            ? "border-amber-500/30 bg-amber-500/5 text-amber-800 dark:text-amber-200"
+            : "border-emerald-500/30 bg-emerald-500/5 text-emerald-800 dark:text-emerald-200"
       }`}
     >
       <div className="flex items-center gap-2.5">
