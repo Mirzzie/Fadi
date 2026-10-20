@@ -119,7 +119,20 @@ export const rubricScoresSchema = z.object({
 
 export type RubricScores = z.infer<typeof rubricScoresSchema>;
 
-const normalise = (text: string) => text.replace(/\s+/g, " ").trim().toLowerCase();
+/**
+ * For comparing a model's quote with the submission. Typographic dashes and quotes count as their
+ * plain forms: models retype "Week 1–2" as "Week 1-2", and Groq's quote of a good plan was refused
+ * for exactly that (20 Oct 2026). The words must still be the person's own.
+ */
+const normalise = (text: string) =>
+  text
+    .replace(/[\u2010-\u2015\u2212]/g, "-")
+    .replace(/[\u2018\u2019\u201A\u2032]/g, "'")
+    .replace(/[\u201C\u201D\u201E\u2033]/g, '"')
+    .replace(/\u2026/g, "...")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
 
 /** Fail closed when assessed text tries to control the assessor rather than answer the task. */
 export function containsRubricGaming(text: string): boolean {
