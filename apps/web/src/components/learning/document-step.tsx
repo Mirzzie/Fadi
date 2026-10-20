@@ -157,7 +157,9 @@ export function DocumentStep({
       {brief ? <CaseView brief={brief} /> : null}
 
       {fields.length ? (
-        <fieldset className="mt-4 grid gap-3 sm:grid-cols-3">
+        <fieldset
+          className={`mt-4 grid gap-3 ${fields.length % 2 === 0 ? "sm:grid-cols-2" : "sm:grid-cols-3"}`}
+        >
           <legend className="mb-1 text-sm font-medium">Your calls</legend>
           {fields.map((field) => (
             <label key={field.id} className="block text-xs text-muted-foreground">
@@ -275,25 +277,34 @@ function CaseView({ brief }: { brief: string }) {
   );
 }
 
-/** Every column visible: cells wrap rather than run off the card (no clipped "Exec sponsor"). */
+/**
+ * Every column visible. A short table (accounts) wraps its cells rather than running off the card
+ * (no clipped "Exec sponsor"). A long one is a log: one line per entry, monospaced, scrolling
+ * sideways inside its own box, because a log you can't scan line by line can't be read (the
+ * sign-in log wrapped every cell onto 2–4 lines, 20 Oct 2026).
+ */
 function CaseTable({ rows }: { rows: string[][] }) {
   const [head, ...body] = rows;
   if (!head) return null;
+  const isLog = body.length > 12;
   return (
     <div className="overflow-x-auto">
-      <table className="w-full table-auto text-left text-xs">
+      <table
+        className={`w-full table-auto text-left text-xs ${isLog ? "whitespace-nowrap font-mono tabular-nums" : ""}`}
+      >
         <thead>
           <tr>
-            {head.map((cell) => (
-              <th key={cell} className="px-2 py-1 align-bottom font-medium">
+            {head.map((cell, index) => (
+              <th key={index} className="px-2 py-1 align-bottom font-medium">
                 {cell}
               </th>
             ))}
           </tr>
         </thead>
         <tbody>
-          {body.map((row) => (
-            <tr key={row[0]} className="border-t border-border/50 align-top">
+          {/* By position: a log's first cell (a time) repeats, so it can't be the key. */}
+          {body.map((row, rowIndex) => (
+            <tr key={rowIndex} className="border-t border-border/50 align-top">
               {row.map((cell, index) => (
                 <td
                   key={index}
