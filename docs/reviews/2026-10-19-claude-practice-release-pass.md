@@ -207,3 +207,78 @@ is satisfied/met. Ordinary text still passes ("a note to the VP", "Success crite
 1. Repeated-run release rule (above).
 2. The owner's Groq measurement, if they agree.
 3. Then the IT ops / security pack (e.g. Wazuh alert triage).
+
+---
+
+# Part 3 (20 Oct): Fadi checks a person's model before it marks their writing
+
+This closes the last churn-review item: "measure the person's configured model before relying on
+it; if it isn't fit, say so plainly instead of issuing 'not yet's it can't justify."
+
+## The rule
+
+`runRubricEvalRepeated`: **every one of 3 runs** must meet the release rule (no false pass, no
+error, ≥ 80% of good answers credited, ≥ 80% agreement). It stops at the first failing run. Why
+three: gemma3:4b credited 80% of good answers on one run and 60% on the next.
+
+## In the product
+
+- **Recorded per model:** `practice_grader_checks` (migration **0071**) keeps each check per
+  person, provider, model and rubric-eval version. A check never carries over to another model
+  or a new evaluation set. `DocGenerate` gains an optional `identity {provider, model}`, which
+  `getUserDocGenerate` fills in.
+- **Enforced in the service:** `submitForReview` refuses model-reviewed steps (`graderCheck: true`)
+  unless the current model's latest check passed. It checks *before* anything is stored, so an
+  unchecked model costs the person no attempt.
+- **Run only by the person** ("Check my AI model"; the button says it sends up to 45 requests on
+  their allowance):
+  - **metering:** the check is metered as a whole, at most **3 a day**
+    (`getUserDocGenerate(…, { meteredByCaller: true })`). Charging each call against the 60/hour
+    runaway guard would spend the hour on one check and turn the next check's refusals into a
+    false "unfit";
+  - **retries:** a review that fails is retried once, as a person resubmitting would;
+  - **errors:** a check with any remaining provider errors **records nothing**, because a refused
+    call says nothing about whether the model marks fairly.
+- **No re-rolls:** a failed model gets no "Check again". Re-rolling an inconsistent marker until
+  one check passes is what the three runs prevent. Switching model makes the new one unchecked.
+- **Old runs:** a run from an earlier pack version (the owner had a 0.1.0 run open) now gets "made
+  with an earlier version → Start the project over" instead of "That step isn't part of a work
+  simulation".
+
+## Seen in a signed-in browser (gemma3:4b, local)
+
+- **Start page before the check:** an explanation plus **Check my AI model**, with no Start
+  button.
+- **First click:** one review in 45 failed (no usable answer); the check recorded nothing. That
+  led to the single retry.
+- **Second click:** 45 reviews over ~12 minutes (the full test suite was running at the same
+  time; 4.4 min without it). Runs 1 and 2 passed; run 3 credited 60% of good answers, so the
+  model was recorded **unfit**. The page says: "gemma3:4b (ollama) didn't pass Fadi's marking
+  check: It credited only 60% of answers that deserve to pass, so it would hold back good work."
+  Its one action is **Open AI settings**.
+
+**Consequence:** on a 4B local model, Fadi won't review writing. The owner needs a stronger model;
+Groq's free `gpt-oss-120b` is still unmeasured, and the owner can now check it from the page
+themselves.
+
+## Surface delta
+
+- Start page: **Check my AI model** replaces Start until the model passes; a failed model gets
+  Open AI settings instead. One action per state; when fit, a single line names the reviewing
+  model.
+- Document step: a refused submission shows the same check in place of the error, and Submit is
+  disabled while it shows.
+- Primary actions per state: 1.
+
+## Verified
+
+- Practice unit tests: 70.
+- Against PostgreSQL **14/14**: refusal without a passed check (nothing stored), and the
+  old-version message.
+- **Full web suite 1,784 passed, 202 skipped**; typecheck 0; changed-file lint 0.
+- One run of `data-sources/providers.test.ts` (Codex's) failed under load, during the local model
+  check. It passes alone, with and without these changes, so it's timing-dependent; worth a look.
+
+**For Codex:** migrations **0070 and 0071** are on this branch and applied to the dev DB, so your
+next is 0072. `getUserDocGenerate` gained an optional second argument; existing callers are
+unchanged.

@@ -7,6 +7,7 @@ import { MAX_SUBMISSION_CHARS } from "@careeros/database";
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import type { DocumentStepState, SubmitResult } from "@/lib/practice/document-sim";
+import type { CheckResult, GraderStatus } from "@/lib/practice/grader-check";
 
 /**
  * Work simulations (Practice packs): start one, hand in a step, read a step's state. Each checks
@@ -97,4 +98,21 @@ export async function restartPracticeActivityAction(input: {
   const result = await restartPracticeActivity(user.id, input);
   if (result.ok) revalidatePath("/dashboard/learning");
   return result;
+}
+
+/** Run the marking check on the person's current model. They asked: it spends their allowance. */
+export async function checkGraderAction(): Promise<CheckResult> {
+  const user = await getCurrentAuthUser();
+  if (!user) return { ok: false, message: "Please sign in again." };
+  const { checkGrader } = await import("@/lib/practice/grader-check");
+  const result = await checkGrader(user.id);
+  revalidatePath("/dashboard/learning");
+  return result;
+}
+
+export async function graderStatusAction(): Promise<GraderStatus | null> {
+  const user = await getCurrentAuthUser();
+  if (!user) return null;
+  const { graderStatus } = await import("@/lib/practice/grader-check");
+  return graderStatus(user.id);
 }

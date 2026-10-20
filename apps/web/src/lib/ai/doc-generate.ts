@@ -20,4 +20,7 @@ export interface DocGenerate {
     options?: { maxTokens?: number }
   ): Promise<T>;
   text(system: string, user: string): Promise<string>;
+  /** Which provider and model answer — so a judgement about the model (e.g. "fit to mark") is
+   * tied to that model and never carries over to another one. Absent for test doubles. */
+  identity?: { provider: string; model: string };
 }

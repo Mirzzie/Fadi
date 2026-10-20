@@ -206,6 +206,25 @@ async function contextFor(
   };
 }
 
+/**
+ * Why a step can't be handed in, in the person's terms. A run made with an earlier version of the
+ * activity can't be reviewed by this one (its criteria changed); starting over gives a new case
+ * under the same commitment. (The owner had a 0.1.0 run open when 0.2.0 landed, 20 Oct 2026.)
+ */
+async function whyNoContext(userId: string, runId: string): Promise<string> {
+  const project = await createProjectRunsRepository(getDatabase()).getWithSteps(userId, runId);
+  const practice = project?.run.practice;
+  if (
+    practice &&
+    project.run.status === "running" &&
+    !activityRuntime(practice.packId, practice.activityId, practice.packVersion) &&
+    activityRuntime(practice.packId, practice.activityId)
+  ) {
+    return "This simulation was made with an earlier version of the activity, and its review has changed since. Open All steps → Start the project over for a new case.";
+  }
+  return "That step isn't part of a work simulation.";
+}
+
 /** The decisions this step asks for, from the run's own case. */
 function choiceFields(context: RunContext): ChoiceField[] {
   const assets = context.runtime.assets[context.packStepId];
@@ -223,14 +242,17 @@ export type ReviewView = {
   receiptId: string;
 };
 
-export type SubmitResult = { ok: true; review: ReviewView } | { ok: false; message: string };
+export type SubmitResult =
+  | { ok: true; review: ReviewView }
+  /** `graderCheck`: the person's model hasn't passed the marking check — offer it in place. */
+  | { ok: false; message: string; graderCheck?: true };
 
 export async function submitForReview(
   userId: string,
   input: { runId: string; stepId: string; body: string; choices?: Record<string, string> }
 ): Promise<SubmitResult> {
   const context = await contextFor(userId, input.runId, input.stepId);
-  if (!context) return { ok: false, message: "That step isn't part of a work simulation." };
+  if (!context) return { ok: false, message: await whyNoContext(userId, input.runId) };
   const assets = context.runtime.assets[context.packStepId];
   if (!assets) return { ok: false, message: "This step has no review criteria." };
 
@@ -267,6 +289,21 @@ export async function submitForReview(
       message:
         "Fadi needs an AI provider to review your work — add one in Settings → AI. Nothing was submitted.",
     };
+  }
+
+  // Writing is reviewed only by a model that has shown it marks fairly (rubric-eval). Checked
+  // before anything is kept, so an unchecked model costs the person no attempt.
+  const needsModel = assets.criteria.some((c) => c.kind === "quality");
+  if (needsModel) {
+    const { isFitToMark } = await import("./grader-check");
+    if (!(await isFitToMark(userId, generate.identity))) {
+      return {
+        ok: false,
+        graderCheck: true,
+        message:
+          "Before Fadi reviews your writing, your AI model needs to pass its marking check. Nothing was submitted.",
+      };
+    }
   }
 
   // A provider failure leaves an immutable, unreviewed attempt. Retrying unchanged work reviews

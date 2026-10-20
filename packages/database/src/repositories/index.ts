@@ -25,6 +25,7 @@ export * from "./mcp-connections.repository";
 export * from "./mcp-tokens.repository";
 export * from "./portfolio.repository";
 export * from "./practice-receipts.repository";
+export * from "./practice-grader-checks.repository";
 export * from "./practice-submissions.repository";
 export * from "./product-events.repository";
 export * from "./profiles.repository";

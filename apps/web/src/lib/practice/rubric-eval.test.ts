@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 
-import { churnBrief, CHURN_REVIEW_ASSETS, CUSTOMER_SUCCESS_PACK } from "./packs/customer-success";
+import { CHURN_REVIEW_ASSETS } from "./packs/customer-success";
+import { reviewSubmission } from "./rubric";
 import {
-  reviewSubmission,
-  rubricPrompt,
-  rubricScoresSchema,
-  type QualityCriterion,
-} from "./rubric";
-import { EVAL_SEED, evalCases, runRubricEval, type GradeFn } from "./rubric-eval";
+  EVAL_SEED,
+  evalCases,
+  graderShortfall,
+  runRubricEval,
+  runRubricEvalRepeated,
+  type GradeFn,
+} from "./rubric-eval";
 import { churnCase } from "./sim/churn-case";
 
 describe("the grader evaluation set (rubric-eval v2)", () => {
@@ -86,43 +88,44 @@ const LIVE_USER = process.env.FADI_RUBRIC_EVAL_USER;
 (LIVE_USER ? describe : describe.skip)("live grader evaluation", () => {
   it("measures the configured model through the full review path", async () => {
     const { getUserDocGenerate } = await import("@/lib/ai/user-generate");
-    const generate = (await getUserDocGenerate(LIVE_USER!))!;
-    const c = churnCase(EVAL_SEED);
-    const brief = churnBrief(c);
-    const steps = CUSTOMER_SUCCESS_PACK.activities[0]!.steps;
-    const grade: GradeFn = async ({ step, submission, choices }) => {
-      const assets = CHURN_REVIEW_ASSETS[step]!;
-      const criteria = assets.criteria;
-      const fields = assets.choices?.(c) ?? [];
-      const quality = criteria.filter((k): k is QualityCriterion => k.kind === "quality");
-      try {
-        const prompt = rubricPrompt({
-          brief,
-          // The step's real instruction, as the product sends it (v1 sent the step id).
-          task: steps.find((s) => s.id === step)!.instruction,
-          criteria: quality,
-          submission,
-          choices: fields.map((f) => ({ label: f.label, value: choices[f.id]! })),
-        });
-        const scores = await generate.structured(
-          prompt.system,
-          prompt.user,
-          rubricScoresSchema,
-          "rubric_review",
-          {
-            maxTokens: 1500,
-          }
-        );
-        return reviewSubmission(criteria, { text: submission, choices }, c, scores).verdict;
-      } catch {
-        return "error";
-      }
-    };
-    const report = await runRubricEval(grade);
+    const { graderFor, GRADER_REPEATS } = await import("./grader-check");
+    // The product's own check: the same review path, the same repeats.
+    const generate = (await getUserDocGenerate(LIVE_USER!, { meteredByCaller: true }))!;
+    const report = await runRubricEvalRepeated(graderFor(generate), GRADER_REPEATS);
     const { writeFileSync } = await import("node:fs");
     if (process.env.FADI_RUBRIC_EVAL_OUT) {
       writeFileSync(process.env.FADI_RUBRIC_EVAL_OUT, JSON.stringify(report, null, 2));
     }
-    expect(report.cases).toBe(evalCases().length);
+    expect(report.runs.length).toBeGreaterThan(0);
   }, 900_000);
+});
+
+describe("a marker is trusted only when every repeated run meets the rule", () => {
+  const byId = new Map(evalCases().map((c) => [c.id, c.expect]));
+  const perfect: GradeFn = async ({ caseId }) => byId.get(caseId)!;
+
+  it("three perfect runs: releasable", async () => {
+    const report = await runRubricEvalRepeated(perfect, 3);
+    expect(report.runs).toHaveLength(3);
+    expect(report.releasable).toBe(true);
+    expect(graderShortfall(report)).toBeNull();
+  });
+
+  it("stops at the first failing run, and says why in plain words", async () => {
+    let run = 0;
+    const flaky: GradeFn = async (input) => {
+      if (input.caseId === evalCases()[0]!.id) run += 1;
+      // The second run holds back every good answer.
+      return run === 2 && byId.get(input.caseId) === "pass" ? "fail" : perfect(input);
+    };
+    const report = await runRubricEvalRepeated(flaky, 3);
+    expect(report.runs).toHaveLength(2);
+    expect(report.releasable).toBe(false);
+    expect(graderShortfall(report)).toMatch(/credited only 0%/);
+  });
+
+  it("names a false pass before anything else", async () => {
+    const lenient: GradeFn = async () => "pass";
+    expect(graderShortfall(await runRubricEvalRepeated(lenient, 3))).toMatch(/should not pass/);
+  });
 });

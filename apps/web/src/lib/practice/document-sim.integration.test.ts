@@ -13,6 +13,7 @@ const holder = vi.hoisted(() => ({ db: null as unknown, failReviews: 0 }));
 vi.mock("@/lib/database/client", () => ({ getDatabase: () => holder.db }));
 vi.mock("@/lib/ai/user-generate", () => ({
   getUserDocGenerate: async () => ({
+    identity: { provider: "test", model: "fair-reviewer" },
     // A fair reviewer: every quality criterion "meets", quoting the first 40 characters written.
     structured: async (_system: string, user: string) => {
       if (holder.failReviews > 0) {
@@ -56,7 +57,22 @@ suite("a document work simulation, end to end", () => {
       ).rows[0].id as string;
     userId = await user("sim");
     strangerId = await user("sim-other");
+    // The fake reviewer has passed the marking check, for both people — except where a test
+    // removes it to see the refusal.
+    for (const id of [userId, strangerId]) await passCheck(id);
   });
+
+  const passCheck = async (id: string) => {
+    const { createPracticeGraderChecksRepository } = await import("@careeros/database");
+    const { EVAL_VERSION } = await import("./rubric-eval");
+    await createPracticeGraderChecksRepository(holder.db as never).record(id, {
+      provider: "test",
+      model: "fair-reviewer",
+      evalVersion: EVAL_VERSION,
+      releasable: true,
+      report: {},
+    });
+  };
 
   afterAll(async () => {
     if (userId) await pool.query("delete from users where id = any($1)", [[userId, strangerId]]);
@@ -101,6 +117,37 @@ suite("a document work simulation, end to end", () => {
     expect(run.commitmentId).not.toBeNull();
     expect(steps.map((s) => s.place)).toEqual(["document", "document", "document"]);
     expect(run.detail).toContain("| Account |");
+  });
+
+  it("won't review writing with a model that hasn't passed the marking check — and keeps nothing", async () => {
+    const { churnCase } = await import("./sim/churn-case");
+    const { submitForReview } = await import("./document-sim");
+    const { run, steps } = await project();
+    const c = churnCase(run.practice!.seed);
+    await pool.query("delete from practice_grader_checks where user_id = $1", [userId]);
+    const { createPracticeGraderChecksRepository } = await import("@careeros/database");
+    const { EVAL_VERSION } = await import("./rubric-eval");
+    // A failed check counts as no check.
+    await createPracticeGraderChecksRepository(holder.db as never).record(userId, {
+      provider: "test",
+      model: "fair-reviewer",
+      evalVersion: EVAL_VERSION,
+      releasable: false,
+      report: {},
+    });
+    const refused = await submitForReview(userId, {
+      runId,
+      stepId: steps[0]!.id,
+      choices: { "risk-1": c.atRisk[0], "risk-2": c.atRisk[1], "false-alarm": c.decoy },
+      body: "A careful analysis of every account in the table, with figures for each one.",
+    });
+    expect(refused).toMatchObject({ ok: false, graderCheck: true });
+    const count = await pool.query(
+      "select count(*)::int as count from practice_submissions where step_id = $1",
+      [steps[0]!.id]
+    );
+    expect(count.rows[0]).toEqual({ count: 0 });
+    await passCheck(userId);
   });
 
   it("refuses step 1 without its picks, and keeps nothing", async () => {
@@ -366,6 +413,33 @@ suite("a document work simulation, end to end", () => {
     // Closed, so it can't be started over twice.
     expect(await restartPracticeActivity(strangerId, { runId: first.runId })).toMatchObject({
       ok: false,
+    });
+  });
+
+  it("tells someone on a run from an earlier version to start over, instead of a dead end", async () => {
+    const { startPracticeActivity, submitForReview } = await import("./document-sim");
+    const { createProjectRunsRepository } = await import("@careeros/database");
+    const started = await startPracticeActivity(strangerId, {
+      packId: "fadi.customer-success",
+      activityId: "churn-review",
+    });
+    if (!started.ok) throw new Error(started.message);
+    await pool.query(
+      "update project_runs set practice = jsonb_set(practice, '{packVersion}', '\"0.0.1\"') where id = $1",
+      [started.runId]
+    );
+    const old = (await createProjectRunsRepository(holder.db as never).getWithSteps(
+      strangerId,
+      started.runId
+    ))!;
+    const result = await submitForReview(strangerId, {
+      runId: started.runId,
+      stepId: old.steps[0]!.id,
+      body: "Anything at all, long enough to be submitted for a review by Fadi.",
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      message: expect.stringMatching(/Start the project over/),
     });
   });
 });

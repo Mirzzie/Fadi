@@ -217,3 +217,49 @@ export async function runRubricEval(grade: GradeFn, cases = evalCases()): Promis
       agreed / cases.length >= 0.8,
   };
 }
+
+export type RepeatedEvalReport = {
+  version: string;
+  /** Runs made — fewer than asked when one fails, since the verdict is already known. */
+  runs: EvalReport[];
+  repeats: number;
+  /**
+   * Every run must meet the release rule on its own. One passing run proves little: gemma3:4b
+   * credited 80% of good answers on one run and 60% on the next (19 Oct 2026).
+   */
+  releasable: boolean;
+};
+
+export async function runRubricEvalRepeated(
+  grade: GradeFn,
+  repeats = 3,
+  cases = evalCases()
+): Promise<RepeatedEvalReport> {
+  const runs: EvalReport[] = [];
+  for (let i = 0; i < repeats; i++) {
+    const report = await runRubricEval(grade, cases);
+    runs.push(report);
+    if (!report.releasable) break;
+  }
+  return {
+    version: EVAL_VERSION,
+    runs,
+    repeats,
+    releasable: runs.length === repeats && runs.every((r) => r.releasable),
+  };
+}
+
+/** Why a model can't be trusted to mark, in the person's language — the worst reason first. */
+export function graderShortfall(report: RepeatedEvalReport): string | null {
+  if (report.releasable) return null;
+  const last = report.runs[report.runs.length - 1];
+  if (!last) return "It wasn't measured.";
+  if (last.errors.length) {
+    return `It failed to answer ${last.errors.length} of ${last.cases} test reviews.`;
+  }
+  if (last.falsePasses.length) {
+    return `It passed ${last.falsePasses.length === 1 ? "an answer" : `${last.falsePasses.length} answers`} that should not pass — including ones that try to trick the marker.`;
+  }
+  const good = Math.round(last.goodPassRate * 100);
+  return `It credited only ${good}% of answers that deserve to pass, so it would hold back good work.`;
+}

@@ -5,13 +5,16 @@ import { useEffect, useState, useTransition } from "react";
 
 import {
   documentStepStateAction,
+  graderStatusAction,
   revealHintAction,
   submitPracticeWorkAction,
 } from "@/app/dashboard/learning/practice-actions";
+import { GraderCheck } from "@/components/learning/grader-check";
 import type { StepView } from "@/app/dashboard/learning/lab-actions";
 import { StepText } from "@/components/learning/step-text";
 import { Button } from "@/components/ui/button";
 import type { DocumentStepState, ReviewView } from "@/lib/practice/document-sim";
+import type { GraderStatus } from "@/lib/practice/grader-check";
 
 /**
  * A WORK-SIMULATION STEP: the person writes, Fadi reviews it against the step's criteria.
@@ -46,6 +49,8 @@ export function DocumentStep({
   const [choices, setChoices] = useState<Record<string, string>>({});
   const [hints, setHints] = useState<string[]>([]);
   const [hinting, startHint] = useTransition();
+  // Set when a submission was refused because the model hasn't passed the marking check.
+  const [grader, setGrader] = useState<Exclude<GraderStatus, { state: "fit" }> | null>(null);
   const [state, setState] = useState<DocumentStepState | null>(null);
   const [review, setReview] = useState<ReviewView | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -113,7 +118,13 @@ export function DocumentStep({
         body: text,
         choices,
       });
-      if (!result.ok) return setMessage(result.message);
+      if (!result.ok) {
+        if (result.graderCheck) {
+          const status = await graderStatusAction();
+          if (status && status.state !== "fit") return setGrader(status);
+        }
+        return setMessage(result.message);
+      }
       setReview(result.review);
       if (result.review.verdict === "pass") {
         try {
@@ -181,7 +192,10 @@ export function DocumentStep({
         className="mt-1 w-full rounded-md border border-border bg-background p-3 text-sm leading-relaxed"
       />
       <div className="mt-2 flex flex-wrap items-center gap-3">
-        <Button onClick={submit} disabled={submitting || !picked || text.trim().length < 40}>
+        <Button
+          onClick={submit}
+          disabled={submitting || Boolean(grader) || !picked || text.trim().length < 40}
+        >
           {submitting ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
           {submitting ? "Fadi is reviewing…" : tried ? "Submit again" : "Submit for review"}
         </Button>
@@ -203,6 +217,12 @@ export function DocumentStep({
         </p>
       ) : null}
       {message ? <p className="mt-2 text-sm text-destructive">{message}</p> : null}
+      {grader ? (
+        // Takes the place of the refusal: the check, then Submit again (the draft is kept).
+        <div className="mt-3 rounded-lg border border-border/70 p-3">
+          <GraderCheck status={grader} onFit={() => setGrader(null)} />
+        </div>
+      ) : null}
 
       <div aria-live="polite">
         {review ? (

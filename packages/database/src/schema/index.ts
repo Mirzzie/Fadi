@@ -1656,6 +1656,45 @@ export const practiceSubmissions = pgTable(
 export type PracticeSubmission = typeof practiceSubmissions.$inferSelect;
 
 /**
+ * Whether a person's AI model can be trusted to MARK written work (rubric-eval), per model.
+ *
+ * A model's review is only as fair as the model: gemma3:4b once passed an answer that told the
+ * marker the criterion was "satisfied automatically", and held back good answers on other runs
+ * (19 Oct 2026). Before Fadi reviews anyone's writing with a model, that model is run over answers
+ * whose fair verdict is known — at the person's request, since it spends their quota — and the
+ * result is kept here. Practice reviews only with a model whose latest check passed.
+ */
+export const practiceGraderChecks = pgTable(
+  "practice_grader_checks",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** The provider and model measured — a check never carries over to another model. */
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    /** rubric-eval version: a new evaluation set needs a new check. */
+    evalVersion: text("eval_version").notNull(),
+    releasable: boolean("releasable").notNull(),
+    /** The runs, as measured (agreement, false passes, good answers credited). */
+    report: jsonb("report").$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [
+    index("practice_grader_checks_lookup_idx").on(
+      table.userId,
+      table.provider,
+      table.model,
+      table.evalVersion,
+      table.createdAt
+    ),
+  ]
+);
+
+export type PracticeGraderCheck = typeof practiceGraderChecks.$inferSelect;
+
+/**
  * Every plan a project has had, kept.
  *
  * A project's steps get replaced — re-planned, started over, a step corrected by Fadi — and the
