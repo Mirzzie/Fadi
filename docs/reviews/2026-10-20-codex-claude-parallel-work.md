@@ -12,9 +12,11 @@ security-operations Practice pack in `/home/mirzzie/Projects/FADI-worktrees/clau
 - case-table/choice layout in `components/learning/document-step.tsx`.
 
 Claude subsequently committed these files and a handoff as `17ae592`. Codex rechecked the findings
-below against that commit. Claude then started uncommitted diagnostic changes in `grader-check.ts`
-and `rubric-eval.ts`, adding criterion-level explanations for grading disagreements. Those ongoing
-changes are not in this candidate. Codex has not edited Claude's worktree.
+below against that commit. Claude then committed diagnostics as `a8c9eb1`, adding criterion-level
+explanations and normalising typographic punctuation in quotes. Codex merged that commit into
+this candidate. Evaluation version 3 correctly invalidates older model checks; the previously
+reported live evaluation must not be presented as a fresh v3 pass. Codex has not edited Claude's
+worktree or run a live provider evaluation.
 
 Claude's `claude/adr-0015` remains at `8d0c841`. Codex's five answers, revised split and blockers are
 in `docs/reviews/2026-10-20-codex-to-claude-adr-0015-contract-review.md`, committed as `c735107` on
@@ -86,9 +88,13 @@ This Learning wiring is committed as `9792f82` in the candidate branch.
 - Fresh isolated database `identity_test_codex_phase0_20261020`: existing migrations 0000–0071
   applied cleanly. No new migration or development-database schema change.
 - Database and web typechecks pass; changed-file lint passes.
-- Final combined suite, with database tests enabled: **1,991 passed, 24 skipped**, four workers.
+- Combined suite at `9792f82`, with database tests enabled: **1,991 passed, 24 skipped**, four workers.
 - Focused selector, incident and speech tests: **32 passed**. Speech/provider tests also pass
   with an inherited local-TTS URL after the test-isolation correction (`eb091a5`).
+- After `a8c9eb1`: rubric/evaluation/incident checks **39 passed, 1 skipped** (live evaluation),
+  including new object-result diagnostics regressions. Detailed explanations cannot make a
+  false-pass grader or a grader rejecting all good answers releasable. Changed-file lint passes.
+  The earlier full-suite and browser numbers above are the pre-`a8c9eb1` baseline.
 - REA observed the signed-in IT Support account's Learning page at 1440×900, with exactly one
   incident-simulation link and no horizontal overflow:
   `ev_36db025d87c613b74f04db40da25348617d6a144b1ea26f22da71f43ce732473`.
@@ -114,13 +120,38 @@ TypeScript versions match between installs. Repository lockfile and product conf
 unchanged. All temporary candidate servers are stopped after validation; the isolated test
 database is retained for reproduction.
 
-## Coordination transport
+## Coordination: Git and checked-in handoffs
 
-October MCP tools are not exposed in this session. The installed Bus CLI reports no runtime
-discovery file, and agent/task listing requires a scope token unavailable to this process. No
-replacement Bus instance or peer identity was created. This checked-in handoff is durable, but
-it is **not evidence that Claude received or accepted it**. Once the connected Claude session
-reads it, the next exchange is its response to the ADR corrections and incident findings.
+The owner has discontinued October. Do not discover, restore or start its Bus for this workflow.
+Coordinate through separate worktrees, commits and these handoffs. A commit or proposal does not
+establish the other agent's acceptance; record explicit decisions and the reviewed revision.
+The owner has told Claude about the pending contract review.
+
+## Worker slice checklist — proposed, awaiting contract agreement
+
+This is preparation, not implementation or a migration reservation. Existing outbox files remain
+the starting point; ADR 0015 is still Proposed.
+
+1. Agree task/consequence state transitions, cancellation, approval waiting and retry ownership.
+   Define a semantic dedupe key scoped to tenant/operation/input revision.
+2. Specify claim generation and conditional heartbeat, completion and failure updates. An expired
+   worker cannot change a newer attempt's state.
+3. Agree bounded claim/concurrency rules: leases cannot expire before later batch items start.
+   Record attempts and exhaustion after crashes as well as handled failures.
+4. Use the same dispatcher for request-time and standalone execution. Define recurring occurrence
+   IDs, time zones, rest and catch-up before promising scheduled unattended work.
+5. Define tool input/target binding, approval revalidation, cancellation checkpoints and external
+   effect reconciliation. Retry a task without blindly repeating its external writes.
+6. Define task → attempt/execution → receipt/output references and bounded, redacted errors.
+   Sensitive evidence stays in its owning module.
+7. Use fake-clock tests and isolated-Postgres race tests for two workers, expiry, stale completion,
+   heartbeat loss, cancellation, exhausted crashes and replay. Test approval waits/resumption
+   without holding a lease or weakening approval.
+8. Reserve 0072 (or the then-next number) only after both agents agree the schema boundary. Verify
+   existing consequence topics and producers remain compatible.
+
+Codex owns the proposed worker slice; Claude reviews its contract while owning Situation/onboarding
+and Practice. No worker, schema or scheduler change has been made during preparation.
 
 ## Next dependency
 
