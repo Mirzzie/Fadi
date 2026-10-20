@@ -50,7 +50,10 @@ export function DocumentStep({
   const [hints, setHints] = useState<string[]>([]);
   const [hinting, startHint] = useTransition();
   // Set when a submission was refused because the model hasn't passed the marking check.
-  const [grader, setGrader] = useState<Exclude<GraderStatus, { state: "fit" }> | null>(null);
+  const [grader, setGrader] = useState<{
+    activity: { packId: string; activityId: string };
+    status: Exclude<GraderStatus, { state: "fit" }>;
+  } | null>(null);
   const [state, setState] = useState<DocumentStepState | null>(null);
   const [review, setReview] = useState<ReviewView | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -120,8 +123,10 @@ export function DocumentStep({
       });
       if (!result.ok) {
         if (result.graderCheck) {
-          const status = await graderStatusAction();
-          if (status && status.state !== "fit") return setGrader(status);
+          const status = await graderStatusAction(result.graderCheck);
+          if (status && status.state !== "fit") {
+            return setGrader({ activity: result.graderCheck, status });
+          }
         }
         return setMessage(result.message);
       }
@@ -222,7 +227,11 @@ export function DocumentStep({
       {grader ? (
         // Takes the place of the refusal: the check, then Submit again (the draft is kept).
         <div className="mt-3 rounded-lg border border-border/70 p-3">
-          <GraderCheck status={grader} onFit={() => setGrader(null)} />
+          <GraderCheck
+            activity={grader.activity}
+            status={grader.status}
+            onFit={() => setGrader(null)}
+          />
         </div>
       ) : null}
 

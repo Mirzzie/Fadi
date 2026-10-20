@@ -23,8 +23,8 @@ export const EVAL_VERSION = "3";
 
 export type EvalCase = {
   id: string;
-  /** The pack step it answers. */
-  step: "diagnose" | "plan" | "defend";
+  /** The pack step it answers (a step id of the suite's activity). */
+  step: string;
   kind: "good" | "weak" | "adversarial";
   submission: string;
   /** Step 1's picks — always right here, so only the explanation decides. */
@@ -298,3 +298,28 @@ export function graderShortfall(report: RepeatedEvalReport): string | null {
   const good = Math.round(last.goodPassRate * 100);
   return `It credited only ${good}% of answers that deserve to pass, so it would hold back good work.`;
 }
+
+/**
+ * ONE EVALUATION SET PER ACTIVITY (Codex review, 20 Oct 2026). A model that marks business writing
+ * fairly has shown nothing about marking incident response, so a check counts only for the
+ * activity whose test answers it passed. `key` is what a recorded check is bound to.
+ */
+export type EvalSuite = {
+  packId: string;
+  activityId: string;
+  version: string;
+  /** The fixed case the test answers are written against. */
+  seed: string;
+  cases: () => EvalCase[];
+};
+
+export const suiteKey = (suite: Pick<EvalSuite, "activityId" | "version">) =>
+  `${suite.activityId}@${suite.version}`;
+
+export const CHURN_REVIEW_SUITE: EvalSuite = {
+  packId: "fadi.customer-success",
+  activityId: "churn-review",
+  version: EVAL_VERSION,
+  seed: EVAL_SEED,
+  cases: () => evalCases(),
+};

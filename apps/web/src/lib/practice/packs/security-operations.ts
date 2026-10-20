@@ -1,6 +1,7 @@
 import type { PracticePack } from "../pack";
 import type { ChoiceField, Criterion } from "../rubric";
 import {
+  SIGNIN_CUTOFF,
   citesIncident,
   clock,
   signinCase,
@@ -27,13 +28,27 @@ import {
 export const SECURITY_OPERATIONS_PACK: PracticePack = {
   schemaVersion: 1,
   id: "fadi.security-operations",
-  version: "0.1.0",
+  // 0.2.0 (20 Oct 2026, Codex review): evidence cutoff stated, report must separate known from
+  // unknown, response guidance corrected against Microsoft's documentation.
+  version: "0.2.0",
   title: "Security operations work simulations",
   domain: { id: "security-operations", label: "Security Operations" },
   license: "CC-BY-4.0",
   trust: "experimental",
   review: null,
-  sources: [],
+  // The primary sources the response guidance and example answers follow.
+  sources: [
+    {
+      title: "Microsoft Entra: Revoke user access in an emergency",
+      url: "https://learn.microsoft.com/en-us/entra/identity/users/users-revoke-access",
+      checkedAt: "2026-10-20T19:45:00Z",
+    },
+    {
+      title: "Microsoft Entra: Block legacy authentication with Conditional Access",
+      url: "https://learn.microsoft.com/en-us/entra/identity/conditional-access/policy-block-legacy-authentication",
+      checkedAt: "2026-10-20T19:45:00Z",
+    },
+  ],
   activities: [
     {
       schemaVersion: 1,
@@ -71,7 +86,7 @@ export const SECURITY_OPERATIONS_PACK: PracticePack = {
           id: "report",
           title: "Write the incident report",
           instruction:
-            "Write the incident report for the IT manager (250–450 words): a short summary, a timeline with times from the log, the impact (what is known and what isn't yet), the root cause, the actions taken, and what will prevent a repeat.",
+            "Write the incident report for the IT manager (250–450 words): a short summary, a timeline with times from the log, the impact (what is known and what isn't yet), the root cause, the actions recommended or taken (say which), and what will prevent a repeat.",
           environment: { kind: "document", adapter: null },
           assessment: { kind: "rubric", adapter: { id: "fadi.rubric", version: "1" } },
           outputs: [{ kind: "text", required: true }],
@@ -84,7 +99,7 @@ export const SECURITY_OPERATIONS_PACK: PracticePack = {
 /** The brief every step shows: the situation and this person's own log. */
 export function signinBrief(c: SigninCase): string {
   return [
-    `You're the security operations analyst on call for ${c.company} (${c.domain}). At 08:00 on ${c.date} an alert fired for unusual sign-in activity overnight. This is the morning's sign-in log.`,
+    `You're the security operations analyst on call for ${c.company} (${c.domain}). At 08:00 on ${c.date} an alert fired for unusual sign-in activity overnight. You pick it up at ${clock(SIGNIN_CUTOFF)}. This is the sign-in log from midnight to ${clock(SIGNIN_CUTOFF)} UTC, and it's all the evidence you have so far.`,
     "",
     signinTable(c),
   ].join("\n");
@@ -227,9 +242,9 @@ export const SUSPICIOUS_SIGNINS_ASSETS: Record<string, StepAssets> = {
         kind: "quality",
         label: "Contains the account first",
         meets:
-          "Before investigating, revokes the account's sessions (signs it out everywhere), resets its password and blocks the source address.",
+          "Before investigating, cuts the attacker off: disables the account or revokes its sessions, resets the password, and blocks the source address.",
         strong:
-          "Puts them in the right order and says why: a password reset alone doesn't end a session the attacker already has.",
+          "Knows the limit: revoking sessions stops new tokens, but access already granted can last until it expires (often up to an hour), so the account stays disabled while it's investigated.",
       },
       {
         id: "scope",
@@ -245,18 +260,19 @@ export const SUSPICIOUS_SIGNINS_ASSETS: Record<string, StepAssets> = {
         kind: "quality",
         label: "Closes the way in",
         meets:
-          "Names the specific gap that let the attacker past MFA in this log, and a control that closes it.",
+          "Names the specific gap that let the attacker past MFA in this log, and a control that actually closes it, not a workaround that leaves the same gap open.",
         strong:
-          "Handles the business reason the gap exists (e.g. what still needs the old protocol, or how people are prompted) instead of ignoring it.",
+          "Handles the business reason the gap exists (what still depends on it, and how to move that safely, e.g. finding it in the logs and testing a block in report-only mode first).",
       },
     ],
     hints: [
       "Ask what the attacker can still do right now, and stop that before anything else.",
-      "Containment, then scoping, then fixing the cause. A session token survives a password change, so signing the account out everywhere matters as much as the reset. Attackers in a mailbox often add a forwarding rule to keep watching.",
+      "Containment, then scoping, then fixing the cause. A password reset alone doesn't end access the attacker already has: disable the account and revoke its sessions, and know that access already granted can last until its tokens expire. Attackers in a mailbox often add a forwarding rule to keep watching.",
       "Structure: right now (in order) → what to check, and what to save first → the change that closes the specific way in → who needs to know.",
     ],
+    // Follows Microsoft's emergency-revocation and legacy-auth guidance (pack sources).
     exampleAnswer: (c) =>
-      `Right now: revoke all sessions for ${c.compromised} and reset the password (in that order: the attacker's session survives a reset), then block ${c.attackerIp} at the identity provider. Before changing anything else, export the sign-in and mailbox audit logs. Then check the account's inbox rules and forwarding, sent items since ${clock(c.compromisedAt)} UTC, and file access; and check whether ${c.attackerIp} got anywhere with any other account. To close the way in: ${c.bypass === "legacy-protocol" ? "block legacy authentication (IMAP/POP/SMTP) in conditional access, moving the scanner and the old CRM to app-specific credentials or OAuth first so nothing breaks" : "turn on number matching and limit repeated MFA prompts, and tell staff to report unexpected prompts rather than approve them"}. Tell the IT manager and the account owner today.`,
+      `Right now: disable ${c.compromised}, revoke its sessions and reset the password, then block ${c.attackerIp}. Revoking sessions stops new tokens, but access already granted can last until it expires (up to about an hour), which is why the account stays disabled while we look. Before changing anything else, export the sign-in and mailbox audit logs. Then check the account's inbox rules and forwarding, sent items since ${clock(c.compromisedAt)} UTC and file access, and whether ${c.attackerIp} got anywhere with any other account. To close the way in: ${c.bypass === "legacy-protocol" ? "find everything still using IMAP, POP or SMTP in the sign-in logs (the client app column), move the scanner and the old CRM to modern authentication (OAuth), then block legacy authentication with conditional access, in report-only mode first to confirm nothing else breaks. App passwords wouldn't help: they still use the legacy protocol" : "turn on number matching and limit repeated MFA prompts, and tell staff to report unexpected prompts rather than approve them"}. Tell the IT manager and the account owner today.`,
   },
   report: {
     criteria: [
@@ -292,11 +308,19 @@ export const SUSPICIOUS_SIGNINS_ASSETS: Record<string, StepAssets> = {
         strong: "Separates the cause from contributing factors.",
       },
       {
+        id: "known-unknown",
+        kind: "quality",
+        label: "Separates what is known from what isn't",
+        meets:
+          "States only what the sign-in log supports. Marks actions as recommended or pending unless the case says they happened, and names what still has to be checked (such as mailbox and file activity) instead of declaring it clean.",
+        strong: "Says what evidence would confirm or change the conclusions.",
+      },
+      {
         id: "prevention",
         kind: "quality",
-        label: "Actions taken and prevention, kept apart",
+        label: "Actions and prevention, kept apart",
         meets:
-          "Lists what was done, then what will prevent a repeat, each specific enough to check later.",
+          "Lists the response actions, then what will prevent a repeat, each specific enough to check later.",
         strong: "Gives each prevention step an owner or a date.",
       },
     ],
@@ -305,8 +329,9 @@ export const SUSPICIOUS_SIGNINS_ASSETS: Record<string, StepAssets> = {
       "A good incident report separates what happened (timeline), why (root cause), what it cost (impact, known and unknown), what was done, and what changes. Honest uncertainty is a strength: managers act on it.",
       "Structure: summary (3–4 sentences) → timeline with times from the log → impact → root cause → actions taken → prevention, each with an owner.",
     ],
+    // Only what the log shows is stated as fact; actions are recommendations, impact is open.
     exampleAnswer: (c) =>
-      `Summary: on ${c.date} an attacker ${c.attack === "password-spray" ? "sprayed passwords across our accounts" : "brute-forced one account"} from ${c.attackerIp} and took over ${c.compromised} at ${clock(c.compromisedAt)} UTC. The account was contained the same morning. Timeline: ${clock(c.firstAttempt)} first attempt; ${clock(c.compromisedAt)} successful sign-in; 08:00 alert; then sessions revoked, password reset, address blocked. Impact: mailbox access for the period between the sign-in and containment; no forwarding rules found so far; file access still being reviewed. Root cause: ${c.bypass === "legacy-protocol" ? "IMAP was still enabled, and conditional access doesn't apply MFA to legacy protocols" : "the user approved an MFA prompt after repeated pushes; prompts didn't require number matching"}. Prevention: ${c.bypass === "legacy-protocol" ? "block legacy authentication once the scanner and CRM are moved (IT lead, two weeks)" : "number matching and prompt limits (IT lead, this week); a short staff note on unexpected prompts"}.`,
+      `Summary: on ${c.date} an attacker ${c.attack === "password-spray" ? "sprayed passwords across our accounts" : "brute-forced one account"} from ${c.attackerIp} and signed in as ${c.compromised} at ${clock(c.compromisedAt)} UTC. Timeline: ${clock(c.firstAttempt)} first attempt; ${clock(c.compromisedAt)} successful sign-in; 08:00 alert. Recommended response (pending confirmation): disable the account, revoke its sessions, reset the password, block the address. Impact: the attacker had access from ${clock(c.compromisedAt)} until the account is disabled. What they did with it is not yet known: the mailbox rules, sent items and file activity still have to be checked in the audit logs, so data exposure can't be ruled in or out yet. Root cause: ${c.bypass === "legacy-protocol" ? "IMAP was still enabled, and conditional access doesn't apply MFA to legacy protocols" : "the user approved an MFA prompt after repeated pushes; prompts didn't require number matching"}. Prevention: ${c.bypass === "legacy-protocol" ? "move the scanner and CRM to modern authentication, then block legacy authentication (IT lead, two weeks)" : "number matching and prompt limits (IT lead, this week); a short staff note on unexpected prompts"}.`,
   },
 };
 

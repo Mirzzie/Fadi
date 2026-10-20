@@ -1,6 +1,7 @@
 import type { PracticeActivity } from "../contract";
 import type { PracticePack } from "../pack";
 import type { ChoiceField, Criterion } from "../rubric";
+import { CHURN_REVIEW_SUITE, type EvalSuite } from "../rubric-eval";
 import {
   CHURN_REVIEW_ASSETS,
   CUSTOMER_SUCCESS_PACK,
@@ -13,6 +14,7 @@ import {
   signinBrief,
   signinCaseFor,
 } from "./security-operations";
+import { SUSPICIOUS_SIGNINS_SUITE } from "./security-operations.eval";
 
 /**
  * The Practice activities this Fadi has installed, with the runtime each needs: how its case is
@@ -26,6 +28,8 @@ export type ActivityRuntime = {
   brief: (seed: string) => string;
   /** The case behind it, for the fact criteria. Opaque outside the pack. */
   caseFor: (seed: string) => unknown;
+  /** The answers with known verdicts a model must mark fairly before it marks this activity. */
+  evalSuite: EvalSuite;
   assets: Record<
     string,
     {
@@ -43,6 +47,7 @@ const RUNTIMES: ActivityRuntime[] = [
     activity: CUSTOMER_SUCCESS_PACK.activities.find((a) => a.id === "churn-review")!,
     brief: (seed) => churnBrief(churnCaseFor(seed)),
     caseFor: (seed) => churnCaseFor(seed),
+    evalSuite: CHURN_REVIEW_SUITE,
     assets: CHURN_REVIEW_ASSETS as ActivityRuntime["assets"],
   },
   {
@@ -50,6 +55,7 @@ const RUNTIMES: ActivityRuntime[] = [
     activity: SECURITY_OPERATIONS_PACK.activities.find((a) => a.id === "suspicious-sign-ins")!,
     brief: (seed) => signinBrief(signinCaseFor(seed)),
     caseFor: (seed) => signinCaseFor(seed),
+    evalSuite: SUSPICIOUS_SIGNINS_SUITE,
     assets: SUSPICIOUS_SIGNINS_ASSETS as ActivityRuntime["assets"],
   },
 ];

@@ -29,7 +29,7 @@ export function StartSimulation({
   const [message, setMessage] = useState<string | null>(null);
   const [pending, start] = useTransition();
   if (status && status.state !== "fit") {
-    return <GraderCheck status={status} onFit={setStatus} />;
+    return <GraderCheck activity={{ packId, activityId }} status={status} onFit={setStatus} />;
   }
   return (
     <div>

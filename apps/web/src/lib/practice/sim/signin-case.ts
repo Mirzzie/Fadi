@@ -271,6 +271,9 @@ export function signinCase(seed: string): SigninCase {
   };
 }
 
+/** The analyst picks the alert up at 09:30 UTC: the log runs to here and no further. */
+export const SIGNIN_CUTOFF = 9 * 60 + 30;
+
 export function clock(minute: number): string {
   return `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
 }

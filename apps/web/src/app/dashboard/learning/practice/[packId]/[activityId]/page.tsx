@@ -32,7 +32,9 @@ export default async function PracticeActivityPage({
     step.criteria.some((c) => c.kind === "quality")
   );
   const { graderStatus } = await import("@/lib/practice/grader-check");
-  const grader = modelReviewed ? await graderStatus(user.id) : null;
+  const grader = modelReviewed
+    ? await graderStatus(user.id, { packId: pack.id, activityId: activity.id })
+    : null;
 
   return (
     <AppShell>

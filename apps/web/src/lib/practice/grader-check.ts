@@ -7,7 +7,7 @@ import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 
-import { CHURN_REVIEW_ASSETS, CUSTOMER_SUCCESS_PACK, churnBrief } from "./packs/customer-success";
+import { activityRuntime, type ActivityRuntime } from "./packs";
 import {
   reviewSubmission,
   rubricPrompt,
@@ -15,15 +15,12 @@ import {
   type QualityCriterion,
 } from "./rubric";
 import {
-  EVAL_SEED,
-  EVAL_VERSION,
-  evalCases,
   graderShortfall,
   runRubricEvalRepeated,
+  suiteKey,
   type GradeFn,
   type RepeatedEvalReport,
 } from "./rubric-eval";
-import { churnCase } from "./sim/churn-case";
 
 /**
  * IS THIS PERSON'S MODEL FIT TO MARK WRITTEN WORK? (rubric-eval, 19 Oct 2026)
@@ -32,8 +29,18 @@ import { churnCase } from "./sim/churn-case";
  * Before relying on it, the model is run — through the exact review path a submission takes —
  * over answers whose fair verdict is known, three times. Fit only if every run gives no false
  * pass, no error, and credits at least 80% of the good answers. Run only when the person asks:
- * it spends their quota. The result is kept per model; a different model needs its own check.
+ * it spends their quota. The result is kept per model AND per activity: passing the churn review's
+ * test answers says nothing about marking incident response (Codex review, 20 Oct 2026).
  */
+
+/** Which activity's marking a check is about. */
+export type ActivityRef = { packId: string; activityId: string };
+
+function runtimeOf(ref: ActivityRef): ActivityRuntime {
+  const runtime = activityRuntime(ref.packId, ref.activityId);
+  if (!runtime) throw new Error(`Activity ${ref.packId}/${ref.activityId} isn't installed.`);
+  return runtime;
+}
 
 export const GRADER_REPEATS = 3;
 
@@ -47,19 +54,22 @@ const label = (identity: { provider: string; model: string }) =>
   `${identity.model} (${identity.provider})`;
 
 /** Requests the check sends at most: every eval case, every run. */
-function requestCount(): number {
-  return evalCases().length * GRADER_REPEATS;
+function requestCount(runtime: ActivityRuntime): number {
+  return runtime.evalSuite.cases().length * GRADER_REPEATS;
 }
 
-export async function graderStatus(userId: string): Promise<GraderStatus> {
+export async function graderStatus(userId: string, ref: ActivityRef): Promise<GraderStatus> {
+  const runtime = runtimeOf(ref);
   const { getUserDocGenerate } = await import("@/lib/ai/user-generate");
   const identity = (await getUserDocGenerate(userId))?.identity;
   if (!identity) return { state: "no_model" };
   const latest = await createPracticeGraderChecksRepository(getDatabase()).latest(userId, {
     ...identity,
-    evalVersion: EVAL_VERSION,
+    evalVersion: suiteKey(runtime.evalSuite),
   });
-  if (!latest) return { state: "unchecked", model: label(identity), requests: requestCount() };
+  if (!latest) {
+    return { state: "unchecked", model: label(identity), requests: requestCount(runtime) };
+  }
   if (latest.releasable) {
     return { state: "fit", model: label(identity), checkedAt: latest.createdAt };
   }
@@ -70,30 +80,32 @@ export async function graderStatus(userId: string): Promise<GraderStatus> {
     reason:
       graderShortfall(latest.report as unknown as RepeatedEvalReport) ??
       "It didn't pass the check.",
-    requests: requestCount(),
+    requests: requestCount(runtime),
   };
 }
 
 /** May this model's review count? Only when its latest check, on this evaluation set, passed. */
 export async function isFitToMark(
   userId: string,
-  identity: { provider: string; model: string } | undefined
+  identity: { provider: string; model: string } | undefined,
+  ref: ActivityRef
 ): Promise<boolean> {
   if (!identity) return false;
   const latest = await createPracticeGraderChecksRepository(getDatabase()).latest(userId, {
     ...identity,
-    evalVersion: EVAL_VERSION,
+    evalVersion: suiteKey(runtimeOf(ref).evalSuite),
   });
   return Boolean(latest?.releasable);
 }
 
 /** The review path a real submission takes, as a grading function over the evaluation set. */
-export function graderFor(generate: DocGenerate): GradeFn {
-  const theCase = churnCase(EVAL_SEED);
-  const brief = churnBrief(theCase);
-  const steps = CUSTOMER_SUCCESS_PACK.activities[0]!.steps;
+export function graderFor(generate: DocGenerate, ref: ActivityRef): GradeFn {
+  const runtime = runtimeOf(ref);
+  const theCase = runtime.caseFor(runtime.evalSuite.seed);
+  const brief = runtime.brief(runtime.evalSuite.seed);
+  const steps = runtime.activity.steps;
   return async ({ caseId, step, submission, choices }) => {
-    const assets = CHURN_REVIEW_ASSETS[step]!;
+    const assets = runtime.assets[step]!;
     const fields = assets.choices?.(theCase) ?? [];
     const quality = assets.criteria.filter((k): k is QualityCriterion => k.kind === "quality");
     const prompt = rubricPrompt({
@@ -147,7 +159,8 @@ const CHECKS_PER_DAY = 3;
 export type CheckResult = { ok: true; status: GraderStatus } | { ok: false; message: string };
 
 /** Measure the person's current model and keep the result. Only on their request. */
-export async function checkGrader(userId: string): Promise<CheckResult> {
+export async function checkGrader(userId: string, ref: ActivityRef): Promise<CheckResult> {
+  const runtime = runtimeOf(ref);
   const rate = await consumeRateLimit({
     key: `practice-grader-check:${userId}`,
     limit: CHECKS_PER_DAY,
@@ -156,14 +169,18 @@ export async function checkGrader(userId: string): Promise<CheckResult> {
   if (!rate.allowed) {
     return {
       ok: false,
-      message: `You've checked ${CHECKS_PER_DAY} times today — each check spends about 45 requests of your AI allowance. Try again tomorrow, or switch model in Settings → AI.`,
+      message: `You've checked ${CHECKS_PER_DAY} times today — each check spends up to ${requestCount(runtime)} requests of your AI allowance. Try again tomorrow, or switch model in Settings → AI.`,
     };
   }
   const { getUserDocGenerate } = await import("@/lib/ai/user-generate");
   const generate = await getUserDocGenerate(userId, { meteredByCaller: true });
   if (!generate?.identity) return { ok: true, status: { state: "no_model" } };
   const identity = generate.identity;
-  const report = await runRubricEvalRepeated(graderFor(generate), GRADER_REPEATS);
+  const report = await runRubricEvalRepeated(
+    graderFor(generate, ref),
+    GRADER_REPEATS,
+    runtime.evalSuite.cases()
+  );
   // A refused or failed call says nothing about whether the model marks fairly (a free tier's
   // per-minute limit, a server that went away), so it is not recorded as "unfit".
   const errored = report.runs.flatMap((run) => run.errors).length;
@@ -176,7 +193,7 @@ export async function checkGrader(userId: string): Promise<CheckResult> {
   }
   await createPracticeGraderChecksRepository(getDatabase()).record(userId, {
     ...identity,
-    evalVersion: EVAL_VERSION,
+    evalVersion: suiteKey(runtime.evalSuite),
     releasable: report.releasable,
     report: report as unknown as Record<string, unknown>,
   });
@@ -184,8 +201,9 @@ export async function checkGrader(userId: string): Promise<CheckResult> {
     userId,
     provider: identity.provider,
     model: identity.model,
+    activity: ref.activityId,
     releasable: report.releasable,
     runs: report.runs.length,
   });
-  return { ok: true, status: await graderStatus(userId) };
+  return { ok: true, status: await graderStatus(userId, ref) };
 }
