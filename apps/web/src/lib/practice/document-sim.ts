@@ -245,7 +245,7 @@ export type ReviewView = {
 export type SubmitResult =
   | { ok: true; review: ReviewView }
   /** `graderCheck`: the person's model hasn't passed the marking check — offer it in place. */
-  | { ok: false; message: string; graderCheck?: true };
+  | { ok: false; message: string; graderCheck?: { packId: string; activityId: string } };
 
 export async function submitForReview(
   userId: string,
@@ -296,10 +296,11 @@ export async function submitForReview(
   const needsModel = assets.criteria.some((c) => c.kind === "quality");
   if (needsModel) {
     const { isFitToMark } = await import("./grader-check");
-    if (!(await isFitToMark(userId, generate.identity))) {
+    const activity = { packId: context.runtime.pack.id, activityId: context.runtime.activity.id };
+    if (!(await isFitToMark(userId, generate.identity, activity))) {
       return {
         ok: false,
-        graderCheck: true,
+        graderCheck: activity,
         message:
           "Before Fadi reviews your writing, your AI model needs to pass its marking check. Nothing was submitted.",
       };

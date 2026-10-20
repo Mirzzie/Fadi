@@ -101,18 +101,41 @@ export async function restartPracticeActivityAction(input: {
 }
 
 /** Run the marking check on the person's current model. They asked: it spends their allowance. */
-export async function checkGraderAction(): Promise<CheckResult> {
+const activityRef = z.object({
+  packId: z.string().min(1).max(160),
+  activityId: z.string().min(1).max(160),
+});
+
+/** Which activity's marking check: a pass for one activity says nothing about another. */
+async function installed(input: unknown) {
+  const parsed = activityRef.safeParse(input);
+  if (!parsed.success) return null;
+  const { activityRuntime } = await import("@/lib/practice/packs");
+  return activityRuntime(parsed.data.packId, parsed.data.activityId) ? parsed.data : null;
+}
+
+export async function checkGraderAction(input: {
+  packId: string;
+  activityId: string;
+}): Promise<CheckResult> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
+  const ref = await installed(input);
+  if (!ref) return { ok: false, message: "Unknown activity." };
   const { checkGrader } = await import("@/lib/practice/grader-check");
-  const result = await checkGrader(user.id);
+  const result = await checkGrader(user.id, ref);
   revalidatePath("/dashboard/learning");
   return result;
 }
 
-export async function graderStatusAction(): Promise<GraderStatus | null> {
+export async function graderStatusAction(input: {
+  packId: string;
+  activityId: string;
+}): Promise<GraderStatus | null> {
   const user = await getCurrentAuthUser();
   if (!user) return null;
+  const ref = await installed(input);
+  if (!ref) return null;
   const { graderStatus } = await import("@/lib/practice/grader-check");
-  return graderStatus(user.id);
+  return graderStatus(user.id, ref);
 }

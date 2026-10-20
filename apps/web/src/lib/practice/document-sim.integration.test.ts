@@ -64,11 +64,11 @@ suite("a document work simulation, end to end", () => {
 
   const passCheck = async (id: string) => {
     const { createPracticeGraderChecksRepository } = await import("@careeros/database");
-    const { EVAL_VERSION } = await import("./rubric-eval");
+    const { CHURN_REVIEW_SUITE, suiteKey } = await import("./rubric-eval");
     await createPracticeGraderChecksRepository(holder.db as never).record(id, {
       provider: "test",
       model: "fair-reviewer",
-      evalVersion: EVAL_VERSION,
+      evalVersion: suiteKey(CHURN_REVIEW_SUITE),
       releasable: true,
       report: {},
     });
@@ -126,12 +126,12 @@ suite("a document work simulation, end to end", () => {
     const c = churnCase(run.practice!.seed);
     await pool.query("delete from practice_grader_checks where user_id = $1", [userId]);
     const { createPracticeGraderChecksRepository } = await import("@careeros/database");
-    const { EVAL_VERSION } = await import("./rubric-eval");
+    const { CHURN_REVIEW_SUITE, suiteKey } = await import("./rubric-eval");
     // A failed check counts as no check.
     await createPracticeGraderChecksRepository(holder.db as never).record(userId, {
       provider: "test",
       model: "fair-reviewer",
-      evalVersion: EVAL_VERSION,
+      evalVersion: suiteKey(CHURN_REVIEW_SUITE),
       releasable: false,
       report: {},
     });
@@ -141,7 +141,10 @@ suite("a document work simulation, end to end", () => {
       choices: { "risk-1": c.atRisk[0], "risk-2": c.atRisk[1], "false-alarm": c.decoy },
       body: "A careful analysis of every account in the table, with figures for each one.",
     });
-    expect(refused).toMatchObject({ ok: false, graderCheck: true });
+    expect(refused).toMatchObject({
+      ok: false,
+      graderCheck: { packId: "fadi.customer-success", activityId: "churn-review" },
+    });
     const count = await pool.query(
       "select count(*)::int as count from practice_submissions where step_id = $1",
       [steps[0]!.id]
@@ -441,5 +444,22 @@ suite("a document work simulation, end to end", () => {
       ok: false,
       message: expect.stringMatching(/Start the project over/),
     });
+  });
+
+  it("a pass on one activity's marking check doesn't let a model mark another", async () => {
+    const { isFitToMark } = await import("./grader-check");
+    const identity = { provider: "test", model: "fair-reviewer" };
+    expect(
+      await isFitToMark(userId, identity, {
+        packId: "fadi.customer-success",
+        activityId: "churn-review",
+      })
+    ).toBe(true);
+    expect(
+      await isFitToMark(userId, identity, {
+        packId: "fadi.security-operations",
+        activityId: "suspicious-sign-ins",
+      })
+    ).toBe(false);
   });
 });

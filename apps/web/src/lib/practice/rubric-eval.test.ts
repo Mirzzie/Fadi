@@ -83,6 +83,7 @@ describe("the grader evaluation set (rubric-eval v2)", () => {
 /**
  * Live: measure the model a person has configured. Opt-in — it calls their provider.
  *   FADI_RUBRIC_EVAL_USER=<user id> FADI_RUBRIC_EVAL_OUT=<file> DATABASE_URL=… npx vitest run rubric-eval
+ * FADI_RUBRIC_EVAL_ACTIVITY=<packId/activityId> picks the activity (default: the churn review).
  */
 const LIVE_USER = process.env.FADI_RUBRIC_EVAL_USER;
 (LIVE_USER ? describe : describe.skip)("live grader evaluation", () => {
@@ -91,7 +92,16 @@ const LIVE_USER = process.env.FADI_RUBRIC_EVAL_USER;
     const { graderFor, GRADER_REPEATS } = await import("./grader-check");
     // The product's own check: the same review path, the same repeats.
     const generate = (await getUserDocGenerate(LIVE_USER!, { meteredByCaller: true }))!;
-    const report = await runRubricEvalRepeated(graderFor(generate), GRADER_REPEATS);
+    const [packId, activityId] = (
+      process.env.FADI_RUBRIC_EVAL_ACTIVITY ?? "fadi.customer-success/churn-review"
+    ).split("/");
+    const { activityRuntime } = await import("./packs");
+    const runtime = activityRuntime(packId!, activityId!)!;
+    const report = await runRubricEvalRepeated(
+      graderFor(generate, { packId: packId!, activityId: activityId! }),
+      GRADER_REPEATS,
+      runtime.evalSuite.cases()
+    );
     const { writeFileSync } = await import("node:fs");
     if (process.env.FADI_RUBRIC_EVAL_OUT) {
       writeFileSync(process.env.FADI_RUBRIC_EVAL_OUT, JSON.stringify(report, null, 2));

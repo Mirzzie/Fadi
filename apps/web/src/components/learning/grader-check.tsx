@@ -17,9 +17,12 @@ import type { GraderStatus } from "@/lib/practice/grader-check";
  * Fit: nothing to do here; `onFit` hands the moment back to the caller's own action.
  */
 export function GraderCheck({
+  activity,
   status,
   onFit,
 }: {
+  /** The activity whose marking this check is about. */
+  activity: { packId: string; activityId: string };
   status: Exclude<GraderStatus, { state: "fit" }>;
   onFit: (status: Extract<GraderStatus, { state: "fit" }>) => void;
 }) {
@@ -29,7 +32,7 @@ export function GraderCheck({
   const check = () =>
     start(async () => {
       setMessage(null);
-      const result = await checkGraderAction();
+      const result = await checkGraderAction(activity);
       if (!result.ok) return setMessage(result.message);
       if (result.status.state === "fit") return onFit(result.status);
       setCurrent(result.status);
