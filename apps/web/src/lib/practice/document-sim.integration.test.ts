@@ -13,6 +13,7 @@ const holder = vi.hoisted(() => ({ db: null as unknown, failReviews: 0 }));
 vi.mock("@/lib/database/client", () => ({ getDatabase: () => holder.db }));
 vi.mock("@/lib/ai/user-generate", () => ({
   getUserDocGenerate: async () => ({
+    identity: { provider: "test", model: "fair-reviewer" },
     // A fair reviewer: every quality criterion "meets", quoting the first 40 characters written.
     structured: async (_system: string, user: string) => {
       if (holder.failReviews > 0) {
@@ -49,11 +50,29 @@ suite("a document work simulation, end to end", () => {
     holder.db = drizzle(pool) as never;
     const stamp = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const user = async (tag: string) =>
-      (await pool.query("insert into users (email) values ($1) returning id", [`${tag}-${stamp}@example.test`]))
-        .rows[0].id as string;
+      (
+        await pool.query("insert into users (email) values ($1) returning id", [
+          `${tag}-${stamp}@example.test`,
+        ])
+      ).rows[0].id as string;
     userId = await user("sim");
     strangerId = await user("sim-other");
+    // The fake reviewer has passed the marking check, for both people — except where a test
+    // removes it to see the refusal.
+    for (const id of [userId, strangerId]) await passCheck(id);
   });
+
+  const passCheck = async (id: string) => {
+    const { createPracticeGraderChecksRepository } = await import("@careeros/database");
+    const { EVAL_VERSION } = await import("./rubric-eval");
+    await createPracticeGraderChecksRepository(holder.db as never).record(id, {
+      provider: "test",
+      model: "fair-reviewer",
+      evalVersion: EVAL_VERSION,
+      releasable: true,
+      report: {},
+    });
+  };
 
   afterAll(async () => {
     if (userId) await pool.query("delete from users where id = any($1)", [[userId, strangerId]]);
@@ -83,19 +102,71 @@ suite("a document work simulation, end to end", () => {
             and practice->>'packId' = $2 and practice->>'activityId' = $3) as runs,
          (select count(*)::int from learning_commitments
           where user_id = $1 and title = $4 and status = 'committed') as commitments`,
-      [userId, request.packId, request.activityId, "Quarterly churn review for a B2B software company"]
+      [
+        userId,
+        request.packId,
+        request.activityId,
+        "Quarterly churn review for a B2B software company",
+      ]
     );
     expect(counts.rows[0]).toEqual({ runs: 1, commitments: 1 });
 
     const { run, steps } = await project();
-    expect(run.practice).toMatchObject({ packId: "fadi.customer-success", packVersion: "0.1.0" });
+    expect(run.practice).toMatchObject({ packId: "fadi.customer-success", packVersion: "0.2.0" });
     expect(run.practice!.seed).toMatch(/^[0-9a-f]{32}$/);
     expect(run.commitmentId).not.toBeNull();
     expect(steps.map((s) => s.place)).toEqual(["document", "document", "document"]);
     expect(run.detail).toContain("| Account |");
   });
 
-  it("'not yet' when the facts are wrong — however well written — with no example answer to copy", async () => {
+  it("won't review writing with a model that hasn't passed the marking check — and keeps nothing", async () => {
+    const { churnCase } = await import("./sim/churn-case");
+    const { submitForReview } = await import("./document-sim");
+    const { run, steps } = await project();
+    const c = churnCase(run.practice!.seed);
+    await pool.query("delete from practice_grader_checks where user_id = $1", [userId]);
+    const { createPracticeGraderChecksRepository } = await import("@careeros/database");
+    const { EVAL_VERSION } = await import("./rubric-eval");
+    // A failed check counts as no check.
+    await createPracticeGraderChecksRepository(holder.db as never).record(userId, {
+      provider: "test",
+      model: "fair-reviewer",
+      evalVersion: EVAL_VERSION,
+      releasable: false,
+      report: {},
+    });
+    const refused = await submitForReview(userId, {
+      runId,
+      stepId: steps[0]!.id,
+      choices: { "risk-1": c.atRisk[0], "risk-2": c.atRisk[1], "false-alarm": c.decoy },
+      body: "A careful analysis of every account in the table, with figures for each one.",
+    });
+    expect(refused).toMatchObject({ ok: false, graderCheck: true });
+    const count = await pool.query(
+      "select count(*)::int as count from practice_submissions where step_id = $1",
+      [steps[0]!.id]
+    );
+    expect(count.rows[0]).toEqual({ count: 0 });
+    await passCheck(userId);
+  });
+
+  it("refuses step 1 without its picks, and keeps nothing", async () => {
+    const { submitForReview } = await import("./document-sim");
+    const { steps } = await project();
+    const result = await submitForReview(userId, {
+      runId,
+      stepId: steps[0]!.id,
+      body: "A careful analysis of every account in the table, with figures for each one.",
+    });
+    expect(result).toMatchObject({ ok: false, message: expect.stringMatching(/every choice/) });
+    const count = await pool.query(
+      "select count(*)::int as count from practice_submissions where step_id = $1",
+      [steps[0]!.id]
+    );
+    expect(count.rows[0]).toEqual({ count: 0 });
+  });
+
+  it("'not yet' when the picks are wrong — however well written — with no example answer to copy", async () => {
     const { churnCase } = await import("./sim/churn-case");
     const { submitForReview } = await import("./document-sim");
     const { run, steps } = await project();
@@ -104,7 +175,9 @@ suite("a document work simulation, end to end", () => {
     const result = await submitForReview(userId, {
       runId,
       stepId: steps[0]!.id,
-      body: `${wrong.name} is clearly the biggest risk because its renewal is coming up and usage looks soft across the quarter.`,
+      // The right names in the writing don't count: the picks decide.
+      choices: { "risk-1": wrong.name, "risk-2": c.atRisk[0], "false-alarm": "None of them" },
+      body: `${wrong.name} is clearly the biggest risk because its renewal is coming up; ${c.atRisk[1]} too.`,
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -125,25 +198,44 @@ suite("a document work simulation, end to end", () => {
     const result = await submitForReview(userId, {
       runId,
       stepId: steps[0]!.id,
-      body: `${c.atRisk[0]} is most urgent: tickets past SLA and weekly active users down sharply before renewal. ${c.atRisk[1]} is next because its executive sponsor left. ${c.decoy} only looks bad: the drop is seasonal, their busy season is later.`,
+      choices: { "risk-1": c.atRisk[0], "risk-2": c.atRisk[1], "false-alarm": c.decoy },
+      // Each at-risk account backed by two of its own figures — checked exactly since 19 Oct 2026.
+      body: `${c.atRisk
+        .map((name) => {
+          const a = c.accounts.find((x) => x.name === name)!;
+          const change = Math.round(((a.activeNow - a.active90) / a.active90) * 100);
+          return `${name}: weekly users ${change}% in 90 days, renewal in ${a.renewalDays} days, $${a.arrK}k ARR.`;
+        })
+        .join(" ")} ${c.decoy} only looks bad: the drop is seasonal, their busy season is later.`,
     });
     expect(result.ok && result.review).toMatchObject({ verdict: "pass", attempt: 2 });
     expect(result.ok && result.review.exampleAnswer).toContain(c.atRisk[0]);
+    // The attempt is one immutable text: the picks above the writing.
+    const { createPracticeSubmissionsRepository } = await import("@careeros/database");
+    const kept = await createPracticeSubmissionsRepository(holder.db as never).latestForStep(
+      userId,
+      steps[0]!.id
+    );
+    expect(kept!.body.split("\n")[0]).toBe(`Most at risk: ${c.atRisk[0]}`);
 
     const step = (await project()).steps[0]!;
     expect(step).toMatchObject({ status: "done", completion: "evidenced" });
 
     const { createPracticeReceiptsRepository } = await import("@careeros/database");
-    const receipts = await createPracticeReceiptsRepository(holder.db as never).listForStep(userId, step.id);
+    const receipts = await createPracticeReceiptsRepository(holder.db as never).listForStep(
+      userId,
+      step.id
+    );
     expect(receipts.map((r) => r.verdict).sort()).toEqual(["fail", "pass"]);
     expect(new Set(receipts.map((r) => r.strength))).toEqual(new Set(["observed"]));
-    expect(receipts.every((r) => r.assessmentKind === "rubric" && r.sourceKind === "practice_submission")).toBe(true);
+    expect(
+      receipts.every((r) => r.assessmentKind === "rubric" && r.sourceKind === "practice_submission")
+    ).toBe(true);
   });
 
   it("one attempt, one receipt — recording the same review again changes nothing", async () => {
-    const { createPracticeReceiptsRepository, createPracticeSubmissionsRepository } = await import(
-      "@careeros/database"
-    );
+    const { createPracticeReceiptsRepository, createPracticeSubmissionsRepository } =
+      await import("@careeros/database");
     const db = holder.db as never;
     const { steps } = await project();
     const last = await createPracticeSubmissionsRepository(db).latestForStep(userId, steps[0]!.id);
@@ -203,7 +295,9 @@ suite("a document work simulation, end to end", () => {
       abandoned.runId
     );
     expect(owned).not.toBeNull();
-    await pool.query("update project_runs set status = 'abandoned' where id = $1", [abandoned.runId]);
+    await pool.query("update project_runs set status = 'abandoned' where id = $1", [
+      abandoned.runId,
+    ]);
     expect(
       await submissions.submit(strangerId, {
         runId: abandoned.runId,
@@ -231,11 +325,39 @@ suite("a document work simulation, end to end", () => {
     expect(count.rows[0]).toEqual({ count: 1 });
   });
 
+  it("records a hint on the step, so the next attempt says 'with 1 hint' — and a reload can't undo it", async () => {
+    const { revealHint, submitForReview, documentStepState } = await import("./document-sim");
+    const { steps } = await project();
+    const step3 = steps[2]!;
+    expect(await revealHint(userId, { runId, stepId: steps[0]!.id })).toMatchObject({ ok: false });
+    expect(await revealHint(strangerId, { runId, stepId: step3.id })).toMatchObject({ ok: false });
+    const opened = await revealHint(userId, { runId, stepId: step3.id });
+    expect(opened.ok && opened.hints).toHaveLength(1);
+    const state = await documentStepState(userId, { runId, stepId: step3.id });
+    expect(state).toMatchObject({ hints: [expect.any(String)], hintsAvailable: 3 });
+
+    const result = await submitForReview(userId, {
+      runId,
+      stepId: step3.id,
+      body: "A blanket discount gives away revenue on accounts renewing anyway and fixes neither cause; I'd fix service and find a new sponsor instead.",
+    });
+    expect(result.ok && result.review.verdict).toBe("pass");
+    const { createPracticeReceiptsRepository } = await import("@careeros/database");
+    const receipts = await createPracticeReceiptsRepository(holder.db as never).listForStep(
+      userId,
+      step3.id
+    );
+    expect(receipts[0]!.evidence.seen).toMatch(/with 1 hint/);
+  });
+
   it("the existing finish review says how it was established: reviewed against a rubric", async () => {
     const { createPracticeReceiptsRepository } = await import("@careeros/database");
     const { completionReview } = await import("@/lib/learning/project-review");
     const { run, steps } = await project();
-    const receipts = await createPracticeReceiptsRepository(holder.db as never).listForRun(userId, run.id);
+    const receipts = await createPracticeReceiptsRepository(holder.db as never).listForRun(
+      userId,
+      run.id
+    );
     const review = completionReview(run.title, steps, receipts);
     expect(review.lines[0]).toMatchObject({ proof: "reviewed" });
     expect(review.lines[0]!.result).toMatch(/criteria met on attempt 2, unaided/);
@@ -243,18 +365,81 @@ suite("a document work simulation, end to end", () => {
   });
 
   it("keeps assessed source text by refusing hard deletion of a practice run", async () => {
-    const { createPracticeSubmissionsRepository, createProjectRunsRepository } = await import(
-      "@careeros/database"
-    );
+    const { createPracticeSubmissionsRepository, createProjectRunsRepository } =
+      await import("@careeros/database");
     const db = holder.db as never;
     const { steps } = await project();
     const source = await createPracticeSubmissionsRepository(db).latestForStep(
       userId,
       steps[0]!.id
     );
-    expect(source?.body).toContain("tickets past SLA");
+    expect(source?.body).toContain("only looks bad");
     expect(await createProjectRunsRepository(db).remove(userId, runId)).toBe(false);
     expect(await createPracticeSubmissionsRepository(db).get(userId, source!.id)).toEqual(source);
     expect(await createPracticeSubmissionsRepository(db).get(strangerId, source!.id)).toBeNull();
+  });
+
+  it("starts over with a new case: the old attempt is closed and kept, not deleted", async () => {
+    const { startPracticeActivity, restartPracticeActivity, submitForReview } =
+      await import("./document-sim");
+    const { createProjectRunsRepository } = await import("@careeros/database");
+    const runs = createProjectRunsRepository(holder.db as never);
+    const first = await startPracticeActivity(strangerId, {
+      packId: "fadi.customer-success",
+      activityId: "churn-review",
+    });
+    if (!first.ok) throw new Error(first.message);
+    const before = (await runs.getWithSteps(strangerId, first.runId))!;
+    await submitForReview(strangerId, {
+      runId: first.runId,
+      stepId: before.steps[0]!.id,
+      choices: { "risk-1": "x", "risk-2": "y", "false-alarm": "z" },
+      body: "Not a real answer, and its picks aren't from the case either.",
+    });
+
+    expect(await restartPracticeActivity(userId, { runId: first.runId })).toMatchObject({
+      ok: false,
+    });
+    const restarted = await restartPracticeActivity(strangerId, { runId: first.runId });
+    if (!restarted.ok) throw new Error(restarted.message);
+    expect(restarted.runId).not.toBe(first.runId);
+
+    const old = (await runs.getWithSteps(strangerId, first.runId))!;
+    const fresh = (await runs.getWithSteps(strangerId, restarted.runId))!;
+    expect(old.run.status).toBe("abandoned");
+    expect(fresh.run).toMatchObject({ status: "running", commitmentId: before.run.commitmentId });
+    expect(fresh.run.practice!.seed).not.toBe(before.run.practice!.seed);
+    expect(fresh.steps.every((s) => s.status === "pending")).toBe(true);
+    // Closed, so it can't be started over twice.
+    expect(await restartPracticeActivity(strangerId, { runId: first.runId })).toMatchObject({
+      ok: false,
+    });
+  });
+
+  it("tells someone on a run from an earlier version to start over, instead of a dead end", async () => {
+    const { startPracticeActivity, submitForReview } = await import("./document-sim");
+    const { createProjectRunsRepository } = await import("@careeros/database");
+    const started = await startPracticeActivity(strangerId, {
+      packId: "fadi.customer-success",
+      activityId: "churn-review",
+    });
+    if (!started.ok) throw new Error(started.message);
+    await pool.query(
+      "update project_runs set practice = jsonb_set(practice, '{packVersion}', '\"0.0.1\"') where id = $1",
+      [started.runId]
+    );
+    const old = (await createProjectRunsRepository(holder.db as never).getWithSteps(
+      strangerId,
+      started.runId
+    ))!;
+    const result = await submitForReview(strangerId, {
+      runId: started.runId,
+      stepId: old.steps[0]!.id,
+      body: "Anything at all, long enough to be submitted for a review by Fadi.",
+    });
+    expect(result).toMatchObject({
+      ok: false,
+      message: expect.stringMatching(/Start the project over/),
+    });
   });
 });

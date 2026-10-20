@@ -28,6 +28,11 @@ export default async function PracticeActivityPage({
   const runtime = activityRuntime(decodeURIComponent(packId), decodeURIComponent(activityId));
   if (!runtime) notFound();
   const { pack, activity } = runtime;
+  const modelReviewed = Object.values(runtime.assets).some((step) =>
+    step.criteria.some((c) => c.kind === "quality")
+  );
+  const { graderStatus } = await import("@/lib/practice/grader-check");
+  const grader = modelReviewed ? await graderStatus(user.id) : null;
 
   return (
     <AppShell>
@@ -57,7 +62,7 @@ export default async function PracticeActivityPage({
             work meets and why, and you revise until it does. Your case has its own figures, so
             nobody else&apos;s answer fits it.
           </p>
-          <StartSimulation packId={pack.id} activityId={activity.id} />
+          <StartSimulation packId={pack.id} activityId={activity.id} grader={grader} />
         </section>
       </main>
     </AppShell>

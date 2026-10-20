@@ -54,13 +54,25 @@ async function chargeOrThrow(userId: string): Promise<void> {
 }
 
 /** Build the document-generation capability from the user's configured provider. */
-export async function getUserDocGenerate(userId: string): Promise<DocGenerate | null> {
+export async function getUserDocGenerate(
+  userId: string,
+  options?: {
+    /**
+     * A deliberate, bounded batch the CALLER has already metered (Practice's marking check: 45
+     * calls, at most 3 checks a day). Charging each call would spend the hour's whole allowance
+     * on one check and turn the next check's refusals into a false "this model can't mark".
+     */
+    meteredByCaller?: boolean;
+  }
+): Promise<DocGenerate | null> {
   const chain = buildProviderChain(await getUserProviderConfigs(userId));
   const provider = chain[0];
   if (!provider) return null;
+  const charge = options?.meteredByCaller ? async () => {} : () => chargeOrThrow(userId);
   return {
+    identity: { provider: provider.id, model: provider.model },
     structured: async (system, user, schema, name, options) => {
-      await chargeOrThrow(userId);
+      await charge();
       return provider.parseStructured(
         [
           { role: "system", content: system },
@@ -72,7 +84,7 @@ export async function getUserDocGenerate(userId: string): Promise<DocGenerate | 
       );
     },
     text: async (system, user) => {
-      await chargeOrThrow(userId);
+      await charge();
       return provider.chat(
         [
           { role: "system", content: system },

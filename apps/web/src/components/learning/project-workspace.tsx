@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
   ArrowLeft,
@@ -54,6 +55,7 @@ import { Checked, ProjectNext } from "@/components/learning/project-next";
 import { DocumentStep, ReviewResult } from "@/components/learning/document-step";
 import type { ReviewView } from "@/lib/practice/document-sim";
 import { conductorAction } from "@/app/dashboard/learning/conductor-actions";
+import { restartPracticeActivityAction } from "@/app/dashboard/learning/practice-actions";
 import type { ConductorView } from "@/lib/lab/conductor/evaluate";
 import { stepScript } from "@/lib/learning/instruction-blocks";
 import { ProjectReadiness } from "@/components/learning/project-readiness";
@@ -348,8 +350,15 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
                     })
                   }
                 />
-                {/* Re-planning a work simulation would hand its pack steps to the AI planner. */}
-                {run.isPractice ? null : <Replan runId={runId} onReplanned={refresh} />}
+                {/* Re-planning a work simulation would hand its pack steps to the AI planner, so
+                    its one option here is the same "Start the project over" — with a new case. */}
+                {run.isPractice ? (
+                  current ? (
+                    <StartPracticeOver runId={runId} />
+                  ) : null
+                ) : (
+                  <Replan runId={runId} onReplanned={refresh} />
+                )}
                 <PlanHistory
                   runId={runId}
                   stepsKey={run.steps.map((s) => `${s.id}:${s.status}`).join()}
@@ -962,6 +971,56 @@ function StepList({
         );
       })}
     </ol>
+  );
+}
+
+/**
+ * A work simulation starts over with a NEW case — new figures, steps from the beginning. The
+ * attempt in progress is closed, not deleted: its submissions and reviews stay on its record.
+ */
+function StartPracticeOver({ runId }: { runId: string }) {
+  const router = useRouter();
+  const [asking, setAsking] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [busy, start] = useTransition();
+  if (!asking) {
+    return (
+      <div className="px-1 text-xs text-muted-foreground">
+        <button
+          type="button"
+          onClick={() => setAsking(true)}
+          className="hover:text-foreground hover:underline"
+        >
+          Start the project over
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2 px-1 text-xs">
+      <span className="w-full">
+        Start over with a new case: new figures, from step one. This attempt is closed, and what you
+        handed in stays on its record.
+      </span>
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={busy}
+        onClick={() =>
+          start(async () => {
+            const result = await restartPracticeActivityAction({ runId });
+            if (!result.ok) return setNote(result.message);
+            router.push(`/dashboard/learning/projects/${result.runId}`);
+          })
+        }
+      >
+        {busy ? "Preparing…" : "Start over with a new case"}
+      </Button>
+      <Button size="sm" variant="ghost" disabled={busy} onClick={() => setAsking(false)}>
+        Cancel
+      </Button>
+      {note ? <span className="w-full text-amber-600">{note}</span> : null}
+    </div>
   );
 }
 
