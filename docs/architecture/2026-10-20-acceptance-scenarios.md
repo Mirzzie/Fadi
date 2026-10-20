@@ -1,7 +1,8 @@
 # Adaptive Career Loop: end-to-end acceptance scenarios
 
 **Date:** 20 Oct 2026
-**Companion to:** ADR 0015 and the roadmap
+**Companion to:** ADR 0015 (revision 2) and the roadmap
+**Revision 2:** A2 and C adjusted, and E, F and G added, after Codex's review.
 
 ## How these tests work
 
@@ -12,7 +13,8 @@
   model judgements themselves are tested separately by the judgement gate (contract 8).
 - **Format:** each step is *Given → When → Then*, plus **Must not** for the failures that matter
   most.
-- **"Strength"** means the scale in ADR §2.1 (`verified | observed | stated | inferred`).
+- **Evidence** keeps its native scale (ADR §2.1). The person's goals and preferences are
+  `person_choice` authority, not evidence strengths.
 - **Permit figures are not settled.** The figures below come from assistants the owner consulted.
   The tests assert that Fadi *re-establishes* them from the recorded official snapshot, never that
   the numbers are correct.
@@ -64,17 +66,22 @@
 - **Then:**
   - Each rule is a `ResearchClaim` with an **exact quote** found in its snapshot, the source's
     `authority: official`, `retrievedAt`, and `effectiveFrom` when the page states one.
-  - Fadi derives these deadlines as facts with `source.kind: derived` and the rule named:
-    - concession deadline = award date + 12 months = **2027-02-14**;
-    - renewal window opens = expiry − 12 weeks ≈ **2027-02-05**;
-    - permission ends **2027-04-30**.
+  - Fadi derives these as **conditional calculated deadlines** (ADR contract 1). Each names the
+    rule and its version, the exact claim versions, the inputs, and `Europe/Dublin`, with a
+    boundary and a more conservative planning target:
+    - concession: boundary = award date + 12 months = **2027-02-14**; the planning target is
+      earlier;
+    - renewal window: opens about **2027-02-05** (expiry − 12 weeks);
+    - current permission ends **2027-04-30**. A possible second Stamp 1G period is a separate,
+      conditional fact, not an extension of this one.
+  - None of these is presented as a verified entitlement.
   - The salary thresholds appear with their source and the date checked. Where two official pages
     differ by a few euros, **both** are shown, linked by `conflictsWith`.
   - The plan carries the advice to confirm with ISD or DETE before applying.
 - **Must not:**
   - present a threshold that has no quote in a snapshot;
   - treat "retrieved today" as "published today";
-  - compute a deadline from a claim that is only `observed`.
+  - compute a deadline from an unadmitted claim, or from one whose applicability is `unclear`.
 
 ### A3. Plan: several strategies, including the person's own
 
@@ -107,13 +114,15 @@
   - 1 technical interview invitation;
   - 16 with no reply after 3 weeks;
 - **Then:**
-  - 9 `application.*` events with `source.kind: mail, provider: pasted`, `strength: observed`,
-    each linked to its application (or to the person's choice when the match is uncertain);
+  - 9 `mail_candidates` (`provider: pasted`) are created. They are admitted as canonical
+    `application.*` events only when the match is unambiguous and the classification check has
+    passed; otherwise the person confirms the type and the application first;
   - the 16 are shown as **"no reply yet"**, with no rejection events;
   - application `outcome` fields update as **projections** of the events.
 - **When** the person reports "they liked my automation projects but I struggled with DNS
   troubleshooting".
-- **Then** an `interview.feedback` event with `strength: stated` is recorded, and a finding of kind
+- **Then** an `interview.feedback` event (source: the person, evidence method `person_said`) is
+  recorded, and a finding of kind
   `reported_gap` names "DNS troubleshooting".
 
 ### A5. Learn and adapt: no overreaction
@@ -209,7 +218,7 @@
 - **When** she reports "the HR manager said I should get experience with employee relations
   cases".
 - **Then:**
-  - a `stated` feedback event;
+  - a feedback event from the person (`person_said`);
   - a finding of `reported_gap: employee relations`;
   - a proposal of `adjust_tactics`: a document simulation on employee relations (Practice), and
     asking her manager to shadow one case.
@@ -231,10 +240,14 @@
   - the official one is `verified` with its effective date;
   - the article is `observed`, with its publication date shown as older.
   - The planner uses X and says a secondary source disagrees.
-- **Given** instead two *official* pages that disagree.
+- **Given** instead two *official* pages that disagree **on the salary threshold**, while a
+  separate official page on the renewal window is consistent.
 - **Then:**
-  - neither is used to compute a deadline;
-  - the plan says "confirm with the authority", and lists both.
+  - the salary conflict **blocks only** salary and eligibility decisions (`blocks:
+    ["salary_eligibility"]`), and the plan lists both values and says "confirm with the
+    authority";
+  - the renewal-window deadline is **still calculated**: blocking is local to the decisions that
+    depend on the conflict.
 - **Must not:** pick whichever source came first; blend the two values.
 
 ---
@@ -293,3 +306,52 @@
 
 A model that hasn't passed a judgement's check can still *propose*, but it never writes a
 consequential record (ADR §2.4). That's how the current marking check already behaves.
+
+---
+
+## Scenario E: research edge cases (revision 2)
+
+- **E1. A stale official rule.** The snapshot's `effectiveUntil` has passed, or `freshForDays`
+  has lapsed. The claim is shown as stale, and no deadline or eligibility decision uses it until
+  it's re-fetched.
+- **E2. An exact quote in the wrong context.** A threshold is quoted exactly, but from a different
+  permit, year or category. Admission records `applicability: does_not_match` and nothing uses it.
+- **E3. A corrected award date.** The person corrects the award date. Every calculated deadline
+  derived from it is marked stale and recalculated, and the plan's checkpoints update. The old
+  deadline stays in history with the reason.
+- **E4. Cross-user references.** A claim, source or event id belonging to another user is refused
+  at every read and admission path.
+- **E5. An unknown predicate or value.** Admission refuses it; nothing is stored as a fact.
+- **E6. Evidence kinds are kept apart.** Measured vacancy counts, incomplete aggregator samples,
+  forecasts and recommendations stay distinct, labelled kinds. Fadi gives no permit verdict from a
+  job title alone or a salary alone.
+
+## Scenario F: execution failures (revision 2)
+
+- **F1. Two workers.** Two workers claim at once: one wins each item, and the other gets nothing.
+- **F2. An expired lease.** A slow item's lease lapses and another worker reclaims it (fence +1).
+- **F3. A stale completion.** The first worker finishes after losing the lease. Its write is
+  refused because the fence doesn't match.
+- **F4. Cancellation during an API call.** The attempt ends `cancelled`; the external effect is
+  reconciled, not assumed.
+- **F5. A crash after an external side effect.** The effect was recorded as `intended` with an
+  idempotency key. On resume it is reconciled (found done), not repeated.
+- **F6. A changed target after approval.** The re-resolved input hash differs, so the approval is
+  stale and the action is refused; the person is asked again.
+- **F7. Replay after a correction.** A corrected event replays through the projection, and an
+  older rejection never overwrites a newer offer.
+- **F8. A missed schedule.** With the worker down for a week, a weekly review catches up once,
+  not seven times. Nothing discretionary runs while the person is resting.
+
+## Scenario G: adaptation edge cases (revision 2)
+
+- **G1. A declined or stale review.** The person declines: nothing changes, and the response is
+  recorded. A plan revised after the review was made makes its acceptance fail safely against
+  `baseRevision`, and the person is asked again.
+- **G2. Rest.** With `resting_until` set, no proposals are made; reviews resume afterwards.
+- **G3. Sparse or correlated applications.** Few suitable applications, or many through one
+  channel, means no fallback proposal. The review says what evidence is missing, and that channel
+  diversity is a hint, not an independence estimate.
+- **G4. A preference change with no application history.** "I want to try IAM instead" is acted
+  on at once (a revision or an experiment). There's no quota and no waiting for rejections.
+
