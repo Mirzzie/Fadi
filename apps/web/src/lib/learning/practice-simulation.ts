@@ -8,9 +8,16 @@ export function practiceSimulation(
   direction: { role?: string | null; domain?: string | null },
   installed: readonly InstalledSimulation[]
 ): { title: string; description: string; href: string; experimental: boolean } | null {
-  const text = `${direction.domain ?? ""} ${direction.role ?? ""}`;
+  const role = direction.role ?? "";
+  const text = `${direction.domain ?? ""} ${role}`;
+  // An industry is not a job function: recruiting or selling for IT/cloud is business work.
+  const businessRole =
+    /\b(recruit(?:er|ing|ment)|sales|account executive|account manager|customer success|marketing|human resources|hr)\b/i.test(
+      role
+    );
   const technical =
-    /\b(cyber(?:security)?|information security|security operations|security analyst|security engineer|soc|iam|identity|cloud|infrastructure|devops|sre|it|helpdesk|service desk|systems? (?:engineer|admin(?:istrator)?))\b/i.test(
+    !businessRole &&
+    /\b(cyber(?:security)?|information security|security operations|security analyst|security engineer|soc|iam|identity|cloud (?:operations|engineer(?:ing)?|architect(?:ure)?|support|admin(?:istrator|istration)?)|infrastructure|devops|sre|it (?:support|operations|admin(?:istrator|istration)?|technician|engineer|specialist)|helpdesk|service desk|systems? (?:engineer|admin(?:istrator)?))\b/i.test(
       text
     );
   const wanted = technical ? "security-operations" : "customer-success";

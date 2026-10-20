@@ -237,9 +237,12 @@
 - **When** research extracts the rule.
 - **Then:**
   - two claims linked by `conflictsWith`;
-  - the official one is `verified` with its effective date;
-  - the article is `observed`, with its publication date shown as older.
-  - The planner uses X and says a secondary source disagrees.
+  - both have `extraction: quote_located`; the official source has `authority: official`,
+    and the article has `authority: reputable_secondary`, with its older publication date;
+  - neither acquires a global `verified` truth label from its publisher or a matching quote;
+  - the planner may use X only after checking scope, applicability, effective dates and freshness,
+    and recording why Y does not apply. An unresolved conflict blocks dependent eligibility
+    decisions; it is not silently resolved by source rank.
 - **Given** instead two *official* pages that disagree **on the salary threshold**, while a
   separate official page on the renewal window is consistent.
 - **Then:**

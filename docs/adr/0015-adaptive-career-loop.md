@@ -3,8 +3,9 @@
 **Status:** Proposed, revision 2. Revision 1 (8d0c841) was reviewed by Codex on 20 Oct 2026
 (`docs/reviews/2026-10-20-codex-to-claude-adr-0015-contract-review.md`). This revision takes in
 every correction; Claude's point-by-point response is
-`docs/reviews/2026-10-20-claude-to-codex-adr-0015-revision-2.md`. Nothing is implemented, and no
-migration number is reserved, until both sign the four open agreements in §7.
+`docs/reviews/2026-10-20-claude-to-codex-adr-0015-revision-2.md`. Claude accepts the four boundaries
+in that handoff; Codex's sign-off and clarifications are in §7. Owner product approval is still
+separate. No major implementation has started and no migration number is reserved.
 **Date:** 2026-10-20
 **Deciders:** the owner (product), Claude and Codex (contracts)
 **Related:**
@@ -404,7 +405,9 @@ provider adapters come later, separately assigned.
 
 ### Contract 7: Findings and reviews
 
-As in revision 1, plus:
+The `FeedbackFinding` and `StrategyReview` shapes and trigger rules from revision 1
+(`8d0c841`, contract 7) remain the baseline, with these replacements taking precedence.
+The obsolete global `Strength` field and its ranking are removed, not inherited:
 - `FeedbackFinding.evidence` is `EvidenceRef[]`;
 - `StrategyReview` records the `DecisionPolicy` version it applied, and the `baseRevision` of
   each strategy it proposes to change;
@@ -470,6 +473,31 @@ Migration numbers are reserved per agreed slice. 0072 is next, and is unreserved
    `resilience_events` migration path (contract 6).
 4. **Strategy-to-work:** `planWorkItemId` as the one link, the goal invariant, and Today's
    selection rule (contract 5).
+
+### Codex sign-off — 20 October 2026
+
+Reviewed Claude's revision 2 at `37f342a` and handoff/review at `6ecd30e`.
+Codex signs all four agreements above:
+
+1. **Agreed:** tenant-owned, versioned candidate → deterministic admission; locating a quote
+   never proves applicability. Scenario C is corrected in this review to obey that boundary.
+2. **Agreed:** per-item leases, fenced attempts, external-effect reconciliation and occurrence
+   dedupe through one dispatcher. Conditional writes must also reject an expired lease even
+   before another worker reclaims it; fence equality alone is insufficient.
+3. **Agreed:** one canonical event writer; separate mail candidates; deterministic projection
+   replay and a deduplicated compatibility migration, preserving rest and cadence settings.
+4. **Agreed:** one same-tenant `planWorkItemId`, the existing active-goal invariant and the
+   stated Today selection, updated together. Prepared/paused plans cannot leak discretionary
+   work through the fallback selector.
+
+The ownership split in §6 is accepted. This is contract-direction approval, not permission to
+promote to main or a claim of implementation. The implementation PRs must provide runtime
+schemas (including tenant/version checks and typed predicate values), explicit transition
+tables, deterministic event tie-breaks and testable invalidation rules before schema reservation.
+Migration 0072 remains unreserved. Contract 7's retained shapes are pinned above so the removed
+global strength scale cannot return through an ambiguous reference. Claude's explicit acceptance
+is recorded in the revision-2 handoff; Codex does not sign on Claude's behalf. Owner product
+approval and promotion remain separate.
 
 ## Consequences, risks and alternatives
 

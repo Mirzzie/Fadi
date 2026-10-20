@@ -9,20 +9,37 @@ describe("the single optional simulation on Learning", () => {
     "Cloud operations",
     "Infrastructure engineer",
     "IAM analyst",
+    "IT operations engineer",
+    "Cloud engineer",
   ])("shows the installed identity incident for %s", (role) => {
     expect(practiceSimulation({ role }, installedActivities())?.href).toBe(
       "/dashboard/learning/practice/fadi.security-operations/suspicious-sign-ins"
     );
   });
 
-  it.each(["Retail manager", "HR coordinator", "Digital marketing", "Security guard"])(
-    "keeps the business sample for %s",
-    (role) => {
-      expect(practiceSimulation({ role }, installedActivities())?.href).toBe(
-        "/dashboard/learning/practice/fadi.customer-success/churn-review"
-      );
-    }
-  );
+  it.each([
+    "Retail manager",
+    "HR coordinator",
+    "Digital marketing",
+    "Security guard",
+    "IT recruiter",
+    "Cloud sales",
+    "Cloud account executive",
+    "Cybersecurity recruiter",
+    "IT",
+    "Cloud",
+  ])("keeps the business sample for %s", (role) => {
+    expect(practiceSimulation({ role }, installedActivities())?.href).toBe(
+      "/dashboard/learning/practice/fadi.customer-success/churn-review"
+    );
+  });
+
+  it("does not mistake a technical industry for a business person's job function", () => {
+    expect(
+      practiceSimulation({ role: "IT recruiter", domain: "Cybersecurity" }, installedActivities())
+        ?.href
+    ).toContain("fadi.customer-success");
+  });
 
   it("uses the active domain when the role is abbreviated", () => {
     expect(

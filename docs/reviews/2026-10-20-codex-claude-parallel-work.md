@@ -1,5 +1,44 @@
 # Codex / Claude parallel work — 20 October 2026
 
+## Current review — Claude revision 2
+
+Codex read both handoffs at `6ecd30e`, reviewed ADR revision 2 at `37f342a`, and merged
+`1b2aad5` and `6ecd30e` into this candidate. All four original sign-ins findings below are
+closed by source review and regression tests: an explicit 09:30 cutoff, honest pending/unknown
+response reporting, corrected sourced authentication guidance, and per-activity marking suites.
+The pack remains experimental: no new live model evaluation or practitioner review is claimed.
+
+Codex signs all four agreements in ADR §7 and accepts the complete-module ownership split.
+Small residual document contradictions were corrected in this candidate: Scenario C's automatic
+`verified` label, the roadmap's global scale and deliberately red tests, missing scheduler,
+and stale implementation status. Contract 7 now pins the retained revision-1 definitions and
+explicitly removes their obsolete global `Strength` field. An expired worker must be rejected
+even before reclamation, not just after its fence changes. Runtime schemas and precise state
+transitions remain implementation review gates. ADR remains Proposed for the owner's decision;
+0072 is still unreserved and no major implementation has started.
+
+Claude's P3 selector finding is fixed here. Business job functions (including IT recruiting and
+cloud sales/account executive) do not become technical because of an industry word or domain.
+Bare `it`/`cloud` alone also do not imply engineering; explicit IT support/operations and cloud
+engineering/operations still select the incident example. Nine additional regressions keep the
+single existing card and its experimental status; no new control or state owner is added.
+
+Combined checks after these merges and the selector fix: **2,010 passed, 24 skipped** with the
+isolated PostgreSQL test database and four workers; database/web typecheck and selector lint pass.
+Browser smoke on the combined tree: **2/2 passed**, 43.6 seconds total, golden path 37.0 seconds,
+with the unchanged 90-second budget. It covers public landing/sign-in, signup, deterministic
+onboarding, all 11 supported dashboard routes, the single technical-direction simulation link,
+and the application workspace. No live grading calls were made.
+
+The first smoke attempt failed with a connection reset because Turbopack aborted while restoring
+cached tasks (`Restore of All ... restoring failed`). The cache was preserved at
+`/tmp/fadi-phase0-r2-cache.Xjjhl1/next-preserved`, not deleted; the clean-cache rerun above passed.
+No product setting, timeout or assertion was relaxed. This is source/integration approval for
+the owner's promotion decision, not an exhaustive visual audit or automatic main promotion.
+
+The sections below retain the historical review sequence; they are not a claim that Claude's
+branches or findings remain at their earlier state.
+
 ## Observed work and ownership
 
 The owner asked us to continue together. Read-only inspection found Claude actively editing the
@@ -35,7 +74,7 @@ This is a candidate for combined validation. The owner's integration worktree an
 untouched. No ADR migrations are started; 0072 remains next. Dependencies are unchanged; existing
 third-party installations are linked locally, while `@careeros` packages resolve to this candidate.
 
-## Incident-pack findings for Claude
+## Original incident-pack findings — now closed by `1b2aad5`
 
 1. **The briefing lacks an evidence cutoff.** `signinBrief` names an 08:00 alert while `signinCase`
    generates normal sign-ins up to minute 560 (09:20). This can be coherent if the analyst reviews
@@ -127,10 +166,11 @@ Coordinate through separate worktrees, commits and these handoffs. A commit or p
 establish the other agent's acceptance; record explicit decisions and the reviewed revision.
 The owner has told Claude about the pending contract review.
 
-## Worker slice checklist — proposed, awaiting contract agreement
+## Worker slice checklist — contracts signed, implementation review next
 
 This is preparation, not implementation or a migration reservation. Existing outbox files remain
-the starting point; ADR 0015 is still Proposed.
+the starting point; ADR 0015 is still Proposed. The four boundaries are now signed in §7;
+the concrete schemas, state transitions and migration allocation are the next review artifact.
 
 1. Agree task/consequence state transitions, cancellation, approval waiting and retry ownership.
    Define a semantic dedupe key scoped to tenant/operation/input revision.
@@ -155,6 +195,8 @@ and Practice. No worker, schema or scheduler change has been made during prepara
 
 ## Next dependency
 
-Codex validates the combined Phase 0 candidate; Claude reviews the incident findings and proposed
-contract amendments. Once Claude responds with corrections, rerun the affected Practice and
-browser checks. Only the owner can approve promotion to main.
+Finish the combined browser check and hand the candidate to the owner for a promotion decision.
+Claude can review Codex's small documentation clarifications and selector regression fix here.
+Next, Codex prepares the worker state-transition/runtime-schema slice while Claude owns
+Situation/onboarding and evaluation. Agree the schema boundary and reserve migrations before
+parallel database changes. Only the owner can approve promotion to main; no push is implied.

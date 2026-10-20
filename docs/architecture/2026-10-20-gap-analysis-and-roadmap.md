@@ -39,7 +39,7 @@ Every "new" row says why nothing existing fits.
 | Goal, plan and step structure | Extended | `work_items` (`kind: goal \| plan \| step`), `lib/work/plans.ts` templates | Strategies sit above plans |
 | Career tracks | Extended | `career_profiles` (several per person, one active) | A strategy can point at a track; tracks stop being the only notion of direction |
 | Plan A/B/C, person-originated plans, experiments, assumptions, activation conditions, revisions | **New** | Nothing holds alternatives with conditions or history | `strategies`, `experiments`, `strategy_revisions` (contract 5) |
-| Deadlines computed from facts | **New** | `applications.deadline_at` is per application only | A derived situation fact (`source.kind: "derived"`, with the rule) |
+| Deadlines computed from facts | **New** | `applications.deadline_at` is per application only | A conditional calculated deadline from an `authority: derived` situation fact, with exact rule, claim and input versions |
 | Today shows the plan's next step | Extended | `lib/work/today.ts` (goal, next, what Fadi did, decisions) | "What am I trying to achieve" reads the active strategies |
 
 ### Act
@@ -57,7 +57,7 @@ Every "new" row says why nothing existing fits.
 | Capability | Status | Existing basis | Change |
 |---|---|---|---|
 | Durable consequences | Extended | `outbox_events` and `lib/outbox/worker.ts` (lease, retry, idempotent) | Task kind, heartbeat, result, max attempts (contract 3) |
-| Worker process | **New** | The worker runs only on request-time kicks and Today loads | `scripts/worker.ts` on a timer (Proxmox-capable). The kicks remain as a fallback. |
+| Worker process | **New** | Request-time kicks, Today loads and the existing authenticated `/api/agent/run` scheduler | `scripts/worker.ts` uses the same dispatcher (Proxmox-capable). Existing entry points remain. |
 | Career event ledger | **New** | `resilience_events` (momentum deltas), application `outcome` fields, outbox topics | `career_events` (contract 6). Application status becomes a projection; `resilience_events` folds in (open question 2). |
 | Mail: paste and forward | **New** | None | Paste or forward a message, classified by the judgement gate |
 | Mail: Gmail and Outlook read-only | **New** | `lib/email/send.ts` only *sends* | Provider adapters, after paste and forward work (milestone M7) |
@@ -84,7 +84,7 @@ Every "new" row says why nothing existing fits.
 
 | Capability | Status | Existing basis | Change |
 |---|---|---|---|
-| One strength scale | Extended | Practice `observed`/`verified`; steps `attested`/`evidenced`/`verified` | `verified \| observed \| stated \| inferred` everywhere (ADR §2.1) |
+| Lossless evidence references | Extended | Practice `self_reported`/`recorded`/`observed`/`verified`; steps `attested`/`evidenced`/`verified` | `EvidenceRef` preserves native scales and provenance; personal authority is separate (ADR §2.1) |
 | AI-judgement gate | Extended | `rubric-eval`, `practice_grader_checks` | `lib/evaluation` with `judgement_checks` (contract 8) |
 | Untrusted content handling | Extended | The rubric's untrusted block, `containsRubricGaming` | Shared wrapper for pages, mail and READMEs |
 | Provider routing | Extended | `lib/ai/registry.ts`, `DocGenerate.identity` | A judgement runs only on a model that passed its check |
@@ -98,7 +98,9 @@ Every "new" row says why nothing existing fits.
 
 ## 2. Roadmap
 
-The order is set by dependency, not by size. The first complete slice is aimed at the owner's 30 Nov milestone, so it deliberately leaves out mail integration and the full worker.
+The order is set by dependency, not by size. The first complete slice is aimed at the owner's
+30 Nov milestone. It includes pasted-mail candidates and a minimal durable worker; provider mail
+integration and full recurring scheduling follow later.
 
 ```mermaid
 flowchart LR
@@ -120,7 +122,7 @@ flowchart LR
 | Milestone | Depends on | Delivers | Exit criterion | Proposed owner |
 |---|---|---|---|---|
 | **M0 Sync** | n/a | `integration/2026-10-20` (facelift and Practice merged) | Suite, migrations from empty, and the browser golden path all pass. **Owner approves before it becomes main.** | Claude prepared; owner approves |
-| **M1 Contracts** | M0 | ADR 0015 accepted, with open questions answered | Codex and Claude both sign the contracts; a schema test per contract exists (failing until built) | Both |
+| **M1 Contracts** | M0 | ADR 0015 accepted, with open questions answered | Codex and Claude sign the contracts; runtime-schema and transition test cases are specified, then delivered green with their implementation slices | Both |
 | **M2 Foundations** | M1 | `EvidenceRef` (native scales untouched); `lib/evaluation` with full check binding; **minimal standalone worker**: outbox `kind: task`, fencing, per-item leases, `task_attempts`, cancellation, the same loop behind `/api/agent/run` and request kicks | Existing tests unchanged. The worker survives a restart, two overlapping workers, a stale completion and duplicate delivery, and a task runs with no page open | Claude (evaluation); Codex (worker) |
 | **M3 Situation** | M1 | `situation_facts`; predicate registry and admission; onboarding that discovers constraints (conversation and UI) | Scenario A1: the owner's CV and answers give the expected facts and authority; unknown predicates are refused; the five-field chat is gone | Claude |
 | **M4 Research v1** | M2, M3 | Tenant-owned runs; safe fetching; snapshots; `ExtractedClaimCandidate → AdmissionResult`; scope, freshness, conflicts and dependency-local blocking. Ireland permit routes first. | Scenarios A2, C and E pass; no calculated deadline from an unadmitted claim | Codex (fetch, store, admission); Claude (candidate semantics, eval set) |
@@ -135,10 +137,11 @@ flowchart LR
 - **Claude:** the three incident Practice packs (suspicious sign-ins, Linux outage, access
   failure). They produce the owner's proof now, and they become `skill.evidenced` events once
   M5 lands.
-- **Codex:** finish the facelift and commit the 12 uncommitted files in `codex-my-career`
-  before the next integration.
+- **Codex:** the 12 pending files are committed as `6024043` and merged into the Phase 0
+  candidate; finish combined validation and hand it to the owner for promotion.
 - **Owner:**
-  - run the marking check on the Groq model (no model has passed it yet);
+  - run a current, per-activity marking check on the chosen model; an earlier churn result
+    does not qualify the new sign-ins suite or replace version-bound checks;
   - review this ADR.
 
 ### Deliberately postponed
