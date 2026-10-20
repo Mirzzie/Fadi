@@ -113,23 +113,34 @@ export default async function JobsPage({
 
   return (
     <AppShell>
-      <div className="mx-auto mb-4 max-w-shell space-y-3">
-        <UnifiedJobSearch
-          activeRole={profile?.targetRole ?? null}
-          selectedCountry={worldwide ? "any" : (getCountry(country)?.code ?? null)}
-          selectedCity={city ?? null}
-          selectedModes={modes}
-          selectedTypes={types}
-          selectedVisa={visa}
-          selectedKeywords={keywords}
-        />
-        <JobSearchProgress status={syncStatus} />
-        <details className="rounded-xl border border-border/60 bg-card/40">
-          <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground">
-            Search details
-          </summary>
-          <div className="border-t border-border/60">
-            <JobControlBar
+      <div className="mx-auto mb-8 max-w-6xl border-b border-border/70 pb-7 pt-3">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+          Opportunities
+        </p>
+        <h1 className="max-w-4xl text-4xl font-semibold tracking-[-0.045em] md:text-5xl">
+          Find work worth pursuing.
+        </h1>
+        <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
+          Search the live market in plain language. Fadi ranks what comes back against the evidence
+          already in your career record.
+        </p>
+        <div className="mt-7 space-y-3">
+          <UnifiedJobSearch
+            activeRole={profile?.targetRole ?? null}
+            selectedCountry={worldwide ? "any" : (getCountry(country)?.code ?? null)}
+            selectedCity={city ?? null}
+            selectedModes={modes}
+            selectedTypes={types}
+            selectedVisa={visa}
+            selectedKeywords={keywords}
+          />
+          <JobSearchProgress status={syncStatus} />
+          <details className="border-t border-border/70">
+            <summary className="cursor-pointer py-3 text-sm font-medium text-muted-foreground hover:text-foreground">
+              Search details
+            </summary>
+            <div className="border-t border-border/60 pt-3">
+              <JobControlBar
               sources={sourcesHealth.sources}
               // What each source actually put in front of them, after matching and filtering. A
               // source's own pull count answers "did the API reply"; this answers "did it help".
@@ -141,9 +152,10 @@ export default async function JobsPage({
               activeModes={modes}
               activeTypes={types}
               autoSearch={Boolean(prefs.autoSearch)}
-            />
-          </div>
-        </details>
+              />
+            </div>
+          </details>
+        </div>
       </div>
       <JobsShell
         observedAt={

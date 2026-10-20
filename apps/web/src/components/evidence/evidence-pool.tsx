@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  ChevronDown,
   ExternalLink,
   ImagePlus,
   Layers,
@@ -98,60 +99,50 @@ export function EvidencePool({
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6 p-4 sm:p-6">
-      <header className="space-y-1.5">
-        <div className="flex items-center gap-2">
-          <Layers className="size-5 text-primary" aria-hidden="true" />
-          <h1 className="text-lg font-semibold">Your evidence</h1>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Your real experience, stored once. It&apos;s ranked here for your active direction
-          {track ? (
-            <>
-              {" — "}
-              <span className="text-foreground">{track.role}</span>
-            </>
-          ) : (
-            <> (set a direction to frame it)</>
-          )}
-          . Switch directions and the{" "}
-          <span className="text-foreground">same evidence re-ranks</span> for that path — one
-          truthful history, many career identities.
+    <div className="mx-auto w-full max-w-4xl space-y-8 pb-12 lg:pt-5">
+      <header className="max-w-3xl space-y-3">
+        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+          <Layers className="size-4" aria-hidden="true" />
+          My career
+        </p>
+        <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
+          A record you can defend.
+        </h1>
+        <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+          Store each real experience once. Fadi uses this record for your CV, portfolio and
+          interview preparation, without changing the underlying truth.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Current direction: {track ? <span className="text-foreground">{track.role}</span> : "not set"}.
+          {track
+            ? " Relevance changes with direction; your record does not."
+            : " Add a direction when you want tailored ordering."}
         </p>
       </header>
 
-      <Link
-        href="/dashboard/evidence/stories"
-        className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-      >
-        <MessageSquareQuote className="size-3.5" aria-hidden="true" />
-        Interview stories from this record
-      </Link>
-
-      {/* ONE DOOR. There used to be two verbs here — "Build from my history" (which read a CV
-          saved on another screen) and "Add an item" — plus a third upload box below, and a CV
-          could sit saved with nothing built from it. Adding history IS the same box either way,
-          so the buttons open it rather than doing a different thing. */}
       {ranked.length > 0 ? (
-        <div className="flex flex-wrap gap-2">
+        <section className="border-y border-border py-5 sm:flex sm:items-center sm:justify-between sm:gap-6">
+          <div className="max-w-xl">
+            <h2 className="font-medium">Keep your record current</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Add new work, learning or outcomes. Fadi will compare them with what is already here
+              before anything becomes career evidence.
+            </p>
+          </div>
           <Button
-            size="sm"
-            variant="outline"
+            className="mt-4 shrink-0 sm:mt-0"
             onClick={() => setCapturing((v) => !v)}
             disabled={pending}
           >
             <Wand2 className="size-4" aria-hidden="true" />
-            Add more history
+            {capturing ? "Close intake" : "Add to my record"}
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setEditing("new")} disabled={pending}>
-            <Plus className="size-4" aria-hidden="true" />
-            Add one by hand
-          </Button>
-        </div>
+        </section>
       ) : null}
+
       {capturing && ranked.length > 0 ? (
         <HistoryCapture
-          title="Add more of your history"
+          title="Add to your career record"
           onSaved={() => {
             setCapturing(false);
             setError(null);
@@ -159,6 +150,7 @@ export function EvidencePool({
           }}
         />
       ) : null}
+
       {notice ? (
         <p role="status" className="text-sm text-muted-foreground">
           {notice}
@@ -184,8 +176,9 @@ export function EvidencePool({
         />
       ) : null}
 
-      {ranked.length === 0 && editing !== "new" ? (
-        <div className="space-y-3">
+      {ranked.length === 0 ? (
+        editing !== "new" ? (
+          <div className="space-y-3">
           {hasStoredHistory ? (
             /* A CV saved with nothing built from it was the commonest broken state: the text was
                on file, the record was empty, and every other screen quietly had nothing to work
@@ -212,42 +205,76 @@ export function EvidencePool({
               }}
             />
           )}
+          </div>
+        ) : null
+      ) : (
+        <section className="space-y-3">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold">Career record</h2>
+              <p className="text-xs text-muted-foreground">
+                {ranked.length} {ranked.length === 1 ? "record" : "records"} · ordered for{" "}
+                {track?.role ?? "your next direction"}
+              </p>
+            </div>
+          </div>
+          <ul className="divide-y divide-border overflow-hidden rounded-xl border bg-card">
+            {ranked.map((r) =>
+              editing === r.item.id ? (
+                <li key={r.item.id} className="p-4 sm:p-5">
+                  <EvidenceEditor
+                    item={r.item}
+                    onClose={() => setEditing(null)}
+                    onSaved={() => {
+                      setEditing(null);
+                      setReviewVersion((v) => v + 1);
+                      router.refresh();
+                    }}
+                  />
+                </li>
+              ) : (
+                <EvidenceCard
+                  key={r.item.id}
+                  ranked={r}
+                  hasTrack={Boolean(track)}
+                  trackRole={track?.role ?? ""}
+                  onEdit={() => setEditing(r.item.id)}
+                  onRemove={() => remove(r.item.id)}
+                  onRemoveArtifact={removeArtifact}
+                />
+              )
+            )}
+          </ul>
+        </section>
+      )}
+
+      <details className="group text-sm text-muted-foreground">
+        <summary className="inline-flex cursor-pointer list-none items-center gap-1.5 hover:text-foreground">
+          Other ways to use this record
+          <ChevronDown
+            className="size-4 transition-transform group-open:rotate-180"
+            aria-hidden="true"
+          />
+        </summary>
+        <div className="mt-3 flex flex-wrap items-center gap-3 border-l border-border pl-4">
           <button
             type="button"
             onClick={() => setEditing("new")}
-            className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+            className="inline-flex items-center gap-1.5 hover:text-foreground"
+            disabled={pending}
           >
-            Or add one item by hand
+            <Plus className="size-4" aria-hidden="true" />
+            Add one item manually
           </button>
+          <Link
+            href="/dashboard/evidence/stories"
+            className="inline-flex items-center gap-1.5 hover:text-foreground"
+          >
+            <MessageSquareQuote className="size-4" aria-hidden="true" />
+            Review interview stories
+          </Link>
         </div>
-      ) : (
-        <ul className="space-y-3">
-          {ranked.map((r) =>
-            editing === r.item.id ? (
-              <EvidenceEditor
-                key={r.item.id}
-                item={r.item}
-                onClose={() => setEditing(null)}
-                onSaved={() => {
-                  setEditing(null);
-                  setReviewVersion((v) => v + 1);
-                  router.refresh();
-                }}
-              />
-            ) : (
-              <EvidenceCard
-                key={r.item.id}
-                ranked={r}
-                hasTrack={Boolean(track)}
-                trackRole={track?.role ?? ""}
-                onEdit={() => setEditing(r.item.id)}
-                onRemove={() => remove(r.item.id)}
-                onRemoveArtifact={removeArtifact}
-              />
-            )
-          )}
-        </ul>
-      )}
+      </details>
     </div>
   );
 }
@@ -269,7 +296,7 @@ function EvidenceCard({
 }) {
   const { item, score, matched } = ranked;
   return (
-    <li className="rounded-lg border bg-card p-4">
+    <li className="p-4 sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -296,15 +323,6 @@ function EvidenceCard({
             aria-label="Edit"
           >
             <Pencil className="size-3.5" aria-hidden="true" />
-          </button>
-          <button
-            type="button"
-            onClick={onRemove}
-            className="text-muted-foreground/60 hover:text-destructive"
-            title="Remove"
-            aria-label="Remove"
-          >
-            <Trash2 className="size-3.5" aria-hidden="true" />
           </button>
         </div>
       </div>
@@ -371,6 +389,18 @@ function EvidenceCard({
       {/* The other wordings of this same fact, if any — the payoff of separating a
           real thing from the words used to describe it. */}
       <RenderingsPanel itemId={item.id} />
+
+      <details className="mt-3 text-xs text-muted-foreground">
+        <summary className="cursor-pointer hover:text-foreground">Record options</summary>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="mt-2 inline-flex items-center gap-1.5 text-destructive/80 hover:text-destructive"
+        >
+          <Trash2 className="size-3.5" aria-hidden="true" />
+          Remove from my record
+        </button>
+      </details>
     </li>
   );
 }

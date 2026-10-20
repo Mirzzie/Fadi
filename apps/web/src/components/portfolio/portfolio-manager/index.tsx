@@ -306,7 +306,7 @@ export function PortfolioManager({
   const meta = SECTION_META[activeTab];
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 md:px-10">
+    <div className="mx-auto w-full max-w-6xl pb-12 pt-4">
       {/* Header — mirrors the original portfolio CMS */}
       <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -398,7 +398,7 @@ export function PortfolioManager({
           problem, while a stale public page is a claim a stranger reads. Named, never acted on
           automatically — see lib/portfolio/freshness.ts. */}
       {drift.withdrawn.length + drift.reworded.length > 0 ? (
-        <div className="mb-6 flex items-start gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4">
+        <div className="mb-6 flex items-start gap-3 border-y border-amber-500/30 bg-amber-500/5 p-4">
           <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-amber-500/10 text-amber-500">
             <History className="size-4" aria-hidden="true" />
           </span>
@@ -413,7 +413,7 @@ export function PortfolioManager({
       ) : null}
 
       {pendingItems > 0 ? (
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-primary/25 bg-primary/5 p-4">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 border-y border-primary/25 bg-primary/5 p-4">
           <div className="flex items-start gap-3">
             <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
               <Sparkles className="size-4" aria-hidden="true" />
@@ -436,7 +436,7 @@ export function PortfolioManager({
       ) : null}
 
       {dismissed.length > 0 && (
-        <div className="mb-6 rounded-2xl border border-border bg-muted/20 p-4">
+        <div className="mb-6 border-y border-border bg-muted/20 p-4">
           <p className="text-sm font-medium">Not shown, by your choice ({dismissed.length})</p>
           <p className="mt-1 text-xs text-muted-foreground">
             Sync will not bring these back — including if the same work turns up again worded
@@ -465,7 +465,7 @@ export function PortfolioManager({
       )}
 
       {unbacked.length > 0 && (
-        <div className="mb-6 space-y-2 rounded-2xl border border-warning/30 bg-warning/5 p-4">
+        <div className="mb-6 space-y-2 border-y border-warning/30 bg-warning/5 p-4">
           <p className="text-sm font-medium">What your public page is missing</p>
           {unbacked.length > 0 && (
             /* SAY WHAT A VISITOR SEES, AND WHAT IS ACTUALLY POSSIBLE. The old wording said "tag

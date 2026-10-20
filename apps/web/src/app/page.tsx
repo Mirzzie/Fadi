@@ -11,138 +11,69 @@ import Link from "next/link";
 import { FadiLogo } from "@/components/brand/fadi-logo";
 import { FadiBadge } from "@/components/ui/fadi-badge";
 import { buttonVariants } from "@/components/ui/button";
-import { getCurrentAuthUser } from "@/lib/auth/session";
-import { getLatestCareerReport } from "@/lib/career-report/data";
-import { getRecommendedJobsForUser } from "@/lib/jobs/data";
-import { getMomentumSparkline, getMomentumSummary } from "@/lib/resilience/service";
 import { cn } from "@/lib/utils";
-
-export const dynamic = "force-dynamic";
 
 const features = [
   {
     icon: Target,
-    title: "Career Intelligence",
+    title: "See your starting point",
     description:
-      "Fadi reads your resume and profile, maps your strengths, identifies skill gaps, and generates a career readiness score with concrete next steps.",
+      "Keep your experience, goals, and evidence in one record. Compare what you have with what your target roles ask for.",
   },
   {
     icon: BriefcaseBusiness,
-    title: "Smart Job Matching",
+    title: "Choose opportunities",
     description:
-      "Fadi matches you against curated opportunities, explains exactly why each role fits, and learns from what you save or skip.",
+      "Review roles against your current direction, save the ones worth your time, and keep each application moving.",
   },
   {
     icon: BookOpen,
-    title: "Learning Paths",
+    title: "Practice the work",
     description:
-      "From your skill gaps, Fadi builds a prioritized learning plan tied directly to your target roles, with courses and certifications ranked by impact.",
+      "Use projects, work simulations, and interview practice to build evidence you can discuss with an employer.",
   },
   {
     icon: ListChecks,
-    title: "Application Workspace",
+    title: "Prepare each application",
     description:
-      "Track every application, prepare role-specific assets, and manage deadlines. Fadi prepares everything for your review before anything is sent.",
+      "Bring the role, your CV, supporting notes, and follow-ups together without losing the source material behind them.",
   },
 ];
 
 const howItWorks = [
   {
     step: "01",
-    title: "Tell Fadi who you are",
-    body: "Paste your resume, add LinkedIn context, and share your career goals. Fadi reads everything and builds your professional profile.",
+    title: "Add what you already have",
+    body: "Bring in your CV, experience, projects, and the kind of work you want to move toward.",
   },
   {
     step: "02",
-    title: "Get your first analysis",
-    body: "Fadi generates a Career Intelligence Report: strengths, gaps, role-fit score, and a prioritized list of next actions.",
+    title: "Choose a direction",
+    body: "Compare your record with a target role and decide which gaps or opportunities deserve attention first.",
   },
   {
     step: "03",
-    title: "Act on recommendations",
-    body: "Browse matched jobs, start your learning path, and track every application — all from one command center.",
+    title: "Do the next piece of work",
+    body: "Prepare an application, practise a task, or rehearse an interview from the same workspace.",
   },
   {
     step: "04",
-    title: "Fadi keeps working",
-    body: "As you progress, Fadi updates recommendations, surfaces new opportunities, and helps you stay ahead of the market.",
+    title: "Keep the record current",
+    body: "Save completed work and outcomes so the next decision starts from what actually happened.",
   },
 ];
 
-type Signal = { label: string; value: string; bars: number[]; realTrend?: boolean };
+const WORKFLOW = [
+  ["01", "Direction", "Choose the work you want to move toward."],
+  ["02", "Opportunities", "Compare roles and prepare applications."],
+  ["03", "Practice", "Build and rehearse evidence of the work."],
+  ["04", "Record", "Keep useful outcomes for the next decision."],
+] as const;
 
-// Sample signals for anonymous visitors — replaced by the viewer's real numbers
-// when they're signed in (see buildSignals).
-const DEMO_SIGNALS: Signal[] = [
-  { label: "Career readiness", value: "78", bars: [4, 6, 5, 8, 7, 9, 6, 8, 10, 7] },
-  { label: "Resume quality", value: "84", bars: [5, 7, 6, 9, 8, 7, 10, 8, 9, 11] },
-  { label: "Top job match", value: "69%", bars: [3, 5, 4, 6, 8, 5, 7, 9, 6, 8] },
-  { label: "Momentum", value: "61", bars: [6, 4, 7, 5, 8, 6, 4, 7, 5, 6] },
-];
-
-/**
- * Real career signals for a signed-in viewer. When a metric doesn't exist yet
- * (e.g. no report generated) we show "—" rather than a fabricated number — the
- * panel is marked "live", so it must never present sample data as the user's
- * own. Anonymous visitors get the sample showcase instead.
- */
-async function buildSignals(): Promise<{ signals: Signal[]; personalized: boolean }> {
-  const user = await getCurrentAuthUser();
-  if (!user) return { signals: DEMO_SIGNALS, personalized: false };
-
-  const [report, jobs, momentum, momentumHistory] = await Promise.all([
-    getLatestCareerReport(user.id),
-    // Stored jobs only. The landing page shows one number; a live crawl and liveness probes
-    // here held every visit to the home page for ~20s. The Jobs page does the live refresh.
-    getRecommendedJobsForUser(user.id, 5, undefined, { skipSync: true }),
-    getMomentumSummary(user.id),
-    getMomentumSparkline(user.id, 10),
-  ]);
-
-  const topMatch = jobs.reduce((max, j) => Math.max(max, j.matchScore ?? 0), 0);
-  const readiness = report?.career_readiness_score ?? null;
-  const resume = report?.resume_quality_score ?? null;
-
-  // realTrend gates the sparkline: only Momentum has a true history, so the other
-  // metrics show their number without a decorative (fake) trend line.
-  const signals: Signal[] = [
-    {
-      label: "Career readiness",
-      value: readiness != null ? String(readiness) : "—",
-      bars: DEMO_SIGNALS[0].bars,
-      realTrend: false,
-    },
-    {
-      label: "Resume quality",
-      value: resume != null ? String(resume) : "—",
-      bars: DEMO_SIGNALS[1].bars,
-      realTrend: false,
-    },
-    {
-      label: "Top job match",
-      value: topMatch > 0 ? `${topMatch}%` : "—",
-      bars: DEMO_SIGNALS[2].bars,
-      realTrend: false,
-    },
-    {
-      label: "Momentum",
-      value: String(Math.round(momentum.momentum)),
-      // Real momentum history — forward motion per day over the last 10 days.
-      bars: momentumHistory,
-      realTrend: true,
-    },
-  ];
-
-  return { signals, personalized: true };
-}
-
-// Aurora mesh — magenta left, blue crown, amber floor, violet corner.
+// Quiet signal field: the landing demonstrates the product instead of performing a brand effect.
 const HERO_MESH =
-  "radial-gradient(115% 130% at 0% 38%, oklch(0.52 0.24 332) 0%, transparent 44%)," +
-  "radial-gradient(120% 115% at 100% -10%, oklch(0.56 0.21 264) 0%, transparent 50%)," +
-  "radial-gradient(95% 95% at -6% 110%, oklch(0.63 0.14 56) 0%, transparent 46%)," +
-  "radial-gradient(88% 98% at 108% 112%, oklch(0.52 0.24 312) 0%, transparent 50%)," +
-  "oklch(0.14 0.04 295)";
+  "radial-gradient(70% 90% at 84% 6%, color-mix(in oklab, var(--primary) 12%, transparent), transparent 68%)," +
+  "linear-gradient(180deg, color-mix(in oklab, var(--background) 94%, var(--primary)), var(--background))";
 
 const navLinks = [
   { label: "Features", href: "#features" },
@@ -150,28 +81,22 @@ const navLinks = [
   { label: "Fadi", href: "#trust" },
 ];
 
-export default async function Home() {
-  const { signals, personalized } = await buildSignals();
-
+export default function Home() {
   return (
-    // The marketing page is authored as a fixed dark experience (white text on a
-    // dark mesh). Scope `dark` to it so it renders correctly even when the user's
-    // saved theme is light — otherwise bg-background turns white and the white
-    // text disappears. App screens still follow the global theme.
-    <div className="dark min-h-screen bg-background text-foreground">
-      {/* ── Framed mesh hero ───────────────────────────────────────────────── */}
-      <div className="p-2.5 sm:p-3.5">
+    <div className="min-h-screen bg-background text-foreground">
+      {/* ── Editorial product hero ──────────────────────────────────────────── */}
+      <div>
         <section
-          className="relative overflow-hidden rounded-[1.75rem] ring-1 ring-white/12"
+          className="relative overflow-hidden border-b border-border"
           style={{ backgroundImage: HERO_MESH }}
         >
           {/* Dotted texture, faded toward the centre-right */}
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 opacity-[0.14]"
+            className="pointer-events-none absolute inset-0 opacity-[0.16]"
             style={{
-              backgroundImage: "radial-gradient(oklch(1 0 0 / 0.7) 1px, transparent 1.4px)",
-              backgroundSize: "18px 18px",
+              backgroundImage: "radial-gradient(currentColor 0.7px, transparent 0.8px)",
+              backgroundSize: "22px 22px",
               maskImage: "radial-gradient(65% 75% at 72% 42%, black, transparent 75%)",
               WebkitMaskImage: "radial-gradient(65% 75% at 72% 42%, black, transparent 75%)",
             }}
@@ -179,22 +104,22 @@ export default async function Home() {
           {/* Top sheen */}
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent"
+            className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent"
           />
 
           <div className="relative">
             {/* Nav */}
-            <nav className="flex items-center justify-between px-6 py-5 sm:px-10">
+            <nav className="mx-auto flex max-w-[90rem] items-center justify-between px-5 py-5 sm:px-8 lg:px-12">
               <Link href="/" className="flex items-center gap-2.5">
                 <FadiLogo className="glow-primary size-8" />
-                <span className="font-semibold tracking-tight text-white">Fadi</span>
+                <span className="font-semibold tracking-tight">Fadi</span>
               </Link>
               <div className="hidden items-center gap-8 md:flex">
                 {navLinks.map((link) => (
                   <a
                     key={link.href}
                     href={link.href}
-                    className="text-sm text-white/70 transition-colors hover:text-white"
+                    className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                   >
                     {link.label}
                   </a>
@@ -203,13 +128,13 @@ export default async function Home() {
               <div className="flex items-center gap-5">
                 <Link
                   href="/auth/sign-in"
-                  className="text-sm text-white/70 transition-colors hover:text-white"
+                  className="text-sm text-muted-foreground transition-colors hover:text-foreground"
                 >
                   Login
                 </Link>
                 <Link
                   href="/auth/sign-up"
-                  className="text-sm font-medium text-white/90 transition-colors hover:text-white"
+                  className="rounded-md bg-foreground px-3 py-1.5 text-sm font-medium text-background transition-opacity hover:opacity-85"
                 >
                   Register
                 </Link>
@@ -217,72 +142,57 @@ export default async function Home() {
             </nav>
 
             {/* Top: headline + signals panel */}
-            <div className="grid gap-10 px-6 pb-4 pt-10 sm:px-10 lg:grid-cols-[1.05fr_0.95fr] lg:gap-6 lg:pt-16">
+            <div className="mx-auto grid max-w-[90rem] gap-12 px-5 pb-16 pt-16 sm:px-8 lg:grid-cols-[1.12fr_0.88fr] lg:gap-16 lg:px-12 lg:pb-24 lg:pt-28">
               {/* Left */}
-              <div className="max-w-xl">
+              <div className="max-w-3xl">
+                <p className="mb-5 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+                  Your career work, connected
+                </p>
                 <h1
-                  className="text-[2.9rem] font-extrabold leading-[0.95] tracking-tight text-white sm:text-6xl lg:text-7xl"
-                  style={{ fontFamily: "var(--font-display)" }}
+                  className="text-[3.25rem] font-semibold leading-[0.94] tracking-[-0.045em] text-foreground sm:text-7xl lg:text-[5.5rem]"
+                  style={{ fontFamily: "var(--font-inter-tight)" }}
                 >
-                  The career mentor
+                  Turn your next
                   <br />
-                  that tells you the truth
+                  career move into a plan.
                 </h1>
-                <p className="mt-6 max-w-md text-base leading-relaxed text-white/65">
-                  No ghost jobs. No spray-and-pray. No AI hype. Fadi surfaces roles you can actually
-                  get, tells you honestly whether each one fits, and keeps you sane through a brutal
-                  market — grounded in your real experience, never invented.
+                <p className="mt-7 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">
+                  Bring your direction, opportunities, applications, practice, and career record
+                  into one workspace. Start with what you have and decide what to do next.
                 </p>
                 <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                   <Link
                     href="/auth/sign-up"
-                    className="inline-flex items-center justify-center gap-1.5 rounded-full bg-gradient-to-r from-[oklch(0.64_0.25_350)] to-[oklch(0.55_0.24_300)] px-6 py-3 text-sm font-semibold text-white shadow-[0_8px_30px_-6px_oklch(0.6_0.25_330_/_0.6)] transition-transform hover:-translate-y-0.5"
+                    className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90"
                   >
                     Sign Up Now
                   </Link>
                   <Link
                     href="#features"
-                    className="inline-flex items-center justify-center rounded-full border border-white/25 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10"
+                    className="inline-flex items-center justify-center rounded-md border border-border bg-background/50 px-6 py-3 text-sm font-semibold transition-colors hover:bg-muted"
                   >
                     Learn More
                   </Link>
                 </div>
               </div>
 
-              {/* Right — career signals panel */}
-              <div className="lg:pl-4">
-                <p className="mb-1 flex items-center gap-2 text-xs font-medium uppercase tracking-[0.18em] text-white/55">
-                  Your career signals
-                  {personalized ? (
-                    <span className="inline-flex items-center gap-1 text-emerald-300/90">
-                      <span className="size-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
-                      Live
-                    </span>
-                  ) : (
-                    <span className="rounded-full border border-white/20 px-1.5 py-0.5 text-[0.6rem] font-medium tracking-normal text-white/50">
-                      Sample
-                    </span>
-                  )}
+              {/* Right — product workflow, not invented outcome scores. */}
+              <div className="border-t border-border pt-6 lg:border-l lg:border-t-0 lg:pl-10 lg:pt-2">
+                <p className="mb-1 text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+                  One working path
                 </p>
-                <div className="divide-y divide-white/10">
-                  {signals.map((s) => (
+                <div className="divide-y divide-border">
+                  {WORKFLOW.map(([step, title, body]) => (
                     <div
-                      key={s.label}
-                      className="flex items-center justify-between gap-4 py-5"
+                      key={step}
+                      className="grid grid-cols-[2.25rem_1fr] gap-3 py-5"
                     >
-                      <span className="text-xs uppercase tracking-wide text-white/55">
-                        {s.label}
+                      <span className="font-mono text-xs text-muted-foreground">
+                        {step}
                       </span>
-                      <div className="flex items-center gap-5">
-                        {/* Anonymous panel is a labeled sample (decorative bars OK);
-                            for a live viewer, only show a sparkline that's a real trend. */}
-                        {!personalized || s.realTrend ? <Sparkline bars={s.bars} /> : null}
-                        <span
-                          className="min-w-[3.5rem] text-right text-3xl font-light tabular-nums text-white sm:text-4xl"
-                          style={{ fontFamily: "var(--font-display)" }}
-                        >
-                          {s.value}
-                        </span>
+                      <div>
+                        <p className="font-medium text-foreground">{title}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">{body}</p>
                       </div>
                     </div>
                   ))}
@@ -291,24 +201,24 @@ export default async function Home() {
             </div>
 
             {/* Bottom: three feature columns */}
-            <div className="mt-6 grid border-t border-white/12 sm:grid-cols-3 sm:divide-x sm:divide-white/12">
+            <div className="mx-auto grid max-w-[90rem] border-t border-border sm:grid-cols-3 sm:divide-x sm:divide-border">
               {[
                 {
-                  title: "From Profile to Plan: A Career Read Honestly",
-                  body: "Turn your resume and goals into a clear, evidence-based readout — strengths, gaps, and the next real step.",
+                  title: "Start from your record",
+                  body: "Keep your experience, goals, and evidence together before deciding what comes next.",
                 },
                 {
-                  title: "Every Application Counts: Quality Over Volume",
-                  body: "Skip the spray-and-pray. Fadi helps you send fewer, sharper applications and learn from every outcome.",
+                  title: "Prepare one application at a time",
+                  body: "Work from the role requirements and your own material, then keep the outcome with the application.",
                 },
                 {
-                  title: "The Hidden Market: Signals Most People Miss",
-                  body: "Live labour, skill, and economic signals — read in plain language, tied to your situation, never to alarm.",
+                  title: "Build proof by doing the work",
+                  body: "Use projects, simulations, and interview practice to create evidence you can explain.",
                 },
               ].map((col) => (
                 <div key={col.title} className="px-6 py-8 sm:px-8">
-                  <h3 className="text-lg font-semibold leading-snug text-white">{col.title}</h3>
-                  <p className="mt-3 text-sm leading-relaxed text-white/60">{col.body}</p>
+                  <h3 className="text-lg font-semibold leading-snug">{col.title}</h3>
+                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{col.body}</p>
                 </div>
               ))}
             </div>
@@ -320,26 +230,24 @@ export default async function Home() {
         {/* Features */}
         <section id="features" className="border-b border-border/60 py-20 sm:py-28">
           <div className="mx-auto max-w-shell px-4 sm:px-6">
-            <div className="mx-auto mb-12 max-w-xl text-center">
-              <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-                Everything your career needs in one place.
+            <div className="mb-14 grid gap-5 lg:grid-cols-[0.8fr_1.2fr] lg:items-end">
+              <h2 className="max-w-xl text-4xl font-semibold tracking-[-0.035em] sm:text-5xl">
+                One place for the work around your career.
               </h2>
-              <p className="mt-3 text-muted-foreground">
-                Fadi connects your profile, the job market, and your learning goals into one
-                intelligent career command center.
+              <p className="max-w-xl text-muted-foreground lg:justify-self-end">
+                Keep decisions, applications, practice, and evidence connected without turning
+                every step into another disconnected tool.
               </p>
             </div>
 
-            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid border-y border-border sm:grid-cols-2">
               {features.map((feature) => (
                 <div
                   key={feature.title}
-                  className="group rounded-xl border border-border/60 bg-card p-5 transition-colors hover:border-primary/30 hover:bg-card"
+                  className="group border-b border-border p-6 sm:odd:border-r lg:p-8"
                 >
-                  <div className="mb-4 inline-flex size-9 items-center justify-center rounded-lg bg-primary/10">
-                    <feature.icon className="size-4.5 text-primary" aria-hidden="true" />
-                  </div>
-                  <h3 className="mb-2 font-semibold">{feature.title}</h3>
+                  <feature.icon className="mb-8 size-5 text-primary" aria-hidden="true" />
+                  <h3 className="mb-2 text-lg font-semibold">{feature.title}</h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">
                     {feature.description}
                   </p>
@@ -352,17 +260,17 @@ export default async function Home() {
         {/* How it works */}
         <section id="how" className="border-b border-border/60 py-20 sm:py-28">
           <div className="mx-auto max-w-shell px-4 sm:px-6">
-            <div className="mx-auto mb-14 max-w-xl text-center">
-              <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">How Fadi works.</h2>
+            <div className="mb-14 max-w-xl">
+              <h2 className="text-4xl font-semibold tracking-[-0.035em] sm:text-5xl">How Fadi works.</h2>
               <p className="mt-3 text-muted-foreground">
-                Four steps from first sign-in to active career momentum.
+                Four steps from first sign-in to ongoing work.
               </p>
             </div>
 
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid border-t border-border sm:grid-cols-2 lg:grid-cols-4 lg:divide-x lg:divide-border">
               {howItWorks.map((item) => (
-                <div key={item.step} className="space-y-3">
-                  <div className="text-3xl font-bold text-primary/30">{item.step}</div>
+                <div key={item.step} className="space-y-3 border-b border-border py-7 lg:px-6 lg:first:pl-0 lg:last:pr-0">
+                  <div className="font-mono text-xs font-semibold text-primary">{item.step}</div>
                   <h3 className="font-semibold">{item.title}</h3>
                   <p className="text-sm leading-relaxed text-muted-foreground">{item.body}</p>
                 </div>
@@ -376,10 +284,10 @@ export default async function Home() {
           <div className="mx-auto max-w-shell px-4 sm:px-6">
             <div className="flex flex-col items-center gap-6 text-center sm:flex-row sm:justify-between sm:text-left">
               <div className="space-y-1">
-                <p className="font-semibold">Fadi never acts without your approval.</p>
+                <p className="font-semibold">Review external actions before they happen.</p>
                 <p className="text-sm text-muted-foreground">
-                  Every application, message, and external action requires your explicit sign-off.
-                  Fadi prepares. You decide.
+                  Applications and messages are prepared for your sign-off. You decide whether they
+                  go any further.
                 </p>
               </div>
               <TrendingUp className="size-10 shrink-0 text-primary opacity-60" aria-hidden="true" />
@@ -392,13 +300,13 @@ export default async function Home() {
           <div className="mx-auto max-w-shell px-4 text-center sm:px-6">
             <FadiBadge size="md" showName={false} className="justify-center mb-6" />
             <h2 className="text-4xl font-semibold tracking-tight sm:text-5xl">
-              Ready to run your career
+                Start with your
               <br />
-              at full intelligence?
+                current direction.
             </h2>
             <p className="mx-auto mt-4 max-w-md text-muted-foreground">
-              Create an account, complete a short profile, and Fadi will have your first Career
-              Intelligence Report ready in minutes.
+              Add what you already have, choose what you are working toward, and take one useful
+              next step.
             </p>
             <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Link
@@ -431,22 +339,6 @@ export default async function Home() {
           </p>
         </div>
       </footer>
-    </div>
-  );
-}
-
-function Sparkline({ bars }: { bars: number[] }) {
-  const max = Math.max(...bars, 0);
-  return (
-    <div className="flex h-8 items-end gap-[3px]" aria-hidden="true">
-      {bars.map((h, i) => (
-        <span
-          key={i}
-          className="w-[3px] rounded-full bg-white/45"
-          // Flat baseline when there's no activity yet (max 0) — honest "no data".
-          style={{ height: max > 0 ? `${Math.max(8, (h / max) * 100)}%` : "8%" }}
-        />
-      ))}
     </div>
   );
 }

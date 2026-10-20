@@ -64,18 +64,14 @@ export function ApplicationsBoard({
   const [adding, setAdding] = useState(false);
 
   return (
-    <div className="mx-auto max-w-shell space-y-5">
-      <div className="flex items-center justify-between gap-3">
+    <div className="mx-auto max-w-shell space-y-8 pb-12 pt-4">
+      <div className="flex items-end justify-between gap-6 border-b border-border/70 pb-7">
         <div>
-          <h2 className="text-2xl font-semibold tracking-tight">
-            Application{" "}
-            <span className="bg-gradient-to-r from-primary to-[oklch(0.7_0.17_230)] bg-clip-text text-transparent">
-              tracker
-            </span>
-          </h2>
-          <p className="text-sm text-muted-foreground">
-            Every role you&apos;re chasing, by stage. Open one to let Fadi draft a tailored resume,
-            cover letter or cold email for it.
+          <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-primary">Opportunities</p>
+          <h2 className="text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Applications in motion.</h2>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
+            Move each opportunity through the real stage it has reached. Open one to prepare its
+            evidence and documents.
           </p>
           {/* A filtered board must SAY it's filtered — otherwise hidden rows read
               as data loss. Links to the setting rather than hiding the choice. */}
@@ -99,7 +95,7 @@ export function ApplicationsBoard({
             )}
           </p>
         </div>
-        <Button size="sm" onClick={() => setAdding(true)}>
+        <Button className="rounded-md" onClick={() => setAdding(true)}>
           <Plus className="size-4" aria-hidden="true" />
           Add
         </Button>
@@ -109,7 +105,7 @@ export function ApplicationsBoard({
           user failing, it's the market being correlated. It only renders when the
           data actually supports the claim. */}
       {channelInsight ? (
-        <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 p-4">
+        <div className="border-y border-amber-500/40 bg-amber-500/5 px-1 py-4">
           <p className="text-sm text-foreground">{channelInsight.headline}</p>
           <p className="mt-1.5 text-sm text-muted-foreground">{channelInsight.action}</p>
           <p className="mt-2 text-xs text-muted-foreground">
@@ -120,12 +116,12 @@ export function ApplicationsBoard({
       ) : null}
 
       {/* Kanban */}
-      <div className="flex gap-3 overflow-x-auto pb-2">
+      <div className="flex gap-0 overflow-x-auto border-y border-border/80">
         {COLUMNS.map((col) => {
           const items = applications.filter((a) => a.status === col.status);
           return (
-            <div key={col.status} className="w-64 shrink-0 space-y-2">
-              <div className={cn("flex items-center justify-between rounded-md px-3 py-1.5 text-sm font-medium", col.tint)}>
+            <div key={col.status} className="w-64 shrink-0 border-r border-border/70 last:border-r-0">
+              <div className={cn("flex items-center justify-between border-b border-border/70 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em]", col.tint)}>
                 <span>{col.label}</span>
                 <span className="text-xs text-muted-foreground">{items.length}</span>
               </div>
@@ -134,7 +130,7 @@ export function ApplicationsBoard({
                   key={a.id}
                   type="button"
                   onClick={() => setSelected(a)}
-                  className="block w-full rounded-lg border border-border/60 bg-card p-3 text-left transition-colors hover:border-primary/40"
+                  className="block w-full border-b border-border/60 bg-background p-4 text-left transition-colors hover:bg-muted/40"
                 >
                   <p className="line-clamp-2 text-sm font-medium leading-tight">{a.title}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">{a.company}</p>
@@ -146,7 +142,7 @@ export function ApplicationsBoard({
                 </button>
               ))}
               {items.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-border/50 p-3 text-center text-xs text-muted-foreground">
+                <p className="p-5 text-center text-xs text-muted-foreground">
                   Nothing here yet
                 </p>
               ) : null}

@@ -1,152 +1,62 @@
 "use client";
 
-import { Search, Volume2, VolumeX } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Search } from "lucide-react";
 
 import { FadiLogo } from "@/components/brand/fadi-logo";
 import { FADI_STATE_LABEL } from "@/lib/agent/state";
-import { stopFadiSpeech } from "@/lib/voice/fadi-speech";
 import { cn } from "@/lib/utils";
 import { ActivityCenter } from "./activity-center";
 import { ApprovalCenter } from "./approval-center";
-import { useCareerMode } from "./career-mode";
 import { useFadi, type FadiState } from "./fadi-presence";
 import { TrackSwitcher } from "./track-switcher";
 import { UserMenu } from "./user-menu";
-
-const VOICE_PREF_KEY = "fadi-voice-enabled";
 
 /** Top menu bar — the OS's persistent identity strip: brand, track, live Fadi
  *  state, the ⌘K spotlight, "Hey Fadi", clock, and the user menu. Fadi is
  *  ambient now, so there's no Desk/Fadi mode toggle. */
 export function MenuBar({ working = null }: { working?: string | null } = {}) {
   const { displayState } = useFadi();
-  const [now, setNow] = useState<Date | null>(null);
-
-  useEffect(() => {
-    setNow(new Date());
-    const id = setInterval(() => setNow(new Date()), 1000 * 30);
-    return () => clearInterval(id);
-  }, []);
-
-  const clock = now ? now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "··:··";
-
   return (
-    <header className="sticky top-0 z-40 flex h-9 items-center justify-between border-b border-border/60 bg-background/80 px-3 text-xs backdrop-blur-md duration-500 animate-in fade-in slide-in-from-top-2">
+    <header className="sticky top-0 z-40 flex h-12 items-center justify-between border-b border-border bg-background/95 px-4 text-xs backdrop-blur-md duration-300 animate-in fade-in slide-in-from-top-2">
       {/* Brand + live Fadi state */}
       <div className="flex items-center gap-2">
         <FadiLogo className="size-5" />
         <span className="font-semibold tracking-tight">Fadi</span>
         <FadiStateChip state={displayState} working={working} />
-        <span className="text-muted-foreground/50">/</span>
         <TrackSwitcher />
-        <ModeSwitch />
       </div>
 
-      {/* Spotlight + voice + clock */}
-      <div className="flex items-center gap-3">
+      {/* Work controls only. Voice lives on the Fadi control; time lives in the OS. */}
+      <div className="flex items-center gap-2">
         {/* ⌘K command spotlight */}
         <button
           type="button"
           onClick={() => window.dispatchEvent(new Event("fadi:command"))}
           title="Search or command (⌘K)"
-          className="flex items-center gap-2 rounded-full border border-border/70 bg-muted/40 px-2.5 py-1 font-medium text-muted-foreground transition-colors hover:text-foreground"
+          className="flex h-7 items-center gap-2 border border-border bg-muted/30 px-2 font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           <Search className="size-3" aria-hidden="true" />
           <span className="hidden sm:inline">Search</span>
-          <kbd className="hidden rounded border border-border/60 bg-background/60 px-1 text-[0.6rem] sm:inline">
+          <kbd className="hidden border border-border bg-background px-1 text-[0.6rem] sm:inline">
             ⌘K
           </kbd>
         </button>
 
-        <VoiceToggle />
         {/* Decisions before notifications. The approval queue sits to the LEFT of the bell
             because it blocks and the bell does not, and it is absent entirely when nothing
             is waiting rather than showing a zero. */}
         <ApprovalCenter />
         <ActivityCenter />
-        <span className="tabular-nums text-muted-foreground">{clock}</span>
         <UserMenu />
       </div>
     </header>
   );
 }
 
-/** Career phase toggle — Apply vs Prepare. Reshapes the whole shell (dock + content). Lives next
- *  to the direction switcher because both are "what am I steering right now" controls. */
-function ModeSwitch() {
-  const { mode, setMode } = useCareerMode();
-  return (
-    <div
-      role="tablist"
-      aria-label="Career phase"
-      className="ml-1 inline-flex rounded-full border border-border/70 bg-muted/40 p-0.5"
-    >
-      {(["apply", "prepare"] as const).map((m) => (
-        <button
-          key={m}
-          type="button"
-          role="tab"
-          aria-selected={mode === m}
-          onClick={() => setMode(m)}
-          className={cn(
-            "rounded-full px-2 py-0.5 font-medium capitalize transition-colors",
-            mode === m
-              ? "bg-primary text-primary-foreground"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          {m}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/** Mute / unmute Fadi's voice (talk-by-default). */
-function VoiceToggle() {
-  const [on, setOn] = useState<boolean | null>(null);
-  useEffect(() => {
-    try {
-      setOn(localStorage.getItem(VOICE_PREF_KEY) === "1");
-    } catch {
-      setOn(false);
-    }
-  }, []);
-  if (on === null) return null;
-  function toggle() {
-    const next = !on;
-    setOn(next);
-    try {
-      localStorage.setItem(VOICE_PREF_KEY, next ? "1" : "0");
-    } catch {
-      /* ignore */
-    }
-    if (!next) stopFadiSpeech();
-  }
-  return (
-    <button
-      type="button"
-      onClick={toggle}
-      aria-pressed={Boolean(on)}
-      title={on ? "Fadi's voice is on — mute" : "Unmute Fadi's voice"}
-      className={cn(
-        "grid size-7 place-items-center rounded-full border border-border/70 transition-colors",
-        on ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"
-      )}
-    >
-      {on ? (
-        <Volume2 className="size-3.5" aria-hidden="true" />
-      ) : (
-        <VolumeX className="size-3.5" aria-hidden="true" />
-      )}
-    </button>
-  );
-}
-
 /** Live status dot + label reflecting Fadi's ambient state. */
 function FadiStateChip({ state, working }: { state: FadiState; working: string | null }) {
   const busy = !["ready", "offline"].includes(state);
+  const showLabel = state !== "ready" || Boolean(working);
   const { openFadi } = useFadi();
   // The state is also the way in: in lab focus the floating orb steps aside, so Fadi opens here.
   return (
@@ -154,7 +64,8 @@ function FadiStateChip({ state, working }: { state: FadiState; working: string |
       type="button"
       onClick={() => openFadi()}
       title="Talk to Fadi"
-      className="hidden items-center gap-1.5 rounded-md px-1 text-muted-foreground hover:text-foreground sm:flex"
+      aria-label={state === "ready" && !working ? "Fadi ready — open conversation" : undefined}
+      className="hidden items-center gap-1.5 px-0.5 text-muted-foreground hover:text-foreground sm:flex"
     >
       <span
         className={cn(
@@ -172,9 +83,11 @@ function FadiStateChip({ state, working }: { state: FadiState; working: string |
       />
       {/* What it is doing beats what it is. "Fadi active" on every screen of a product that
           runs plans is a light that is always on. */}
-      <span className="max-w-[16rem] truncate">
-        {state === "ready" && working ? `On: ${working}` : `Fadi ${FADI_STATE_LABEL[state].toLowerCase()}`}
-      </span>
+      {showLabel ? (
+        <span className="max-w-[16rem] truncate">
+          {state === "ready" && working ? `On: ${working}` : `Fadi ${FADI_STATE_LABEL[state].toLowerCase()}`}
+        </span>
+      ) : null}
     </button>
   );
 }

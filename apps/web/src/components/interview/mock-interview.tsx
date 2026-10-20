@@ -288,9 +288,12 @@ export function MockInterview({
   // ── Setup screen ──
   if (!questions) {
     return (
-      <section className="space-y-4 rounded-xl border bg-card p-5">
+      <section className="space-y-4 border-y border-border bg-card py-6">
         <div>
-          <h2 className="text-base font-semibold">Practise an interview</h2>
+          <p className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Interview practice
+          </p>
+          <h1 className="font-heading text-3xl font-semibold tracking-tight">Practise an interview</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Practise one question at a time. Speak or type your answer, then review the feedback.
           </p>

@@ -15,7 +15,7 @@ import { getDatabase } from "@/lib/database/client";
 import { rankedEvidenceForActiveTrack } from "@/lib/evidence/pool";
 import { getOnboardingStatus } from "@/lib/onboarding/status";
 
-export const metadata: Metadata = { title: "Your evidence" };
+export const metadata: Metadata = { title: "My career record" };
 export const dynamic = "force-dynamic";
 
 export default async function EvidencePage() {

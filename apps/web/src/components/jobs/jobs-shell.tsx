@@ -40,10 +40,11 @@ export function JobsShell({
   searchOutcome,
 }: JobsShellProps) {
   return (
-    <div className="mx-auto max-w-shell space-y-4">
+    <div className="mx-auto max-w-6xl space-y-6 pb-12">
       <header className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h1 className="text-xl font-semibold">Roles for {activeRole ?? "your direction"}</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">Live board</p>
+          <h2 className="mt-2 text-3xl font-semibold tracking-[-0.035em]">Roles for {activeRole ?? "your direction"}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {jobs.length} current {jobs.length === 1 ? "role" : "roles"}, ordered by the
             evidence in your career record.
@@ -69,15 +70,15 @@ export function JobsShell({
       ) : null}
 
       {jobs.length > 0 ? (
-        <section className="divide-y rounded-xl border bg-card">
+        <section className="divide-y border-y border-border/80">
           {jobs.map((job) => {
             const fit = presentOpportunityFit(job);
             return (
-              <article key={job.id} className="p-4 sm:p-5">
+              <article key={job.id} className="py-6 transition-colors hover:bg-muted/20 sm:px-2">
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h2 className="font-semibold">{job.title}</h2>
+                      <h3 className="text-lg font-semibold tracking-tight">{job.title}</h3>
                       <FitBadge fit={fit} />
                       {job.applicationStatus ? (
                         <Badge variant="outline" className="capitalize">{job.applicationStatus}</Badge>
@@ -116,7 +117,7 @@ export function JobsShell({
           })}
         </section>
       ) : (
-        <Card>
+        <Card className="max-w-2xl rounded-lg border-border/80 bg-card/70 shadow-none">
           <CardHeader>
             <CardTitle>
               {searchOutcome?.keywords.length

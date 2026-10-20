@@ -42,7 +42,7 @@ export default async function InterviewPage({
 
   return (
     <AppShell>
-      <div className="mx-auto w-full max-w-4xl p-4 sm:p-6">
+      <div className="mx-auto w-full max-w-4xl pb-12">
         <MockInterview
           job={job}
           initialSession={initialSession}

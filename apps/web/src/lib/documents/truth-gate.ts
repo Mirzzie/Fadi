@@ -14,7 +14,11 @@
  */
 
 export type TruthSeverity = "block" | "warn";
-export type TruthCategory = "unsupported-number" | "jd-only-term" | "seniority-inflation";
+export type TruthCategory =
+  | "unsupported-number"
+  | "jd-only-term"
+  | "seniority-inflation"
+  | "unchecked-claim";
 
 export type TruthFinding = {
   category: TruthCategory;
@@ -31,7 +35,9 @@ export type TruthCheckInput = {
   jobDescription?: string | null;
 };
 
-// Metric shapes that are the classic invented-résumé numbers: "30%", "3x", "$50k", "€1.2M".
+// Metric shapes that are the classic invented-résumé numbers: "30%", "3x", "$50k", "€1.2M",
+// "<3ms" and "200+". Time thresholds and counted outcomes are just as interviewable as money or
+// percentages; omitting them let persuasive claims bypass the gate solely because of their unit.
 // (No trailing \b: it fails after "%"/"x" since those are non-word chars.)
 // Two parsing defects the oracle exposed, both silently producing WRONG REJECTIONS —
 // the failure mode that teaches people to click past the gate:
@@ -51,6 +57,10 @@ export const METRIC_RE = new RegExp(
     String.raw`\b\d{1,3}(?:\.\d+)?\s?%`,
     // 3x, 1.5x
     String.raw`\b\d+(?:\.\d+)?x(?![a-z])`,
+    // <3ms, under 6 minutes, ≤ 2 hours
+    String.raw`(?:<|≤|(?:under|below)\s+)\d[\d,]*(?:\.\d+)?\s?(?:ms|milliseconds?|seconds?|minutes?|hours?|days?)\b`,
+    // 200+ attacks / 1,000+ tickets (the noun is deliberately not captured)
+    String.raw`\b\d[\d,]*\+`,
   ].join("|"),
   "gi",
 );
@@ -68,7 +78,7 @@ const strip = (s: string) => s.toLowerCase().replace(/[\s,]/g, "");
  */
 type Metric = {
   value: number;
-  unit: "percent" | "multiple" | "money";
+  unit: "percent" | "multiple" | "money" | "duration-ms" | "count";
   /**
    * Which money. Dropping this made EUR 5000 corroborate USD 5000 — the oracle's
    * currency-wrong case, and a real regression introduced by widening the pattern to
@@ -84,6 +94,20 @@ function parseMetric(raw: string): Metric | null {
   if (!Number.isFinite(num)) return null;
   if (t.includes("%")) return { value: num, unit: "percent" };
   if (/x$/.test(t)) return { value: num, unit: "multiple" };
+  if (t.endsWith("+")) return { value: num, unit: "count" };
+  const duration = t.match(/(ms|milliseconds?|seconds?|minutes?|hours?|days?)$/);
+  if (duration) {
+    const factor = /^(ms|millisecond)/.test(duration[1])
+      ? 1
+      : /^second/.test(duration[1])
+        ? 1_000
+        : /^minute/.test(duration[1])
+          ? 60_000
+          : /^hour/.test(duration[1])
+            ? 3_600_000
+            : 86_400_000;
+    return { value: num * factor, unit: "duration-ms" };
+  }
   if (/^[$€£]/.test(t) || /^(usd|eur|gbp)/.test(t) || /(usd|eur|gbp)$/.test(t)) {
     // "50k" and "1.2m" are the same quantity written shorter. The suffix has to be read
     // before the ISO code, or "5000usd" would scale by nothing and "1.2musd" would.

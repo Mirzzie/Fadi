@@ -67,7 +67,7 @@ export function FlagshipProjects({
 
   if (flagships.length === 0) {
     return (
-      <div className="rounded-2xl border border-dashed border-border bg-card/40 p-5">
+      <div className="border-y border-dashed border-border bg-card/40 p-5">
         <p className="text-sm text-muted-foreground">
           Two or three substantial projects, each answering a problem organisations are dealing with
           right now — researched from this month&apos;s news and matched to your record and the
@@ -90,7 +90,7 @@ export function FlagshipProjects({
           return (
             <article
               key={flagship.title}
-              className="flex flex-col rounded-2xl border border-border bg-card p-4 shadow-sm"
+              className="flex flex-col border border-border bg-card p-4"
             >
               <h3 className="font-semibold leading-snug">{flagship.title}</h3>
               <p className="mt-1 text-xs text-muted-foreground">{flagship.scope}</p>

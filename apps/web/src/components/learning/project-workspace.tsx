@@ -325,7 +325,7 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
           )}
 
           {run.steps.length > 0 ? (
-            <details className="group rounded-2xl border border-border bg-card">
+            <details className="group border border-border bg-card">
               <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm">
                 <span className="font-medium">All steps</span>
                 <span className="text-muted-foreground">
@@ -376,7 +376,7 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
         </div>
 
         {hasLab ? (
-          <section className="overflow-hidden rounded-2xl border border-border bg-card lg:sticky lg:top-12">
+          <section className="overflow-hidden border border-border bg-card lg:sticky lg:top-12">
             {/* ONE environment line. Everything that used to be stacked here — machine choice,
                 settings, checks setup, readiness, services, sign-in, base, pause — is behind it,
                 and none of it polls while closed. */}
@@ -650,7 +650,7 @@ function CurrentStep({
   }
 
   return (
-    <section className="rounded-2xl border border-primary/30 bg-card p-5">
+    <section className="border border-primary/30 bg-card p-5">
       <p className="flex items-center gap-2 text-xs font-medium text-primary">
         Step {step.ordinal}
         {step.place ? (
@@ -916,7 +916,7 @@ function StepList({
   onReopen: (stepId: string) => void;
 }) {
   return (
-    <ol className="rounded-2xl border border-border bg-card py-1">
+    <ol className="border border-border bg-card py-1">
       {steps.map((step) => {
         const done = step.status === "done";
         const isCurrent = step.id === currentId;
@@ -1123,7 +1123,7 @@ function FreshStart({ runId, onPlanned }: { runId: string; onPlanned: () => Prom
   const [note, setNote] = useState<string | null>(null);
   const [busy, start] = useTransition();
   return (
-    <section className="rounded-2xl border border-primary/30 bg-card p-5">
+    <section className="border border-primary/30 bg-card p-5">
       <p className="text-xs font-medium text-primary">Fresh start</p>
       <h2 className="mt-0.5 text-lg font-semibold">Nothing done yet</h2>
       <p className="mt-2 text-sm text-muted-foreground">
@@ -1170,7 +1170,7 @@ function PassedNote({
   onClose: () => void;
 }) {
   return (
-    <section className="rounded-2xl border border-emerald-500/30 bg-card px-5 py-4">
+    <section className="border border-emerald-500/30 bg-card px-5 py-4">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-medium">“{passed.title}” passed.</p>
         <button

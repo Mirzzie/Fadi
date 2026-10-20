@@ -1,7 +1,7 @@
 # Fadi UI and UX guidelines
 
 **Status:** Current product standard for every new or changed surface
-**Updated:** 16 October 2026
+**Updated:** 19 October 2026
 
 Fadi should feel like one calm, capable career partner guiding one career journey. A screen is
 successful when a person can answer three questions without learning Fadi's architecture:
@@ -24,7 +24,7 @@ equal. When they disagree, use this order:
 2. **Paperclip for work structure and operational clarity** — goals, work threads, attention,
    decisions, approvals and traceability.
 3. **Current Fadi for domain identity and proven behaviour** — the four destinations, career truth,
-   safety contracts and teal accent. Existing visual patterns are not presumptively retained.
+   safety contracts. Existing visual patterns are not presumptively retained.
 4. **UniMad for career-journey comparison only** — shared profile context and end-to-end flow. It is
    not a visual reference until its authenticated product is independently evaluated.
 
@@ -37,7 +37,7 @@ journey is complete.
 | Paperclip | Goal-aligned work, one attention queue, work threads containing activity and decisions, persistent status, inline approvals, traceable execution | Org charts, agent employees, budgets, ticket administration, dense operator dashboards |
 | Pipecat | One live multimodal session, explicit listening/thinking/speaking/acting states, natural turn detection, interruption, typed screen commands, cancellable progress | Provider selectors, pipeline internals, developer controls, an always-on microphone |
 | UniMad | One profile grounding the job-search journey, low-clutter presentation, role positioning before documents, discovery connected to applications and interviews | A new UniBoard destination, visible specialist-agent topology, ATS scores presented as truth, marketing and coaching funnels inside the product |
-| Current Fadi | Four human destinations, career direction, canonical career record, trustworthy evidence, calm teal identity | Card walls, infrastructure-first controls, duplicate conductors, raw logs as the experience |
+| Current Fadi | Four human destinations, career direction, canonical career record and trustworthy evidence | Card walls, infrastructure-first controls, duplicate conductors, raw logs as the experience |
 
 The references support these choices:
 
@@ -403,7 +403,7 @@ Do not copy Paperclip's agent-company dashboard density, org chart, budgets or a
 
 Fadi retains:
 
-- calm teal/cyan as the primary active and voice accent;
+- a Pipecat-inspired indigo signal family on zinc neutrals, with restrained yellow reserved for attention;
 - the four career destinations;
 - approachable career language;
 - the Fadi presence mark, integrated into the shell rather than floating over work;

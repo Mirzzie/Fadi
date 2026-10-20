@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { History } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/layout/app-shell";
@@ -22,14 +21,14 @@ export default async function LearningActivityPage() {
 
   return (
     <AppShell>
-      <main className="mx-auto w-full max-w-4xl space-y-5 p-4 sm:p-6">
+      <main className="mx-auto w-full max-w-4xl space-y-5 pb-12">
         <LearningNavigation />
 
-        <div>
-          <h1 className="flex items-center gap-2 text-lg font-semibold">
-            <History className="size-5" aria-hidden="true" />
-            Activity
-          </h1>
+        <div className="border-b border-border pb-7 pt-3">
+          <p className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            Practice history
+          </p>
+          <h1 className="font-heading text-3xl font-semibold tracking-tight">Activity</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Everything Fadi has done on this machine and the devices you have connected, grouped by
             what it was trying to do. Refusals are never folded away.

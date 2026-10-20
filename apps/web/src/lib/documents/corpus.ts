@@ -1,7 +1,7 @@
 import "server-only";
 
 import { buildCareerContext } from "@/lib/career/context";
-import { truthCheck, type TruthFinding } from "@/lib/documents/truth-gate";
+import { coverageGaps, truthCheck, type TruthFinding } from "@/lib/documents/truth-gate";
 
 /** A current-history audit may consult all accepted records. Raw imports are not authority.
  * Generation checks its own captured selection, rather than reloading this broader corpus.
@@ -21,5 +21,15 @@ export async function checkDocumentTruth(
   jobDescription?: string | null
 ): Promise<TruthFinding[]> {
   const corpus = await loadCandidateCorpus(userId);
-  return truthCheck(content, { corpus, jobDescription: jobDescription ?? null });
+  return [
+    ...truthCheck(content, { corpus, jobDescription: jobDescription ?? null }),
+    ...coverageGaps(content).map(
+      (gap): TruthFinding => ({
+        category: "unchecked-claim",
+        severity: "warn",
+        offending: gap.offending,
+        message: gap.message,
+      }),
+    ),
+  ];
 }

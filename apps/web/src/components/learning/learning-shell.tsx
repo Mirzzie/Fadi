@@ -32,7 +32,7 @@ function ResourceLinks({ skill }: { skill: string }) {
           href={it.href}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1.5 rounded-md border border-border/60 bg-background/40 px-2 py-1 text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground"
+          className="inline-flex items-center gap-1.5 border border-border bg-background px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           <it.icon className="size-3.5" aria-hidden="true" />
           {it.label}
@@ -82,25 +82,49 @@ export function LearningShell({
   ];
 
   return (
-    <div className="mx-auto w-full max-w-[96rem] space-y-8 px-2 sm:px-4">
-      <header className="space-y-1">
-        <h1 className="font-heading text-2xl font-semibold">Learning</h1>
-        <p className="text-sm text-muted-foreground">
-          Build toward {direction}, one project at a time.
+    <div className="mx-auto w-full max-w-6xl space-y-8 pb-12">
+      <header className="border-b border-border pb-8 pt-3">
+        <p className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Practice</p>
+        <h1 className="max-w-4xl font-heading text-4xl font-semibold tracking-[-0.045em] md:text-5xl">
+          Get better by doing the work.
+        </h1>
+        <p className="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
+          Build toward {direction} through projects, simulations and evidence you can explain.
         </p>
       </header>
 
-      <section className="space-y-3">
+      <section className="space-y-4 border-b border-border pb-10">
         <SectionHeading icon={MonitorPlay} eyebrow="Continue" title="Where you left off" />
         {home.continue?.kind === "run" ? (
           <ProjectCard run={home.continue.run} featured />
         ) : home.continue?.kind === "commitment" ? (
           <CommitmentsList commitments={[home.continue.commitment]} heading={null} />
         ) : (
-          <p className="rounded-xl border border-dashed border-border bg-card/40 p-4 text-sm text-muted-foreground">
+          <p className="border-y border-dashed border-border py-5 text-sm text-muted-foreground">
             Nothing in progress. Take on one of the flagship projects below.
           </p>
         )}
+      </section>
+
+      <section className="border-y border-border bg-card py-6">
+        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          Work simulation · experimental
+        </p>
+        <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="max-w-2xl">
+            <h2 className="font-heading text-2xl font-semibold tracking-tight">Customer Success churn review</h2>
+            <p className="mt-2 text-sm leading-6 text-muted-foreground">
+              Analyse a book of accounts, write a 30-day retention plan and defend your priorities.
+              Fadi reviews your own case against named criteria. Not yet practitioner-reviewed.
+            </p>
+          </div>
+          <Link
+            href="/dashboard/learning/practice/fadi.customer-success/churn-review"
+            className="inline-flex h-9 shrink-0 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Start simulation
+          </Link>
+        </div>
       </section>
 
       {/* Two or three substantial projects beat a pile of small ones. Each answers a problem
@@ -120,28 +144,15 @@ export function LearningShell({
         />
       </section>
 
-      <section className="rounded-2xl border border-primary/25 bg-card p-4 sm:p-5">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
-          Work simulation · experimental
-        </p>
-        <div className="mt-1 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="max-w-2xl">
-            <h2 className="text-base font-semibold">Try a Customer Success churn review</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Analyse a book of accounts, write a 30-day retention plan and defend your priorities.
-              Fadi reviews your own case against named criteria. Not yet practitioner-reviewed.
-            </p>
-          </div>
-          <Link
-            href="/dashboard/learning/practice/fadi.customer-success/churn-review"
-            className="inline-flex h-9 shrink-0 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-          >
-            Review simulation
-          </Link>
-        </div>
-      </section>
-
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <details className="group border-y border-border">
+        <summary className="flex cursor-pointer list-none items-center justify-between py-4 text-sm font-semibold marker:hidden">
+          <span>Browse other learning work</span>
+          <span className="font-mono text-xs font-normal text-muted-foreground group-open:hidden">
+            {inProgressCount + gapList.length + browse.finished.length} items
+          </span>
+          <span className="hidden font-mono text-xs font-normal text-muted-foreground group-open:inline">Close</span>
+        </summary>
+        <div className="grid gap-0 border-t border-border md:grid-cols-2 xl:grid-cols-3">
         <Panel title="Also in progress" count={inProgressCount}>
           {inProgressCount === 0 ? (
             <Empty>Nothing else under way. One thing at a time is the point.</Empty>
@@ -218,12 +229,15 @@ export function LearningShell({
             </Link>
           </nav>
         </Panel>
-      </div>
+        </div>
+      </details>
 
-      <section className="space-y-3">
-        <SectionHeading icon={Map} eyebrow="Longer plan" title="Where this leads" />
-        <CareerBlueprint role={role} />
-      </section>
+      <details className="group border-y border-border">
+        <summary className="cursor-pointer list-none py-4 marker:hidden">
+          <SectionHeading icon={Map} eyebrow="Longer plan" title="Where this leads" />
+        </summary>
+        <div className="border-t border-border py-5"><CareerBlueprint role={role} /></div>
+      </details>
     </div>
   );
 }
@@ -238,8 +252,8 @@ function Panel({
   children: React.ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-4">
-      <h3 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+    <section className="border-b border-border p-4 last:border-b-0 xl:border-b-0 xl:border-r xl:last:border-r-0">
+      <h3 className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
         {title}
         {count > 0 ? <span className="ml-1.5 text-primary">{count}</span> : null}
       </h3>
@@ -264,12 +278,10 @@ function SectionHeading({
   detail?: string;
 }) {
   return (
-    <div className="flex items-start gap-3">
-      <div className="mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">
-        <Icon className="size-4" aria-hidden="true" />
-      </div>
+    <div className="flex items-start gap-2.5">
+      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       <div>
-        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           {eyebrow}
         </p>
         <h2 className="text-base font-semibold">{title}</h2>

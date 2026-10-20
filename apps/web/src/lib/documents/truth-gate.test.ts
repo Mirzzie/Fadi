@@ -21,6 +21,19 @@ describe("truthCheck — unsupported numbers (block)", () => {
     const f = truthCheck("Reduced build time by 30% using GitHub Actions.", { corpus });
     expect(f.filter((x) => x.category === "unsupported-number")).toHaveLength(0);
   });
+
+  it("blocks unsupported response-time and counted-outcome claims", () => {
+    const f = truthCheck("Kept overhead below <3ms and detected 200+ attacks.", { corpus });
+    const blocked = f.filter((x) => x.category === "unsupported-number");
+    expect(blocked.map((x) => x.offending)).toEqual(expect.arrayContaining(["<3ms", "200+"]));
+  });
+
+  it("accepts supported time thresholds and counted outcomes across equivalent time units", () => {
+    const f = truthCheck("Kept overhead under 3,000 milliseconds and detected 200+ attacks.", {
+      corpus: `${corpus}\nMeasured overhead below 3 seconds. Detected 200+ synthetic attacks.`,
+    });
+    expect(f.filter((x) => x.category === "unsupported-number")).toHaveLength(0);
+  });
 });
 
 describe("truthCheck — seniority inflation (warn)", () => {

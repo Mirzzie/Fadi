@@ -27,12 +27,12 @@ export default async function LearningMachinesPage() {
 
   return (
     <AppShell>
-      <main className="mx-auto w-full max-w-5xl space-y-6 px-2 pb-28 sm:px-4">
+      <main className="mx-auto w-full max-w-5xl space-y-6 pb-28">
         <LearningNavigation />
 
         <section className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <h1 className="font-heading text-xl font-semibold">Machines</h1>
+            <h1 className="font-heading text-3xl font-semibold tracking-tight">Machines</h1>
             <MachineRegistration />
           </div>
           {/* The laptop is where labs run by default. It was never listed, so projects said
