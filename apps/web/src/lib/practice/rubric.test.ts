@@ -157,3 +157,16 @@ describe("a structured answer: picks above the writing, one immutable text", () 
     expect(review.verdict).toBe("fail");
   });
 });
+
+describe("a quote matches whatever dashes and quotes the model typed", () => {
+  const text = "Week 1–2: identify and meet the new budget holder — then the “renewal” call.";
+
+  it("accepts plain hyphens and quotes for typographic ones", () => {
+    expect(quoteIsGenuine("Week 1-2: identify and meet the new budget holder", text)).toBe(true);
+    expect(quoteIsGenuine('budget holder - then the "renewal" call', text)).toBe(true);
+  });
+
+  it("still refuses words the person didn't write", () => {
+    expect(quoteIsGenuine("Week 1-2: identify and replace the budget holder", text)).toBe(false);
+  });
+});

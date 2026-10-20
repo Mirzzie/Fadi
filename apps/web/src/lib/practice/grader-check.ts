@@ -114,8 +114,21 @@ export function graderFor(generate: DocGenerate): GradeFn {
           "rubric_review",
           { maxTokens: 1500 }
         );
-        return reviewSubmission(assets.criteria, { text: submission, choices }, theCase, scores)
-          .verdict;
+        const review = reviewSubmission(
+          assets.criteria,
+          { text: submission, choices },
+          theCase,
+          scores
+        );
+        return {
+          verdict: review.verdict,
+          criteria: review.results.map((r) => ({
+            id: r.id,
+            level: r.level,
+            decidedBy: r.decidedBy,
+            feedback: r.feedback.slice(0, 300),
+          })),
+        };
       } catch (error) {
         logger.warn("practice.grader_check_review_failed", {
           caseId,

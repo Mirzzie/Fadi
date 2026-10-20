@@ -15,7 +15,11 @@ import { churnCase, type ChurnCase } from "./sim/churn-case";
 
 export const EVAL_SEED = "rubric-eval-v1";
 /** 2 (19 Oct 2026): step 1's accounts are picked, so its explanation is model-judged — 3 cases. */
-export const EVAL_VERSION = "2";
+/**
+ * 3 (20 Oct 2026): quote matching treats typographic dashes and quotes as plain ones, which
+ * changes the marking path, so every model is checked again on it.
+ */
+export const EVAL_VERSION = "3";
 
 export type EvalCase = {
   id: string;
@@ -159,12 +163,32 @@ export type GradeFn = (input: {
   step: EvalCase["step"];
   submission: string;
   choices: Record<string, string>;
-}) => Promise<"pass" | "fail" | "error">;
+}) => Promise<"pass" | "fail" | "error" | GradeResult>;
+
+/**
+ * A verdict with its reasons. When a marker disagrees with a case, the report must say which
+ * criterion it held back and why; without that a failed check can't be diagnosed (both Groq and
+ * gemma held back the same good plan, and the report couldn't say why, 20 Oct 2026).
+ */
+export type GradeResult = {
+  verdict: "pass" | "fail";
+  criteria: { id: string; level: string; decidedBy: string; feedback: string }[];
+};
+
+/** For each case the marker got wrong, the criteria it held back or credited, and why. */
+export type Disagreement = {
+  caseId: string;
+  expected: "pass" | "fail";
+  got: "pass" | "fail";
+  criteria: GradeResult["criteria"];
+};
 
 export type EvalReport = {
   version: string;
   cases: number;
   agreed: number;
+  /** Why it disagreed, case by case (when the grading function gives its reasons). */
+  disagreements: Disagreement[];
   /** Credited work that should not pass — the dangerous error. */
   falsePasses: string[];
   /** Held back work that should pass. */
@@ -184,15 +208,25 @@ export async function runRubricEval(grade: GradeFn, cases = evalCases()): Promis
   const falsePasses: string[] = [];
   const falseFails: string[] = [];
   const errors: string[] = [];
+  const disagreements: Disagreement[] = [];
   let agreed = 0;
   let goodPassed = 0;
   for (const item of cases) {
-    const got = await grade({
+    const graded = await grade({
       caseId: item.id,
       step: item.step,
       submission: item.submission,
       choices: item.choices ?? {},
     });
+    const got = typeof graded === "string" ? graded : graded.verdict;
+    if (got !== "error" && got !== item.expect) {
+      disagreements.push({
+        caseId: item.id,
+        expected: item.expect,
+        got,
+        criteria: typeof graded === "string" ? [] : graded.criteria,
+      });
+    }
     if (got === "error") errors.push(item.id);
     else if (got === item.expect) {
       agreed += 1;
@@ -206,6 +240,7 @@ export async function runRubricEval(grade: GradeFn, cases = evalCases()): Promis
     version: EVAL_VERSION,
     cases: cases.length,
     agreed,
+    disagreements,
     falsePasses,
     falseFails,
     errors,
