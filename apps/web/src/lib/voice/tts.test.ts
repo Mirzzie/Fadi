@@ -1,8 +1,12 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ configs: vi.fn() }));
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/ai/user-settings", () => ({ getUserProviderConfigs: mocks.configs }));
+
+// These tests choose their own backends, independently of a developer's local speech server.
+beforeEach(() => vi.stubEnv("FADI_TTS_LOCAL_BASE", ""));
+afterEach(() => vi.unstubAllEnvs());
 
 /**
  * THE PROVIDER'S ANSWER IS THE ANSWER.
@@ -83,7 +87,7 @@ describe("which failure the person is shown", () => {
     // Measured: FADI_TTS_LOCAL_BASE points at a Kokoro server that is not running, so it fails
     // first with "fetch failed" — which would have masked Groq's actual, actionable message.
     mocks.configs.mockResolvedValue([{ id: "groq", apiKey: "gsk-test" }]);
-    process.env.FADI_TTS_LOCAL_BASE = "http://localhost:8880/v1";
+    vi.stubEnv("FADI_TTS_LOCAL_BASE", "http://localhost:8880/v1");
     const fetchSpy = vi
       .spyOn(globalThis, "fetch")
       .mockRejectedValueOnce(new Error("fetch failed"))
@@ -103,7 +107,6 @@ describe("which failure the person is shown", () => {
       expect(told?.reason).toContain("terms acceptance");
     } finally {
       fetchSpy.mockRestore();
-      delete process.env.FADI_TTS_LOCAL_BASE;
     }
   });
 });
