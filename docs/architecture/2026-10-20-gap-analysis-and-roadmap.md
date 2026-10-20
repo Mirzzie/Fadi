@@ -2,7 +2,8 @@
 
 **Date:** 20 Oct 2026
 **Companion to:** ADR 0015 (contracts) and `2026-10-20-acceptance-scenarios.md` (tests)
-**Status:** proposal. Nothing below starts until both Claude and Codex have reviewed ADR 0015.
+**Status:** proposal, revision 2 (after Codex's review). Nothing below starts until both Claude
+and Codex have signed ADR 0015 §7.
 
 ## 1. Gap analysis
 
@@ -92,7 +93,8 @@ Every "new" row says why nothing existing fits.
 - 9 capabilities reused;
 - 21 extended;
 - 13 new;
-- about 8 new tables.
+- ten domain tables plus two support tables (`task_attempts`, `mail_candidates`), listed in
+  ADR 0015 §6.
 
 ## 2. Roadmap
 
@@ -101,16 +103,16 @@ The order is set by dependency, not by size. The first complete slice is aimed a
 ```mermaid
 flowchart LR
   M0["M0 Sync<br/>integration branch"] --> M1["M1 Contracts<br/>ADR 0015 agreed"]
-  M1 --> M2["M2 Foundations<br/>strength scale · judgement gate · task kind"]
+  M1 --> M2["M2 Foundations<br/>EvidenceRef · judgement checks · durable worker"]
   M1 --> M3["M3 Situation<br/>facts + onboarding"]
-  M2 --> M4["M4 Research v1<br/>sources · claims · quotes"]
+  M2 --> M4["M4 Research v1<br/>candidates · admission · quotes"]
   M3 --> M4
   M2 --> M5["M5 Ledger + strategies<br/>events · Plan A/B/C · experiments"]
   M3 --> M5
   M4 --> M6["M6 First slice<br/>feedback → review → revision"]
   M5 --> M6
-  M6 --> M7["M7 Mail<br/>paste/forward → Gmail/Graph"]
-  M6 --> M8["M8 Worker process<br/>scheduled reviews · research refresh"]
+  M6 --> M7["M7 Mail providers<br/>Gmail · Graph"]
+  M6 --> M8["M8 Operations<br/>schedules · catch-up · research refresh"]
   M7 --> M9["M9 Close the loop<br/>CV · portfolio PRs · practice · targeting"]
   M8 --> M9
 ```
@@ -119,13 +121,13 @@ flowchart LR
 |---|---|---|---|---|
 | **M0 Sync** | n/a | `integration/2026-10-20` (facelift and Practice merged) | Suite, migrations from empty, and the browser golden path all pass. **Owner approves before it becomes main.** | Claude prepared; owner approves |
 | **M1 Contracts** | M0 | ADR 0015 accepted, with open questions answered | Codex and Claude both sign the contracts; a schema test per contract exists (failing until built) | Both |
-| **M2 Foundations** | M1 | Strength-scale mapping; `lib/evaluation` extracted from rubric-eval; outbox `kind: task` | Existing tests unchanged; rubric checks run through `lib/evaluation` | Claude (evaluation); Codex (outbox) |
-| **M3 Situation** | M1 | `situation_facts`; predicate registry; onboarding that discovers constraints | Scenario A step 1: the owner's CV and answers give the expected facts and strengths; the five-field chat is gone | Claude (logic); Codex (onboarding UI) |
-| **M4 Research v1** | M2, M3 | Fetch, snapshot, extract, quote-check, date, conflict, cite. Ireland permit routes first. | Scenario A step 2 and Scenario C pass the research judgement check; no deadline from an unverified claim | Codex (fetch and store); Claude (claim rules and eval set) |
-| **M5 Ledger and strategies** | M2, M3 | `career_events` fed by applications, Practice and interviews; `strategies`, `experiments`, `strategy_revisions` | Scenario A step 3: Plans A, B, C and a person-originated plan stored with assumptions and conditions | Codex (ledger); Claude (strategies) |
-| **M6 First slice** (target 30 Nov) | M4, M5 | Paste a rejection or feedback → classified → ledger → findings → strategy review → the person accepts or declines → revision → Today | Scenarios A (steps 4–6) and B pass end to end; the overreaction cases hold | Both; Claude leads review logic |
-| **M7 Mail** | M6 | Paste and forward first, then Gmail (each person's own OAuth client) and Outlook (Graph `Mail.Read`) | Scenario D passes; the mail judgement checks pass; disconnect deletes the token and raw messages | Codex |
-| **M8 Worker process** | M6 | `scripts/worker.ts`, lease, heartbeat, stale recovery; scheduled reviews and research refresh | A task survives a restart with no duplicate writes; reviews run with no page open | Codex |
+| **M2 Foundations** | M1 | `EvidenceRef` (native scales untouched); `lib/evaluation` with full check binding; **minimal standalone worker**: outbox `kind: task`, fencing, per-item leases, `task_attempts`, cancellation, the same loop behind `/api/agent/run` and request kicks | Existing tests unchanged. The worker survives a restart, two overlapping workers, a stale completion and duplicate delivery, and a task runs with no page open | Claude (evaluation); Codex (worker) |
+| **M3 Situation** | M1 | `situation_facts`; predicate registry and admission; onboarding that discovers constraints (conversation and UI) | Scenario A1: the owner's CV and answers give the expected facts and authority; unknown predicates are refused; the five-field chat is gone | Claude |
+| **M4 Research v1** | M2, M3 | Tenant-owned runs; safe fetching; snapshots; `ExtractedClaimCandidate → AdmissionResult`; scope, freshness, conflicts and dependency-local blocking. Ireland permit routes first. | Scenarios A2, C and E pass; no calculated deadline from an unadmitted claim | Codex (fetch, store, admission); Claude (candidate semantics, eval set) |
+| **M5 Ledger and strategies** | M2, M3 | Canonical `career_events` with projections (the `resilience_events` path); strategies linked by `planWorkItemId`, with Today's read path updated in the same slice | Scenario A3; Today still shows every open step; old and new projections match after backfill | Codex (events); Claude (strategies) |
+| **M6 First slice** (target 30 Nov) | M4, M5 | Pasted mail → `mail_candidates` → the person confirms → canonical event → findings → review (with `DecisionPolicy`) → acceptance against base revision → Today. **Runs on the worker with no page open.** | Scenarios A4–A6, B and G pass end to end | Both; Claude leads reviews, Codex leads mail candidates |
+| **M7 Mail providers** | M6 | Gmail (each person's own OAuth client) and Outlook (Graph `Mail.Read`) behind the M6 candidate path | Scenario D passes on provider mail; disconnecting deletes the token and raw messages | Separately assigned |
+| **M8 Operations** | M6 | Recurring occurrences, time zones, catch-up, rest; scheduled reviews and research refresh | Scenario F passes; a missed week catches up once. "24/7" is claimed only after F. | Codex |
 | **M9 Close the loop** | M7, M8 | Outcomes feed CV changes (claim-evidence gate), portfolio pull requests, Practice packs and targeting | A rejection with feedback leads to a practice exercise, then new evidence, then a CV proposal, each step traceable | Both |
 
 ### What runs alongside (no dependency on the above)
