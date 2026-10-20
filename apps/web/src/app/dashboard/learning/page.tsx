@@ -63,6 +63,7 @@ export default async function LearningPage() {
         runs={projects.runs}
         flagships={flagships}
         role={track?.targetRole ?? null}
+        domain={track?.domain ?? null}
       />
     </AppShell>
   );

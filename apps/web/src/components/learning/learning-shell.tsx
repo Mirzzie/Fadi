@@ -11,6 +11,8 @@ import type { StoredCareerReport } from "@/lib/career-report/schema";
 import type { FlagshipsState } from "@/lib/learning/flagships";
 import { buildPracticeHome } from "@/lib/learning/practice-home";
 import { learningResources } from "@/lib/learning/resources";
+import { installedActivities } from "@/lib/practice/packs";
+import { practiceSimulation } from "@/lib/learning/practice-simulation";
 
 /** Free reference links for a skill. ("Build a project" lives in the AI suggest
  *  button below — one concept, one control, no duplicate.) */
@@ -47,6 +49,7 @@ type Props = {
   commitments?: CommitmentView[];
   runs?: RunView[];
   role?: string | null;
+  domain?: string | null;
   flagships?: FlagshipsState | null;
 };
 
@@ -64,6 +67,7 @@ export function LearningShell({
   commitments = [],
   runs = [],
   role = null,
+  domain = null,
   flagships = null,
 }: Props) {
   const home = buildPracticeHome({
@@ -73,6 +77,7 @@ export function LearningShell({
     route: report?.recommended_learning_path ?? [],
   });
   const direction = role ?? "your next role";
+  const simulation = practiceSimulation({ role, domain }, installedActivities());
   const { browse } = home;
   const inProgressCount = browse.runs.length + browse.commitments.length;
   // The single gap recommendation is a smaller step now; flagships are the headline.
@@ -110,34 +115,35 @@ export function LearningShell({
         </section>
       ) : null}
 
-      <details className="group border-y border-border">
-        <summary className="cursor-pointer py-4 text-sm font-semibold">
-          Explore a work simulation
-        </summary>
-        <section className="border-t border-border bg-card py-5">
-          <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            Work simulation · experimental
-          </p>
-          <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div className="max-w-2xl">
-              <h2 className="font-heading text-2xl font-semibold tracking-tight">
-                Customer Success churn review
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                Analyse a book of accounts, write a 30-day retention plan and defend your
-                priorities. Fadi reviews your own case against named criteria. Not yet
-                practitioner-reviewed.
-              </p>
+      {simulation ? (
+        <details className="group border-y border-border">
+          <summary className="cursor-pointer py-4 text-sm font-semibold">
+            Explore a work simulation
+          </summary>
+          <section className="border-t border-border bg-card py-5">
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Work simulation{simulation.experimental ? " · experimental" : ""}
+            </p>
+            <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+              <div className="max-w-2xl">
+                <h2 className="font-heading text-2xl font-semibold tracking-tight">
+                  {simulation.title}
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  {simulation.description}
+                  {simulation.experimental ? " Not yet practitioner-reviewed." : ""}
+                </p>
+              </div>
+              <Link
+                href={simulation.href}
+                className="inline-flex h-10 shrink-0 items-center justify-center rounded-md border border-border px-4 text-sm font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
+              >
+                View simulation
+              </Link>
             </div>
-            <Link
-              href="/dashboard/learning/practice/fadi.customer-success/churn-review"
-              className="inline-flex h-10 shrink-0 items-center justify-center rounded-md border border-border px-4 text-sm font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
-            >
-              View simulation
-            </Link>
-          </div>
-        </section>
-      </details>
+          </section>
+        </details>
+      ) : null}
 
       {/* Two or three substantial projects beat a pile of small ones. Each answers a problem
           organisations are dealing with now, cited, so the finished work reads as someone who

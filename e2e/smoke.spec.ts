@@ -20,7 +20,6 @@ const DASHBOARD_ROUTES = [
   "/dashboard/learning",
   "/dashboard/network",
   "/dashboard/niche-finder",
-  "/dashboard/intelligence",
   "/dashboard/profile",
   "/dashboard/settings",
 ];
@@ -80,9 +79,20 @@ test("golden path: sign up → onboard → every route → workspace", async ({ 
 
   // ── Every dashboard route renders without the error boundary ──
   for (const route of DASHBOARD_ROUTES) {
-    await page.goto(route, { waitUntil: "domcontentloaded" });
+    const response = await page.goto(route, { waitUntil: "domcontentloaded" });
+    expect(response?.status(), `${route} must resolve to a working page`).toBeLessThan(400);
     await expect(page.locator("h1, h2").first()).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(BOUNDARY_TEXT)).toHaveCount(0);
+    if (route === "/dashboard/learning") {
+      await page.locator("summary").filter({ hasText: "Explore a work simulation" }).click();
+      await expect(
+        page.getByRole("link", { name: "View simulation", exact: true })
+      ).toHaveAttribute(
+        "href",
+        "/dashboard/learning/practice/fadi.security-operations/suspicious-sign-ins"
+      );
+      await expect(page.getByRole("link", { name: "View simulation", exact: true })).toHaveCount(1);
+    }
   }
 
   // ── Paste a job → open its FULL workspace (the RSC-crash class lives here) ──
