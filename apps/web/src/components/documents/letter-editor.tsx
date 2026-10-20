@@ -1,15 +1,20 @@
 "use client";
 
-import { ArrowLeft, Check, Download, Loader2 } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { AiTellCheck } from "@/components/documents/ai-tell-check";
+import { ImproveBox } from "@/components/documents/improve-box";
 import { DocAdvisor } from "@/components/documents/doc-advisor";
 import { DocTemplatePicker } from "@/components/documents/doc-template-picker";
 import { LetterPreview } from "@/components/documents/letter-preview";
-import { updateDocumentAction } from "@/app/dashboard/documents/actions";
+import {
+  DocumentHistoryLink,
+  DocumentSaveIndicator,
+  useVersionedDocumentSave,
+} from "@/components/documents/versioned-save";
 import type { DocKind } from "@/lib/jobs/application-types";
 import type { DocTemplate } from "@/lib/documents/doc-templates";
 import {
@@ -39,25 +44,30 @@ export function LetterEditor({
   kind,
   initialTitle,
   initialContent,
+  initialVersion,
+  hasJob = false,
+  freshnessAsk = null,
 }: {
   id: string;
   kind: ProseKind;
   initialTitle: string;
   initialContent: string;
+  initialVersion: number;
+  /** Whether this letter belongs to a posting — Fadi tailors to it when asked to change things. */
+  hasJob?: boolean;
+  /** When the person's record has moved on, the one-click way to act on it. */
+  freshnessAsk?: string | null;
 }) {
   const fields = LETTER_FIELDS[kind];
   const [title, setTitle] = useState(initialTitle);
   const [data, setData] = useState<LetterData>(() => parseLetter(initialContent, kind));
-  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const { status, markDirty, save: saveVersion } = useVersionedDocumentSave(id, initialVersion);
   const dirty = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const save = useCallback(async () => {
-    setStatus("saving");
-    const res = await updateDocumentAction({ id, title, content: serializeLetter(data) });
-    setStatus(res.ok ? "saved" : "idle");
-    dirty.current = false;
-  }, [id, title, data]);
+    await saveVersion({ title, content: serializeLetter(data) });
+  }, [saveVersion, title, data]);
 
   useEffect(() => {
     if (!dirty.current) return;
@@ -70,7 +80,7 @@ export function LetterEditor({
 
   function patch(next: Partial<LetterData>) {
     dirty.current = true;
-    setStatus("idle");
+    markDirty();
     setData((d) => ({ ...d, ...next }));
   }
   function patchSender(next: Partial<LetterData["sender"]>) {
@@ -93,7 +103,7 @@ export function LetterEditor({
   }
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-7rem)] max-w-6xl flex-col gap-3">
+    <div className="flex h-[calc(100vh-9rem)] w-full flex-col gap-3">
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -108,26 +118,15 @@ export function LetterEditor({
             value={title}
             onChange={(e) => {
               dirty.current = true;
-              setStatus("idle");
+              markDirty();
               setTitle(e.target.value);
             }}
             className="rounded-md bg-transparent px-1 text-sm font-semibold outline-none focus:bg-accent/40"
           />
-          <span className="flex items-center gap-1 text-xs text-muted-foreground">
-            {status === "saving" ? (
-              <>
-                <Loader2 className="size-3 animate-spin" aria-hidden="true" /> Saving…
-              </>
-            ) : status === "saved" ? (
-              <>
-                <Check className="size-3 text-emerald-400" aria-hidden="true" /> Saved
-              </>
-            ) : (
-              "Autosaves"
-            )}
-          </span>
+          <DocumentSaveIndicator status={status} />
         </div>
         <div className="flex items-center gap-2">
+          <DocumentHistoryLink id={id} />
           <select
             value={data.font ?? ""}
             onChange={(e) => patch({ font: (e.target.value || undefined) as ResumeFontId | undefined })}
@@ -165,7 +164,7 @@ export function LetterEditor({
             <Download className="size-4" aria-hidden="true" />
             PDF
           </Button>
-          <Button size="sm" onClick={save}>
+          <Button size="sm" onClick={save} disabled={status === "saving" || status === "conflict"}>
             Save
           </Button>
         </div>
@@ -174,6 +173,25 @@ export function LetterEditor({
       {/* Recruiter-backed length guidance + honest reads-human check (body prose) */}
       <DocAdvisor kind={kind as DocKind} text={data.body} />
       <AiTellCheck text={data.body} />
+
+      {/* Ask for a change and get the change — applied here, autosaved as a new version. */}
+      <ImproveBox
+        documentId={id}
+        hasJob={hasJob}
+        currentContent={() => serializeLetter(data)}
+        onApply={(content) => {
+          dirty.current = true;
+          markDirty();
+          setData(parseLetter(content, kind));
+        }}
+        quick={[
+          ...(freshnessAsk ? [freshnessAsk] : []),
+          hasJob ? "Tailor it to this posting" : "Make it specific to the role",
+          "Shorter — cut it by a third",
+          "Open with something concrete, not a stock line",
+          "Plainer language, fewer adjectives",
+        ]}
+      />
 
       <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-2">
         {/* Live preview */}

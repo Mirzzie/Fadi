@@ -1,4 +1,5 @@
 import { isLegitJob } from "@/lib/jobs/job-validation";
+import { matchesAnyKeyword } from "@/lib/jobs/keyword-match";
 import { getCountry } from "@/lib/jobs/locations";
 import { searchJobUrls, webSearchConfigured } from "@/lib/jobs/web-search";
 import { logger } from "@/lib/observability/logger";
@@ -74,12 +75,12 @@ export class WebCrawlSource implements JobSource {
     for (const j of records) {
       if (!isLegitJob({ title: j.title, description: j.description, validThrough: j.validThrough }))
         continue;
-      const hay = `${j.title} ${j.description ?? ""}`.toLowerCase();
       const loc = (j.location ?? "").toLowerCase();
       const isRemote = /\bremote\b|anywhere|work from home|wfh/.test(loc);
       const remoteAnywhere =
         isRemote && /\banywhere\b|worldwide|\bglobal\b|\bemea\b|\beurope\b/.test(loc);
-      if (kws.length && !kws.some((k) => hay.includes(k))) continue;
+      if (kws.length && !matchesAnyKeyword({ title: j.title ?? "", description: j.description }, kws))
+        continue;
       if (wantsLocation) {
         const ok =
           (city && loc.includes(city)) ||

@@ -1,38 +1,13 @@
 import "server-only";
 
-import {
-  createCareerProfilesRepository,
-  createLinkedInProfilesRepository,
-  createResumesRepository,
-} from "@careeros/database";
+import { buildCareerContext } from "@/lib/career/context";
+import { coverageGaps, truthCheck, type TruthFinding } from "@/lib/documents/truth-gate";
 
-import { composeCareerEvidence } from "@/lib/career/evidence";
-import { getDatabase } from "@/lib/database/client";
-import { truthCheck, type TruthFinding } from "@/lib/documents/truth-gate";
-
-/**
- * The candidate's REAL record as one text blob — résumé + LinkedIn + evidence pool. This is the
- * only thing the truth gate is allowed to treat as "backed". Same formula generation uses, so a
- * document is judged against exactly the material it should have been drawn from.
+/** A current-history audit may consult all accepted records. Raw imports are not authority.
+ * Generation checks its own captured selection, rather than reloading this broader corpus.
  */
 export async function loadCandidateCorpus(userId: string): Promise<string> {
-  const db = getDatabase();
-  const careerProfile = await createCareerProfilesRepository(db).getActiveForUser(userId);
-  const [resume, linkedin] = await Promise.all([
-    createResumesRepository(db).getLatestForTrack(userId, careerProfile?.id ?? null),
-    createLinkedInProfilesRepository(db).getLatestForUser(userId),
-  ]);
-  const linkedInText = linkedin?.rawText ?? linkedin?.profileUrl ?? undefined;
-  const evidence = composeCareerEvidence({
-    resumeText: resume?.parsedText ?? resume?.rawText,
-    linkedInText,
-  });
-  const topEvidence = await import("@/lib/evidence/pool").then((m) =>
-    m.topEvidenceForPrompt(userId)
-  );
-  return [evidence.block, topEvidence, resume?.parsedText ?? resume?.rawText, linkedInText]
-    .filter(Boolean)
-    .join("\n");
+  return (await buildCareerContext(userId, { all: true })).block;
 }
 
 /**
@@ -46,5 +21,15 @@ export async function checkDocumentTruth(
   jobDescription?: string | null
 ): Promise<TruthFinding[]> {
   const corpus = await loadCandidateCorpus(userId);
-  return truthCheck(content, { corpus, jobDescription: jobDescription ?? null });
+  return [
+    ...truthCheck(content, { corpus, jobDescription: jobDescription ?? null }),
+    ...coverageGaps(content).map(
+      (gap): TruthFinding => ({
+        category: "unchecked-claim",
+        severity: "warn",
+        offending: gap.offending,
+        message: gap.message,
+      }),
+    ),
+  ];
 }

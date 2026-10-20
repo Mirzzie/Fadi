@@ -1,16 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  evidenceScore,
-  hasArtifact,
-  isMeasurement,
-  latestYear,
-  pickLead,
-  rankCases,
-  skillIndex,
-  splitBullets,
-  unbackedSkills,
-} from "@careeros/portfolio";
+import { caseSkillSlugs, evidenceScore, hasArtifact, isMeasurement, latestYear, pickLead, rankCases, skillIndex, splitBullets, unbackedSkills } from "@careeros/portfolio";
 import type { PortfolioItemView } from "@careeros/portfolio";
 
 const item = (over: Partial<PortfolioItemView>): PortfolioItemView => ({
@@ -84,10 +74,10 @@ describe("the lead case", () => {
     expect(pickLead([old, fresh])?.title).toBe("Fresh");
   });
 
-  it("is null when nothing has an artefact, rather than promoting an empty frame", () => {
+  it("can lead with a useful text-only project because media is optional", () => {
     const bare = item({ title: "Bare", description: "Words only." });
 
-    expect(pickLead([bare])).toBeNull();
+    expect(pickLead([bare])).toBe(bare);
     expect(hasArtifact(bare)).toBe(false);
   });
 
@@ -156,5 +146,59 @@ describe("growth", () => {
     expect(latestYear("Jan 2026 — Present")).toBe(2026);
     expect(latestYear("2020 — 2023")).toBe(2023);
     expect(latestYear("Summer")).toBe(0);
+  });
+});
+
+/**
+ * A SKILL THE WORK NAMES IS BACKED BY THAT WORK — and the filter has to agree.
+ *
+ * Measured on the owner's real site: sixteen listed skills, zero backed, because backing came
+ * only from a case's single `tag` ("IaC", "Homelab", "Blue Team") while the skills read
+ * "Ansible", "AWS Cloud", "Terraform". Seven projects could never back sixteen skills, so the
+ * page's instruction — "tag the work that proves each one" — was impossible to follow. They
+ * asked what it meant, which was the fair question.
+ */
+describe("skills backed by what the work says", () => {
+  const project = (over: Partial<PortfolioItemView> = {}): PortfolioItemView =>
+    item({
+      section: "project",
+      title: "WordPress on AWS + Ansible",
+      description: "A hardened WordPress stack on AWS EC2, provisioned with Ansible playbooks.",
+      tag: "IaC",
+      ...over,
+    });
+  const skill = (title: string): PortfolioItemView => item({ section: "skill", title });
+
+  it("backs a skill the case names in its own words", () => {
+    const backed = skillIndex([project(), skill("Ansible")]).map((s) => s.label);
+    expect(backed).toContain("Ansible");
+    expect(unbackedSkills([project(), skill("Ansible")])).toEqual([]);
+  });
+
+  it("still hides a skill nothing on the page shows", () => {
+    expect(unbackedSkills([project(), skill("Terraform")])).toEqual(["Terraform"]);
+  });
+
+  it("the filter answers to the same skill the index counted", () => {
+    const labels = ["Ansible", "Terraform"];
+    const slugs = caseSkillSlugs(project(), labels);
+    expect(slugs).toContain("ansible"); // named in the description
+    expect(slugs).toContain("iac"); // its own tag
+    expect(slugs).not.toContain("terraform");
+  });
+
+  it("matches whole words, so SOC does not match society", () => {
+    const social = project({ title: "Community site", description: "A society newsletter." });
+    expect(unbackedSkills([social, skill("SOC")])).toEqual(["SOC"]);
+  });
+
+  it("needs the whole phrase for a multi-word skill", () => {
+    const partial = project({
+      title: "Server work",
+      description: "Server rebuilds, plus administration of the ticket queue.",
+    });
+    expect(unbackedSkills([partial, skill("Server Administration")])).toEqual([
+      "Server Administration",
+    ]);
   });
 });

@@ -1,5 +1,7 @@
 # Data-flow audit — every feature, schema → repository → caller → live rows
 
+> **Historical investigation (16 July 2026).** Findings and live-data counts below describe that date. Use [Architecture](ARCHITECTURE.md), [Data model](DATABASE_SCHEMA.md), and [Technical debt](TECHNICAL_DEBT_REGISTER.md) for current state. This file remains because regression tests and source comments cite finding IDs.
+
 *Run: 2026-07-16 · against the real database (host Postgres `:5432`, 7 app users).*
 
 Method: for each table, check (a) does a repository exist, (b) does app code call it,

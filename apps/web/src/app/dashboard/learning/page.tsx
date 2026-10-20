@@ -1,14 +1,20 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 
-import { createCareerProfilesRepository, createLearningCommitmentsRepository } from "@careeros/database";
+import {
+  createCareerProfilesRepository,
+  createLearningCommitmentsRepository,
+} from "@careeros/database";
 
+import { listProjectRuns } from "@/app/dashboard/learning/lab-actions";
 import { AppShell } from "@/components/layout/app-shell";
 import { LearningShell } from "@/components/learning/learning-shell";
 import { toCommitmentView } from "@/lib/learning/commitments-view";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
 import { getLatestCareerReport } from "@/lib/career-report/data";
+import { getFlagships, refreshFlagships } from "@/lib/learning/flagships";
 import { getOnboardingStatus } from "@/lib/onboarding/status";
 
 export const metadata: Metadata = {
@@ -31,11 +37,19 @@ export default async function LearningPage() {
   }
 
   const db = getDatabase();
-  const [report, commitments, track] = await Promise.all([
+  const [report, commitments, track, projects, flagships] = await Promise.all([
     getLatestCareerReport(user.id),
     createLearningCommitmentsRepository(db).listForUser(user.id),
     createCareerProfilesRepository(db).getActiveForUser(user.id),
+    listProjectRuns(),
+    getFlagships(user.id),
   ]);
+
+  // Business problems move, so the flagships are researched again once they are a week old —
+  // after the response, so the page never waits on the web. The fresh set shows next visit.
+  if (flagships.stale && flagships.flagships.length > 0) {
+    after(() => refreshFlagships(user.id).then(() => undefined));
+  }
 
   return (
     <AppShell>
@@ -46,6 +60,8 @@ export default async function LearningPage() {
         commitments={commitments
           .filter((c) => c.careerProfileId === (track?.id ?? null))
           .map(toCommitmentView)}
+        runs={projects.runs}
+        flagships={flagships}
         role={track?.targetRole ?? null}
       />
     </AppShell>

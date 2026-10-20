@@ -2,22 +2,22 @@
 
 ## Scope
 
-CareerOS is building toward the Phase 1 MVP. Contributions should support the frozen MVP scope unless an architecture decision record approves otherwise.
+Fadi is an evolving product. Contributions should follow the current product context and roadmap unless an architecture decision record approves a change in direction.
 
 The product has a clear identity: Fadi is the entire CareerOS system — not a chatbot widget on a dashboard. Contributions should reinforce this identity, not dilute it.
 
 ## Before You Start
 
-1. Check the issue tracker.
-2. Confirm the work fits `docs/MVP_SCOPE_FREEZE.md`.
-3. Create or update an issue for the change.
-4. Create a feature branch from `main`.
+1. Read `docs/README.md`, `docs/FadiOS-Project-Context.md`, and `docs/ROADMAP.md`.
+2. Check the issue tracker and current work to avoid overlapping ownership.
+3. Create or update an issue for the change when the repository workflow requires one.
+4. Create a focused branch from the agreed base.
 
 ## Contribution Types
 
 - Documentation updates.
 - Repository foundation improvements.
-- Phase 1 application code.
+- Product application code.
 - Tests.
 - Infrastructure configuration.
 - Security or privacy improvements.
@@ -39,7 +39,7 @@ Every pull request should:
 
 Reviewers should check:
 
-- Scope discipline — does this fit Phase 1?
+- Scope discipline — does this serve the active roadmap and one coherent user lifecycle?
 - Correctness.
 - Simplicity.
 - Security and privacy impact.
@@ -60,7 +60,7 @@ Create an ADR for decisions that affect:
 - Security posture.
 - Repository structure.
 - Public API contracts.
-- Phase versioning (moving a feature from Phase 2 to Phase 1, or vice versa).
+- A change to the accepted roadmap sequence or product boundary.
 
 Use the template in `docs/ARCHITECTURE_DECISION_RECORDS.md`.
 
@@ -69,7 +69,7 @@ Use the template in `docs/ARCHITECTURE_DECISION_RECORDS.md`.
 Contributions must not:
 
 - Redesign any screen to treat Fadi as a supplementary feature or chatbot widget.
-- Add voice interaction in Phase 1 code (reserved for Phase 2).
+- Build voice as a surface of the same work-scoped agent, not as a separate assistant.
 - Hard-code model provider assumptions into feature code.
 - Add Supabase imports or environment variables back into the active codebase.
 - Remove or soften the niche validation honest-mentor behavior.

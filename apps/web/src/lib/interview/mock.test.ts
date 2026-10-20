@@ -1,12 +1,15 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
-  analyzeDelivery,
+  analyzeTranscript,
   countryInterviewNorms,
-  deliveryNote,
   INTERVIEWER_PERSONAS,
+  interviewQuestionCount,
+  interviewStageGuide,
   overallFromScores,
   personaStyle,
+  scoreInterviewAnswer,
+  transcriptNote,
 } from "./mock";
 
 describe("countryInterviewNorms", () => {
@@ -23,28 +26,62 @@ describe("countryInterviewNorms", () => {
   });
 });
 
-describe("analyzeDelivery", () => {
-  it("counts words and estimates duration", () => {
-    const d = analyzeDelivery("I led the team and we shipped on time.");
-    expect(d.wordCount).toBe(9);
-    expect(d.estSeconds).toBeGreaterThan(0);
+describe("interview setup", () => {
+  it("turns a user-recognizable stage into question guidance", () => {
+    expect(interviewStageGuide("recruiter")).toMatch(/motivation|career narrative/i);
+    expect(interviewStageGuide("technical")).toMatch(/troubleshooting|trade-offs/i);
+    expect(interviewStageGuide("behavioral")).toMatch(/STAR|competenc/i);
+    expect(interviewStageGuide("unknown")).toMatch(/hiring-manager/i);
   });
 
-  it("flags filler words", () => {
-    const d = analyzeDelivery("So um I basically like led the team you know and uh shipped it.");
-    expect(d.fillerCount).toBeGreaterThanOrEqual(3);
-    expect(d.fillerWords).toEqual(expect.arrayContaining(["um", "basically"]));
+  it("uses only the two promised practice lengths", () => {
+    expect(interviewQuestionCount(10)).toBe(4);
+    expect(interviewQuestionCount(20)).toBe(7);
+    expect(interviewQuestionCount(45)).toBe(4);
+  });
+});
+
+describe("analyzeTranscript", () => {
+  it("counts transcript words without inventing audio timing", () => {
+    const stats = analyzeTranscript("I led the team and we shipped on time.");
+    expect(stats.wordCount).toBe(9);
+    expect(stats).not.toHaveProperty("estSeconds");
+    expect(stats).not.toHaveProperty("pacing");
   });
 
-  it("labels pacing by length", () => {
-    expect(analyzeDelivery("Too short.").pacing).toBe("short");
-    expect(analyzeDelivery(Array(120).fill("word").join(" ")).pacing).toBe("good");
-    expect(analyzeDelivery(Array(300).fill("word").join(" ")).pacing).toBe("long");
+  it("flags possible filler phrases in the transcript", () => {
+    const stats = analyzeTranscript(
+      "So um I basically like led the team you know and uh shipped it."
+    );
+    expect(stats.fillerCount).toBeGreaterThanOrEqual(3);
+    expect(stats.fillerWords).toEqual(expect.arrayContaining(["um", "basically"]));
   });
 
-  it("deliveryNote calls out length and heavy filler", () => {
-    const note = deliveryNote(analyzeDelivery("So um like uh you know basically I mean kind of."));
-    expect(note).toMatch(/short|filler/i);
+  it("describes only facts available from text", () => {
+    const note = transcriptNote(
+      analyzeTranscript("So um like uh you know basically I mean kind of.")
+    );
+    expect(note).toMatch(/words in the transcript|filler phrases/i);
+    expect(note).not.toMatch(/seconds|pace|slow down|good length/i);
+  });
+});
+
+describe("answer review fallback", () => {
+  it("does not present a missing AI review as a zero content score", async () => {
+    vi.doMock("@/lib/ai/user-generate", () => ({
+      getUserDocGenerate: async () => null,
+    }));
+
+    const result = await scoreInterviewAnswer("user-1", {
+      question: "Tell me about a time you resolved an incident.",
+      answer: "I checked the logs, found the failed service, restarted it, and documented the fix.",
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.score.overall).toBeNull();
+    expect(result.score.scores).toBeNull();
+    expect(result.score.transcriptNote).toMatch(/words in the transcript/i);
   });
 });
 
@@ -66,8 +103,18 @@ describe("interviewer personas (style, not impersonation)", () => {
 
 describe("overallFromScores", () => {
   it("weights structure and specificity most", () => {
-    const structured = overallFromScores({ structure: 5, specificity: 5, relevance: 0, concision: 0 });
-    const polished = overallFromScores({ structure: 0, specificity: 0, relevance: 5, concision: 5 });
+    const structured = overallFromScores({
+      structure: 5,
+      specificity: 5,
+      relevance: 0,
+      concision: 0,
+    });
+    const polished = overallFromScores({
+      structure: 0,
+      specificity: 0,
+      relevance: 5,
+      concision: 5,
+    });
     expect(structured).toBeGreaterThan(polished);
     expect(overallFromScores({ structure: 5, specificity: 5, relevance: 5, concision: 5 })).toBe(5);
   });

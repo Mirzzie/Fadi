@@ -1,5 +1,7 @@
 # CareerOS Platform Ideology
 
+> **Status: durable doctrine, not an implementation map.** For current behavior and sequencing, see [Architecture](ARCHITECTURE.md) and [Roadmap](ROADMAP.md).
+
 > **This document is the spine.** Every feature is measured against it. If a feature
 > contradicts a principle here, the feature is wrong — not the principle. If reality
 > contradicts a principle here, we change the principle **and say so, with a date and

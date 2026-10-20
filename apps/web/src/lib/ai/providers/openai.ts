@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { zodResponseFormat } from "openai/helpers/zod";
-import type { ZodSchema } from "zod";
+import { z, type ZodSchema } from "zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
 import { aiErrorMessage, isStructuredOutputUnsupported } from "./errors";
@@ -20,7 +20,10 @@ import type {
  * and stray prose around it, which non-strict providers often add.
  */
 function extractJsonObject(text: string): unknown {
-  const cleaned = text.trim().replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "");
+  const cleaned = text
+    .trim()
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "");
   try {
     return JSON.parse(cleaned);
   } catch {
@@ -38,6 +41,14 @@ function extractJsonObject(text: string): unknown {
  * OpenAI-compatible provider. Works for OpenAI itself and any compatible
  * endpoint (Groq, Ollama, Google's OpenAI-compat gateway) via `baseURL`.
  */
+/**
+ * How many times Fadi may act before it has to answer.
+ *
+ * Enough for the chains that matter — look, decide, propose; or propose, check, report —
+ * and low enough that a model looping on one tool costs a few calls rather than a bill.
+ */
+const MAX_TOOL_ROUNDS = 5;
+
 export class OpenAIProvider implements AIProvider {
   readonly id: string;
   readonly name: string;
@@ -64,7 +75,7 @@ export class OpenAIProvider implements AIProvider {
       name?: string;
       keyless?: boolean;
       headers?: Record<string, string>;
-    } = {},
+    } = {}
   ) {
     this.id = options.id ?? "openai";
     this.name = options.name ?? "OpenAI";
@@ -96,7 +107,7 @@ export class OpenAIProvider implements AIProvider {
 
   async openChatStream(
     messages: AIMessage[],
-    options?: ChatOptions,
+    options?: ChatOptions
   ): Promise<AsyncIterable<string>> {
     if (!this.client) throw new Error("AI provider is not configured.");
     // create() throws here on auth/quota/rate-limit, before any tokens.
@@ -144,7 +155,7 @@ export class OpenAIProvider implements AIProvider {
     messages: AIMessage[],
     schema: ZodSchema<T>,
     schemaName: string,
-    options?: ChatOptions,
+    options?: ChatOptions
   ): Promise<T> {
     if (!this.client) {
       throw new Error("AI provider is not configured.");
@@ -196,9 +207,7 @@ export class OpenAIProvider implements AIProvider {
     //    conversion (which handles optionals) so the guidance is still schema-shaped.
     const jsonSchema =
       (strictFormat as { json_schema?: { schema?: unknown } } | null)?.json_schema?.schema ??
-      // Cast: the bundled zod-to-json-schema is typed against a different zod build; it
-      // only reads the schema shape at runtime, so this is safe.
-      zodToJsonSchema(schema as unknown as Parameters<typeof zodToJsonSchema>[0], schemaName);
+      describeSchema(schema, schemaName);
     const guide: AIMessage = {
       role: "system",
       content: jsonSchema
@@ -246,7 +255,7 @@ export class OpenAIProvider implements AIProvider {
     tools: ToolSpec[],
     executeTool: ToolExecutor,
     options?: ChatOptions,
-    callbacks?: ToolRunCallbacks,
+    callbacks?: ToolRunCallbacks
   ): Promise<ToolRunResult> {
     if (!this.client) throw new Error("AI provider is not configured.");
     const client = this.client;
@@ -257,48 +266,86 @@ export class OpenAIProvider implements AIProvider {
     }));
     const toolResults: ToolRunResult["toolResults"] = [];
 
-    // Phase 1 — a single tool-resolution pass (non-streaming, so we can read the
-    // tool calls). Low temperature → far more reliable tool-call JSON on Groq.
-    const first = await client.chat.completions.create({
-      model: this.model,
-      messages: convo,
-      tools,
-      tool_choice: "auto",
-      temperature: 0.2,
-    });
-    const choice = first.choices[0]?.message;
-    const calls = (choice?.tool_calls ?? []).filter((c) => c.type === "function");
+    // THE LOOP, and why it used to be a single pass.
+    //
+    // This was one tool-resolution call, then an answer with the tools taken away. It
+    // meant Fadi got exactly one guess. It could not call inspect_machine, see there was
+    // no Docker, and propose something else; it could not ask for a grant after being
+    // refused and retry; it could not check that the thing it just did had worked. Every
+    // one of those is two rounds, and it only ever had one.
+    //
+    // Bounded, because a loop with no ceiling is a bill with no ceiling — and a model
+    // stuck calling the same tool forever is a real failure mode, not a hypothetical.
+    // The de-dupe below is per ROUND rather than per run, so "check it again now that I
+    // changed something" stays possible while "call it twice in the same breath" does not.
+    let rounds = 0;
 
-    if (calls.length === 0) {
-      // No tools needed — return the direct answer (delivered whole).
-      const text = choice?.content ?? "";
-      callbacks?.onToken?.(text);
-      return { text, toolResults };
+    while (rounds < MAX_TOOL_ROUNDS) {
+      rounds += 1;
+
+      const step = await client.chat.completions.create({
+        model: this.model,
+        messages: convo,
+        tools,
+        tool_choice: "auto",
+        // Low temperature → far more reliable tool-call JSON on Groq.
+        temperature: 0.2,
+      });
+      const choice = step.choices[0]?.message;
+      const calls = (choice?.tool_calls ?? []).filter((c) => c.type === "function");
+
+      if (calls.length === 0) {
+        // The model may already have answered using the tool results. Preserve that
+        // answer instead of paying for a second, potentially different completion.
+        const text = choice?.content ?? "";
+        if (text.trim()) {
+          callbacks?.onToken?.(text);
+          return { text, toolResults };
+        }
+        // Some compatible providers end a tool round with no content. Ask for prose
+        // once in that case, using the same fallback as the round limit.
+        break;
+      }
+
+      convo.push(choice as OpenAI.Chat.Completions.ChatCompletionMessageParam);
+
+      const executedThisRound = new Set<string>();
+      for (const call of calls) {
+        let args: Record<string, unknown> = {};
+        try {
+          args = JSON.parse(call.function.arguments || "{}");
+        } catch {
+          /* leave empty on malformed JSON */
+        }
+        const key = `${call.function.name}:${JSON.stringify(args)}`;
+        if (executedThisRound.has(key)) {
+          convo.push({ role: "tool", tool_call_id: call.id, content: "(already provided above)" });
+          continue;
+        }
+        executedThisRound.add(key);
+        const result = await executeTool(call.function.name, args);
+        toolResults.push({
+          name: call.function.name,
+          view: result.view ?? "none",
+          data: result.data,
+        });
+        convo.push({ role: "tool", tool_call_id: call.id, content: result.summary });
+      }
+      callbacks?.onToolResults?.(toolResults);
     }
 
-    // Execute the requested tools (de-duped: llama on Groq tends to repeat calls).
-    convo.push(choice as OpenAI.Chat.Completions.ChatCompletionMessageParam);
-    const executed = new Set<string>();
-    for (const call of calls) {
-      let args: Record<string, unknown> = {};
-      try {
-        args = JSON.parse(call.function.arguments || "{}");
-      } catch {
-        /* leave empty on malformed JSON */
-      }
-      const key = `${call.function.name}:${JSON.stringify(args)}`;
-      if (executed.has(key)) {
-        convo.push({ role: "tool", tool_call_id: call.id, content: "(already provided above)" });
-        continue;
-      }
-      executed.add(key);
-      const result = await executeTool(call.function.name, args);
-      toolResults.push({ name: call.function.name, view: result.view ?? "none", data: result.data });
-      convo.push({ role: "tool", tool_call_id: call.id, content: result.summary });
+    if (rounds >= MAX_TOOL_ROUNDS) {
+      // Said to the model rather than hidden, so the answer it writes can be honest about
+      // having stopped early instead of pretending it finished.
+      convo.push({
+        role: "user",
+        content:
+          "You have used all the tool calls available for this turn. Answer now with what you have, and say plainly if something is still unfinished.",
+      });
     }
-    callbacks?.onToolResults?.(toolResults);
 
-    // Phase 2 — STREAM the final answer (no tools offered, so it must answer).
+    // The answer. Tools are withheld here so this call must produce prose — the loop
+    // above is where acting happens, and this is where it reports.
     const stream = await client.chat.completions.create({
       model: this.model,
       messages: convo,
@@ -321,18 +368,31 @@ export class OpenAIProvider implements AIProvider {
    * OpenAI (whisper-1) support this; other OpenAI-compatible endpoints (Gemini,
    * Ollama, OpenRouter) do not, so this throws for them.
    */
-  async transcribe(file: File): Promise<string> {
+  /**
+   * Speech to text.
+   *
+   * The language is passed, not guessed. Whisper auto-detects when it is not told, and on a
+   * short utterance it detects badly — "Hi, hello" came back as Icelandic, "Hæ, héló", which no
+   * command could match. A one-word answer like "yes" is the shortest utterance there is, and
+   * the whole hands-free loop is built on them.
+   *
+   * The prompt biases it toward the words Fadi is actually listening for. Whisper uses it as
+   * context, not instruction, which is exactly right for names it would otherwise mangle.
+   */
+  async transcribe(file: File, options: { language?: string } = {}): Promise<string> {
     if (!this.client) throw new Error("AI provider is not configured.");
     const model =
-      this.id === "groq"
-        ? "whisper-large-v3-turbo"
-        : this.id === "openai"
-          ? "whisper-1"
-          : null;
+      this.id === "groq" ? "whisper-large-v3-turbo" : this.id === "openai" ? "whisper-1" : null;
     if (!model) {
       throw new Error(`${this.name} doesn't support audio transcription.`);
     }
-    const res = await this.client.audio.transcriptions.create({ file, model });
+    const res = await this.client.audio.transcriptions.create({
+      file,
+      model,
+      language: options.language || "en",
+      prompt:
+        "Fadi. Commands: what's on today, what's next, read me the plan, carry on, do the next step, start it, not now, stop the plan, apply to, open opportunities, open my career, open practice, yes, no.",
+    });
     return (res as { text?: string }).text ?? "";
   }
 
@@ -353,3 +413,25 @@ export class OpenAIProvider implements AIProvider {
     }
   }
 }
+
+/**
+ * The JSON Schema a model is told to follow on the tolerant path.
+ *
+ * Fadi is on Zod 4. zod-to-json-schema is written for Zod 3 and, given a Zod 4 schema, returns
+ * an EMPTY schema — so every structured call that fell back here (any schema with an optional
+ * field, or a provider without json_schema mode, Groq included) told the model "any JSON", and
+ * it invented its own field names: a project plan came back with "action"/"command" instead of
+ * "title"/"instruction" and failed validation (15 Oct 2026). Zod 4 converts itself.
+ */
+export function describeSchema(schema: unknown, name: string): unknown {
+  const native = (z as unknown as { toJSONSchema?: (s: unknown) => unknown }).toJSONSchema;
+  if (native) {
+    try {
+      return native(schema);
+    } catch {
+      // A schema Zod cannot express (a transform, say): fall through.
+    }
+  }
+  return zodToJsonSchema(schema as unknown as Parameters<typeof zodToJsonSchema>[0], name);
+}
+

@@ -3,7 +3,7 @@
  * unit-testable and shared by the discovery service + the Jobs UI.
  *
  * The problem it solves (domain-agnostic mandate): the always-on keyless job feeds
- * (Remotive, Arbeitnow) are tech-focused. A nurse, electrician, or accountant must
+ * are tech-focused. A nurse, electrician, or accountant must
  * not be silently fed tech roles — and must be told honestly when the live sources
  * don't cover their field, with the concrete fix (add a general job-board key).
  */
@@ -36,17 +36,17 @@ export type JobSourceCoverage = {
 export function isLikelyTechDomain(domain?: string | null): boolean {
   if (!domain || !domain.trim()) return true;
   return /tech|\bit\b|information technology|software|develop|engineer|data|cyber|security|cloud|devops|\bweb\b|\bai\b|\bml\b|computer|programming|sre|network/.test(
-    domain.toLowerCase(),
+    domain.toLowerCase()
   );
 }
 
 const ADD_KEY_HINT =
-  "Add a job-source key in Settings to pull real roles: a JSearch key gives the broadest reach (Google for Jobs — LinkedIn, Indeed, Glassdoor, compliantly), or Reed / Adzuna / Jooble for cross-industry coverage.";
+  "Add a job-source key in Settings to pull real roles: Jooble covers most markets, and Reed covers the UK and Ireland with salary. Fadi's own sources — company career pages and the open web — need no key.";
 
 /** Decide coverage for a domain against the configured sources. Pure. */
 export function decideJobCoverage(
   domain: string | null | undefined,
-  sources: SourceCoverageInfo[],
+  sources: SourceCoverageInfo[]
 ): JobSourceCoverage {
   const d = domain?.trim() || null;
   const general = sources.filter((s) => s.coverage !== "tech");
@@ -64,12 +64,24 @@ export function decideJobCoverage(
 
   // Tech (or unknown) field: any configured source is acceptable coverage.
   if (isLikelyTechDomain(d)) {
-    return { domain: d, hasCoverage: true, needsGeneralSource: false, generalSources, message: null };
+    return {
+      domain: d,
+      hasCoverage: true,
+      needsGeneralSource: false,
+      generalSources,
+      message: null,
+    };
   }
 
   // Non-tech field with a general source available → covered.
   if (general.length > 0) {
-    return { domain: d, hasCoverage: true, needsGeneralSource: false, generalSources, message: null };
+    return {
+      domain: d,
+      hasCoverage: true,
+      needsGeneralSource: false,
+      generalSources,
+      message: null,
+    };
   }
 
   // Non-tech field, only tech feeds live → honest advisory, no silent tech noise.

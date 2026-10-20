@@ -1,7 +1,7 @@
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
 
 import type { Database } from "../client";
-import { savedJobs, type SavedJob } from "../schema";
+import { jobs, savedJobs, type SavedJob } from "../schema";
 
 export type SaveJobInput = {
   matchScore?: number | null;
@@ -50,6 +50,34 @@ export function createSavedJobsRepository(db: Database) {
         .select()
         .from(savedJobs)
         .where(and(eq(savedJobs.userId, userId), inArray(savedJobs.jobId, jobIds)));
+    },
+
+    /**
+     * Saves for a vacancy, whichever board's copy they saved.
+     *
+     * The same posting arrives from several sources and the board renders one row per canonical
+     * key. Looking saves up by ROW id loses the flag whenever the kept copy is not the copy the
+     * person saved — the card comes back unsaved and an application in progress vanishes from
+     * the list.
+     */
+    /**
+     * Saves for a vacancy, whichever board's copy they saved.
+     *
+     * The same posting arrives from several sources and the board renders one row per canonical
+     * key. Looking saves up by ROW id loses the flag whenever the kept copy is not the copy the
+     * person saved — the card comes back unsaved and an application in progress vanishes.
+     */
+    async listForUserByCanonicalKeys(
+      userId: string,
+      keys: string[]
+    ): Promise<Array<SavedJob & { canonicalKey: string }>> {
+      if (keys.length === 0) return [];
+      const rows = await db
+        .select({ saved: savedJobs, canonicalKey: jobs.canonicalKey })
+        .from(savedJobs)
+        .innerJoin(jobs, eq(jobs.id, savedJobs.jobId))
+        .where(and(eq(savedJobs.userId, userId), inArray(jobs.canonicalKey, keys)));
+      return rows.map((row) => ({ ...row.saved, canonicalKey: row.canonicalKey }));
     },
 
     async saveForUser(userId: string, jobId: string, input: SaveJobInput = {}): Promise<SavedJob> {

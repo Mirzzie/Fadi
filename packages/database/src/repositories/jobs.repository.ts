@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, lt, sql } from "drizzle-orm";
 
-import { canonicalizeUrl, canonicalJobKey } from "../canonical";
+import { canonicalizeUrl, canonicalOccurrenceJobKey, stableExternalId } from "../canonical";
 import type { Database } from "../client";
 import { jobOccurrences, jobs, type Job, type JobOccurrence } from "../schema";
 
@@ -173,9 +173,18 @@ export function createJobsRepository(db: Database) {
     async archiveStaleLiveJobs(staleBefore: Date, source?: string): Promise<number> {
       // PUBLIC rows only: a private capture's freshness is the user's business, not the crawl's —
       // it must not expire just because the systematic sync stopped re-seeing it.
+      //
+      // Staleness is WHEN A SOURCE LAST LISTED IT, not when this row was last written. Keyed on
+      // `updated_at`, this archived nothing at all: a liveness probe, an embedding write or a
+      // re-aggregation all bump that column, so every posting looked fresh forever and 2,595
+      // "active" vacancies included ones no board had carried in months.
       const conditions = [
         eq(jobs.status, "active"),
-        lt(jobs.updatedAt, staleBefore),
+        sql`coalesce(
+          (select max(${jobOccurrences.lastSeenAt}) from ${jobOccurrences}
+            where ${jobOccurrences.jobId} = ${jobs.id}),
+          ${jobs.createdAt}
+        ) < ${staleBefore}`,
         sql`${jobs.ownerUserId} is null`,
       ];
       if (source) conditions.push(eq(jobs.source, source));
@@ -186,6 +195,63 @@ export function createJobsRepository(db: Database) {
         .where(and(...conditions))
         .returning({ id: jobs.id });
       return updated.length;
+    },
+
+    /**
+     * Stand down postings from sources Fadi no longer has.
+     *
+     * A retired source's postings cannot be refreshed, re-checked or re-listed by anyone — they
+     * are frozen at the moment the provider was removed, and every one of them is a role the
+     * person might tailor a CV for. Marked expired rather than deleted: reversible, and the
+     * occurrence rows stay as the record of where they came from.
+     */
+    async expireJobsFromRetiredSources(liveSources: string[]): Promise<number> {
+      if (liveSources.length === 0) return 0;
+      // One parameter, not a list: drizzle expands a bare array into ($1, $2, …), which is a row
+      // constructor and not something `= any(...)` can read.
+      const live = sql.param(liveSources);
+      // A source id may be stamped with its sub-board ("fadi-scraper:indeed"), so a posting is
+      // kept when ANY of its occurrences came from a source that is still registered.
+      const rows = await db.execute<{ id: string }>(sql`
+        update jobs set status = 'expired', updated_at = now()
+        where status = 'active'
+          and owner_user_id is null
+          and not exists (
+            select 1 from job_occurrences o
+            where o.job_id = jobs.id
+              and (
+                o.source = any(${live}::text[])
+                or exists (
+                  select 1 from unnest(${live}::text[]) as live(id)
+                  where o.source like live.id || ':%'
+                )
+              )
+          )
+        returning id
+      `);
+      return rows.rows.length;
+    },
+
+    /**
+     * The postings most worth a liveness probe: never checked first, then longest ago.
+     *
+     * The board probes only what it is about to show, six at a time, on a twelve-hour cache —
+     * which cannot catch up with thousands of postings and never touches the ones nobody has
+     * scrolled to. This feeds the background sweep, where nobody is waiting.
+     */
+    async listForLivenessSweep(
+      limit: number
+    ): Promise<{ id: string; url: string | null; livenessCheckedAt: Date | null }[]> {
+      return db
+        .select({
+          id: jobs.id,
+          url: jobs.url,
+          livenessCheckedAt: jobs.livenessCheckedAt,
+        })
+        .from(jobs)
+        .where(and(eq(jobs.status, "active"), sql`${jobs.url} is not null`))
+        .orderBy(sql`${jobs.livenessCheckedAt} asc nulls first`)
+        .limit(limit);
     },
 
     /** Store a job's semantic vector (hybrid search). Best-effort, additive. */
@@ -216,6 +282,29 @@ export function createJobsRepository(db: Database) {
     },
 
     /** Every provider's occurrence of a vacancy — provenance for the workspace. */
+    /**
+     * Which boards listed each of these vacancies, for the cards about to be shown.
+     *
+     * A vacancy can be grouped from several providers; the board showed one of them and said
+     * nothing about the rest, so "is this the same job I already saw on Reed?" had no answer.
+     * One query for the whole page rather than one per card.
+     */
+    async sourcesForJobs(jobIds: string[]): Promise<Map<string, string[]>> {
+      if (jobIds.length === 0) return new Map();
+      const rows = await db
+        .selectDistinct({ jobId: jobOccurrences.jobId, source: jobOccurrences.source })
+        .from(jobOccurrences)
+        .where(inArray(jobOccurrences.jobId, jobIds));
+      const bySource = new Map<string, string[]>();
+      for (const row of rows) {
+        const list = bySource.get(row.jobId) ?? [];
+        list.push(row.source);
+        bySource.set(row.jobId, list);
+      }
+      for (const [jobId, list] of bySource) bySource.set(jobId, [...new Set(list)].sort());
+      return bySource;
+    },
+
     async listOccurrencesForJob(jobId: string): Promise<JobOccurrence[]> {
       return db
         .select()
@@ -224,10 +313,19 @@ export function createJobsRepository(db: Database) {
         .orderBy(asc(jobOccurrences.source));
     },
 
-    async upsertSeedJob(input: SeedJobInput): Promise<Job> {
+    async upsertSeedJob(rawInput: SeedJobInput): Promise<Job> {
+      // One stable id for the row, its key and its occurrence (see stableExternalId).
+      const input = { ...rawInput, externalId: stableExternalId(rawInput.externalId) };
       const ownerUserId = input.ownerUserId ?? null;
       const canonicalKey =
-        input.canonicalKey ?? canonicalJobKey(input.company, input.title, input.location);
+        input.canonicalKey ??
+        canonicalOccurrenceJobKey(
+          input.company,
+          input.title,
+          input.location,
+          input.source,
+          input.externalId
+        );
       const url = canonicalizeUrl(input.url) ?? null;
 
       // Dedupe within the correct SCOPE: a public write conflicts only with other public rows
@@ -263,6 +361,63 @@ export function createJobsRepository(db: Database) {
       // failure can never leave a canonical job without its occurrence, and the FOR UPDATE lock in
       // reaggregate serializes concurrent ingestions of the same vacancy.
       return db.transaction(async (tx) => {
+        // Source occurrence identity is stronger than mutable content. A corrected
+        // title or shorter replacement description updates the occurrence already
+        // observed instead of creating a second job or retaining stale text because
+        // it happened to be longer.
+        const [exact] = await tx
+          .select({ jobId: jobOccurrences.jobId })
+          .from(jobOccurrences)
+          .innerJoin(jobs, eq(jobs.id, jobOccurrences.jobId))
+          .where(
+            and(
+              eq(jobOccurrences.source, input.source),
+              eq(jobOccurrences.externalId, input.externalId),
+              ownerUserId === null
+                ? sql`${jobs.ownerUserId} is null`
+                : eq(jobs.ownerUserId, ownerUserId)
+            )
+          )
+          .limit(1);
+
+        if (exact) {
+          await tx
+            .update(jobs)
+            .set({
+              title: input.title,
+              company: input.company,
+              ...(input.location != null ? { location: input.location } : {}),
+              ...(input.remoteMode != null ? { remoteMode: input.remoteMode } : {}),
+              ...(input.employmentType != null ? { employmentType: input.employmentType } : {}),
+              ...(input.seniority != null ? { seniority: input.seniority } : {}),
+              ...(input.salaryText != null ? { salaryText: input.salaryText } : {}),
+              rawPayload: input.rawPayload ?? {},
+              updatedAt: new Date(),
+            })
+            .where(eq(jobs.id, exact.jobId));
+          await tx
+            .update(jobOccurrences)
+            .set({
+              ...(url ? { url } : {}),
+              ...(input.description != null ? { description: input.description } : {}),
+              ...(input.postedAt != null ? { postedAt: input.postedAt } : {}),
+              status: input.status ?? "active",
+              lastSeenAt: new Date(),
+              rawPayload: input.rawPayload ?? {},
+              updatedAt: new Date(),
+            })
+            .where(
+              and(
+                eq(jobOccurrences.jobId, exact.jobId),
+                eq(jobOccurrences.source, input.source),
+                eq(jobOccurrences.externalId, input.externalId)
+              )
+            );
+          const updated = await reaggregate(tx, exact.jobId);
+          if (!updated) throw new Error("Existing job occurrence has no canonical job");
+          return updated;
+        }
+
         const [job] = await tx
           .insert(jobs)
           .values({
@@ -283,14 +438,14 @@ export function createJobsRepository(db: Database) {
             postedAt: input.postedAt ?? null,
             rawPayload: input.rawPayload ?? {},
           })
-          // Dedupe on the CANONICAL vacancy identity (scoped above), not (source, externalId): one
-          // row per real job even when several providers surface it. On conflict we FIELD-QUALITY
-          // MERGE — a later teaser or a null must never downgrade an existing description/metadata.
+          // Dedupe on the scoped conservative vacancy identity. The default includes
+          // source occurrence id; verified callers can pass a shared cross-source key.
+          // On conflict, field-quality merge protects an explicitly grouped vacancy.
           .onConflictDoUpdate(conflict)
           .returning();
 
-        // Record THIS provider's occurrence (provenance + per-source truth), then re-derive the
-        // canonical row's rolled-up fields from ALL occurrences so readers stay unchanged.
+        // Record this provider occurrence (provenance + per-source truth), then
+        // re-derive the canonical row from every occurrence deliberately grouped here.
         await tx
           .insert(jobOccurrences)
           .values({

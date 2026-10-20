@@ -15,6 +15,7 @@ export type PortfolioSiteView = {
 
 export type PortfolioItemView = {
   id: string;
+  evidenceItemId?: string | null;
   section: string;
   title: string;
   subtitle: string | null;
@@ -81,6 +82,7 @@ export function toSiteView(site: PortfolioSite): PortfolioSiteView {
 export function toItemView(item: PortfolioItem): PortfolioItemView {
   return {
     id: item.id,
+    evidenceItemId: item.evidenceItemId,
     section: item.section,
     title: item.title,
     subtitle: item.subtitle,
@@ -119,9 +121,7 @@ export function toExportItem(item: PortfolioItem): PortfolioItemExport {
 }
 
 /** Interchange (snake_case, from portfolio export or Fadi) → DB insert fields. */
-export function fromExportItem(
-  raw: Partial<PortfolioItemExport>,
-): {
+export function fromExportItem(raw: Partial<PortfolioItemExport>): {
   section: string;
   title: string;
   subtitle: string | null;
@@ -159,13 +159,14 @@ export function toPortfolioView(site: PortfolioSite, items: PortfolioItem[]): Po
   return { site: toSiteView(site), items: items.map(toItemView) };
 }
 
-// Maps an evidence kind → the portfolio section it seeds into.
+/** One career record, projected into the section that presents that kind of fact. */
 const EVIDENCE_SECTION: Record<string, string> = {
-  experience: "experience",
   project: "project",
-  achievement: "project",
-  skill: "skill",
+  achievement: "achievement",
+  experience: "experience",
   education: "education",
+  certification: "certification",
+  skill: "skill",
 };
 
 /**
@@ -174,9 +175,7 @@ const EVIDENCE_SECTION: Record<string, string> = {
  * `description` starts from the evidence detail and is meant to be AI-enhanced /
  * user-curated afterward (never invented here).
  */
-export function seedItemsFromEvidence(
-  evidence: EvidenceItem[],
-): Array<{
+export function seedItemsFromEvidence(evidence: EvidenceItem[]): Array<{
   evidenceItemId: string;
   section: string;
   title: string;
@@ -187,17 +186,19 @@ export function seedItemsFromEvidence(
   tag: string | null;
   sortOrder: number;
 }> {
-  return evidence.map((e, i) => ({
-    evidenceItemId: e.id,
-    section: EVIDENCE_SECTION[e.kind] ?? "custom",
-    title: e.title,
-    subtitle: e.organization ?? null,
-    dateRange: e.period ?? null,
-    description: e.detail || null,
-    bullets: e.metrics ? [e.metrics] : [],
-    tag: e.tags?.[0] ?? null,
-    sortOrder: (i + 1) * 10,
-  }));
+  return evidence
+    .filter((e) => EVIDENCE_SECTION[e.kind])
+    .map((e, i) => ({
+      evidenceItemId: e.id,
+      section: EVIDENCE_SECTION[e.kind],
+      title: e.title,
+      subtitle: e.organization ?? null,
+      dateRange: e.period ?? null,
+      description: e.detail || null,
+      bullets: e.metrics ? [e.metrics] : [],
+      tag: e.tags?.[0] ?? null,
+      sortOrder: (i + 1) * 10,
+    }));
 }
 
 // ── Duplicate detection for sync ──────────────────────────────────────────────
@@ -207,10 +208,16 @@ export function seedItemsFromEvidence(
 // entries are the SAME thing — biased to avoid FALSE merges (losing a distinct entry is worse
 // than an occasional missed dedup the user can delete).
 
-type EntryLike = { section: string; title: string; subtitle?: string | null; dateRange?: string | null };
+type EntryLike = {
+  section: string;
+  title: string;
+  subtitle?: string | null;
+  dateRange?: string | null;
+};
 
 const STOP = new Set(["of", "the", "and", "for", "a", "an", "at", "to", "in", "on", "de", "du"]);
-const collapse = (s: string | null | undefined) => (s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
+const collapse = (s: string | null | undefined) =>
+  (s ?? "").toLowerCase().replace(/[^a-z0-9]+/g, "");
 const wordsOf = (s: string | null | undefined) => (s ?? "").toLowerCase().match(/[a-z0-9]+/g) ?? [];
 
 function yearsOf(s: string | null | undefined): [number, number] | null {
@@ -237,8 +244,9 @@ function titlesRelated(a: string, b: string, orgA: string, orgB: string): boolea
   const codes = (t: string) =>
     new Set(
       wordsOf(t).filter(
-        (w) => w.length >= 2 && w.length <= 5 && /^[a-z]+$/.test(w) && !STOP.has(w) && !orgTokens.has(w),
-      ),
+        (w) =>
+          w.length >= 2 && w.length <= 5 && /^[a-z]+$/.test(w) && !STOP.has(w) && !orgTokens.has(w)
+      )
     );
   const ca = codes(a);
   const cb = codes(b);

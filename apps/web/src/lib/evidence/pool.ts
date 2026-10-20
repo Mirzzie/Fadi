@@ -14,10 +14,37 @@ import type { EvidenceItem } from "@careeros/database";
  * only in the user's real history — never invents experience.
  */
 
-export type EvidenceKind = "experience" | "project" | "achievement" | "skill" | "education";
+/**
+ * What kind of thing a record is.
+ *
+ * `certification` is its own kind. It used to be missing, and `normKind` turned every
+ * unrecognised value — including "certification" — into `experience`, so a credential extracted
+ * from a CV became employment-shaped data that every downstream reader treated as a job. The
+ * portfolio has always had certifications, so the same credential could be a certificate there
+ * and a job here.
+ *
+ * `unclassified` is the honest landing place for anything else. A record whose kind could not be
+ * read is held for review; it is never quietly filed as employment.
+ */
+export type EvidenceKind =
+  | "experience"
+  | "project"
+  | "achievement"
+  | "certification"
+  | "skill"
+  | "education"
+  | "unclassified";
+
+export type EvidenceArtifactView = {
+  id: string;
+  kind: string;
+  url: string;
+  label: string | null;
+};
 
 export type EvidenceView = {
   id: string;
+  factId?: string;
   kind: EvidenceKind;
   title: string;
   organization: string | null;
@@ -29,18 +56,52 @@ export type EvidenceView = {
   /** What the market calls that same real thing ("siem", "incident triage"). */
   marketTags: string[];
   origin: string;
+  artifacts?: EvidenceArtifactView[];
 };
 
-const KINDS: EvidenceKind[] = ["experience", "project", "achievement", "skill", "education"];
-/** Accepts null as well as undefined — the extraction schema uses `.nullable()`. */
+const KINDS: EvidenceKind[] = [
+  "experience",
+  "project",
+  "achievement",
+  "certification",
+  "skill",
+  "education",
+  "unclassified",
+];
+
+/** Words a person or a model may use for a kind Fadi stores under another name. */
+const SYNONYMS: Record<string, EvidenceKind> = {
+  job: "experience",
+  role: "experience",
+  employment: "experience",
+  work: "experience",
+  cert: "certification",
+  certificate: "certification",
+  credential: "certification",
+  licence: "certification",
+  license: "certification",
+  qualification: "education",
+  degree: "education",
+  course: "education",
+  award: "achievement",
+};
+
+/**
+ * Accepts null as well as undefined — the extraction schema uses `.nullable()`.
+ *
+ * An unreadable kind becomes `unclassified`, NOT `experience`. Defaulting to employment wrote a
+ * job into someone's history every time extraction met a word it did not know.
+ */
 export function normKind(s?: string | null): EvidenceKind {
   const k = (s ?? "").toLowerCase().trim();
-  return (KINDS as string[]).includes(k) ? (k as EvidenceKind) : "experience";
+  if ((KINDS as string[]).includes(k)) return k as EvidenceKind;
+  return SYNONYMS[k] ?? "unclassified";
 }
 
 export function toEvidenceView(row: EvidenceItem): EvidenceView {
   return {
     id: row.id,
+    factId: row.factId ?? row.id,
     kind: normKind(row.kind),
     title: row.title,
     organization: row.organization,
@@ -50,6 +111,7 @@ export function toEvidenceView(row: EvidenceItem): EvidenceView {
     tags: Array.isArray(row.tags) ? row.tags : [],
     marketTags: Array.isArray(row.marketTags) ? row.marketTags : [],
     origin: row.origin,
+    artifacts: [],
   };
 }
 
@@ -242,6 +304,7 @@ export const extractionSchemaShape = {
       kind: z.string().nullable(),
       title: z.string(),
       organization: z.string().nullable(),
+      attribution: z.enum(["personal", "employment", "education", "platform", "client"]).nullable(),
       period: z.string().nullable(),
       detail: z.string().nullable(),
       metrics: z.string().nullable(),
@@ -257,7 +320,8 @@ const poolSchema = z.object(extractionSchemaShape);
 const MAX_POOL_ITEMS = 40;
 
 const EXTRACT_SYSTEM = `You are building a candidate's "evidence pool": discrete, reusable pieces of their REAL career, independent of any one job.
-Extract items of kind: experience (a role held), project, achievement, skill, education.
+Extract items of kind: experience (a role held), project, achievement, certification (a credential awarded by an issuer), skill, education.
+- If an item's kind is genuinely unclear, use "unclassified". NEVER file something as experience to make it fit — a record wrongly marked as employment becomes a job in the person's history.
 Rules:
 - Use ONLY the evidence provided. Never invent roles, employers, dates, metrics, or skills.
 - One item per real thing. Keep detail tight and factual. Put real numbers/outcomes in "metrics".
@@ -267,10 +331,11 @@ Rules:
   - Do not add seniority the evidence doesn't show, and never add a term just because it is in demand.
   - Prefer the generic industry term over any vendor's brand name.
   - If a real thing has no honest market name, leave marketTags empty rather than stretch.
+- Set attribution only from the stated relationship: employment, education, client, platform or personal. Use null when unclear; a tool or a course provider is not an employer.
 - If the history is thin, return fewer items. Never pad.`;
 
 export type ExtractResult =
-  | { ok: true; items: EvidenceView[] }
+  | { ok: true; items: EvidenceView[]; pendingReview: number }
   | { ok: false; reason: "no_evidence" | "no_provider" | "empty"; message: string };
 
 // The marker lives with the gate that sets it (lib/identity/admit), so there is one
@@ -279,13 +344,11 @@ import { UNCONFIRMED_LINK } from "@/lib/identity/admit";
 export { UNCONFIRMED_LINK };
 
 export async function extractEvidencePool(userId: string): Promise<ExtractResult> {
-  const [{ getCareerReportContext }, { composeCareerEvidence }, { getUserDocGenerate }, { createEvidenceRepository }, { getDatabase }] =
+  const [{ getCareerReportContext }, { composeCareerEvidence }, { getUserDocGenerate }] =
     await Promise.all([
       import("@/lib/career-report/data"),
       import("@/lib/career/evidence"),
       import("@/lib/ai/user-generate"),
-      import("@careeros/database"),
-      import("@/lib/database/client"),
     ]);
 
   const ctx = await getCareerReportContext(userId);
@@ -322,11 +385,8 @@ export async function extractEvidencePool(userId: string): Promise<ExtractResult
     return { ok: false, reason: "empty", message: "Not enough concrete detail in your history yet — add more to your LinkedIn/résumé and try again." };
   }
 
-  // ONE GATE (lib/identity/admit). This function used to carry its own copy of the
-  // resolve-before-create logic, which is how it drifted: the copy here only suppressed
-  // a confident "same" while every real duplicate scored "maybe". Extraction now hands
-  // candidates to the same gate the extension, the manual form and the learning path
-  // use, so a duplicate is impossible to create through one door and not another.
+  // Admission serializes exact reimports and holds inferred matches for review.
+  // Absence of a match is not proof that the extracted claims are factually correct.
   const { admitEvidenceBatch } = await import("@/lib/identity/admit");
   const { created, absorbed, uncertain } = await admitEvidenceBatch(
     userId,
@@ -334,6 +394,7 @@ export async function extractEvidencePool(userId: string): Promise<ExtractResult
       kind: normKind(i.kind),
       title: i.title,
       organization: i.organization ?? null,
+      attribution: i.attribution ?? "personal",
       period: i.period ?? null,
       detail: i.detail ?? null,
       metrics: i.metrics ?? null,
@@ -348,7 +409,7 @@ export async function extractEvidencePool(userId: string): Promise<ExtractResult
     logger.info("evidence.rewordings_absorbed", { userId, count: absorbed, uncertain });
   }
 
-  return { ok: true, items: created.map(toEvidenceView) };
+  return { ok: true, items: created.map(toEvidenceView), pendingReview: uncertain };
 }
 
 export async function listEvidence(userId: string): Promise<EvidenceView[]> {

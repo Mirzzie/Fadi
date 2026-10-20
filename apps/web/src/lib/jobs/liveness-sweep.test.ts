@@ -75,3 +75,52 @@ describe("sweepJobsLiveness", () => {
     expect([...closed]).toEqual(["b"]);
   });
 });
+
+describe("a probe that could not read the page is not a closed job", () => {
+  it("THE ACCEPTANCE CASE: blocked, rate-limited and unreachable never drop a posting", async () => {
+    // Criterion 5: "a blocked/failed liveness request does not prove that the role is closed".
+    const states = ["unknown", "live"] as const;
+    for (const state of states) {
+      const persisted: Array<[string, string]> = [];
+      const closed = await sweepJobsLiveness(
+        [{ id: "j1", url: "https://example.test/job", livenessCheckedAt: null }],
+        {
+          check: async () => ({ state, reason: "Source returned 403", checkedAt: new Date().toISOString() }),
+          persist: async (id, s) => {
+            persisted.push([id, s]);
+          },
+        }
+      );
+      expect(closed.size).toBe(0);
+      expect(persisted).toEqual([["j1", state]]);
+    }
+  });
+
+  it("a probe that throws leaves the posting alone and uncached for a retry", async () => {
+    const persisted: string[] = [];
+    const closed = await sweepJobsLiveness(
+      [{ id: "j1", url: "https://example.test/job", livenessCheckedAt: null }],
+      {
+        check: async () => {
+          throw new Error("network down");
+        },
+        persist: async (id) => {
+          persisted.push(id);
+        },
+      }
+    );
+    expect(closed.size).toBe(0);
+    expect(persisted).toEqual([]);
+  });
+
+  it("only an explicit closure drops it", async () => {
+    const closed = await sweepJobsLiveness(
+      [{ id: "j1", url: "https://example.test/job", livenessCheckedAt: null }],
+      {
+        check: async () => ({ state: "closed", reason: "Source returned 404", checkedAt: new Date().toISOString() }),
+        persist: async () => {},
+      }
+    );
+    expect([...closed]).toEqual(["j1"]);
+  });
+});

@@ -6,6 +6,7 @@ import {
   normCompetency,
   pickBestStory,
   toStoryView,
+  type StarStory,
   type StoryView,
 } from "./story-format";
 
@@ -32,7 +33,7 @@ const STORY_SCHEMA = z.object({
         action: z.string(),
         result: z.string(),
         reflection: z.string(),
-      }),
+      })
     )
     .max(8),
 });
@@ -56,30 +57,24 @@ export type ExtractResult =
  */
 export async function generateStoriesFromEvidence(userId: string): Promise<ExtractResult> {
   const [
-    { getCareerReportContext },
-    { composeCareerEvidence },
+    { approvedCareerEvidence },
     { getUserDocGenerate },
     { createInterviewStoriesRepository },
     { getDatabase },
   ] = await Promise.all([
-    import("@/lib/career-report/data"),
-    import("@/lib/career/evidence"),
+    import("@/lib/career/context"),
     import("@/lib/ai/user-generate"),
     import("@careeros/database"),
     import("@/lib/database/client"),
   ]);
 
-  const context = await getCareerReportContext(userId);
-  const evidence = composeCareerEvidence({
-    resumeText: context?.resumeText,
-    linkedInText: context?.linkedInProfileText,
-  });
+  const evidence = await approvedCareerEvidence(userId);
   if (evidence.historySource === "none") {
     return {
       ok: false,
       reason: "no_evidence",
       message:
-        "I don't have your career history yet. Paste your LinkedIn or upload a resume first, and I'll mine your real experience into interview stories.",
+        "I don't have your career history yet. Add and review your records in Evidence first, and I'll mine your real experience into interview stories.",
     };
   }
 
@@ -88,7 +83,8 @@ export async function generateStoriesFromEvidence(userId: string): Promise<Extra
     return {
       ok: false,
       reason: "no_provider",
-      message: "Connect an AI provider in Settings and I'll draft your story bank from your experience.",
+      message:
+        "Connect an AI provider in Settings and I'll draft your story bank from your experience.",
     };
   }
 
@@ -98,10 +94,14 @@ export async function generateStoriesFromEvidence(userId: string): Promise<Extra
       EXTRACTION_SYSTEM,
       buildExtractionContext(evidence.block),
       STORY_SCHEMA,
-      "interview_stories",
+      "interview_stories"
     );
   } catch {
-    return { ok: false, reason: "empty", message: "I couldn't draft stories just now — please try again." };
+    return {
+      ok: false,
+      reason: "empty",
+      message: "I couldn't draft stories just now — please try again.",
+    };
   }
 
   const clean = (parsed.stories ?? []).filter((s) => s.title.trim() && s.action.trim());
@@ -110,7 +110,7 @@ export async function generateStoriesFromEvidence(userId: string): Promise<Extra
       ok: false,
       reason: "empty",
       message:
-        "There wasn't enough concrete detail in your history for a real story yet. Add more specifics to your LinkedIn/resume and try again.",
+        "There wasn't enough concrete detail in your history for a real story yet. Add more specifics to your Evidence records and try again.",
     };
   }
 
@@ -126,7 +126,7 @@ export async function generateStoriesFromEvidence(userId: string): Promise<Extra
       result: s.result.trim(),
       reflection: s.reflection.trim(),
       origin: "ai",
-    })),
+    }))
   );
   return { ok: true, stories: created.map(toStoryView) };
 }
@@ -159,10 +159,11 @@ export type StoryFromAnswerResult =
  */
 export async function storyFromMockAnswer(
   userId: string,
-  input: { question: string; answer: string; role?: string | null; competency?: string | null },
+  input: { question: string; answer: string; role?: string | null; competency?: string | null }
 ): Promise<StoryFromAnswerResult> {
   const answer = input.answer?.trim() ?? "";
-  if (!answer) return { ok: false, reason: "empty_answer", message: "There's no answer to save yet." };
+  if (!answer)
+    return { ok: false, reason: "empty_answer", message: "There's no answer to save yet." };
 
   const [{ getUserDocGenerate }, { createInterviewStoriesRepository }, { getDatabase }] =
     await Promise.all([
@@ -191,15 +192,25 @@ export async function storyFromMockAnswer(
 
   let s: z.infer<typeof ONE_STORY_SCHEMA>;
   try {
-    s = await generate.structured(ANSWER_TO_STORY_SYSTEM, user, ONE_STORY_SCHEMA, "interview_story_from_answer");
+    s = await generate.structured(
+      ANSWER_TO_STORY_SYSTEM,
+      user,
+      ONE_STORY_SCHEMA,
+      "interview_story_from_answer"
+    );
   } catch {
-    return { ok: false, reason: "empty", message: "I couldn't shape that into a story just now — please try again." };
+    return {
+      ok: false,
+      reason: "empty",
+      message: "I couldn't shape that into a story just now — please try again.",
+    };
   }
   if (!s.title.trim() || !s.action.trim()) {
     return {
       ok: false,
       reason: "empty",
-      message: "That answer didn't have enough to form a story yet. Add more specifics and re-answer.",
+      message:
+        "That answer didn't have enough to form a story yet. Add more specifics and re-answer.",
     };
   }
 
@@ -217,6 +228,73 @@ export async function storyFromMockAnswer(
   return { ok: true, story: toStoryView(row) };
 }
 
+const RECORD_TO_STORY_SYSTEM = `You turn ONE finished piece of self-directed learning — a practice project or a course — from the candidate's career record into a STAR+Reflection interview story.
+
+Hard rules:
+- Use ONLY the record and step results provided. Never invent achievements, metrics, employers, clients, production use, dates or outcomes.
+- It was self-directed: a project in their own lab, or a course they chose to take (the input says which). Say so in the situation; never present it as work for an employer, and never treat finishing a course as mastery.
+- action is what THEY did, naming the real tools. result is what the record shows they produced or confirmed.
+- reflection only if the record states a lesson or difficulty; otherwise leave it empty rather than inventing one.
+- competencies are lowercase tags this story could answer (for example: learning, ownership, troubleshooting).
+- Keep each field tight and concrete. Never pad.`;
+
+export type StoryDraft = StarStory;
+
+/**
+ * Draft — do not save — a story from one saved career record. The person reads it and
+ * decides; saving goes through the ordinary story save, so a draft they skip leaves nothing.
+ */
+export async function draftStoryFromRecord(
+  userId: string,
+  input: { title: string; kind: "project" | "course"; record: string }
+): Promise<{ ok: true; draft: StoryDraft } | { ok: false; message: string }> {
+  const { getUserDocGenerate } = await import("@/lib/ai/user-generate");
+  const generate = await getUserDocGenerate(userId);
+  if (!generate) {
+    return {
+      ok: false,
+      message: "Drafting a story needs an AI provider — add one in Settings → AI.",
+    };
+  }
+  try {
+    const s = await generate.structured(
+      RECORD_TO_STORY_SYSTEM,
+      `${input.kind === "course" ? "Course" : "Project"}: ${input.title}\n\nCareer record and step results:\n${input.record.slice(0, 6000)}`,
+      ONE_STORY_SCHEMA,
+      "interview_story_from_record"
+    );
+    if (!s.title.trim() || !s.action.trim()) {
+      return { ok: false, message: "The record is too thin for a story yet." };
+    }
+    return {
+      ok: true,
+      draft: {
+        title: s.title.trim(),
+        competencies: s.competencies.map(normCompetency).filter(Boolean).slice(0, 6),
+        situation: s.situation.trim(),
+        task: s.task.trim(),
+        action: s.action.trim(),
+        result: s.result.trim(),
+        reflection: s.reflection.trim(),
+      },
+    };
+  } catch (error) {
+    const { logger } = await import("@/lib/observability/logger");
+    logger.warn("interview.story_from_record_failed", {
+      userId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    // Waiting does not fix a rejected key, so do not suggest it.
+    if (/\b(401|403)\b|invalid api key|unauthori[sz]ed/i.test(String(error))) {
+      return {
+        ok: false,
+        message: "Your AI provider rejected its key. Check it in Settings → AI.",
+      };
+    }
+    return { ok: false, message: "Couldn't draft a story just now. Try again in a minute." };
+  }
+}
+
 /** List a user's stories as views. */
 export async function listStories(userId: string): Promise<StoryView[]> {
   const { createInterviewStoriesRepository } = await import("@careeros/database");
@@ -228,7 +306,7 @@ export async function listStories(userId: string): Promise<StoryView[]> {
 /** Answer a behavioral question with the best-matching real story (no fabrication). */
 export async function answerBehavioral(
   userId: string,
-  question: string,
+  question: string
 ): Promise<{ ok: boolean; answer?: string; storyTitle?: string; message?: string }> {
   const stories = await listStories(userId);
   const story = pickBestStory(stories, question);
@@ -236,7 +314,9 @@ export async function answerBehavioral(
     return {
       ok: false,
       message:
-        "Your story bank is empty. Generate it from your experience first, then I can answer behavioral questions with your real stories.",
+        stories.length === 0
+          ? "Your story bank is empty. Add or generate a real story first."
+          : "I could not find a grounded story for that question. Add a real example for this competency rather than forcing an unrelated answer.",
     };
   }
   return { ok: true, answer: formatStoryAsAnswer(story), storyTitle: story.title };

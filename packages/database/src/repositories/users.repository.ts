@@ -1,7 +1,13 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 import type { Database } from "../client";
-import { authIdentities, user as betterAuthUser, users, type User } from "../schema/index";
+import {
+  authIdentities,
+  user as betterAuthUser,
+  productEvents,
+  users,
+  type User,
+} from "../schema/index";
 
 export type AuthProvider = "supabase" | "better_auth" | "authjs" | "custom";
 
@@ -30,8 +36,32 @@ export function createUsersRepository(db: Database) {
      * start a fresh, empty account. This is the "start over" path, distinct from account
      * closure below. See docs/adr/0007-data-retention-and-erasure.md.
      */
+    /**
+     * "Delete my data" — erase career data, keep the login.
+     *
+     * D07: `product_events` is the ONE table that does not cascade — it is
+     * `ON DELETE SET NULL`, so its rows survive the user with `user_id` emptied. That is
+     * defensible for anonymous product counts and indefensible for what the payloads
+     * actually hold: which pieces of work were opened, the visitor's city, country and
+     * NETWORK ORGANISATION, and — for feedback events — the message someone wrote and
+     * the email address they left.
+     *
+     * So a person deleting their data orphaned a THIRD PARTY's message and contact
+     * details into a row nobody owns and no deletion request can ever reach again.
+     *
+     * The payload is redacted before the user goes. The event type and its timestamp
+     * remain, which is all an aggregate count needs; everything identifying does not.
+     * One transaction, because a redaction that half-applies is worse than none — the
+     * caller would report success over rows still holding the content.
+     */
     async deleteById(id: string): Promise<void> {
-      await db.delete(users).where(eq(users.id, id));
+      await db.transaction(async (tx) => {
+        await tx
+          .update(productEvents)
+          .set({ payload: {} })
+          .where(eq(productEvents.userId, id));
+        await tx.delete(users).where(eq(users.id, id));
+      });
     },
 
     /**
@@ -62,6 +92,10 @@ export function createUsersRepository(db: Database) {
           .from(authIdentities)
           .where(and(eq(authIdentities.userId, id), eq(authIdentities.provider, "better_auth")));
         const betterAuthIds = identities.map((r) => r.subject);
+
+        // D07 again, and it matters more here: closure is full erasure, so leaving
+        // orphaned payloads behind would contradict the promise outright.
+        await tx.update(productEvents).set({ payload: {} }).where(eq(productEvents.userId, id));
 
         // App side: cascades 26 career-data tables (incl. auth_identities).
         await tx.delete(users).where(eq(users.id, id));

@@ -2,7 +2,7 @@ import "server-only";
 
 import { getKv } from "@/lib/kv/store";
 import { logger } from "@/lib/observability/logger";
-import { isSafeFetchUrl } from "@/lib/security/url-guard";
+import { fetchSafeUrl, isSafeFetchUrl } from "@/lib/security/url-guard";
 import { detectClosedSignal, type PostingLiveness } from "./liveness-detect";
 
 export type { LivenessState, PostingLiveness } from "./liveness-detect";
@@ -13,6 +13,44 @@ export { detectClosedSignal } from "./liveness-detect";
 const LIVENESS_TTL_SECONDS = 10 * 60;
 const FETCH_TIMEOUT_MS = 4000;
 const MAX_BODY_BYTES = 24 * 1024; // enough to catch a banner/headline, not the whole page
+
+/**
+ * Read only the response prefix needed by the liveness detector.
+ *
+ * `arrayBuffer().slice(...)` placed the limit after the download, so a server could
+ * still make Fadi buffer an arbitrarily large body. Cancel the stream as soon as the
+ * bounded prefix is available. The streaming decoder preserves a multibyte character
+ * split across network chunks.
+ */
+export async function readBodyPrefix(
+  body: ReadableStream<Uint8Array> | null,
+  maxBytes = MAX_BODY_BYTES
+): Promise<string> {
+  if (!body || maxBytes <= 0) return "";
+  const reader = body.getReader();
+  const decoder = new TextDecoder("utf-8", { fatal: false });
+  let read = 0;
+  let text = "";
+
+  try {
+    while (read < maxBytes) {
+      const next = await reader.read();
+      if (next.done) break;
+      const remaining = maxBytes - read;
+      const chunk =
+        next.value.byteLength > remaining ? next.value.subarray(0, remaining) : next.value;
+      read += chunk.byteLength;
+      text += decoder.decode(chunk, { stream: true });
+      if (next.value.byteLength > remaining || read === maxBytes) {
+        await reader.cancel().catch(() => undefined);
+        break;
+      }
+    }
+    return text + decoder.decode();
+  } finally {
+    reader.releaseLock();
+  }
+}
 
 async function readCache(url: string): Promise<PostingLiveness | null> {
   try {
@@ -57,22 +95,19 @@ export async function checkPostingLiveness(url: string): Promise<PostingLiveness
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
-    const res = await fetch(url, {
+    const res = await fetchSafeUrl(url, {
       method: "GET",
-      redirect: "follow",
       signal: controller.signal,
       headers: {
         // A plausible UA — many boards 403 a bare fetch, which we treat as unknown.
-        "User-Agent":
-          "Mozilla/5.0 (compatible; Fadi/1.0; +https://careeros.app) freshness-check",
+        "User-Agent": "Mozilla/5.0 (compatible; Fadi/1.0; +https://careeros.app) freshness-check",
         Accept: "text/html,application/xhtml+xml",
       },
     });
 
     let snippet = "";
     try {
-      const buf = await res.arrayBuffer();
-      snippet = new TextDecoder("utf-8", { fatal: false }).decode(buf.slice(0, MAX_BODY_BYTES));
+      snippet = await readBodyPrefix(res.body);
     } catch {
       snippet = "";
     }

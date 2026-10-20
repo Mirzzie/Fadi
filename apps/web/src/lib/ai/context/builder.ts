@@ -8,7 +8,7 @@ import {
   createSavedJobsRepository,
 } from "@careeros/database";
 
-import { composeCareerEvidence } from "@/lib/career/evidence";
+import { buildCareerContext } from "@/lib/career/context";
 import { getDatabase } from "@/lib/database/client";
 import { getMarketIntelligence } from "@/lib/data-sources/service";
 import { getMomentumSummary } from "@/lib/resilience/service";
@@ -25,14 +25,9 @@ export interface BuildFadiContextOptions {
   includeLiveMarket?: boolean;
 }
 
-function truncate(text: string | null | undefined, max: number): string | null {
-  if (!text) return null;
-  return text.length > max ? `${text.slice(0, max)}\n[truncated for context]` : text;
-}
-
 export async function buildFadiContext(
   userId: string,
-  options: BuildFadiContextOptions = {},
+  options: BuildFadiContextOptions = {}
 ): Promise<FadiUserContext | null> {
   const db = getDatabase();
 
@@ -50,6 +45,8 @@ export async function buildFadiContext(
     getMomentumSummary(userId),
     createAgentRunsRepository(db).listRecentForUser(userId, 8),
   ]);
+
+  const career = await buildCareerContext(userId, { directionId: careerProfile.id });
 
   // Live, personalized market intelligence — opt-in (see options doc above).
   const skillGaps = (report?.missingSkills as Array<{ title: string; detail: string }>) ?? [];
@@ -96,8 +93,9 @@ export async function buildFadiContext(
     },
 
     evidence: {
-      resumeText: truncate(resume?.parsedText ?? resume?.rawText, 8000),
-      linkedInText: truncate(linkedIn?.rawText ?? linkedIn?.profileUrl, 4000),
+      resumeText: null,
+      linkedInText: null,
+      approvedBlock: career.block,
       hasResume: Boolean(resume?.rawText ?? resume?.parsedText),
       hasLinkedIn: Boolean(linkedIn?.rawText ?? linkedIn?.profileUrl),
     },
@@ -125,7 +123,7 @@ export async function buildFadiContext(
     opportunities: {
       savedJobsCount: savedJobsList.length,
       activeApplicationsCount: savedJobsList.filter(
-        (j) => j.status !== "saved" && j.status !== "rejected",
+        (j) => j.status !== "saved" && j.status !== "rejected"
       ).length,
       savedJobs: savedJobsList.slice(0, 10).map((j) => ({
         title: "Saved role",
@@ -172,20 +170,16 @@ export function formatFadiContextAsPrompt(ctx: FadiUserContext): string {
 
   lines.push("");
   lines.push("## Career Evidence");
-  // LinkedIn (the full record) is the source of truth; a resume is a role-tailored
-  // excerpt. composeCareerEvidence enforces that hierarchy + the honest labels.
   lines.push(
-    composeCareerEvidence({
-      resumeText: ctx.evidence.resumeText,
-      linkedInText: ctx.evidence.linkedInText,
-    }).block,
+    ctx.evidence.approvedBlock ||
+      "No accepted career records selected. Ask the user to add and review Evidence; do not infer employment from imported documents."
   );
 
   if (ctx.analysis.hasReport) {
     lines.push("");
-    lines.push("## Career Intelligence Analysis");
+    lines.push("## Previous Career Analysis — derived advice, not a source of career facts");
     lines.push(
-      `Generated: ${ctx.analysis.generatedAt ? new Date(ctx.analysis.generatedAt).toLocaleDateString() : "recently"}`,
+      `Generated: ${ctx.analysis.generatedAt ? new Date(ctx.analysis.generatedAt).toLocaleDateString() : "recently"}`
     );
     lines.push(`Career readiness score: ${ctx.analysis.careerReadinessScore ?? "N/A"}/100`);
     lines.push(`Resume quality score: ${ctx.analysis.resumeQualityScore ?? "N/A"}/100`);
@@ -195,20 +189,16 @@ export function formatFadiContextAsPrompt(ctx: FadiUserContext): string {
     }
 
     if (ctx.analysis.strengths.length > 0) {
-      lines.push(
-        `Key strengths: ${ctx.analysis.strengths.map((s) => s.title).join(", ")}`,
-      );
+      lines.push(`Key strengths: ${ctx.analysis.strengths.map((s) => s.title).join(", ")}`);
     }
 
     if (ctx.analysis.skillGaps.length > 0) {
-      lines.push(
-        `Skill gaps: ${ctx.analysis.skillGaps.map((g) => g.title).join(", ")}`,
-      );
+      lines.push(`Skill gaps: ${ctx.analysis.skillGaps.map((g) => g.title).join(", ")}`);
     }
 
     if (ctx.analysis.targetRoleFit) {
       lines.push(
-        `Target role fit: ${ctx.analysis.targetRoleFit.rating ?? "unknown"} — ${ctx.analysis.targetRoleFit.explanation ?? ""}`,
+        `Target role fit: ${ctx.analysis.targetRoleFit.rating ?? "unknown"} — ${ctx.analysis.targetRoleFit.explanation ?? ""}`
       );
     }
 
@@ -235,7 +225,7 @@ export function formatFadiContextAsPrompt(ctx: FadiUserContext): string {
   if (ctx.opportunities.savedJobs.length > 0) {
     ctx.opportunities.savedJobs.forEach((j) => {
       lines.push(
-        `  - ${j.title} at ${j.company} (match: ${j.matchScore ?? "?"}%, status: ${j.status})`,
+        `  - ${j.title} at ${j.company} (match: ${j.matchScore ?? "?"}%, status: ${j.status})`
       );
     });
   }
@@ -253,32 +243,36 @@ export function formatFadiContextAsPrompt(ctx: FadiUserContext): string {
   lines.push("## Background Agency Findings");
   if (ctx.backgroundFindings.length > 0) {
     lines.push(
-      "Your background runs found these (the ONLY background work you may claim — cite them by what they are):",
+      "Your background runs found these (the ONLY background work you may claim — cite them by what they are):"
     );
     ctx.backgroundFindings.forEach((f) => {
       lines.push(
-        `  - [${f.kind}] ${f.title}${f.detail ? ` — ${f.detail}` : ""} (found ${new Date(f.foundAt).toLocaleDateString()})`,
+        `  - [${f.kind}] ${f.title}${f.detail ? ` — ${f.detail}` : ""} (found ${new Date(f.foundAt).toLocaleDateString()})`
       );
     });
   } else {
     lines.push(
-      "No background findings on the ledger yet. Do NOT claim you did work between sessions; offer to check live now instead.",
+      "No background findings on the ledger yet. Do NOT claim you did work between sessions; offer to check live now instead."
     );
   }
 
   lines.push("");
   lines.push("## Momentum & Resilience");
   lines.push(
-    "Use this to calibrate your tone and pacing — never to shame or pressure. Score the process, protect rest.",
+    "Use this to calibrate your tone and pacing — never to shame or pressure. Score the process, protect rest."
   );
-  lines.push(`Momentum: ${ctx.momentum.score}/100 (${ctx.momentum.band}) — ${ctx.momentum.bandMessage}`);
+  lines.push(
+    `Momentum: ${ctx.momentum.score}/100 (${ctx.momentum.band}) — ${ctx.momentum.bandMessage}`
+  );
   if (ctx.momentum.isResting) {
-    lines.push("The user is in a protected rest period. Do not push for output; affirm the recovery.");
+    lines.push(
+      "The user is in a protected rest period. Do not push for output; affirm the recovery."
+    );
   }
   lines.push(
     ctx.momentum.cadenceTarget
       ? `Commitment cadence: ${ctx.momentum.qualityApplicationsThisPeriod}/${ctx.momentum.cadenceTarget} quality applications this ${ctx.momentum.cadencePeriod}. ${ctx.momentum.cadenceMessage}`
-      : `Quality applications this ${ctx.momentum.cadencePeriod}: ${ctx.momentum.qualityApplicationsThisPeriod}. No cadence target set yet.`,
+      : `Quality applications this ${ctx.momentum.cadencePeriod}: ${ctx.momentum.qualityApplicationsThisPeriod}. No cadence target set yet.`
   );
 
   return lines.join("\n");

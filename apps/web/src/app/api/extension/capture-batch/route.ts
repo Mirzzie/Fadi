@@ -7,6 +7,7 @@ import { getExtensionUser } from "@/lib/extension/auth";
 import { getDatabase } from "@/lib/database/client";
 import { aiExtractJobs } from "@/lib/data-sources/providers/fadi-scraper/ai-extract";
 import { logger } from "@/lib/observability/logger";
+import { consumeAiSpendLimit } from "@/lib/security/ai-spend";
 
 // Bulk capture: the extension scrapes a whole portal SEARCH page (in the user's own session,
 // so it reads results a server scraper can't) and sends the list here. This is how "search
@@ -96,6 +97,22 @@ export async function POST(req: Request) {
       list.filter((d) => d.title?.trim() && d.company?.trim()).length;
     let usedAi = false;
     if (usable(items) === 0 && parsed.data.pageText?.trim()) {
+      const spend = await consumeAiSpendLimit({
+        userId: user.id,
+        operation: "extension-job-extraction",
+        perUserLimit: 20,
+        globalLimit: 120,
+        windowMs: 10 * 60 * 1000,
+      });
+      if (!spend.allowed) {
+        return withCors(
+          NextResponse.json(
+            { ok: false, error: "rate_limited", retryAfterSeconds: spend.retryAfterSeconds },
+            { status: 429 },
+          ),
+          origin,
+        );
+      }
       items = await aiExtractJobs(parsed.data.pageText, parsed.data.source ?? "job board");
       usedAi = true;
     }

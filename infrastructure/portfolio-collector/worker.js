@@ -65,6 +65,17 @@ const ALERTABLE = new Set(["contact_clicked", "resume_downloaded"]);
 const ALERT_COOLDOWN_MS = 15 * 60 * 1000;
 
 /**
+ * The resume cursor for one response page.
+ *
+ * It is deliberately derived from the rows returned, not from the table maximum.
+ * A caller cannot acknowledge rows it has never received.
+ */
+export function pageCursor(after, rows) {
+  if (rows.length === 0) return after;
+  return Number(rows[rows.length - 1].id);
+}
+
+/**
  * WHAT CLOUDFLARE ALREADY KNOWS, and this Worker was discarding.
  *
  * Every request arrives with `request.cf` filled in at the edge: country, city,
@@ -499,13 +510,12 @@ export default {
             .bind(after, limit)
             .all();
 
-      // The highest id SCANNED, so a caller can advance past rows it filtered out.
-      const [{ results: maxRow }] = [
-        await env.DB.prepare("select max(id) as max from events").all(),
-      ];
-      const scanned = Number(maxRow?.[0]?.max ?? 0) || 0;
+      // Advance only through the page actually returned. A table-wide maximum can
+      // jump over matching rows which did not fit within this response's limit.
+      const page = results ?? [];
+      const scanned = pageCursor(after, page);
 
-      return new Response(JSON.stringify({ events: results ?? [], scanned }), {
+      return new Response(JSON.stringify({ events: page, scanned }), {
         headers: { "content-type": "application/json" },
       });
     }
@@ -531,11 +541,10 @@ export default {
           )
             .bind(after)
             .all();
-      const [{ results: maxRow }] = [
-        await env.DB.prepare("select max(id) as max from feedback").all(),
-      ];
+      const page = results ?? [];
+      const scanned = pageCursor(after, page);
       return new Response(
-        JSON.stringify({ feedback: results ?? [], scanned: Number(maxRow?.[0]?.max ?? 0) || 0 }),
+        JSON.stringify({ feedback: page, scanned }),
         {
           headers: { "content-type": "application/json" },
         },

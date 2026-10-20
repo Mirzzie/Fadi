@@ -18,3 +18,36 @@ search:
     - json
   # Be gentle so public engines don't rate-limit your instance.
   autocomplete: ""
+
+# WHICH ENGINES ANSWER A LOCAL INSTANCE.
+#
+# Measured 21 Sep 2026 against this container: duckduckgo returns a CAPTCHA immediately, brave
+# suspends with 429 after a few searches, and qwant CAPTCHAs - so a crawl running three query
+# variants came back with ZERO results and no error, which reads as "no jobs in Dublin". Bing,
+# Google and Yahoo answered every site:-scoped job search. The rest are disabled so the response
+# carries results rather than excuses; Fadi treats an answer where every engine failed as a
+# backend failure, not an empty market.
+engines:
+  - name: duckduckgo
+    disabled: true
+  - name: brave
+    disabled: true
+  - name: qwant
+    disabled: true
+  - name: wikidata
+    disabled: true
+  - name: wikipedia
+    disabled: true
+  - name: bing
+    disabled: false
+  - name: google
+    disabled: false
+  - name: yahoo
+    disabled: false
+
+outgoing:
+  # Public engines are slower than a local service; the default timeout turned working engines
+  # into "unresponsive" ones.
+  request_timeout: 6.0
+  max_request_timeout: 12.0
+

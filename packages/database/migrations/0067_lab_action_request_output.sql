@@ -1,0 +1,1 @@
+ALTER TABLE "lab_action_requests" ADD COLUMN "output" text;

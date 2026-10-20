@@ -1,5 +1,5 @@
-import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter, Outfit } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Inter, Inter_Tight, JetBrains_Mono } from "next/font/google";
 import Script from "next/script";
 
 import { QueryProvider } from "@/components/providers/query-provider";
@@ -10,28 +10,20 @@ import "./globals.css";
 // strategy="beforeInteractive" is injected into the initial HTML and runs before
 // hydration — unlike a raw <script> element, which React 19 flags ("scripts inside
 // React components are never executed on the client").
-const THEME_INIT = `try{var t=localStorage.getItem('theme');if(t==='light')document.documentElement.classList.remove('dark');else document.documentElement.classList.add('dark');}catch(e){}`;
+const THEME_INIT = `try{var t=localStorage.getItem('theme');var d=t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme:dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}`;
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-// Display face for large hero headlines (tight, bold grotesque).
 const inter = Inter({
-  variable: "--font-display",
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
-// Heading face — friendly, rounded, modern. Carries Fadi's "for everyone" voice
-// across every heading in the system (see --font-heading in globals.css).
-const outfit = Outfit({
-  variable: "--font-outfit",
+const interTight = Inter_Tight({
+  variable: "--font-inter-tight",
+  subsets: ["latin"],
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  variable: "--font-jetbrains-mono",
   subsets: ["latin"],
 });
 
@@ -40,7 +32,15 @@ export const metadata: Metadata = {
     default: "Fadi",
     template: "%s | Fadi",
   },
-  description: "The career mentor that tells you the truth — honest job search, no ghost jobs, no hype.",
+  description: "Plan career moves, prepare applications, practise the work, and keep a useful record.",
+};
+
+export const viewport: Viewport = {
+  colorScheme: "light dark",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0a0a0a" },
+  ],
 };
 
 export default function RootLayout({
@@ -52,7 +52,7 @@ export default function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} ${outfit.variable} dark h-full antialiased`}
+      className={`${inter.variable} ${interTight.variable} ${jetbrainsMono.variable} dark h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
         <Script id="theme-init" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: THEME_INIT }} />

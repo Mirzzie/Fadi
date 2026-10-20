@@ -2,16 +2,13 @@
   "name": "careeros",
   "version": "0.1.0",
   "private": true,
-  "description": "Fadi — an AI operating system for a person's career (monorepo).",
+  "description": "Fadi \u2014 an AI operating system for a person's career (monorepo).",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "setup": "node scripts/setup.mjs",
-    "dev": "npm --workspace @careeros/web run dev",
     "build": "npm --workspace @careeros/web run build",
-    "test": "npm --workspace @careeros/web run test",
     "db:down": "docker compose -f infrastructure/docker/docker-compose.yml down",
     "db:generate": "npm --workspace @careeros/database run db:generate",
     "db:migrate": "npm --workspace @careeros/database run db:migrate",
@@ -19,12 +16,18 @@
     "db:seed:jobs": "npm --workspace @careeros/database run db:seed:jobs",
     "db:studio": "npm --workspace @careeros/database run db:studio",
     "db:up": "docker compose -f infrastructure/docker/docker-compose.yml up -d postgres",
-    "lint": "npm --workspace @careeros/web run lint",
-    "start": "npm --workspace @careeros/web run start",
-    "typecheck": "npm --workspace @careeros/database run typecheck && npm --workspace @careeros/web run typecheck",
+    "dev": "npm run services:up || true && npm --workspace @careeros/web run dev",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test:e2e": "playwright test"
+    "lint": "npm --workspace @careeros/web run lint",
+    "services:down": "docker compose -f infrastructure/docker/docker-compose.yml stop postgres searxng speaches kokoro",
+    "services:up": "docker compose -f infrastructure/docker/docker-compose.yml up -d postgres searxng speaches kokoro && node scripts/voice-models.mjs",
+    "setup": "node scripts/setup.mjs",
+    "start": "npm --workspace @careeros/web run start",
+    "test": "npm --workspace @careeros/web run test",
+    "test:e2e": "playwright test",
+    "typecheck": "npm --workspace @careeros/database run typecheck && npm --workspace @careeros/web run typecheck",
+    "voice:up": "docker compose -f infrastructure/docker/docker-compose.yml up -d speaches kokoro && node scripts/voice-models.mjs"
   },
   "engines": {
     "node": ">=20.11.0",

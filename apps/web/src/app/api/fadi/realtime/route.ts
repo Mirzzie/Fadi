@@ -1,6 +1,7 @@
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { serverEnv } from "@/lib/env.server";
 import { logger } from "@/lib/observability/logger";
+import { consumeAiSpendLimit } from "@/lib/security/ai-spend";
 
 /**
  * Real-time voice session broker (OpenAI Realtime API, WebRTC).
@@ -38,6 +39,20 @@ export async function POST() {
     return Response.json(
       { error: "Real-time voice needs an OpenAI key (OPENAI_API_KEY) on the server." },
       { status: 503 },
+    );
+  }
+
+  const spend = await consumeAiSpendLimit({
+    userId: user.id,
+    operation: "realtime-session",
+    perUserLimit: 6,
+    globalLimit: 60,
+    windowMs: 5 * 60 * 1000,
+  });
+  if (!spend.allowed) {
+    return Response.json(
+      { error: "Too many voice sessions started. Wait a moment and try again.", retryAfterSeconds: spend.retryAfterSeconds },
+      { status: 429 },
     );
   }
 

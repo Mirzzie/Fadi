@@ -20,7 +20,7 @@ export function ApplicationsTabs({ board, library }: { board: ReactNode; library
 
   return (
     <div className="space-y-4">
-      <div className="inline-flex rounded-lg border border-border/70 bg-muted/30 p-0.5 text-sm">
+      <div className="flex border-b border-border/80 text-sm">
         <TabButton active={tab === "pipeline"} onClick={() => setTab("pipeline")} icon={<KanbanSquare className="size-4" />}>
           Pipeline
         </TabButton>
@@ -52,8 +52,10 @@ function TabButton({
       onClick={onClick}
       aria-pressed={active}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 font-medium transition-colors",
-        active ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground",
+        "relative inline-flex items-center gap-1.5 px-4 py-3 font-medium transition-colors",
+        active
+          ? "text-foreground after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:bg-primary"
+          : "text-muted-foreground hover:text-foreground",
       )}
     >
       {icon}

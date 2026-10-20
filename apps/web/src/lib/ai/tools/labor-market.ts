@@ -6,6 +6,7 @@ import type { FadiTool, FadiToolResult } from "./types";
 /** Real US labor-market data (BLS) so Fadi grounds "how's the market" in facts. */
 export const getLaborMarket: FadiTool = {
   name: "get_labor_market",
+  risk: "read",
   description:
     "Get real US labor-market data from the Bureau of Labor Statistics: unemployment rate, total job openings (JOLTS), and quits rate, each with month-over-month trend. Use for 'how's the job market', 'is hiring slowing down', 'market conditions', or to ground morale/strategy context.",
   parameters: { type: "object", properties: {} },
