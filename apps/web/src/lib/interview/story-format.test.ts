@@ -41,26 +41,18 @@ describe("pickBestStory", () => {
 
   it("matches a question to the story whose competency it names", () => {
     const stories = [leadership, conflict, failure];
-    expect(
-      pickBestStory(stories, "Tell me about a time you handled conflict on a team")?.title
-    ).toBe("Defused a team standoff");
+    expect(pickBestStory(stories, "Tell me about a time you handled conflict on a team")?.title).toBe(
+      "Defused a team standoff",
+    );
     expect(pickBestStory(stories, "Describe a failure you learned from")?.title).toBe(
-      "Shipped a regression"
+      "Shipped a regression",
     );
-    expect(pickBestStory(stories, "When did you show leadership?")?.title).toBe(
-      "Led the migration"
-    );
+    expect(pickBestStory(stories, "When did you show leadership?")?.title).toBe("Led the migration");
   });
 
-  it("returns null when the question has no meaningful overlap", () => {
+  it("falls back to the first story when nothing meaningful overlaps", () => {
     const stories = [leadership, conflict];
-    expect(pickBestStory(stories, "the of a")).toBeNull();
-    expect(pickBestStory(stories, "How did you reconcile customer billing records?")).toBeNull();
-  });
-
-  it("does not treat one incidental content word as a grounded match", () => {
-    const stories = [leadership, conflict];
-    expect(pickBestStory(stories, "Tell me about a project")).toBeNull();
+    expect(pickBestStory(stories, "the of a")).toBe(leadership);
   });
 });
 
@@ -72,9 +64,7 @@ describe("formatStoryAsAnswer", () => {
     expect(out).toContain("Result: Shipped the release a week early");
     expect(out).not.toContain("Reflection:"); // empty → omitted
 
-    const withReflection = formatStoryAsAnswer(
-      story({ title: "X", reflection: "I now over-communicate early." })
-    );
+    const withReflection = formatStoryAsAnswer(story({ title: "X", reflection: "I now over-communicate early." }));
     expect(withReflection).toContain("Reflection: I now over-communicate early.");
   });
 });

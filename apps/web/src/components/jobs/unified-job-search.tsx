@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Globe, Loader2, Search, SlidersHorizontal } from "lucide-react";
 
 import { resolveSearch } from "@/app/dashboard/jobs/actions";
-import { ImportJobLink } from "@/components/jobs/import-job-link";
 import { JobFilterChips } from "@/components/jobs/job-filter-chips";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,7 +21,6 @@ export function UnifiedJobSearch({
   selectedModes,
   selectedTypes,
   selectedVisa,
-  selectedKeywords = [],
 }: {
   activeRole?: string | null;
   selectedCountry: string | null;
@@ -30,8 +28,6 @@ export function UnifiedJobSearch({
   selectedModes: WorkMode[];
   selectedTypes: EmploymentType[];
   selectedVisa: VisaFilter;
-  /** The words from the last search — shown, and clearable. */
-  selectedKeywords?: string[];
 }) {
   const router = useRouter();
   const [prompt, setPrompt] = useState("");
@@ -42,18 +38,11 @@ export function UnifiedJobSearch({
   // state to drift out of sync with the shown location.
   const worldwide = selectedCountry === "any";
 
-  function push(next: {
-    country?: string | null;
-    city?: string | null;
-    modes?: WorkMode[];
-    keywords?: string[];
-  }) {
+  function push(next: { country?: string | null; city?: string | null; modes?: WorkMode[] }) {
     const country = next.country === undefined ? selectedCountry : next.country;
     const city = next.city === undefined ? selectedCity : next.city;
     const modes = next.modes ?? selectedModes;
-    const keywords = next.keywords ?? selectedKeywords;
     const p = new URLSearchParams();
-    if (keywords.length) p.set("q", keywords.join(","));
     if (country && country !== null) p.set("country", country);
     if (country !== "any" && city) p.set("city", city);
     if (modes.length) p.set("modes", modes.join(","));
@@ -67,13 +56,11 @@ export function UnifiedJobSearch({
     if (!prompt.trim()) return;
     start(async () => {
       const r = await resolveSearch(prompt);
-      // Typing a place overrides worldwide; typing none keeps the current scope. The WORDS are
-      // carried too — the board filters on them, instead of quietly searching the direction.
+      // Typing a place overrides worldwide; typing none keeps the current scope.
       push({
         country: r.country ?? (worldwide ? "any" : selectedCountry),
         city: r.city ?? (r.country ? null : selectedCity),
         modes: r.remote ? Array.from(new Set([...selectedModes, "remote" as WorkMode])) : selectedModes,
-        keywords: r.keywords,
       });
     });
   }
@@ -84,7 +71,7 @@ export function UnifiedJobSearch({
   }
 
   return (
-    <div>
+    <div className="rounded-xl border border-border/60 bg-card p-4">
       <div className="flex items-center gap-2">
         <Search className="size-4 text-primary" aria-hidden="true" />
         <h3 className="text-sm font-semibold">Search jobs</h3>
@@ -94,14 +81,13 @@ export function UnifiedJobSearch({
           </span>
         ) : null}
       </div>
-      <p className="mt-1 max-w-3xl text-xs leading-5 text-muted-foreground">
+      <p className="mt-1 text-xs text-muted-foreground">
         Say where and how you want to work — Fadi pulls it fresh and matches it to your direction.
         e.g. &ldquo;graduate IT support in Dublin, remote&rdquo;.
       </p>
 
-      <div className="mt-5 flex min-w-0 flex-col gap-2 border-b-2 border-foreground pb-2 sm:flex-row">
+      <div className="mt-3 flex gap-2">
         <Input
-          className="h-12 min-w-0 border-0 bg-transparent px-0 text-base shadow-none focus-visible:ring-0"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           onKeyDown={(e) => {
@@ -110,31 +96,13 @@ export function UnifiedJobSearch({
           placeholder="e.g. graduate IT support in Dublin, remote"
           aria-label="Search jobs in plain language"
         />
-        <Button className="h-11 w-full rounded-md px-5 sm:w-auto" onClick={run} disabled={pending || !prompt.trim()}>
+        <Button onClick={run} disabled={pending || !prompt.trim()}>
           {pending ? <Loader2 className="size-4 animate-spin" /> : <Search className="size-4" />}
           {pending ? "Searching…" : "Search"}
         </Button>
       </div>
 
-      {selectedKeywords.length > 0 ? (
-        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
-          <span className="text-muted-foreground">Matching</span>
-          {selectedKeywords.map((word) => (
-            <span key={word} className="rounded-full bg-muted px-2 py-0.5 font-medium">
-              {word}
-            </span>
-          ))}
-          <button
-            type="button"
-            onClick={() => push({ keywords: [] })}
-            className="text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
-          >
-            Clear words
-          </button>
-        </div>
-      ) : null}
-
-      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
         <label className="flex cursor-pointer items-center gap-2">
           <input type="checkbox" checked={worldwide} onChange={toggleWorldwide} className="size-3.5 accent-primary" />
           <Globe className="size-3.5" aria-hidden="true" />
@@ -144,7 +112,6 @@ export function UnifiedJobSearch({
         <span>
           {worldwide ? "Anywhere" : selectedCity ? `${selectedCity}` : "your saved region"}
         </span>
-        <ImportJobLink />
         <button
           type="button"
           onClick={() => setShowFilters((s) => !s)}

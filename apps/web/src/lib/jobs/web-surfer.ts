@@ -1,7 +1,5 @@
 import "server-only";
 
-import { fetchSafeUrl, readTextBodyLimited } from "@/lib/security/url-guard";
-
 // Fadi Web Surfer — a server-side reader for the OPEN web: company career pages and ATS boards
 // (Greenhouse, Lever) that no job API covers and that aren't behind a bot wall. It does NOT try
 // to beat Cloudflare/LinkedIn — when it detects a wall it says so and hands off to the browser
@@ -27,15 +25,18 @@ export type SurfResult =
 const UA =
   "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0 Safari/537.36";
 
-const clean = (s: unknown): string => (typeof s === "string" ? s.replace(/\s+/g, " ").trim() : "");
+const clean = (s: unknown): string =>
+  typeof s === "string" ? s.replace(/\s+/g, " ").trim() : "";
 
 // ── Wall detection ────────────────────────────────────────────────────────────
 /** Does this response look like a bot wall / login gate rather than real content? */
 export function looksBlocked(status: number, body: string): boolean {
   if (status === 401 || status === 403 || status === 429 || status === 503) return true;
   const b = body.slice(0, 6000).toLowerCase();
-  return /just a moment|cf-browser-verification|challenge-platform|_cf_chl|captcha|access denied|are you a robot|authwall|please enable javascript to view/.test(
-    b
+  return (
+    /just a moment|cf-browser-verification|challenge-platform|_cf_chl|captcha|access denied|are you a robot|authwall|please enable javascript to view/.test(
+      b,
+    )
   );
 }
 
@@ -78,9 +79,7 @@ export function mapGreenhouse(json: any, company?: string): SurfedJob[] {
       company,
       location: clean(j?.location?.name) || undefined,
       url: clean(j?.absolute_url) || undefined,
-      description:
-        clean(j?.content ? String(j.content).replace(/<[^>]+>/g, " ") : "").slice(0, 4000) ||
-        undefined,
+      description: clean(j?.content ? String(j.content).replace(/<[^>]+>/g, " ") : "").slice(0, 4000) || undefined,
       postedAt: clean(j?.updated_at) || undefined,
     }))
     .filter((j: SurfedJob) => j.title);
@@ -106,10 +105,7 @@ const locName = (o: any): string => {
   const first = Array.isArray(o) ? o[0] : o;
   const a = first?.address ?? {};
   if (typeof a === "string") return clean(a);
-  return [a.addressLocality, a.addressRegion, a.addressCountry]
-    .map(clean)
-    .filter(Boolean)
-    .join(", ");
+  return [a.addressLocality, a.addressRegion, a.addressCountry].map(clean).filter(Boolean).join(", ");
 };
 
 /** Pull schema.org JobPosting objects out of <script type="application/ld+json"> blocks. No DOM. */
@@ -130,8 +126,7 @@ export function extractJsonLdJobs(html: string): SurfedJob[] {
       if (Array.isArray(n)) return n.forEach(visit);
       nodes.push(n);
       if (Array.isArray(n["@graph"])) n["@graph"].forEach(visit);
-      if (Array.isArray(n.itemListElement))
-        n.itemListElement.forEach((el: any) => visit(el?.item ?? el));
+      if (Array.isArray(n.itemListElement)) n.itemListElement.forEach((el: any) => visit(el?.item ?? el));
     };
     visit(data);
     for (const n of nodes) {
@@ -149,8 +144,7 @@ export function extractJsonLdJobs(html: string): SurfedJob[] {
         company: orgName(n.hiringOrganization) || undefined,
         location: locName(n.jobLocation) || undefined,
         url: clean(n.url) || undefined,
-        description:
-          clean(String(n.description ?? "").replace(/<[^>]+>/g, " ")).slice(0, 4000) || undefined,
+        description: clean(String(n.description ?? "").replace(/<[^>]+>/g, " ")).slice(0, 4000) || undefined,
       });
     }
   }
@@ -182,11 +176,12 @@ export function htmlToText(html: string): string {
 }
 
 async function getText(url: string): Promise<{ status: number; body: string }> {
-  const res = await fetchSafeUrl(url, {
+  const res = await fetch(url, {
     headers: { "user-agent": UA, accept: "text/html,application/json,*/*" },
+    redirect: "follow",
     signal: AbortSignal.timeout(12_000),
   });
-  return { status: res.status, body: await readTextBodyLimited(res, 8 * 1024 * 1024) };
+  return { status: res.status, body: await res.text() };
 }
 
 /**
@@ -194,22 +189,23 @@ async function getText(url: string): Promise<{ status: number; body: string }> {
  * (Greenhouse/Lever JSON), then JSON-LD, then optionally the AI text fallback. Detects bot
  * walls and reports them honestly instead of returning nothing.
  */
-export async function surfForJobs(input: string, opts?: { ai?: boolean }): Promise<SurfResult> {
+export async function surfForJobs(
+  input: string,
+  opts?: { ai?: boolean },
+): Promise<SurfResult> {
   const ats = detectAts(input);
   try {
     if (ats?.kind === "greenhouse") {
       // No content=true: the full-content board can be tens of MB across a sweep, which stalls
       // the pull. The board sweep needs title/company/location/url only; full JD comes from the
       // single job page (surfPage) when needed.
-      const { status, body } = await getText(
-        `https://boards-api.greenhouse.io/v1/boards/${ats.token}/jobs`
-      );
+      const { status, body } = await getText(`https://boards-api.greenhouse.io/v1/boards/${ats.token}/jobs`);
       if (looksBlocked(status, body)) return { ok: false, blocked: true, reason: wallMsg };
       return { ok: true, jobs: mapGreenhouse(safeJson(body), ats.token), via: "greenhouse" };
     }
     if (ats?.kind === "lever") {
       const { status, body } = await getText(
-        `https://api.lever.co/v0/postings/${ats.token}?mode=json`
+        `https://api.lever.co/v0/postings/${ats.token}?mode=json`,
       );
       if (looksBlocked(status, body)) return { ok: false, blocked: true, reason: wallMsg };
       return { ok: true, jobs: mapLever(safeJson(body), ats.token), via: "lever" };
@@ -223,8 +219,7 @@ export async function surfForJobs(input: string, opts?: { ai?: boolean }): Promi
     if (ld.length > 0) return { ok: true, jobs: ld, via: "jsonld" };
 
     if (opts?.ai) {
-      const { aiExtractJobs } =
-        await import("@/lib/data-sources/providers/fadi-scraper/ai-extract");
+      const { aiExtractJobs } = await import("@/lib/data-sources/providers/fadi-scraper/ai-extract");
       let host = "career page";
       try {
         host = new URL(url).hostname;
@@ -244,10 +239,7 @@ export async function surfForJobs(input: string, opts?: { ai?: boolean }): Promi
     }
     return { ok: true, jobs: [], via: "none" };
   } catch (error) {
-    const reason =
-      error instanceof Error && error.name === "TimeoutError"
-        ? "The page took too long to respond."
-        : "Couldn't reach that page.";
+    const reason = error instanceof Error && error.name === "TimeoutError" ? "The page took too long to respond." : "Couldn't reach that page.";
     return { ok: false, blocked: false, reason };
   }
 }

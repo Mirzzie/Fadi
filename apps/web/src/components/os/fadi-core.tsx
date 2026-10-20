@@ -8,8 +8,7 @@ import type { FadiState } from "./fadi-presence";
 /**
  * The living Fadi — a luminous, reactive core. Layered glow + orbiting particles +
  * counter-rotating rings + a speaking waveform, driven by Fadi's live state
- * (ready / listening / understanding / speaking / acting / waiting / blocked / offline).
- * One component for the orb,
+ * (idle / listening / thinking / working / speaking). One component for the orb,
  * the boot sequence, and the desktop centerpiece.
  *
  * Performance: every loop here is a pure CSS animation on transform/opacity, so it
@@ -19,35 +18,17 @@ import type { FadiState } from "./fadi-presence";
  * and made the whole UI feel slow. Honors prefers-reduced-motion.
  */
 
-const INDIGO = "#7d87ff";
-const VIOLET = "#584dfc";
-const INDIGO_HALO = "color-mix(in oklab, #7d87ff 50%, transparent)";
+const TEAL = "oklch(0.72 0.19 192)";
+const VIOLET = "oklch(0.66 0.22 285)";
+const TEAL_HALO = "oklch(0.72 0.19 192 / 0.5)";
 
 // Ring spin period (s) + overall energy per state.
-const SPIN: Record<FadiState, number> = {
-  ready: 18,
-  listening: 9,
-  understanding: 5,
-  speaking: 8,
-  acting: 5,
-  waiting_for_approval: 12,
-  blocked: 16,
-  offline: 24,
-};
-const ENERGY: Record<FadiState, number> = {
-  ready: 0.45,
-  listening: 0.85,
-  understanding: 1,
-  speaking: 0.9,
-  acting: 1,
-  waiting_for_approval: 0.7,
-  blocked: 0.6,
-  offline: 0.2,
-};
+const SPIN: Record<FadiState, number> = { idle: 18, listening: 9, thinking: 5, working: 5, speaking: 8 };
+const ENERGY: Record<FadiState, number> = { idle: 0.45, listening: 0.85, thinking: 1, working: 1, speaking: 0.9 };
 const PARTICLE_DEGS = [0, 45, 90, 135, 180, 225, 270, 315];
 
 export function FadiCore({
-  state = "ready",
+  state = "idle",
   size = 56,
   className,
 }: {
@@ -71,7 +52,7 @@ export function FadiCore({
       <div
         className={cn("absolute inset-0 rounded-full", !reduce && "holo-pulse")}
         style={{
-          background: `radial-gradient(circle, ${INDIGO_HALO}, transparent 70%)`,
+          background: `radial-gradient(circle, ${TEAL_HALO}, transparent 70%)`,
           filter: "blur(6px)",
           opacity: reduce ? energy : undefined,
         }}
@@ -81,7 +62,7 @@ export function FadiCore({
       {speaking ? (
         <span
           className="core-ripple absolute inset-0 rounded-full border-2"
-          style={{ borderColor: INDIGO_HALO }}
+          style={{ borderColor: TEAL_HALO }}
         />
       ) : null}
 
@@ -91,17 +72,7 @@ export function FadiCore({
         className={cn("absolute inset-0 h-full w-full", !reduce && "core-spin")}
         style={reduce ? undefined : { animationDuration: `${spin}s` }}
       >
-        <circle
-          cx="50"
-          cy="50"
-          r="46"
-          fill="none"
-          stroke={INDIGO}
-          strokeOpacity="0.5"
-          strokeWidth="1.5"
-          strokeDasharray="10 14"
-          strokeLinecap="round"
-        />
+        <circle cx="50" cy="50" r="46" fill="none" stroke={TEAL} strokeOpacity="0.5" strokeWidth="1.5" strokeDasharray="10 14" strokeLinecap="round" />
       </svg>
 
       {/* Inner ring (counter-rotating) */}
@@ -110,17 +81,7 @@ export function FadiCore({
         className={cn("absolute inset-0 h-full w-full", !reduce && "core-spin-rev")}
         style={reduce ? undefined : { animationDuration: `${spin * 1.5}s` }}
       >
-        <circle
-          cx="50"
-          cy="50"
-          r="33"
-          fill="none"
-          stroke={VIOLET}
-          strokeOpacity="0.5"
-          strokeWidth="2"
-          strokeDasharray="3 18"
-          strokeLinecap="round"
-        />
+        <circle cx="50" cy="50" r="33" fill="none" stroke={VIOLET} strokeOpacity="0.5" strokeWidth="2" strokeDasharray="3 18" strokeLinecap="round" />
       </svg>
 
       {/* Orbiting particles — one rotating container (a single composited transform). */}
@@ -135,7 +96,7 @@ export function FadiCore({
             style={{
               width: Math.max(2, size * 0.05),
               height: Math.max(2, size * 0.05),
-              background: i % 2 ? VIOLET : INDIGO,
+              background: i % 2 ? VIOLET : TEAL,
               boxShadow: "0 0 6px currentColor",
               opacity: energy,
               transform: `translate(-50%, -50%) rotate(${deg}deg) translateY(-${ringR}px)`,
@@ -150,8 +111,8 @@ export function FadiCore({
         style={{
           width: size * 0.5,
           height: size * 0.5,
-          background: `radial-gradient(circle at 35% 30%, #e0e7ff, ${VIOLET} 72%)`,
-          boxShadow: `0 0 18px ${INDIGO}, inset 0 0 10px oklch(1 0 0 / 0.45)`,
+          background: `radial-gradient(circle at 35% 30%, oklch(0.9 0.1 192), ${VIOLET} 72%)`,
+          boxShadow: `0 0 18px ${TEAL}, inset 0 0 10px oklch(1 0 0 / 0.45)`,
           animationDuration: speaking ? "0.9s" : undefined,
         }}
       >

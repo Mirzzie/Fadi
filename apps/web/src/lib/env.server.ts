@@ -41,14 +41,20 @@ const serverEnvSchema = z.object({
   // Fadi's own browser-automation job scraper — "1"/"true" to enable (needs Playwright + a
   // browser installed). Off by default: it self-reports unavailable and returns no jobs.
   FADI_SCRAPER_ENABLED: z.string().optional(),
-  // Job sources self-report unavailable until their key is set. Keys for retired sources
-  // (Adzuna, JSearch, Apify/LinkedIn) were removed with the providers — see the registry.
+  // Phase B/C — providers self-report unavailable until their key is set.
+  ADZUNA_APP_ID: z.string().optional(),
+  ADZUNA_APP_KEY: z.string().optional(),
   REED_API_KEY: z.string().optional(), // reed.co.uk — UK + Ireland, salary
   JOOBLE_API_KEY: z.string().optional(), // jooble.org — global aggregator, covers IE
+  JSEARCH_RAPIDAPI_KEY: z.string().optional(),
   BRAVE_SEARCH_API_KEY: z.string().optional(), // Brave Search API (paid-ish)
   SEARXNG_URL: z.string().optional(), // self-hosted SearXNG — FREE, no key, zero budget
   GOOGLE_CSE_KEY: z.string().optional(), // Google Programmable Search — 100/day free, no card
   GOOGLE_CSE_CX: z.string().optional(),
+  // Apify — OPT-IN job scraping (e.g. Curious Coder's LinkedIn Jobs actor).
+  // Off unless a token is set; the operator owns the ToS/legal decision.
+  APIFY_TOKEN: z.string().optional(),
+  APIFY_LINKEDIN_ACTOR: z.string().optional(), // default: curious_coder~linkedin-jobs-scraper
   BLS_API_KEY: z.string().optional(),
   ONET_API_KEY: z.string().optional(),
   FRED_API_KEY: z.string().optional(),
@@ -67,51 +73,54 @@ const serverEnvSchema = z.object({
  */
 function stripEmpty<T extends Record<string, unknown>>(obj: T): T {
   return Object.fromEntries(
-    Object.entries(obj).map(([k, v]) => [k, v === "" ? undefined : v])
+    Object.entries(obj).map(([k, v]) => [k, v === "" ? undefined : v]),
   ) as T;
 }
 
 export const serverEnv = {
   ...publicEnv,
-  ...serverEnvSchema.parse(
-    stripEmpty({
-      BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
-      BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
-      BETTER_AUTH_TRUSTED_ORIGINS: process.env.BETTER_AUTH_TRUSTED_ORIGINS,
-      RESEND_API_KEY: process.env.RESEND_API_KEY,
-      EMAIL_FROM: process.env.EMAIL_FROM,
-      CRON_SECRET: process.env.CRON_SECRET,
-      GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
-      GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
-      LINKEDIN_CLIENT_ID: process.env.LINKEDIN_CLIENT_ID,
-      LINKEDIN_CLIENT_SECRET: process.env.LINKEDIN_CLIENT_SECRET,
-      AI_PROVIDER: process.env.AI_PROVIDER,
-      OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-      UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
-      UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
-      OPENAI_MODEL: process.env.OPENAI_MODEL,
-      ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
-      ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL,
-      GROQ_API_KEY: process.env.GROQ_API_KEY,
-      GROQ_MODEL: process.env.GROQ_MODEL,
-      GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
-      GOOGLE_MODEL: process.env.GOOGLE_MODEL,
-      JOB_SOURCE_API_KEY: process.env.JOB_SOURCE_API_KEY,
-      NEWS_API_KEY: process.env.NEWS_API_KEY,
-      FADI_SCRAPER_ENABLED: process.env.FADI_SCRAPER_ENABLED,
-      REED_API_KEY: process.env.REED_API_KEY,
-      JOOBLE_API_KEY: process.env.JOOBLE_API_KEY,
-      BRAVE_SEARCH_API_KEY: process.env.BRAVE_SEARCH_API_KEY,
-      SEARXNG_URL: process.env.SEARXNG_URL,
-      GOOGLE_CSE_KEY: process.env.GOOGLE_CSE_KEY,
-      GOOGLE_CSE_CX: process.env.GOOGLE_CSE_CX,
-      BLS_API_KEY: process.env.BLS_API_KEY,
-      ONET_API_KEY: process.env.ONET_API_KEY,
-      FRED_API_KEY: process.env.FRED_API_KEY,
-      FADIOS_MCP_TOKEN: process.env.FADIOS_MCP_TOKEN,
-      FADIOS_MCP_USER_ID: process.env.FADIOS_MCP_USER_ID,
-      LIGHTCAST_CLIENT_ID: process.env.LIGHTCAST_CLIENT_ID,
-      LIGHTCAST_CLIENT_SECRET: process.env.LIGHTCAST_CLIENT_SECRET,
-    })
-  ),
+  ...serverEnvSchema.parse(stripEmpty({
+    BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET,
+    BETTER_AUTH_URL: process.env.BETTER_AUTH_URL,
+    BETTER_AUTH_TRUSTED_ORIGINS: process.env.BETTER_AUTH_TRUSTED_ORIGINS,
+    RESEND_API_KEY: process.env.RESEND_API_KEY,
+    EMAIL_FROM: process.env.EMAIL_FROM,
+    CRON_SECRET: process.env.CRON_SECRET,
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+    LINKEDIN_CLIENT_ID: process.env.LINKEDIN_CLIENT_ID,
+    LINKEDIN_CLIENT_SECRET: process.env.LINKEDIN_CLIENT_SECRET,
+    AI_PROVIDER: process.env.AI_PROVIDER,
+    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+    UPSTASH_REDIS_REST_URL: process.env.UPSTASH_REDIS_REST_URL,
+    UPSTASH_REDIS_REST_TOKEN: process.env.UPSTASH_REDIS_REST_TOKEN,
+    OPENAI_MODEL: process.env.OPENAI_MODEL,
+    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
+    ANTHROPIC_MODEL: process.env.ANTHROPIC_MODEL,
+    GROQ_API_KEY: process.env.GROQ_API_KEY,
+    GROQ_MODEL: process.env.GROQ_MODEL,
+    GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
+    GOOGLE_MODEL: process.env.GOOGLE_MODEL,
+    JOB_SOURCE_API_KEY: process.env.JOB_SOURCE_API_KEY,
+    NEWS_API_KEY: process.env.NEWS_API_KEY,
+    FADI_SCRAPER_ENABLED: process.env.FADI_SCRAPER_ENABLED,
+    ADZUNA_APP_ID: process.env.ADZUNA_APP_ID,
+    ADZUNA_APP_KEY: process.env.ADZUNA_APP_KEY,
+    REED_API_KEY: process.env.REED_API_KEY,
+    JOOBLE_API_KEY: process.env.JOOBLE_API_KEY,
+    JSEARCH_RAPIDAPI_KEY: process.env.JSEARCH_RAPIDAPI_KEY,
+    BRAVE_SEARCH_API_KEY: process.env.BRAVE_SEARCH_API_KEY,
+    SEARXNG_URL: process.env.SEARXNG_URL,
+    GOOGLE_CSE_KEY: process.env.GOOGLE_CSE_KEY,
+    GOOGLE_CSE_CX: process.env.GOOGLE_CSE_CX,
+    APIFY_TOKEN: process.env.APIFY_TOKEN,
+    APIFY_LINKEDIN_ACTOR: process.env.APIFY_LINKEDIN_ACTOR,
+    BLS_API_KEY: process.env.BLS_API_KEY,
+    ONET_API_KEY: process.env.ONET_API_KEY,
+    FRED_API_KEY: process.env.FRED_API_KEY,
+    FADIOS_MCP_TOKEN: process.env.FADIOS_MCP_TOKEN,
+    FADIOS_MCP_USER_ID: process.env.FADIOS_MCP_USER_ID,
+    LIGHTCAST_CLIENT_ID: process.env.LIGHTCAST_CLIENT_ID,
+    LIGHTCAST_CLIENT_SECRET: process.env.LIGHTCAST_CLIENT_SECRET,
+  })),
 };

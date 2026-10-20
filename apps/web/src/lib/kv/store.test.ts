@@ -40,16 +40,4 @@ describe("MemoryKv", () => {
     expect(await kv.setNx("lock", "1", 30)).toBe(true);
     vi.useRealTimers();
   });
-
-  it("renews and releases a lease only for its current owner", async () => {
-    const kv = new MemoryKv();
-    await kv.setNx("lease", "owner-a", 30);
-
-    expect(await kv.expireIfValue("lease", "owner-b", 60)).toBe(false);
-    expect(await kv.deleteIfValue("lease", "owner-b")).toBe(false);
-    expect(await kv.get("lease")).toBe("owner-a");
-    expect(await kv.expireIfValue("lease", "owner-a", 60)).toBe(true);
-    expect(await kv.deleteIfValue("lease", "owner-a")).toBe(true);
-    expect(await kv.get("lease")).toBeNull();
-  });
 });

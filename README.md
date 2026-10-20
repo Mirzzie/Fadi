@@ -4,25 +4,16 @@
 > and the local Postgres role is `careeros` — those are functional identifiers, not the
 > brand. The product is **Fadi**.
 
-**Fadi is a free, open-source career workspace with an AI orchestrator.** Instead of a folder of
+**Fadi is an AI operating system for a person's career.** Instead of a folder of
 disconnected tools (a job board here, a resume editor there, a spreadsheet to track
-applications), it is one connected, work-scoped intelligent environment that helps someone decide
+applications), it is one always-present intelligent environment that helps someone decide
 *where* to aim their career, *find* the right opportunities, *prepare* strong applications,
 get through the grind of a job search, and *understand* how the wider world affects their
 path.
 
-At the center is **Fadi** — an AI mentor designed to continue the person's active goal across
-the product instead of living in a separate chat widget. That continuity is partly implemented
-and remains a release goal. The brand promise is *a calm, honest, intelligent partner that helps
-you get hired without losing your mind*. The deepest current path is for people developing or presenting
-hands-on work in IT, cloud, security, DevOps and software. Broader careers are a direction for
-the project, not a finished claim.
-
-Fadi is under active development. The architecture aims at one continuous career loop, while
-job-source reliability, complete cross-feature handoffs, lab breadth and production hardening
-remain works in progress. See
-[`docs/PRODUCT_QUALITY_STANDARD.md`](docs/PRODUCT_QUALITY_STANDARD.md) for the current evidence
-and release bar.
+At the center is **Fadi** — an AI mentor (not a chatbot widget) present across the whole
+product. The brand promise: *a calm, honest, intelligent partner that helps you get hired
+without losing your mind* — for **any** career, not just tech.
 
 Its non-negotiable doctrine (see [`docs/FadiOS-Project-Context.md`](docs/FadiOS-Project-Context.md)):
 score the **process, never the outcome**; protect the user's mental health and locus of
@@ -56,15 +47,15 @@ full static site (hero, animations, case studies) directly from the app — see
 ├── apps/
 │   ├── web/                  # The Next.js application (the product)
 │   └── portfolio-export/     # Static-export build of a user's portfolio (GitHub Pages target)
-├── docs/                     # Canonical product, architecture, roadmap, and engineering docs
-│   ├── README.md             # Documentation map and maintenance policy
+├── docs/                     # Product, architecture, and engineering docs (start here to learn the app)
 │   └── adr/                  # Architecture Decision Records
 ├── infrastructure/
 │   ├── docker/               # Local PostgreSQL (docker-compose.yml)
 │   ├── supabase/             # LEGACY historical migrations only — not used at runtime
 │   └── vercel/
 ├── packages/
-│   └── database/             # Drizzle schema, migrations, repositories, seeds
+│   ├── database/             # Drizzle schema, migrations, repositories, seeds
+│   ├── shared/ · types/ · ui/
 ├── scripts/
 └── tests/
 ```
@@ -134,11 +125,6 @@ GROQ_API_KEY=your-key-here
 npm run dev
 ```
 
-`npm run dev` starts PostgreSQL **and SearXNG** (the crawler's search backend) beside the app,
-so the job search can reach the open web. Without SearXNG the crawler has nothing to search
-with — it says so rather than reporting an empty market, but you get fewer jobs. Start or stop
-them on their own with `npm run services:up` / `npm run services:down`.
-
 Open **http://localhost:3000**, then **sign up** (email/password) and follow onboarding —
 that first run creates your user and walks the full Career Intelligence flow as a brand-new
 user would experience it.
@@ -156,7 +142,6 @@ node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
 
 # 3. database (Docker running):
 npm run db:up          # PostgreSQL 17, host port 5433
-npm run services:up    # ...plus SearXNG on 8888, the web crawler's search backend
 npm run db:migrate     # committed Drizzle migrations
 npm run db:seed:jobs   # seed job data
 ```
@@ -195,8 +180,7 @@ everything needed to see the product's core surface. Every key lives in
 
 | Command | What it does |
 | --- | --- |
-| `npm run dev` | Start the app, with Postgres and the crawler's search backend |
-| `npm run services:up` / `npm run services:down` | Start / stop Postgres **and** SearXNG on their own |
+| `npm run dev` | Start the app (Next.js dev server) |
 | `npm run db:up` / `npm run db:down` | Start / stop the local Postgres container |
 | `npm run db:migrate` | Apply migrations |
 | `npm run db:reset` | **Destroy** the DB volume, recreate, and re-migrate (fresh slate) |
@@ -213,9 +197,17 @@ To generate a new migration after changing the Drizzle schema: `npm run db:gener
 
 ## Where to learn the app (docs)
 
-Start with [`docs/README.md`](docs/README.md). It identifies the canonical product, architecture, data, UX, roadmap, security, operations, and ADR documents.
+Read these in order to get productive:
 
-Do not infer current behavior from a dated review or audit. The code and schema define implemented behavior; the canonical docs explain the intended boundaries and next sequence.
+1. [`docs/FadiOS-Project-Context.md`](docs/FadiOS-Project-Context.md) — **what Fadi is and what it believes** (the doctrine that shapes every feature). Start here.
+2. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — how the system is put together.
+3. [`docs/POSTGRES_FIRST_ARCHITECTURE.md`](docs/POSTGRES_FIRST_ARCHITECTURE.md) · [`docs/DATABASE_SCHEMA.md`](docs/DATABASE_SCHEMA.md) — data layer.
+4. [`docs/AUTHENTICATION_ARCHITECTURE.md`](docs/AUTHENTICATION_ARCHITECTURE.md) — Better Auth setup.
+5. [`docs/DEVELOPMENT_GUIDE.md`](docs/DEVELOPMENT_GUIDE.md) · [`docs/CODING_STANDARDS.md`](docs/CODING_STANDARDS.md) · [`docs/CONTRIBUTING.md`](docs/CONTRIBUTING.md) · [`docs/GIT_WORKFLOW.md`](docs/GIT_WORKFLOW.md) — how to work in the repo.
+6. [`docs/adr/`](docs/adr/) — the decisions and *why* behind them.
+
+The full `docs/` folder covers each engine (job discovery, learning, market intelligence,
+onboarding, portfolio, etc.) in depth.
 
 ---
 

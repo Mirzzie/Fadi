@@ -54,7 +54,7 @@ export function AutoPrepRunner({
       {state === "running" ? (
         <>
           <Loader2 className="size-4 shrink-0 animate-spin text-primary" aria-hidden="true" />
-          <span>Fadi is preparing your resume and cover letter…</span>
+          <span>Fadi is preparing your application packet — CV, cover letter, cold email, and value proposition…</span>
         </>
       ) : state === "done" ? (
         <>
@@ -64,9 +64,7 @@ export function AutoPrepRunner({
       ) : (
         <>
           <Wand2 className="size-4 shrink-0 text-amber-500" aria-hidden="true" />
-          <span>
-            {message ?? "Auto-prep didn't finish — you can draft each document manually below."}
-          </span>
+          <span>{message ?? "Auto-prep didn't finish — you can draft each document manually below."}</span>
         </>
       )}
     </div>

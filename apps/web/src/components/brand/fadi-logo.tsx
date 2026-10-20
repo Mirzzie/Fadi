@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
  * Fadi logo — a calligraphic nod to فادي ("one who helps / saves"). The mark is
  * a flowing brush form of the Arabic letter ف (fā, the initial of فادي): an open
  * bowl that sweeps into a rising tail, crowned by the letter's single dot. Rendered
- * in the product signal gradient (indigo → violet).
+ * in the brand aurora gradient (teal → violet).
  *
  * - variant="tile"  → rounded app-icon square (white mark on the gradient).
  * - variant="mark"  → the stroke alone in the gradient, on a transparent ground.
@@ -34,8 +34,8 @@ export function FadiLogo({
       <title>{title}</title>
       <defs>
         <linearGradient id={gid} x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#7d87ff" />
-          <stop offset="1" stopColor="#584dfc" />
+          <stop offset="0" stopColor="oklch(0.72 0.19 192)" />
+          <stop offset="1" stopColor="oklch(0.66 0.22 285)" />
         </linearGradient>
       </defs>
 

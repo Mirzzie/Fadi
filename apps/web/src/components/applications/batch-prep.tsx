@@ -60,7 +60,7 @@ export function BatchPrep({ candidates }: { candidates: BatchCandidate[] }) {
   }
 
   return (
-    <section className="mb-6 border-y border-primary/30 bg-primary/5 px-1 py-4">
+    <section className="mb-4 rounded-xl border border-primary/30 bg-primary/5 p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="flex items-center gap-2 text-sm font-semibold">

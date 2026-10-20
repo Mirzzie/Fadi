@@ -9,13 +9,12 @@ import { z } from "zod";
  *    time", UK competency evidence, German structured grids, Indian fundamentals-
  *    first, Japanese self-introduction, etc.) for the user's role/seniority and an
  *    optional job description.
- *  - Answer scoring: deterministic transcript facts (word and possible filler
- *    counts) plus an AI qualitative score (structure / specificity / relevance /
- *    concision).
+ *  - Answer scoring: a deterministic delivery read (filler words, length, pacing)
+ *    plus an AI qualitative score (structure / specificity / relevance / concision).
  *
  * Honesty: the "stronger answer" only reshapes what the candidate actually said —
  * it never invents an achievement, number, or experience. Pure helpers
- * (countryInterviewNorms / analyzeTranscript) are unit-testable; the AI loads
+ * (countryInterviewNorms / analyzeDelivery) are unit-testable; the AI loads
  * dynamically. The questions are spoken aloud and answers can be captured by voice
  * using the existing speech pipeline; this module is the brain behind that.
  */
@@ -49,37 +48,26 @@ export function countryInterviewNorms(country?: string | null): string {
   return "General professional style: behavioral and role-specific questions; reward STAR structure, real specifics over adjectives, and relevance to the role.";
 }
 
-// ── Transcript analysis (pure, deterministic) ───────────────────────────────────
+// ── Delivery analysis (pure, deterministic) ─────────────────────────────────────
 const FILLER_PATTERNS = [
-  "um",
-  "uh",
-  "er",
-  "like",
-  "you know",
-  "i mean",
-  "basically",
-  "actually",
-  "literally",
-  "kind of",
-  "sort of",
-  "i guess",
-  "right",
-  "okay so",
+  "um", "uh", "er", "like", "you know", "i mean", "basically", "actually",
+  "literally", "kind of", "sort of", "i guess", "right", "okay so",
 ];
-export type TranscriptStats = {
+const WORDS_PER_SECOND = 2.3; // ~140 wpm speaking pace
+
+export type DeliveryStats = {
   wordCount: number;
   fillerCount: number;
   fillerWords: string[];
+  estSeconds: number;
+  pacing: "short" | "good" | "long";
 };
 
-export function analyzeTranscript(transcript: string): TranscriptStats {
+export function analyzeDelivery(transcript: string): DeliveryStats {
   const text = transcript.trim();
   const words = text ? text.split(/\s+/) : [];
   const wordCount = words.length;
-  const lower = ` ${text
-    .toLowerCase()
-    .replace(/[^a-z\s]/g, " ")
-    .replace(/\s+/g, " ")} `;
+  const lower = ` ${text.toLowerCase().replace(/[^a-z\s]/g, " ").replace(/\s+/g, " ")} `;
 
   const fillerWords: string[] = [];
   let fillerCount = 0;
@@ -91,26 +79,34 @@ export function analyzeTranscript(transcript: string): TranscriptStats {
     }
   }
 
-  return { wordCount, fillerCount, fillerWords };
+  const estSeconds = Math.round(wordCount / WORDS_PER_SECOND);
+  // A strong behavioral answer is roughly 60–220 words (~25–95 seconds).
+  const pacing: DeliveryStats["pacing"] = wordCount < 60 ? "short" : wordCount > 220 ? "long" : "good";
+
+  return { wordCount, fillerCount, fillerWords, estSeconds, pacing };
 }
 
-export function transcriptNote(stats: TranscriptStats): string {
-  const count = `${stats.wordCount} ${stats.wordCount === 1 ? "word" : "words"} in the transcript.`;
-  if (stats.fillerCount < 3) return count;
-  return `${count} It contains ${stats.fillerCount} possible filler phrases (${stats.fillerWords.slice(0, 4).join(", ")}); review the transcript to confirm them.`;
+export function deliveryNote(d: DeliveryStats): string {
+  const parts: string[] = [];
+  parts.push(
+    d.pacing === "short"
+      ? `A bit short (~${d.wordCount} words, ~${d.estSeconds}s) — add one concrete example.`
+      : d.pacing === "long"
+        ? `A bit long (~${d.wordCount} words, ~${d.estSeconds}s) — tighten to the strongest details.`
+        : `Good length (~${d.wordCount} words, ~${d.estSeconds}s).`,
+  );
+  if (d.fillerCount >= 3) parts.push(`${d.fillerCount} filler words (${d.fillerWords.slice(0, 4).join(", ")}) — slow down and pause instead.`);
+  return parts.join(" ");
 }
 
 // Interviewer personas live in ./personas (pure) so client code can import the list
 // without pulling this module's server-only AI imports into the browser bundle.
 export { INTERVIEWER_PERSONAS, personaStyle, type InterviewerPersona } from "./personas";
+import { personaStyle } from "./personas";
 import { logger } from "@/lib/observability/logger";
 
 // ── Question generation (AI) ────────────────────────────────────────────────────
-export type MockQuestion = {
-  question: string;
-  kind: "opener" | "behavioral" | "role" | "situational";
-  competency?: string;
-};
+export type MockQuestion = { question: string; kind: "opener" | "behavioral" | "role" | "situational"; competency?: string };
 
 // `kind` is a plain string here (not a strict enum) on purpose: several providers'
 // structured-output modes reject enum constraints and the whole call fails. We
@@ -122,7 +118,7 @@ const questionsSchema = z.object({
         question: z.string(),
         kind: z.string().nullable(),
         competency: z.string().nullable(),
-      })
+      }),
     )
     .max(10),
 });
@@ -133,52 +129,23 @@ function toKind(s?: string | null): MockQuestion["kind"] {
   return k === "opener" || k === "role" || k === "situational" ? k : "behavioral";
 }
 
-export type InterviewStage = "recruiter" | "hiring_manager" | "technical" | "behavioral";
-
-export function interviewStageGuide(stage?: string | null): string {
-  switch (stage) {
-    case "recruiter":
-      return "Recruiter screen: focus on motivation, career narrative, communication, availability, and role fit. Keep technical depth light.";
-    case "technical":
-      return "Technical interview: focus on practical reasoning, troubleshooting, trade-offs, and role-specific scenarios. Ask for concrete steps, not trivia alone.";
-    case "behavioral":
-      return "Behavioral interview: focus on competencies and real examples. Ask questions that can be answered with a STAR story.";
-    default:
-      return "Hiring-manager interview: focus on ownership, impact, collaboration, judgment, and depth relevant to the role.";
-  }
-}
-
-export function interviewQuestionCount(durationMinutes?: number | null): number {
-  return durationMinutes === 20 ? 7 : 4;
-}
-
-export type MockConfig = {
-  role: string;
-  country?: string | null;
-  seniority?: string | null;
-  jobDescription?: string | null;
-  stage?: InterviewStage | null;
-  durationMinutes?: number | null;
-};
+export type MockConfig = { role: string; country?: string | null; seniority?: string | null; jobDescription?: string | null; persona?: string | null };
 
 export async function generateMockQuestions(
   userId: string,
-  config: MockConfig
+  config: MockConfig,
 ): Promise<{ ok: true; questions: MockQuestion[] } | { ok: false; message: string }> {
   if (!config.role?.trim()) return { ok: false, message: "Pick a role to interview for first." };
 
   const { getUserDocGenerate } = await import("@/lib/ai/user-generate");
   const generate = await getUserDocGenerate(userId);
-  if (!generate)
-    return { ok: false, message: "Connect an AI provider in Settings to run a mock interview." };
+  if (!generate) return { ok: false, message: "Connect an AI provider in Settings to run a mock interview." };
 
-  const questionCount = interviewQuestionCount(config.durationMinutes);
-  const system = `You are an experienced interviewer running a realistic MOCK INTERVIEW. Produce exactly ${questionCount} questions for this specific role, seniority, stage, and country's interview norms.
-${countryInterviewNorms(config.country)}
-${interviewStageGuide(config.stage)}
+  const system = `You are an experienced interviewer running a realistic MOCK INTERVIEW. Produce 5–7 questions for this specific role, seniority, and country's interview norms.
+${countryInterviewNorms(config.country)}${personaStyle(config.persona)}
 Rules:
 - Start with one opener appropriate to the country's norms.
-- Follow the selected stage. Include other question types only where a real interviewer at that stage would.
+- Mix behavioral ("tell me about a time…"), role-specific, and one situational question.
 - Calibrate depth to the seniority. Be realistic — these should sound like a real interviewer for THIS role, not generic.
 - Tag each question's kind, and a competency for behavioral ones.`;
 
@@ -186,11 +153,7 @@ Rules:
     `Role: ${config.role}`,
     `Seniority: ${config.seniority ?? "not specified"}`,
     `Country/region: ${config.country ?? "not specified"}`,
-    `Interview stage: ${config.stage ?? "hiring manager"}`,
-    `Practice length: ${config.durationMinutes ?? 10} minutes`,
-    config.jobDescription?.trim()
-      ? `Job description:\n${config.jobDescription.slice(0, 4000)}`
-      : "",
+    config.jobDescription?.trim() ? `Job description:\n${config.jobDescription.slice(0, 4000)}` : "",
   ]
     .filter(Boolean)
     .join("\n");
@@ -199,36 +162,24 @@ Rules:
     const raw = await generate.structured(system, user, questionsSchema, "mock_questions");
     const questions: MockQuestion[] = (raw.questions ?? [])
       .filter((q) => q.question?.trim())
-      .map((q) => ({
-        question: q.question.trim(),
-        kind: toKind(q.kind),
-        competency: q.competency?.trim() || undefined,
-      }))
-      .slice(0, questionCount);
+      .map((q) => ({ question: q.question.trim(), kind: toKind(q.kind), competency: q.competency?.trim() || undefined }));
     if (questions.length === 0) {
-      return {
-        ok: false,
-        message:
-          "Your AI provider returned no questions. Try a simpler role, or check the model in Settings supports structured output.",
-      };
+      return { ok: false, message: "Your AI provider returned no questions. Try a simpler role, or check the model in Settings supports structured output." };
     }
     return { ok: true, questions };
   } catch (err) {
     const reason = err instanceof Error ? err.message : "the provider call failed";
     logger.warn("interview.mock_questions_failed", { userId, role: config.role, error: reason });
-    return {
-      ok: false,
-      message: `Couldn't draft questions: ${reason.slice(0, 160)}. Check your AI provider in Settings, then try again.`,
-    };
+    return { ok: false, message: `Couldn't draft questions: ${reason.slice(0, 160)}. Check your AI provider in Settings, then try again.` };
   }
 }
 
-// ── Answer scoring (transcript facts + AI qualitative review) ────────────────────
+// ── Answer scoring (deterministic delivery + AI qualitative) ─────────────────────
 export type AnswerScore = {
-  transcript: TranscriptStats;
-  transcriptNote: string;
-  scores: { structure: number; specificity: number; relevance: number; concision: number } | null;
-  overall: number | null; // 0–5 when an AI content review ran
+  delivery: DeliveryStats;
+  deliveryNote: string;
+  scores: { structure: number; specificity: number; relevance: number; concision: number };
+  overall: number; // 0–5
   strengths: string[];
   improvements: string[];
   strongerVersion: string; // reshapes ONLY what the candidate said; never invents
@@ -247,41 +198,33 @@ const scoreSchema = z.object({
 
 const clamp5 = (n: number) => Math.max(0, Math.min(5, Number.isFinite(n) ? n : 0));
 
-export function overallFromScores(s: {
-  structure: number;
-  specificity: number;
-  relevance: number;
-  concision: number;
-}): number {
+export function overallFromScores(s: { structure: number; specificity: number; relevance: number; concision: number }): number {
   // Structure and specificity matter most in behavioral answers.
-  const weighted =
-    s.structure * 0.3 + s.specificity * 0.3 + s.relevance * 0.25 + s.concision * 0.15;
+  const weighted = s.structure * 0.3 + s.specificity * 0.3 + s.relevance * 0.25 + s.concision * 0.15;
   return Math.round(weighted * 10) / 10;
 }
 
 export async function scoreInterviewAnswer(
   userId: string,
-  input: { question: string; answer: string; role?: string | null }
+  input: { question: string; answer: string; role?: string | null },
 ): Promise<{ ok: true; score: AnswerScore } | { ok: false; message: string }> {
   const answer = input.answer?.trim() ?? "";
   if (!answer) return { ok: false, message: "Give an answer to score." };
-  const transcript = analyzeTranscript(answer);
+  const delivery = analyzeDelivery(answer);
 
   const { getUserDocGenerate } = await import("@/lib/ai/user-generate");
   const generate = await getUserDocGenerate(userId);
   if (!generate) {
-    // Transcript-only fallback. Do not display zeroes as if the content was judged.
+    // Deterministic-only fallback so the user still gets a useful read with no provider.
     return {
       ok: true,
       score: {
-        transcript,
-        transcriptNote: transcriptNote(transcript),
-        scores: null,
-        overall: null,
+        delivery,
+        deliveryNote: deliveryNote(delivery),
+        scores: { structure: 0, specificity: 0, relevance: 0, concision: delivery.pacing === "good" ? 4 : 2 },
+        overall: 0,
         strengths: [],
-        improvements: [
-          "Connect an AI provider for a content review. Fadi only counted words and possible filler phrases in this transcript.",
-        ],
+        improvements: ["Connect an AI provider for a full content score; the delivery read above is from your answer length and filler words."],
         strongerVersion: "",
       },
     };
@@ -292,15 +235,13 @@ export async function scoreInterviewAnswer(
 - specificity: real details, names, numbers, outcomes — not vague adjectives?
 - relevance: does it actually answer THIS question for THIS role?
 - concision: tight and on-point, not rambling or padded?
-Use the same anchors for every dimension: 1 = unsupported or largely missing, 3 = credible but incomplete, 5 = specific, grounded, and strong. Use 0 only when there is no assessable content.
 Then give strengths, improvements, and a "strongerVersion".
 HARD RULE: the strongerVersion must only reshape what the candidate actually said — clearer structure, tighter wording, surfacing the specifics they already gave. NEVER invent an achievement, number, company, or experience they didn't mention.`;
 
   const user = [
     input.role ? `Role: ${input.role}` : "",
     `Question: ${input.question}`,
-    // 4096: the longest spoken answer a live interview accepts (INTERVIEW_ANSWER_MAX_CHARS), whole.
-    `Candidate's answer:\n${answer.slice(0, 4096)}`,
+    `Candidate's answer:\n${answer.slice(0, 4000)}`,
   ]
     .filter(Boolean)
     .join("\n");
@@ -316,8 +257,8 @@ HARD RULE: the strongerVersion must only reshape what the candidate actually sai
     return {
       ok: true,
       score: {
-        transcript,
-        transcriptNote: transcriptNote(transcript),
+        delivery,
+        deliveryNote: deliveryNote(delivery),
         scores,
         overall: overallFromScores(scores),
         strengths: raw.strengths.map((s) => s.trim()).filter(Boolean),

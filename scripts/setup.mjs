@@ -85,11 +85,8 @@ if (skipDb) {
   }
   ok("Docker is running");
 
-  // Postgres AND the crawler's search backend. Leaving SearXNG out is how the web crawler spent
-  // months reporting "live, 0 jobs": SEARXNG_URL was set, nothing was listening, and a search
-  // that cannot run looks exactly like a market with nothing in it.
-  run("npm run services:up");
-  ok("PostgreSQL and SearXNG containers starting");
+  run("npm run db:up");
+  ok("PostgreSQL container starting");
 
   process.stdout.write("  waiting for PostgreSQL to be healthy");
   let healthy = false;

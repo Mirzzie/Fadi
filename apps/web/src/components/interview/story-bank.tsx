@@ -8,7 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatStoryAsAnswer, pickBestStory, type StoryView } from "@/lib/interview/story-format";
-import { deleteStory, generateStoryBank, saveStory } from "@/app/dashboard/interview/actions";
+import {
+  deleteStory,
+  generateStoryBank,
+  saveStory,
+} from "@/app/dashboard/interview/actions";
 
 const STAR_FIELDS: Array<{ key: keyof EditState; label: string; rows: number }> = [
   { key: "situation", label: "Situation", rows: 2 },
@@ -60,7 +64,7 @@ export function StoryBank({ stories: initial }: { stories: StoryView[] }) {
   }
 
   return (
-    <div className="mx-auto w-full space-y-6 pb-12">
+    <div className="mx-auto w-full max-w-3xl space-y-6 p-4 sm:p-6">
       <header className="space-y-1.5">
         <div className="flex items-center gap-2">
           <MessageSquareQuote className="size-5 text-primary" aria-hidden="true" />
@@ -68,8 +72,8 @@ export function StoryBank({ stories: initial }: { stories: StoryView[] }) {
         </div>
         <p className="text-sm text-muted-foreground">
           Most behavioral questions are answered by the same{" "}
-          <span className="text-foreground">5–10 strong stories</span>. Build them once — in STAR +
-          Reflection shape, from your real experience — and reuse them in every interview.
+          <span className="text-foreground">5–10 strong stories</span>. Build them once — in
+          STAR + Reflection shape, from your real experience — and reuse them in every interview.
         </p>
       </header>
 
@@ -125,12 +129,12 @@ export function StoryBank({ stories: initial }: { stories: StoryView[] }) {
                 onRemove={(id) => {
                   startTransition(() => {
                     void deleteStory({ id }).then(() =>
-                      setStories((prev) => prev.filter((p) => p.id !== id))
+                      setStories((prev) => prev.filter((p) => p.id !== id)),
                     );
                   });
                 }}
               />
-            )
+            ),
           )}
         </ul>
       )}
@@ -157,14 +161,12 @@ function PracticeBox({ stories }: { stories: StoryView[] }) {
       />
       {q.trim() && !match ? (
         <p className="text-sm text-muted-foreground">
-          {stories.length === 0
-            ? "Your story bank is empty. Add a real example before practising this question."
-            : "You do not yet have a grounded story for this question. Add a real example or practise a different competency."}
+          No stories yet — build your bank above and your best answer will appear here.
         </p>
       ) : null}
       {match ? (
         <div className="rounded-md border bg-muted/40 p-3">
-          <p className="mb-1 text-xs text-muted-foreground">A grounded story you can use:</p>
+          <p className="mb-1 text-xs text-muted-foreground">Your strongest story for this:</p>
           <pre className="whitespace-pre-wrap font-sans text-sm">{formatStoryAsAnswer(match)}</pre>
         </div>
       ) : null}
@@ -269,10 +271,7 @@ function StoryEditor({
       const res = await saveStory({
         id: story?.id,
         title: form.title,
-        competencies: form.competencies
-          .split(",")
-          .map((c) => c.trim())
-          .filter(Boolean),
+        competencies: form.competencies.split(",").map((c) => c.trim()).filter(Boolean),
         situation: form.situation,
         task: form.task,
         action: form.action,

@@ -114,15 +114,6 @@ export interface JobSource extends DataSourceBase {
   readonly coverage?: import("./coverage").SourceCoverage;
   fetchJobs(query: SignalQuery): Promise<JobPosting[]>;
   /**
-   * Does this source cover the place being searched?
-   *
-   * Adzuna has no Ireland endpoint at all (its API answers UNSUPPORTED_COUNTRY), so for an Irish
-   * search it returned an empty list that the UI showed as "live, 0 jobs" — a provider with no
-   * coverage read exactly like a market with no jobs. A source that knows it cannot serve a
-   * place says so, and is reported as unavailable there rather than empty.
-   */
-  covers?(query: SignalQuery): "yes" | "no" | "unknown";
-  /**
    * Liveness check: is this posting still open / accepting applications?
    * Returns null when the source cannot determine it.
    */

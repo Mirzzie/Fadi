@@ -11,7 +11,7 @@
  * every rule is testable without a network.
  */
 
-import { canonicalizeUrl, stableExternalId } from "@careeros/database";
+import { canonicalizeUrl } from "@careeros/database";
 
 import type { JobPosting } from "./types";
 
@@ -287,7 +287,7 @@ export function dedupeWithinSource(jobs: JobPosting[]): JobPosting[] {
     // persistence: external/requisition id first, then the canonical apply URL, and only then a
     // conservative content-key fallback.
     const identity = job.externalId?.trim()
-      ? `id:${stableExternalId(job.externalId)}`
+      ? `id:${job.externalId.trim()}`
       : job.url
         ? `url:${canonicalizeUrl(job.url) ?? job.url}`
         : `content:${dedupeKey(job)}`;

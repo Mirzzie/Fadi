@@ -43,42 +43,9 @@ export function buildExtractionContext(evidenceBlock: string): string {
 }
 
 const STOPWORDS = new Set([
-  "tell",
-  "me",
-  "about",
-  "a",
-  "an",
-  "the",
-  "time",
-  "when",
-  "you",
-  "your",
-  "give",
-  "example",
-  "describe",
-  "of",
-  "to",
-  "in",
-  "on",
-  "that",
-  "had",
-  "have",
-  "with",
-  "and",
-  "or",
-  "for",
-  "how",
-  "did",
-  "do",
-  "handle",
-  "situation",
-  "story",
-  "what",
-  "was",
-  "were",
-  "is",
-  "are",
-  "this",
+  "tell","me","about","a","an","the","time","when","you","your","give","example",
+  "describe","of","to","in","on","that","had","have","with","and","or","for","how",
+  "did","do","handle","situation","story","what","was","were","is","are","this",
 ]);
 
 function keywords(text: string): string[] {
@@ -92,32 +59,22 @@ function keywords(text: string): string[] {
 /**
  * Pick the story that best fits a behavioral question, by overlap between the
  * question's keywords and each story's competencies + content. Pure + deterministic
- * so it works with no AI call. A story is returned only when the question has a
- * grounded match: a curated competency hit, or at least two content-keyword hits.
- * Returning null is intentional; recommending an unrelated story is worse than
- * admitting that the bank does not cover the question yet.
+ * so it works with no AI call. Returns null when the bank is empty.
  */
 export function pickBestStory(stories: StoryView[], question: string): StoryView | null {
   if (stories.length === 0) return null;
   const qWords = new Set(keywords(question));
-  if (qWords.size === 0) return null;
+  if (qWords.size === 0) return stories[0];
 
-  let best: StoryView | null = null;
-  let bestScore = 0;
+  let best = stories[0];
+  let bestScore = -1;
   for (const story of stories) {
     const comp = story.competencies.map(normCompetency);
-    const competencyWords = new Set(comp.flatMap(keywords));
-    const contentWords = new Set(
-      keywords(
-        `${story.title} ${story.situation} ${story.task} ${story.action} ${story.result} ${story.reflection}`
-      )
-    );
-    const competencyHits = [...competencyWords].filter((word) => qWords.has(word)).length;
-    const contentHits = [...contentWords].filter((word) => qWords.has(word)).length;
-    if (competencyHits === 0 && contentHits < 2) continue;
-
-    // Curated competency tags are a stronger signal than wording overlap.
-    const score = competencyHits * 3 + contentHits;
+    const hay = keywords(`${story.title} ${comp.join(" ")} ${story.situation} ${story.result}`);
+    let score = 0;
+    for (const w of hay) if (qWords.has(w)) score += 1;
+    // Competency tag hits count double — they're the curated index.
+    for (const c of comp) if (qWords.has(c)) score += 2;
     if (score > bestScore) {
       best = story;
       bestScore = score;

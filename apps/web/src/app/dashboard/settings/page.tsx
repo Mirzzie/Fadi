@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import { Cpu } from "lucide-react";
 
-import { createMcpConnectionsRepository, createProfilesRepository } from "@careeros/database";
+import { createProfilesRepository } from "@careeros/database";
 
 import { AppShell } from "@/components/layout/app-shell";
 import { AiProviderForm } from "@/components/settings/ai-provider-form";
 import { AutoPrepToggle } from "@/components/settings/auto-prep-toggle";
 import { ConnectedAccounts } from "@/components/settings/connected-accounts";
-import { ConnectedTools } from "@/components/settings/connected-tools";
 import { McpTokens } from "@/components/settings/mcp-tokens";
 import { NotionIntegration } from "@/components/settings/notion-integration";
 import { listMcpTokens } from "@/lib/mcp/tokens";
@@ -27,35 +27,36 @@ export default async function SettingsPage() {
   const settings = await getUserAiSettingsView(user.id);
   const profile = await createProfilesRepository(getDatabase()).getByUserId(user.id);
   const mcpTokens = await listMcpTokens(user.id);
-  const connections = await createMcpConnectionsRepository(getDatabase()).listForUser(user.id);
 
   return (
     <AppShell>
-      <div className="mx-auto max-w-3xl space-y-8 pb-12">
-        <header className="border-b border-border pb-8 pt-3">
-          <p className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Account</p>
-          <h1 className="font-heading text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Settings.</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Choose how Fadi connects, prepares work and uses your own AI provider. Keys remain
-            encrypted at rest.
-          </p>
-        </header>
+      <div className="mx-auto max-w-3xl space-y-6">
+        <section className="relative overflow-hidden rounded-xl border bg-card p-6">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -right-16 -top-20 size-64 rounded-full opacity-[0.12] blur-3xl"
+            style={{ background: "oklch(0.66 0.22 285)" }}
+          />
+          <div className="relative flex items-start gap-4">
+            <div className="glow-primary grid size-10 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-primary to-[oklch(0.66_0.22_285)]">
+              <Cpu className="size-5 text-primary-foreground" aria-hidden="true" />
+            </div>
+            <div>
+              <h2 className="font-heading text-xl font-semibold tracking-tight">
+                AI{" "}
+                <span className="bg-gradient-to-r from-primary to-[oklch(0.7_0.17_230)] bg-clip-text text-transparent">
+                  provider
+                </span>
+              </h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Fadi works with any provider. Bring your own key — it&apos;s encrypted at rest and
+                only ever used to power your Fadi.
+              </p>
+            </div>
+          </div>
+        </section>
 
         <AiProviderForm descriptors={PROVIDER_DESCRIPTORS} initial={settings} />
-
-        <ConnectedTools
-          connections={connections.map((connection) => ({
-            id: connection.id,
-            label: connection.label,
-            slug: connection.slug,
-            url: connection.url,
-            status: connection.status,
-            statusDetail: connection.statusDetail,
-            toolCount: connection.tools.length,
-            mayAct: connection.autoApprove,
-            lastCheckedAt: connection.lastCheckedAt?.toISOString() ?? null,
-          }))}
-        />
 
         <AutoPrepToggle initial={profile?.autoPrepEnabled ?? false} />
 

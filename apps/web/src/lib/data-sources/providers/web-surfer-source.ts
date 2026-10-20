@@ -1,5 +1,4 @@
 import { ATS_SEED } from "@/lib/jobs/ats-seed";
-import { matchesAnyKeyword } from "@/lib/jobs/keyword-match";
 import { getCountry } from "@/lib/jobs/locations";
 import { surfForJobs } from "@/lib/jobs/web-surfer";
 
@@ -31,6 +30,7 @@ export class WebSurferSource implements JobSource {
       if (res.status !== "fulfilled" || !res.value.ok) return;
       const company = ATS_SEED[i].company;
       for (const j of res.value.jobs) {
+        const hay = `${j.title} ${j.description ?? ""}`.toLowerCase();
         const loc = (j.location ?? "").toLowerCase();
         const isRemote = /\bremote\b|anywhere|work from home|wfh/.test(loc);
         // Remote that isn't pinned to a DIFFERENT country — so "Remote, EMEA" counts for an
@@ -38,8 +38,7 @@ export class WebSurferSource implements JobSource {
         const remoteAnywhere = isRemote && /\banywhere\b|worldwide|\bglobal\b|\bemea\b|\beurope\b/.test(loc);
 
         // Role gate: at least one keyword must appear (skip when none supplied).
-        if (kws.length && !matchesAnyKeyword({ title: j.title, description: j.description }, kws))
-          continue;
+        if (kws.length && !kws.some((k) => hay.includes(k))) continue;
         // Location gate: match the city, the country, or a location-agnostic remote role.
         // Skipped when the user searched worldwide (no location) — then everything qualifies.
         if (wantsLocation) {

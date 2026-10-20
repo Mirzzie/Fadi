@@ -7,8 +7,7 @@ import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
 import { buildPortfolioSite, pagesBasePath } from "@/lib/portfolio/build-export";
 import { buildPagesDeployWorkflow, GitHubClient, GitHubError, pagesUrl } from "@/lib/portfolio/github";
-import { MAX_RESTORE_BYTES, readRestorePayload } from "@/lib/portfolio/restore-payload";
-import { toExportItem, toPortfolioView } from "@careeros/portfolio";
+import { toPortfolioView } from "@careeros/portfolio";
 import { consumeRateLimit } from "@/lib/security/rate-limit";
 import { decryptSecret, encryptSecret } from "@/lib/security/crypto";
 
@@ -209,16 +208,7 @@ export async function publishToGithub(input: {
     // the assets are base-path-aware for this repo's Pages URL.
     let siteFiles;
     try {
-      siteFiles = await buildPortfolioSite({
-        view,
-        basePath: pagesBasePath(login, repoName),
-        // The same payload Export produces and Import consumes — see build-export.ts.
-        backup: {
-          version: 1,
-          exported_at: new Date().toISOString(),
-          items: published.items.map(toExportItem),
-        },
-      });
+      siteFiles = await buildPortfolioSite({ view, basePath: pagesBasePath(login, repoName) });
     } catch (e) {
       logger.error("github.export_build_failed", {
         userId: user.id,
@@ -425,67 +415,4 @@ export async function checkPublishedSite(): Promise<
   } catch {
     return { ok: true, data: { url, state: "unknown", message: `Couldn't reach ${url} from here.` } };
   }
-}
-
-/**
- * RESTORE THE PUBLISHED ITEMS FROM YOUR REPO.
- *
- * Deliberately narrower than it first read (Codex C15-04). The backup is built from the PUBLISHED
- * view — published, confirmed items only — so it cannot restore drafts, hidden entries, site
- * title/headline/theme/resume links, evidence links or confirmation state. Calling that "the
- * whole CMS" was false, and a public page cannot be made to carry private drafts safely.
- *
- * The file is read through the authenticated GitHub Contents API using the stored owner and repo,
- * not by fetching the Pages URL: a plain fetch follows redirects a user could influence, which
- * turns reading our own file into an authenticated request-forgery surface. It is then validated
- * against a strict schema with byte, row, string and link caps before anything is written.
- */
-export async function restoreFromPublishedSite(input: {
-  mode: "merge" | "replace";
-}): Promise<{ ok: true; imported: number; heldBack: number } | { ok: false; message: string }> {
-  const user = await getCurrentAuthUser();
-  if (!user) return { ok: false, message: "Please sign in again." };
-
-  const row = await createGithubConnectionsRepository(getDatabase()).getByUserId(user.id);
-  if (!row?.tokenCiphertext || !row.githubLogin || !row.repo) {
-    return {
-      ok: false,
-      message: "No published site to restore from — connect GitHub and publish once first.",
-    };
-  }
-
-  const { decryptSecret } = await import("@/lib/security/crypto");
-  const token = decryptSecret(row.tokenCiphertext);
-  if (!token) return { ok: false, message: "Reconnect GitHub — the stored token can't be read." };
-
-  let raw: string | null;
-  try {
-    const gh = clientFor(token);
-    raw = await gh.readFile({
-      owner: row.githubLogin,
-      repo: row.repo,
-      path: "public/fadi-portfolio.json",
-      maxBytes: MAX_RESTORE_BYTES,
-    });
-  } catch (error) {
-    logger.warn("portfolio.restore_read_failed", {
-      userId: user.id,
-      error: error instanceof Error ? error.message.slice(0, 160) : "unknown",
-    });
-    return { ok: false, message: "Couldn't read the backup from your repository just now." };
-  }
-
-  if (raw === null) {
-    return {
-      ok: false,
-      message:
-        "Your repository doesn't carry a backup file yet — publish once more and it will, from then on.",
-    };
-  }
-
-  const parsed = readRestorePayload(raw);
-  if (!parsed.ok) return { ok: false, message: parsed.message };
-
-  const { importPortfolio } = await import("./actions");
-  return importPortfolio({ payload: parsed.payload as never, mode: input.mode });
 }

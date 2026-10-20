@@ -60,11 +60,6 @@ export function ItemCard({
               Draft
             </span>
           )}
-          {item.evidenceItemId && (
-            <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] text-primary">
-              Evidence linked
-            </span>
-          )}
           {item.tag && (
             <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[10px] text-primary">
               {item.tag}
@@ -104,13 +99,7 @@ export function ItemCard({
         <Button size="icon-sm" variant="ghost" onClick={onEdit} title="Edit">
           <Pencil className="size-4" />
         </Button>
-        <Button
-          size="icon-sm"
-          variant="ghost"
-          className="text-destructive"
-          onClick={onDelete}
-          title="Delete"
-        >
+        <Button size="icon-sm" variant="ghost" className="text-destructive" onClick={onDelete} title="Delete">
           <Trash2 className="size-4" />
         </Button>
       </div>

@@ -30,7 +30,6 @@ const KIND_LABEL: Record<string, string> = {
   portfolio_duplicate: "Recorded twice",
   evidence_link_unconfirmed: "Did Fadi get this right?",
   evidence_needs_decision: "Two versions — you choose",
-  evidence_captured: "Proof Fadi found for you",
 };
 
 /**

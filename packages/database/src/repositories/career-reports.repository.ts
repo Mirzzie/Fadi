@@ -9,8 +9,6 @@ type ReportListItem = {
 };
 
 export type CreateCareerReportInput = {
-  /** How many evidence items this report was built from (D08). */
-  evidenceCountAtGeneration?: number | null;
   careerProfileId?: string | null;
   resumeId?: string | null;
   linkedinProfileId?: string | null;
@@ -90,8 +88,6 @@ export function createCareerReportsRepository(db: Database) {
           recommendedActions: input.recommendedActions ?? [],
           modelName: input.modelName ?? null,
           promptVersion: input.promptVersion ?? null,
-          // D08: recorded so later staleness can see REMOVAL, which a timestamp cannot.
-          evidenceCountAtGeneration: input.evidenceCountAtGeneration ?? null,
           generatedAt: input.generatedAt ?? null,
         })
         .returning();

@@ -26,17 +26,8 @@ export async function AppShell({ children }: { children: React.ReactNode }) {
     : null;
   const activeTrackKey = activeTrack?.id ?? "none";
 
-  // What Fadi is in the middle of, for the chip that is visible on every screen. A presence
-  // that says "Fadi active" on every page of a product that runs plans is saying nothing.
-  const { runningPlan } = await import("@/lib/work/run-plan");
-  const inFlight = user ? await runningPlan(user.id).catch(() => undefined) : undefined;
-
   return (
-    <OsShell
-      initialMode={initialMode}
-      activeTrackKey={activeTrackKey}
-      working={inFlight?.title ?? null}
-    >
+    <OsShell initialMode={initialMode} activeTrackKey={activeTrackKey}>
       {children}
     </OsShell>
   );

@@ -128,8 +128,6 @@ export async function getLatestCareerReport(userId: string): Promise<StoredCaree
     recommended_actions: report.recommendedActions,
     recommended_learning_path: report.recommendedLearningPath,
     model_name: report.modelName,
-    /** D08: lets staleness see removal, which a newest-timestamp comparison cannot. */
-    evidence_count_at_generation: report.evidenceCountAtGeneration ?? null,
     generated_at: toIsoString(report.generatedAt),
     created_at: toIsoString(report.createdAt) ?? new Date().toISOString(),
   };

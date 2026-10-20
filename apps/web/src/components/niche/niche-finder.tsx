@@ -74,17 +74,20 @@ export function NicheFinder() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8 pb-12">
-      <header className="border-b border-border pb-8 pt-3">
-        <p className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Direction</p>
-        <h1 className="font-heading text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Choose with evidence.</h1>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          Compare possible directions using demand, pay ranges, competition, and the time and cost
-          involved. Review the inputs before choosing where to focus.
+    <div className="mx-auto max-w-2xl space-y-5">
+      <header className="space-y-1">
+        <div className="flex items-center gap-2">
+          <Compass className="size-5 text-primary" aria-hidden="true" />
+          <h1 className="font-heading text-xl font-semibold tracking-tight">Niche Finder</h1>
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Torn between paths? Tell me where you stand. I&apos;ll pull live demand data and give you the
+          honest reality on each option — demand, pay, competition, the real time and money to break
+          in, and your odds — so you stop guessing.
         </p>
       </header>
 
-      <div className="space-y-5 border-y border-border bg-card p-5">
+      <div className="space-y-4 rounded-2xl border border-border/60 bg-card/60 p-5">
         <div className="space-y-1.5">
           <Label htmlFor="nf-situation">Where are you right now?</Label>
           <Textarea
@@ -165,7 +168,7 @@ export function NicheFinder() {
 
 function Results({ result, onReset }: { result: Result; onReset: () => void }) {
   return (
-    <div className="mx-auto max-w-3xl space-y-6 pb-12">
+    <div className="mx-auto max-w-3xl space-y-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Compass className="size-5 text-primary" aria-hidden="true" />
@@ -176,7 +179,7 @@ function Results({ result, onReset }: { result: Result; onReset: () => void }) {
         </Button>
       </div>
 
-      <div className="border-y border-border bg-card p-5">
+      <div className="rounded-2xl border border-border/60 bg-card/60 p-5">
         <p className="text-sm leading-relaxed">{result.overview}</p>
       </div>
 
@@ -187,13 +190,13 @@ function Results({ result, onReset }: { result: Result; onReset: () => void }) {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className="border-y border-primary/30 bg-primary/5 p-5">
+        <div className="rounded-2xl border border-primary/30 bg-primary/5 p-5">
           <p className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-primary">
             <TrendingUp className="size-4" aria-hidden="true" /> Recommendation
           </p>
           <p className="text-sm leading-relaxed">{result.recommendation}</p>
         </div>
-        <div className="border-y border-amber-500/30 bg-amber-500/5 p-5">
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5">
           <p className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-amber-400">
             <AlertTriangle className="size-4" aria-hidden="true" /> Reality check
           </p>
@@ -231,7 +234,7 @@ function NicheCard({ niche, rank }: { niche: Niche; rank: number }) {
   }
 
   return (
-    <div className="overflow-hidden border border-border bg-card">
+    <div className="overflow-hidden rounded-2xl border border-border/60 bg-card/60">
       <div className="flex items-start justify-between gap-3 border-b border-border/50 p-5">
         <div className="min-w-0">
           <div className="flex items-center gap-2">

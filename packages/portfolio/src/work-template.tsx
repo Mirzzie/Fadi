@@ -6,7 +6,8 @@ import { ResumeButton } from "./resume-button";
 import { FeedbackForm } from "./feedback-form";
 import { SkillFilter } from "./skill-filter";
 import {
-  caseSkillSlugs,
+  caseSkills,
+  hasArtifact,
   pickLead,
   rankCases,
   skillIndex,
@@ -38,8 +39,11 @@ import type { PageLabels } from "./work-index";
  *      work that demonstrates it. A skill nothing backs is never listed at all —
  *      listing it would be exactly the unbacked claim this platform refuses to make.
  *
- *   3. MEDIA IS OPTIONAL. Screenshots, video and source links enrich work when they
- *      exist. Their absence is not advertised as a failure to a public visitor.
+ *   3. MISSING PROOF IS SHOWN, NOT PADDED — but only for career work. A project
+ *      with no image, gallery or link gets a labelled gap; a hobby without a
+ *      screenshot gets nothing, because it isn't a failing. Padding a real gap with
+ *      confident prose is how a portfolio quietly turns back into a résumé; nagging
+ *      about someone's hobbies is how it turns into an audit.
  *
  *   4. IT IS NOT A JOB APPLICATION. Career, passion and hobbies all belong here —
  *      "Outside the job" catches whatever the owner adds later without a code change.
@@ -83,9 +87,6 @@ export function WorkTemplate({
   const lead = pickLead(items);
   const rest = cases.filter((c) => c.id !== lead?.id);
   const skills = skillIndex(items);
-  // The labels the owner lists, so a case can answer to a skill it names and not only to its tag
-  // — the index and the filter have to agree or a chip filters to nothing.
-  const skillLabels = items.filter((i) => i.section === "skill").map((i) => i.title);
   const experience = items.filter((i) => i.section === "experience");
   // Education and certifications are NOT the same class of thing. Rendering a degree
   // in the same list as a one-afternoon job simulation flattens the difference and
@@ -186,7 +187,7 @@ export function WorkTemplate({
             <h2 className="mb-6 font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--pf-ink-3)]">
               {L.featured}
             </h2>
-            <Lead item={lead} href={itemHref(lead.id)} labels={L} skillLabels={skillLabels} />
+            <Lead item={lead} href={itemHref(lead.id)} labels={L} />
           </section>
         ) : null}
 
@@ -209,7 +210,7 @@ export function WorkTemplate({
         {rest.length > 0 ? (
           <section className="grid gap-4 py-10">
             {rest.map((c) => (
-              <Case key={c.id} item={c} href={itemHref(c.id)} labels={L} skillLabels={skillLabels} />
+              <Case key={c.id} item={c} href={itemHref(c.id)} labels={L} />
             ))}
           </section>
         ) : null}
@@ -402,17 +403,7 @@ export function WorkTemplate({
   );
 }
 
-function Lead({
-  item,
-  href,
-  labels,
-  skillLabels,
-}: {
-  item: PortfolioItemView;
-  href: string;
-  labels: PageLabels;
-  skillLabels: string[];
-}) {
+function Lead({ item, href, labels }: { item: PortfolioItemView; href: string; labels: PageLabels }) {
   const { figures } = splitBullets(item.bullets ?? []);
   const leadMedia = [item.imageUrl, ...(item.gallery ?? [])].filter((m): m is string => !!m);
   return (
@@ -420,7 +411,7 @@ function Lead({
       data-case
       data-portfolio-item
       data-roles={item.roles.join(" ")}
-      data-skills={caseSkillSlugs(item, skillLabels).join(" ")}
+      data-skills={caseSkills(item).map(slugify).join(" ")}
       className="grid items-start gap-8 py-2 md:grid-cols-[1.05fr_.95fr] md:gap-10"
     >
       <div>
@@ -454,18 +445,13 @@ function Lead({
   );
 }
 
-function Case({
-  item,
-  href,
-  labels,
-  skillLabels,
-}: {
-  item: PortfolioItemView;
-  href: string;
-  labels: PageLabels;
-  skillLabels: string[];
-}) {
+function Case({ item, href, labels }: { item: PortfolioItemView; href: string; labels: PageLabels }) {
   const { figures, notes } = splitBullets(item.bullets ?? []);
+  const proven = hasArtifact(item);
+  // Only career work is held to the evidence standard. A hobby or a side interest
+  // without a screenshot isn't a gap — it's a hobby. Nagging about it would turn the
+  // page back into an audit of the reader's own life.
+  const expectsProof = item.section === "project";
   const media = [item.imageUrl, ...(item.gallery ?? [])].filter((m): m is string => !!m);
 
   return (
@@ -473,10 +459,10 @@ function Case({
       data-case
       data-portfolio-item
       data-roles={item.roles.join(" ")}
-      data-skills={caseSkillSlugs(item, skillLabels).join(" ")}
+      data-skills={caseSkills(item).map(slugify).join(" ")}
       className={`grid overflow-hidden rounded-xl border bg-[var(--pf-surface)] ${
         media.length > 0 ? "md:grid-cols-[300px_1fr]" : ""
-      } border-[var(--pf-line)]`}
+      } ${proven ? "border-[var(--pf-line)]" : "border-dashed border-[var(--pf-line)]"}`}
     >
       {media.length > 0 ? (
         <div className="border-b border-[var(--pf-line)] p-3 md:border-b-0 md:border-r">
@@ -524,7 +510,21 @@ function Case({
           </div>
         ) : null}
 
-        <Actions caseHref={href} url={item.url} primaryLabel={labels.detailCta} />
+        {proven ? <Actions caseHref={href} url={item.url} primaryLabel={labels.detailCta} /> : null}
+
+        {/* The honest gap. This is the design doing its job — a case with nothing to
+            show says so, instead of being padded with prose until it reads like a CV. */}
+        {!proven && expectsProof ? (
+          <div className="mt-4 rounded-lg border border-dashed border-[var(--pf-gap)]/50 bg-[var(--pf-gap-soft)] p-3.5">
+            <span className="mb-1 block font-mono text-[11px] uppercase tracking-[0.1em] text-[var(--pf-gap)]">
+              {labels.gap}
+            </span>
+            <p className="m-0 text-[15px] text-[var(--pf-ink-2)]">
+              A screenshot, a diagram, a repo or a short write-up would turn this from a claim into
+              evidence.
+            </p>
+          </div>
+        ) : null}
       </div>
     </article>
   );

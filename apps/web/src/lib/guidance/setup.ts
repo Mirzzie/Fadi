@@ -39,21 +39,7 @@ export type SetupState = {
   exploreNiche: { suggested: boolean; href: string };
 };
 
-/**
- * The checklist, for the phase the user is actually in.
- *
- * Two of these five steps are pipeline work — saving a role and tracking an
- * application — and both link to routes that Prepare declares it hides. In Prepare the
- * headline "NEXT STEP" was therefore "Save a role worth pursuing" with a See jobs
- * button: an instruction to leave the mode you just chose, and a progress bar counting
- * you incomplete for not doing it.
- *
- * A checklist that asks for what the current phase excludes is worse than no checklist.
- */
-export async function getSetupState(
-  userId: string,
-  mode: "apply" | "prepare" = "apply",
-): Promise<SetupState> {
+export async function getSetupState(userId: string): Promise<SetupState> {
   const db = getDatabase();
 
   // Active direction first, so the report check below is for THIS track.
@@ -123,17 +109,12 @@ export async function getSetupState(
     },
   ];
 
-  // Pipeline steps belong to Apply. In Prepare they are not merely irrelevant — both
-  // link to routes this mode hides, so following the checklist means leaving the mode.
-  const APPLY_ONLY = new Set(["save-role", "apply"]);
-  const forMode = mode === "prepare" ? steps.filter((st) => !APPLY_ONLY.has(st.id)) : steps;
-
-  const completed = forMode.filter((s) => s.done).length;
-  const total = forMode.length;
-  const nextStep = forMode.find((s) => !s.done) ?? null;
+  const completed = steps.filter((s) => s.done).length;
+  const total = steps.length;
+  const nextStep = steps.find((s) => !s.done) ?? null;
 
   return {
-    steps: forMode,
+    steps,
     completed,
     total,
     percent: Math.round((completed / total) * 100),

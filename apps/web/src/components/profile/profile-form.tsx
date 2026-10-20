@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { CheckCircle2, Loader2, Trash2, UserX, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
+import { CvUpload } from "@/components/profile/cv-upload";
 import { FadiGuardianCallout } from "@/components/workspace/fadi-guardian-callout";
 import { evaluateDeleteAllData } from "@/lib/guardian/guardian";
 import { cn } from "@/lib/utils";
@@ -20,10 +20,12 @@ const EXPERIENCE_LEVELS = ["entry", "mid", "senior", "lead", "principal"];
 export function ProfileForm({
   email,
   initial,
+  directionLabel,
 }: {
   email: string;
   initial: UpdateProfileInput;
   /** The active direction's name — the resume below belongs to IT. */
+  directionLabel?: string | null;
 }) {
   const [form, setForm] = useState<UpdateProfileInput>(initial);
   const [pending, startTransition] = useTransition();
@@ -62,29 +64,17 @@ export function ProfileForm({
     <div className="space-y-4">
       <div className="rounded-xl border bg-card p-6 space-y-4">
         <Field label="Full name">
-          <input
-            value={form.fullName}
-            onChange={(e) => set("fullName", e.target.value)}
-            className={inputCls}
-          />
+          <input value={form.fullName} onChange={(e) => set("fullName", e.target.value)} className={inputCls} />
         </Field>
         <Field label="Email">
           <input value={email} disabled className={cn(inputCls, "opacity-60")} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Target role">
-            <input
-              value={form.targetRole}
-              onChange={(e) => set("targetRole", e.target.value)}
-              className={inputCls}
-            />
+            <input value={form.targetRole} onChange={(e) => set("targetRole", e.target.value)} className={inputCls} />
           </Field>
           <Field label="Location preference">
-            <input
-              value={form.location}
-              onChange={(e) => set("location", e.target.value)}
-              className={inputCls}
-            />
+            <input value={form.location} onChange={(e) => set("location", e.target.value)} className={inputCls} />
           </Field>
         </div>
         <Field label="Experience level">
@@ -118,18 +108,38 @@ export function ProfileForm({
             className={inputCls}
           />
         </Field>
-        {/* THE CV LIVES IN ONE PLACE. Two boxes here stored text that did nothing until the
-            person pressed a button on another screen — which is how a saved CV and an empty
-            record existed side by side. Intake is Evidence; this page is who you are and how to
-            reach you. */}
-        <p className="rounded-lg border border-dashed border-border/70 p-3 text-xs text-muted-foreground">
-          Your CV and career history live in{" "}
-          <Link href="/dashboard/evidence" className="text-foreground underline underline-offset-2">
-            Evidence
-          </Link>
-          . Drop it there once and Fadi reads it into records you can check — documents, your
-          portfolio and interview prep all draw on those.
-        </p>
+        <Field label="Career history — LinkedIn (your source of truth)">
+          <p className="-mt-0.5 text-xs text-muted-foreground">
+            The full, role-agnostic record Fadi grounds everything in. We can&apos;t pull it from
+            LinkedIn automatically — paste your About + experience, or upload your LinkedIn
+            &ldquo;Save to PDF&rdquo; export. Your resumes can be tailored per role; this stays complete.
+          </p>
+          <CvUpload label="Upload LinkedIn PDF export" onExtracted={(text) => set("linkedInText", text)} />
+          <textarea
+            value={form.linkedInText}
+            onChange={(e) => set("linkedInText", e.target.value)}
+            rows={6}
+            placeholder="Paste your LinkedIn About + experience here, or upload the PDF above."
+            className={cn(inputCls, "h-auto py-2")}
+          />
+        </Field>
+        <Field label={directionLabel ? `Base resume — your “${directionLabel}” direction` : "Base resume / CV"}>
+          <p className="-mt-0.5 text-xs text-muted-foreground">
+            Each direction keeps its own base resume — every job document Fadi tailors in{" "}
+            {directionLabel ? `“${directionLabel}”` : "this direction"} starts from THIS text (your
+            words are preserved, not rewritten). Add direction-specific projects or certifications
+            here as you earn them. Your LinkedIn above stays the shared career history. Don&apos;t
+            paste the same LinkedIn text here — it needs to be an actual resume.
+          </p>
+          <CvUpload onExtracted={(text) => set("resumeText", text)} />
+          <textarea
+            value={form.resumeText}
+            onChange={(e) => set("resumeText", e.target.value)}
+            rows={8}
+            placeholder="Upload your CV above, or paste the text here."
+            className={cn(inputCls, "h-auto py-2 font-mono text-xs")}
+          />
+        </Field>
 
         {status ? (
           <div
@@ -137,7 +147,7 @@ export function ProfileForm({
               "flex items-start gap-2 rounded-lg border p-3 text-sm",
               status.ok
                 ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                : "border-amber-500/30 bg-amber-500/10 text-amber-200"
+                : "border-amber-500/30 bg-amber-500/10 text-amber-200",
             )}
           >
             {status.ok ? (
@@ -159,32 +169,11 @@ export function ProfileForm({
       <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 space-y-6">
         {/* 1. Start over — wipe data, keep the login. */}
         <div>
-          <h3 className="text-sm font-semibold text-destructive">
-            Delete my data &amp; start over
-          </h3>
-          {/* THE LIST HAS TO BE COMPLETE. It named profile, reports, evidence,
-              applications, momentum and AI settings — and omitted the portfolio, which
-              this also erases: every item, the site, the handle, the custom wording and
-              the GitHub connection. An irreversible action described incompletely is
-              worse than one described bluntly. */}
+          <h3 className="text-sm font-semibold text-destructive">Delete my data &amp; start over</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Permanently removes your profile, reports, evidence, applications, momentum, AI settings{" "}
-            <strong>and your entire portfolio</strong> — every item, your public page and its
-            handle, your custom wording, and the GitHub connection. Then it signs you out.{" "}
-            <strong>Your login stays</strong>, so you can sign back in and start fresh. This
-            can&apos;t be undone.
-          </p>
-          {/* WHAT IS ACTUALLY RECOVERABLE. This used to hand the owner a rule to remember at the
-              one moment nobody thinks about backups. Their site is published to their own repo,
-              and every publish now ships fadi-portfolio.json beside the page — the same file
-              Import reads — so the repo IS the copy. */}
-          <p className="mt-2 rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
-            Your published site on GitHub Pages keeps serving — Fadi just stops knowing about it.
-            Uploaded images stay on Cloudinary. If you have published since this was added, your
-            repo carries <code>fadi-portfolio.json</code>, and Portfolio can restore the entries
-            that were <strong>live at that publish</strong> — not drafts, hidden entries or your
-            site settings. For everything else, <strong>Export first</strong> (Portfolio →
-            Export).
+            Permanently removes your profile, reports, evidence, applications, momentum, and AI
+            settings — then signs you out. <strong>Your login stays</strong>, so you can sign back
+            in and start a fresh search. This can&apos;t be undone.
           </p>
           {confirming === "data" ? (
             <div className="mt-3 space-y-3">
@@ -199,12 +188,7 @@ export function ProfileForm({
                   )}
                   Yes, delete my data
                 </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setConfirming(null)}
-                  disabled={pending}
-                >
+                <Button variant="ghost" size="sm" onClick={() => setConfirming(null)} disabled={pending}>
                   Cancel
                 </Button>
               </div>
@@ -245,12 +229,7 @@ export function ProfileForm({
                 )}
                 Yes, close my account
               </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setConfirming(null)}
-                disabled={pending}
-              >
+              <Button variant="ghost" size="sm" onClick={() => setConfirming(null)} disabled={pending}>
                 Cancel
               </Button>
             </div>

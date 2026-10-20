@@ -1,98 +1,490 @@
-# Fadi data model
+# CareerOS Database Schema
 
-**Status:** Current ownership guide
+## Purpose
 
-**Updated:** 23 September 2026
+This document defines the conceptual data model for CareerOS. The active schema is implemented in PostgreSQL using Drizzle ORM, with committed migrations in `packages/database/migrations`.
 
-The executable schema in `packages/database/src/schema/index.ts` and committed migrations are authoritative. This document explains ownership and invariants; it does not duplicate every column.
+The model supports user identity, career profiles, AI memory, opportunities, applications, learning plans, market intelligence, motivation, and agent activity.
 
-## Identity and account
+## Technology
 
-`users` is the application identity used by domain repositories. Better Auth owns `user`, `session`, `account`, and `verification`; `auth_identities` links authentication identities to the application user. `profiles`, AI settings, MCP tokens, and provider connections are account-owned configuration.
+- **Database**: PostgreSQL (Docker locally, managed provider for production).
+- **ORM**: Drizzle ORM.
+- **Auth**: Better Auth — owns `user`, `session`, `account`, `verification` tables.
+- **Domain tables**: reference CareerOS app-owned `users.id`, not the auth provider's user ID.
 
-All person-owned rows must be scoped through the application user id. Authentication ids are not domain ownership keys.
+## Identity
 
-## Career core: one record, many sources and renderings
+### users (CareerOS-owned)
 
-```mermaid
-flowchart LR
-  SOURCE[career_source_versions] --> EXTRACT[Candidate records]
-  EXTRACT --> FACT[evidence_items]
-  FACT --> HISTORY[career_record_versions]
-  FACT --> SELECT[career_selections]
-  SELECT --> SNAP[career_context_snapshots]
-  SNAP --> DOC[documents / revisions]
-  FACT --> PORT[portfolio_items]
-  FACT --> MEDIA[evidence_artifacts]
-  FACT --> STORY[interview_stories]
-```
+Application identity, separate from auth provider identity.
 
-- `career_source_versions` preserves each imported or pasted source. Identical content is reused; replacing stored source text and recording its version is atomic.
-- `evidence_items` is the canonical career record. Supported kinds include experience, project, education, certification, achievement, skill, and unclassified. A source that cannot be classified must never default to employment.
-- `career_record_versions` is append-only history for accepted changes and withdrawals.
-- `career_selections` stores Auto, Include, or Exclude at direction or job scope. Selection changes relevance, never record identity.
-- `career_context_snapshots` records the exact facts and versions supplied to a generation run.
-- `evidence_artifacts` stores optional proof media attached to a record.
+Suggested fields:
 
-Different résumé wording belongs in document revisions or fact renderings, not duplicate evidence items. Employer, date, title, issuer, credential id, and project identity are factual fields; audience-specific wording is presentation.
+- id (uuid, primary key)
+- email (text, not null)
+- email_verified_at (timestamptz, nullable)
+- created_at (timestamptz)
+- updated_at (timestamptz)
 
-### Career invariants
+### auth_identities
 
-- Preserve raw sources before interpretation.
-- One real-world fact has one stable identity per user.
-- Every canonical fact has at least one approved representation; transitions are transactional.
-- A merge may combine provenance and renderings, but cannot silently inherit conflicting selection decisions.
-- Unknown identity stays unresolved. Similar vocabulary alone is not an identity anchor.
-- A withdrawn fact remains in history and is excluded from new projections.
-- Projections reference a fact id. Title matching is only migration or recovery logic, never steady-state identity.
+Maps auth provider identity to CareerOS app identity.
 
-## Documents
+Suggested fields:
 
-`documents` owns a saved résumé, cover letter, or related output. `document_revisions` preserves edits. `resume_templates` owns layouts. A document's context snapshot is its freshness baseline; employer, title, date, description, selection, and withdrawal changes can make it stale.
+- id
+- user_id (references users.id)
+- provider (text: `better_auth`)
+- provider_subject (text: Better Auth user.id)
+- provider_profile (jsonb: minimal metadata only)
+- created_at
 
-A user can explicitly accept the current state as a new baseline, but that is an attestation, not proof that every sentence matches the career record.
+### Better Auth tables (auth-owned)
 
-## Portfolio
+- `user`
+- `session`
+- `account`
+- `verification`
 
-`portfolio_sites` stores site configuration and publishing state. `portfolio_items` stores presentation data and references a career record when the entry is a projection. `evidence_artifacts` owns proof media; Cloudinary/GitHub connections own provider state.
+Domain tables always reference CareerOS `users.id`, not Better Auth `user.id`.
 
-Sync is an identity reconciliation:
+## Career Profile Entities
 
-- a linked record updates the existing item without deleting media or presentation fields;
-- a new eligible record creates one item;
-- an intentionally hidden or presentation-only item is not recreated merely because a title is similar;
-- deleted projections can return only when the person has not recorded an exclusion/tombstone decision.
+### profiles
 
-Stable links and tombstones must carry this behavior; best-title matching without a score floor is unsafe.
+Stores the user's career profile.
 
-## Work kernel
+Suggested fields:
 
-`work_items` is a tree of goal, plan, and step records. `work_executions` stores attempts, effects, resolved risk, timing, and outcomes. `work_outputs` links a domain object to the work that produced or used it. `agent_messages.work_item_id` scopes a conversation without making messages depend on the work item's lifetime.
+- id
+- user_id
+- full_name
+- headline
+- current_title
+- current_company
+- location
+- target_role
+- target_industries (jsonb)
+- preferred_locations (jsonb)
+- remote_preference
+- salary_expectation (jsonb)
+- years_experience
+- career_goal
+- created_at
+- updated_at
 
-The work kernel coordinates domains. It must not copy full job descriptions, career facts, project state, or document contents.
+### career_profiles
 
-## Opportunities and progress
+Stores richer career profile data from onboarding.
 
-`jobs`, `job_occurrences`, and `saved_jobs` separate a normalised opportunity from source observations and user interest. `applications` owns the person's pipeline. `referral_targets`, resilience events, and momentum state support follow-up and process health.
+Suggested fields:
 
-A job score is advisory. Legitimacy and eligibility gates must be evaluated independently from fit; a high fit score cannot make a suspect posting safe.
+- id
+- user_id
+- career_summary
+- experience_level
+- primary_skills (jsonb)
+- industry_focus
+- onboarding_status
+- created_at
+- updated_at
 
-## Practice
+### resumes
 
-`learning_recommendations` and `learning_commitments` record guidance and commitments. `project_runs` and `project_steps` own practical execution. `lab_resources`, settings, grants, actions, and action requests own environments and approvals. `interview_stories` stores reusable grounded stories.
+Stores uploaded and generated resume records.
 
-Current limitation: interview sessions, rubric snapshots, answer turns, and audio measurements are not durable records. Project and commitment completion still need one shared outcome service linked to the work kernel.
+Suggested fields:
 
-## Agent and observability
+- id
+- user_id
+- title
+- source_type
+- file_path (object storage reference)
+- parsed_text
+- summary
+- parse_status
+- version
+- is_primary
+- created_at
+- updated_at
 
-`agent_messages` stores conversation; `agent_runs` and `agent_findings` store scheduled analysis; `work_executions` stores consequential action receipts. `product_events` is analytics, not a source of truth.
+### linkedin_profiles
 
-Do not use analytics events to reconstruct domain state.
+Stores LinkedIn profile input from paste/import.
 
-## Migration rules
+Suggested fields:
 
-- Generate and commit a migration for every schema change.
-- Test invariants against real PostgreSQL when transaction, uniqueness, JSON, or concurrency behavior matters.
-- Never rewrite an applied migration.
-- Data repair is explicit, backed up, reversible where possible, and separate from schema creation.
-- Do not backfill uncertain legacy meaning as fact. Mark it unresolved and ask.
+- id
+- user_id
+- source_type (pasted_text, profile_url, manual)
+- raw_text
+- parsed_summary
+- imported_at
+
+### experiences
+
+Stores work history.
+
+Suggested fields:
+
+- id
+- user_id
+- company
+- title
+- location
+- start_date
+- end_date
+- is_current
+- description
+- achievements (jsonb)
+- skills_used (jsonb)
+
+### education
+
+Stores formal education.
+
+Suggested fields:
+
+- id
+- user_id
+- institution
+- qualification
+- field_of_study
+- start_date
+- end_date
+- location
+
+### certifications
+
+Stores certifications and credentials.
+
+Suggested fields:
+
+- id
+- user_id
+- name
+- issuer
+- issued_at
+- expires_at
+- credential_url
+- status
+
+### user_skills
+
+Links users to extracted or confirmed skills.
+
+Suggested fields:
+
+- id
+- user_id
+- name
+- source
+- proficiency_level
+- evidence
+- confidence
+- created_at
+
+## Intelligence and Scoring Entities
+
+### career_reports
+
+Stores AI-generated career analysis outputs.
+
+Suggested fields:
+
+- id
+- user_id
+- career_summary
+- niche_assessment_status (supported, challenged, redirected)
+- niche_assessment_evidence (jsonb)
+- strengths (jsonb)
+- weaknesses (jsonb)
+- missing_skills (jsonb)
+- readiness_score
+- opportunity_score
+- career_system_prescription (jsonb)
+- recommendations (jsonb)
+- model_name
+- prompt_version
+- market_data_snapshot_date
+- status (generating, ready, failed)
+- created_at
+
+### career_goals
+
+Stores explicit user goals.
+
+Suggested fields:
+
+- id
+- user_id
+- goal_type
+- title
+- description
+- target_date
+- priority
+- status
+- created_at
+- updated_at
+
+### ai_memories
+
+Stores persistent Fadi memory.
+
+Suggested fields:
+
+- id
+- user_id
+- memory_type
+- key
+- value
+- source
+- confidence
+- is_user_editable
+- created_at
+- updated_at
+
+Memory types:
+
+- explicit_preference
+- inferred_preference
+- career_fact
+- niche_validation_result
+- application_history
+- interview_feedback
+- learning_progress
+- networking_target
+- communication_preference
+
+## Opportunity Entities
+
+### jobs
+
+Stores discovered or imported jobs.
+
+Suggested fields:
+
+- id
+- source
+- external_id
+- title
+- company
+- location
+- remote_mode
+- description
+- url
+- salary_text
+- salary_min (numeric, nullable)
+- salary_max (numeric, nullable)
+- currency
+- seniority
+- employment_type
+- required_skills (jsonb)
+- posted_at
+- expires_at
+- discovered_at
+- raw_payload (jsonb, original source payload)
+
+### job_recommendations
+
+Stores per-user job match analysis.
+
+Suggested fields:
+
+- id
+- user_id
+- job_id
+- match_score
+- matched_skills (jsonb)
+- missing_skills (jsonb)
+- explanation
+- status (new, viewed, saved, rejected)
+- created_at
+
+### saved_jobs
+
+Stores user-saved jobs.
+
+Suggested fields:
+
+- id
+- user_id
+- job_id
+- saved_at
+
+## Application Entities
+
+### applications
+
+Tracks user applications.
+
+Suggested fields:
+
+- id
+- user_id
+- job_id (nullable for manual entries)
+- company
+- title
+- url
+- status (saved, preparing, applied, interview, offer, rejected, withdrawn)
+- priority
+- notes
+- next_action
+- deadline_at
+- applied_at
+- created_at
+- updated_at
+
+### application_assets
+
+Stores generated or uploaded application documents.
+
+Suggested fields:
+
+- id
+- application_id
+- asset_type (tailored_resume, cover_letter, recruiter_message, interview_plan)
+- title
+- content
+- version
+- approval_status
+- approved_at
+- created_at
+
+### approval_requests
+
+Tracks user approvals for sensitive external actions.
+
+Suggested fields:
+
+- id
+- user_id
+- action_type
+- action_description
+- content_preview
+- destination
+- status (pending, approved, denied)
+- approved_at
+- denied_at
+- created_at
+
+## Learning Entities
+
+### learning_recommendations
+
+Stores learning recommendations generated from skill gaps.
+
+Suggested fields:
+
+- id
+- user_id
+- skill_name
+- item_type (course, certification, portfolio_project, github_repo, case_study)
+- title
+- provider
+- url
+- reason
+- market_demand_basis
+- estimated_time
+- status (recommended, saved, completed, dismissed)
+- created_at
+
+### learning_plans
+
+Stores structured learning plans.
+
+Suggested fields:
+
+- id
+- user_id
+- title
+- target_role
+- objective
+- status
+- start_date
+- target_completion_date
+- created_at
+- updated_at
+
+## Market Intelligence Entities
+
+### market_signals
+
+Stores external market observations.
+
+Suggested fields:
+
+- id
+- signal_type (hiring_trend, layoff_trend, salary_trend, skill_demand, economic_indicator, geopolitical_signal, industry_news)
+- title
+- summary
+- source_name
+- source_url
+- publication_date
+- observed_at
+- industries (jsonb)
+- locations (jsonb)
+- roles (jsonb)
+- confidence
+- created_at
+
+## Agent and Workflow Entities
+
+### agent_tasks
+
+Stores Fadi work items.
+
+Suggested fields:
+
+- id
+- user_id
+- task_type
+- title
+- description
+- status
+- priority
+- requires_approval
+- approved_at
+- completed_at
+- result_summary
+- created_at
+- updated_at
+
+### agent_messages
+
+Stores Fadi conversation messages.
+
+Suggested fields:
+
+- id
+- user_id
+- role (user, fadi, system)
+- content
+- context_summary
+- created_at
+
+### events
+
+Stores product and system events.
+
+Suggested fields:
+
+- id
+- user_id (nullable for system events)
+- event_type
+- entity_type
+- entity_id (nullable)
+- payload (jsonb — small metadata only, no sensitive content)
+- created_at
+
+## Privacy and Retention Notes
+
+CareerOS handles sensitive personal, career, and application data. Implementation must define:
+
+- Data retention periods by category.
+- User export and deletion workflows.
+- Consent records for integrations.
+- Access audit logs.
+- Encryption requirements.
+- Redaction rules for AI prompts and logs — raw resume text, LinkedIn text, and prompt content must never appear in logs.

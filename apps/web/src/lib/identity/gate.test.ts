@@ -19,6 +19,9 @@ import { describe, expect, it } from "vitest";
 const ALLOWED = [
   // The gate itself.
   "src/lib/identity/admit.ts",
+  // Inside a transaction with the learning commitment, resolved beforehand via
+  // admitAgainst() — atomicity forces the write to use the transaction's repo.
+  "src/app/dashboard/learning/actions.ts",
 ];
 
 function grep(pattern: string): string[] {

@@ -36,9 +36,6 @@ import { logger } from "@/lib/observability/logger";
  * changed — the caller passes the last run time and this returns early unless the
  * résumé or the portfolio has actually moved since.
  */
-/** GitHub does not change between two runs an hour apart. */
-const CAPTURE_INTERVAL_MS = 24 * 60 * 60 * 1000;
-
 export async function coherenceFindings(
   userId: string,
   since: Date | null,
@@ -166,46 +163,6 @@ export async function coherenceFindings(
         data: { kind: gap.kind, title: gap.title, organization: gap.organization ?? null },
       });
     }
-    // ---- 4. Evidence the user never told Fadi about. -----------------------
-    //
-    // ADR 0011, first slice. The GitHub connection has existed since portfolio
-    // publishing shipped and has only ever pushed; reading it costs nothing and turns
-    // repositories — dated, linkable, not written to impress anyone — into evidence.
-    //
-    // IT PROPOSES, IT DOES NOT ADMIT. The first version wrote straight into the pool,
-    // and against the real account that meant 24 of 47 repos including a 2020 "my
-    // first repository in github" and three GitHub Skills clones. No filter fixes that
-    // properly: only the owner knows which of their repos is real work. Silently
-    // filling the pool the résumé and job matching draw from is the same class of
-    // mistake as publishing an unconfirmed portfolio item — so it takes the same
-    // shape, a finding that asks.
-    if (!since || Date.now() - since.getTime() > CAPTURE_INTERVAL_MS) {
-      const { captureGithubRepos } = await import("@/lib/capture/github");
-      const captured = await captureGithubRepos(userId);
-      if (captured && captured.candidates.length > 0) {
-        logger.info("capture.github", {
-          userId,
-          scanned: captured.scanned,
-          proposed: captured.candidates.length,
-        });
-        findings.push({
-          kind: "evidence_captured",
-          title: `${captured.candidates.length} of your GitHub repositories could be evidence`,
-          detail:
-            captured.candidates.slice(0, 5).map((c) => c.title).join(", ") +
-            (captured.candidates.length > 5 ? ` +${captured.candidates.length - 5} more` : "") +
-            ". Each carries its repository link and real dates — proof rather than a claim. " +
-            "Nothing has been added: pick the ones that are actually your work.",
-          href: "/dashboard/evidence",
-          data: {
-            source: "github",
-            scanned: captured.scanned,
-            candidates: captured.candidates.slice(0, 20),
-          },
-        });
-      }
-    }
-
   } catch (err) {
     // Coherence is one section of a wider pass. It must never take the run down with it.
     logger.warn("agent.coherence_failed", {

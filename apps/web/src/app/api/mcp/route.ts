@@ -64,8 +64,7 @@ export async function POST(req: Request): Promise<Response> {
 
   // Build the execution context once per request (userId + the user's own AI provider).
   const generate = await getUserDocGenerate(userId);
-  // "mcp", so anything this client does on the machine is logged as the client doing it.
-  const ctx: FadiToolContext = { userId, generate: generate ?? undefined, surface: "mcp" };
+  const ctx: FadiToolContext = { userId, generate: generate ?? undefined };
   const deps: McpDeps = {
     listTools: () => getFadiTools().map((t) => toMcpTool(t, getFadiToolAnnotations(t.name))),
     callTool: (name, args) => executeFadiTool(name, args, ctx),

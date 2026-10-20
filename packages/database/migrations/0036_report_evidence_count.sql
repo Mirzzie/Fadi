@@ -1,1 +1,0 @@
-ALTER TABLE "career_reports" ADD COLUMN "evidence_count_at_generation" integer;

@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-07-14
-- **Supersedes:** nothing. Replaced the earlier aspirational event-driven proposal with a real in-process bus.
+- **Supersedes:** nothing. Makes `EVENT_DRIVEN_ARCHITECTURE.md` real (it was aspirational — no bus existed).
 
 ## Context
 

@@ -1,1 +1,0 @@
-ALTER TABLE "lab_resources" ADD COLUMN "guest_user" text;

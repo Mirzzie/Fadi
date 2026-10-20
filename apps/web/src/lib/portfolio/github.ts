@@ -203,29 +203,11 @@ export class GitHubClient {
    * is exactly its selected set — so it doubles as "what can I publish to?", which is the
    * whole point of showing a picker instead of a blind name field.
    */
-  async listRepos(): Promise<
-    Array<{
-      name: string;
-      fullName: string;
-      private: boolean;
-      // Kept for evidence capture. The picker only reads `name`, but a repository is
-      // also an artefact — dated, attributable, and linkable — and throwing this away
-      // meant re-fetching every repo to learn anything about it.
-      description: string | null;
-      language: string | null;
-      topics: string[];
-      url: string | null;
-      fork: boolean;
-      archived: boolean;
-      createdAt: string | null;
-      pushedAt: string | null;
-      stars: number;
-    }>
-  > {
+  async listRepos(): Promise<Array<{ name: string; fullName: string; private: boolean }>> {
     // Paginate. A single page caps at 100, and "the repo I wanted wasn't in the list" is
     // indistinguishable from "the token can't see it" — so walk until GitHub runs out.
     // Bounded at 10 pages so a pathological account can't stall the picker.
-    const out: Awaited<ReturnType<GitHubClient["listRepos"]>> = [];
+    const out: Array<{ name: string; fullName: string; private: boolean }> = [];
     for (let page = 1; page <= 10; page += 1) {
       const { status, data } = await this.request(
         "GET",
@@ -241,15 +223,6 @@ export class GitHubClient {
           name: String(r.name),
           fullName: String(r.full_name ?? r.name),
           private: r.private === true,
-          description: typeof r.description === "string" ? r.description : null,
-          language: typeof r.language === "string" ? r.language : null,
-          topics: Array.isArray(r.topics) ? r.topics.filter((t): t is string => typeof t === "string") : [],
-          url: typeof r.html_url === "string" ? r.html_url : null,
-          fork: r.fork === true,
-          archived: r.archived === true,
-          createdAt: typeof r.created_at === "string" ? r.created_at : null,
-          pushedAt: typeof r.pushed_at === "string" ? r.pushed_at : null,
-          stars: typeof r.stargazers_count === "number" ? r.stargazers_count : 0,
         });
       }
       if (rows.length < 100) break;
@@ -339,37 +312,6 @@ export class GitHubClient {
       description: "My portfolio, published from Fadi.",
     });
     if (status !== 201) this.fail(status, data, "Could not create the repository.");
-  }
-
-  /**
-   * Read one file from the repo through the authenticated API.
-   *
-   * Not a plain fetch of the Pages URL: that follows redirects a user could control, which makes
-   * an authenticated request-forgery surface out of what should be a read of our own file
-   * (Codex C15-04). This goes to api.github.com with the stored token and the stored owner/repo.
-   */
-  async readFile(args: {
-    owner: string;
-    repo: string;
-    path: string;
-    maxBytes?: number;
-  }): Promise<string | null> {
-    const { status, data } = await this.request(
-      "GET",
-      `/repos/${args.owner}/${args.repo}/contents/${args.path}`
-    );
-    if (status === 404) return null;
-    if (status !== 200 || !data || typeof data !== "object") {
-      this.fail(status, data, `Could not read ${args.path}.`);
-    }
-    const body = data as { content?: unknown; encoding?: unknown; size?: unknown };
-    const size = typeof body.size === "number" ? body.size : 0;
-    const cap = args.maxBytes ?? 2_000_000;
-    if (size > cap) {
-      throw new GitHubError(413, `${args.path} is ${size} bytes — too large to read back.`);
-    }
-    if (typeof body.content !== "string" || body.encoding !== "base64") return null;
-    return Buffer.from(body.content, "base64").toString("utf8");
   }
 
   /**
