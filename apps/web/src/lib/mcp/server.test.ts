@@ -27,7 +27,6 @@ describe("toMcpTool", () => {
     const t = toMcpTool({
       name: "scan_company_jobs",
       description: "Pull a company's roles",
-      risk: "read" as const,
       parameters: { type: "object", properties: { company: { type: "string" } }, required: ["company"] },
       execute: async () => ({ summary: "", view: "none" }),
     });
@@ -57,7 +56,6 @@ describe("toMcpTool annotations", () => {
   const base = {
     name: "track_application",
     description: "d",
-    risk: "read" as const,
     parameters: { type: "object", properties: {} },
     execute: async () => ({ summary: "", view: "none" as const }),
   };

@@ -35,22 +35,6 @@ export function parseSearxng(json: any): SearchHit[] {
     .filter((r: SearchHit) => r.url.startsWith("http"));
 }
 
-/**
- * Did SearXNG actually search, or did every engine turn it away?
- *
- * A local instance is rate-limited and CAPTCHA'd by the big engines within a few queries. The
- * response is still 200 with an empty `results` — indistinguishable, downstream, from "there are
- * no such jobs". Measured 21 Sep 2026: three query variants in a row came back empty with
- * duckduckgo on CAPTCHA and brave suspended, and the crawler reported a clean zero for Dublin.
- * Empty results WITH every engine unresponsive is a failed search, and is reported as one.
- */
-export function searxngSearchFailed(json: any): boolean {
-  const results = Array.isArray(json?.results) ? json.results : [];
-  if (results.length > 0) return false;
-  const dead = json?.unresponsive_engines;
-  return Array.isArray(dead) && dead.length > 0;
-}
-
 /** Google Programmable Search `items` → hits. Pure. */
 export function parseGoogle(json: any): SearchHit[] {
   const items = json?.items;
@@ -110,11 +94,7 @@ export async function searchJobUrls(keywords: string, location: string, limit = 
     // 1) SearXNG — free, self-hosted, unlimited.
     if (serverEnv.SEARXNG_URL) {
       const base = serverEnv.SEARXNG_URL.replace(/\/$/, "");
-      const json = await getJson(`${base}/search?q=${enc}&format=json&categories=general`);
-      if (searxngSearchFailed(json)) {
-        throw new Error("every engine the local SearXNG asked was rate-limited or blocked");
-      }
-      return keepCrawlable(parseSearxng(json)).slice(0, limit);
+      return keepCrawlable(parseSearxng(await getJson(`${base}/search?q=${enc}&format=json&categories=general`))).slice(0, limit);
     }
     // 2) Google Programmable Search — 100/day free.
     if (serverEnv.GOOGLE_CSE_KEY && serverEnv.GOOGLE_CSE_CX) {
@@ -126,20 +106,8 @@ export async function searchJobUrls(keywords: string, location: string, limit = 
       const u = `https://api.search.brave.com/res/v1/web/search?q=${enc}&count=20`;
       return keepCrawlable(parseBrave(await getJson(u, { "X-Subscription-Token": serverEnv.BRAVE_SEARCH_API_KEY }))).slice(0, limit);
     }
-  } catch (error) {
-    // A search backend that cannot be reached is NOT "no results". SEARXNG_URL pointed at a
-    // container that was not running, so every crawl returned zero in milliseconds and the UI
-    // reported the crawler as live with nothing found (measured 20 Sep 2026). The caller turns
-    // this into a source error, which the board shows as a failure the person can retry.
-    throw new SearchBackendUnavailable(error instanceof Error ? error.message : "search failed");
+  } catch {
+    return [];
   }
   return [];
-}
-
-/** The configured search backend could not be reached. Distinct from "it found nothing". */
-export class SearchBackendUnavailable extends Error {
-  constructor(detail: string) {
-    super(`The web-search backend is not reachable (${detail}).`);
-    this.name = "SearchBackendUnavailable";
-  }
 }

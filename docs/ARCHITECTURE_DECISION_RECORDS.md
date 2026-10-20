@@ -1,59 +1,102 @@
-# Architecture decision records
+# Architecture Decision Records
 
-ADRs capture durable decisions that affect ownership, trust boundaries, storage, delivery, or external contracts. Use the template below for new decisions and update this index when one lands.
+## Purpose
 
-## Current records
+Architecture Decision Records document important technical decisions, the context behind them, and their consequences. They prevent the repository from accumulating invisible architectural drift.
 
-| ADR | Decision | Status |
-|---|---|---|
-| [0006](adr/0006-in-process-domain-event-bus.md) | In-process domain event bus | Accepted; durable outbox remains roadmap work |
-| [0007](adr/0007-data-retention-and-erasure.md) | Data retention and erasure | Accepted |
-| [0008](adr/0008-github-portfolio-publishing.md) | GitHub portfolio publishing | Accepted |
-| [0009](adr/0009-portfolio-hosting-and-static-export.md) | Portfolio hosting and static export | Accepted |
-| [0010](adr/0010-reactive-resume-editor-adoption.md) | Reactive résumé editor adoption | Accepted |
-| [0011](adr/0011-lab-resources-and-evidence-capture.md) | Lab resources and evidence capture | Accepted |
-| [0012](adr/0012-local-machine-permission-broker.md) | Local machine permission broker | Accepted |
-| [0013](adr/0013-unified-work-surface-and-multimodal-agent-runtime.md) | Unified work surface and multimodal agent runtime | Proposed |
-| [0014](adr/0014-domain-neutral-practice-runtime.md) | Domain-neutral practice runtime | Proposed |
+## ADR Naming
 
-The earlier framework, auth, ORM, provider, and PostgreSQL decisions predate the numbered files. Their current state is documented in [Architecture](ARCHITECTURE.md), [Authentication](AUTHENTICATION_ARCHITECTURE.md), and [PostgreSQL architecture](POSTGRES_FIRST_ARCHITECTURE.md). Create a retrospective ADR only when a new decision changes one of them.
+Store ADRs in:
 
-## Required next decisions
+```text
+docs/adr/
+```
 
-Write an ADR before landing:
+Use this naming format:
 
-- a transactional outbox and its delivery guarantees;
-- a unified Realtime voice transport and audio-retention policy (ADR 0013 defines the worker boundary, not transport or retention);
-- a general capability/approval policy beyond the lab broker;
-- social publishing connections and token custody;
-- a new hypervisor provider contract;
-- a split from the modular monolith into a separate service.
+```text
+0001-use-nextjs-app-router.md
+0002-use-better-auth-not-supabase.md
+0003-use-drizzle-orm-not-prisma.md
+0004-pluggable-model-gateway.md
+0005-postgresql-first-architecture.md
+```
 
-## Template
+## ADR Statuses
+
+- `Proposed`
+- `Accepted`
+- `Rejected`
+- `Superseded`
+- `Deprecated`
+
+## ADR Template
 
 ```markdown
-# ADR 0013: Decision title
+# ADR 0000: Decision Title
 
-**Status:** Proposed | Accepted | Rejected | Superseded | Deprecated
-**Date:** YYYY-MM-DD
+## Status
+
+Proposed
+
+## Date
+
+YYYY-MM-DD
 
 ## Context
 
-What problem and constraints require a durable decision?
+Describe the problem, constraints, business needs, and technical forces.
 
 ## Decision
 
-What boundary, contract, or technology will we adopt?
+Describe the decision clearly.
 
-## Alternatives considered
+## Alternatives Considered
 
-What viable alternatives were rejected, and why?
+- Option A: pros and cons.
+- Option B: pros and cons.
+- Option C: pros and cons.
 
 ## Consequences
 
-What improves, what becomes harder, and what must change?
+Positive:
 
-## Verification and review
+- Outcome.
 
-How is the decision enforced, and when should it be revisited?
+Negative:
+
+- Tradeoff.
+
+## Implementation Notes
+
+- Migration steps.
+- Required follow-up work.
+- Operational considerations.
+
+## Review Date
+
+YYYY-MM-DD or "Not scheduled".
 ```
+
+## ADRs Already Decided (Capture As Formal ADRs)
+
+These decisions have been made and should be captured as formal ADRs:
+
+1. **Next.js 16 App Router as the web framework**: full-stack TypeScript, server actions, React 19.
+2. **Better Auth as the MVP auth provider**: replaces Supabase Auth; first-party TypeScript auth with Drizzle adapter.
+3. **PostgreSQL as the database**: Docker locally, managed provider for production; all migrations must run against vanilla PostgreSQL.
+4. **Drizzle ORM with committed migrations**: type-safe, SQL-forward, portable; chosen over Prisma for its SQL visibility and service extraction compatibility.
+5. **Pluggable AI model gateway**: OpenAI currently wired; Claude, Gemini, and local models supported by design; no feature code imports provider SDKs directly.
+6. **Fadi as the entire product**: not a chatbot widget or a supplementary assistant; the entire UI is Fadi's operating surface.
+
+## ADRs Required Before Implementation Expands
+
+Create ADRs for:
+
+- Managed PostgreSQL hosting provider selection (Neon vs Supabase Postgres vs RDS).
+- Vercel as MVP hosting provider.
+- Object storage provider (S3 vs Cloudflare R2 vs equivalent).
+- Job source API selection for Phase 3.
+- Voice implementation approach (Browser Web Speech API specifics for Phase 2).
+- Background job queue approach (lightweight queue vs scheduled API jobs for Phase 3 monitoring).
+- Real-time market data API selection for Phase 3.

@@ -2,16 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import type { ZodSchema } from "zod";
 
 import { aiErrorMessage } from "./errors";
-import type {
-  AIMessage,
-  AIProvider,
-  ChatOptions,
-  ProviderCapability,
-  ToolExecutor,
-  ToolRunCallbacks,
-  ToolRunResult,
-  ToolSpec,
-} from "./types";
+import type { AIMessage, AIProvider, ChatOptions, ProviderCapability } from "./types";
 
 /** Split our flat messages into Anthropic's (system string, messages[]) shape. */
 function toAnthropic(messages: AIMessage[]) {
@@ -24,9 +15,6 @@ function toAnthropic(messages: AIMessage[]) {
     .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
   return { system, turns };
 }
-
-/** Same ceiling as the other provider: enough to chain, low enough to bound a mistake. */
-const MAX_TOOL_ROUNDS = 5;
 
 export class AnthropicProvider implements AIProvider {
   readonly id = "anthropic";
@@ -46,132 +34,6 @@ export class AnthropicProvider implements AIProvider {
     this.model = model;
     this.isConfigured = Boolean(apiKey);
     this.client = apiKey ? new Anthropic({ apiKey }) : null;
-  }
-
-  /**
-   * TOOL CALLING ON ANTHROPIC — absent until now, and absent SILENTLY.
-   *
-   * `runWithTools` is optional on the provider interface, and only the OpenAI-compatible
-   * provider implemented it. The chat route filters for providers that have it and falls
-   * through to "plain resilient stream (no tools)" when none do — so choosing Claude as
-   * the provider turned Fadi from something that acts into something that answers, with no
-   * error and no warning. That is a bug, not a limitation.
-   *
-   * Same bounded loop as the other provider: tools stay on the table each round, it stops
-   * when the model stops asking, and it is told when it runs out so the answer can say so.
-   */
-  async runWithTools(
-    messages: AIMessage[],
-    tools: ToolSpec[],
-    executeTool: ToolExecutor,
-    options?: ChatOptions,
-    callbacks?: ToolRunCallbacks,
-  ): Promise<ToolRunResult> {
-    if (!this.client) throw new Error("Fadi is not configured. Add a Claude API key in Settings.");
-    const client = this.client;
-
-    const { system, turns } = toAnthropic(messages);
-    // Anthropic takes a flat {name, description, input_schema}; the registry speaks the
-    // OpenAI function shape. Converted here rather than at the call site, so the registry
-    // stays one vocabulary.
-    const anthropicTools = tools.map((t) => ({
-      name: t.function.name,
-      description: t.function.description,
-      input_schema: t.function.parameters as Anthropic.Tool.InputSchema,
-    }));
-
-    const convo: Anthropic.MessageParam[] = turns.map((t) => ({
-      role: t.role,
-      content: t.content as unknown as Anthropic.MessageParam["content"],
-    }));
-    const toolResults: ToolRunResult["toolResults"] = [];
-    let rounds = 0;
-
-    while (rounds < MAX_TOOL_ROUNDS) {
-      rounds += 1;
-
-      const step = await client.messages.create({
-        model: this.model,
-        max_tokens: 4096,
-        system: system || undefined,
-        messages: convo,
-        tools: anthropicTools,
-      });
-
-      const calls = step.content.filter(
-        (block): block is Anthropic.ToolUseBlock => block.type === "tool_use",
-      );
-
-      if (calls.length === 0) {
-        const text = step.content
-          .filter((block): block is Anthropic.TextBlock => block.type === "text")
-          .map((block) => block.text)
-          .join("");
-        callbacks?.onToken?.(text);
-        return { text, toolResults };
-      }
-
-      convo.push({ role: "assistant", content: step.content });
-
-      // Every tool_result for one assistant turn goes back in ONE user message. Splitting
-      // them across messages is accepted and quietly teaches the model to stop calling
-      // tools in parallel.
-      const results: Anthropic.ToolResultBlockParam[] = [];
-      const executedThisRound = new Set<string>();
-
-      for (const call of calls) {
-        const args = (call.input ?? {}) as Record<string, unknown>;
-        const key = `${call.name}:${JSON.stringify(args)}`;
-        if (executedThisRound.has(key)) {
-          results.push({
-            type: "tool_result",
-            tool_use_id: call.id,
-            content: "(already provided above)",
-          });
-          continue;
-        }
-        executedThisRound.add(key);
-
-        try {
-          const result = await executeTool(call.name, args);
-          toolResults.push({ name: call.name, view: result.view ?? "none", data: result.data });
-          results.push({ type: "tool_result", tool_use_id: call.id, content: result.summary });
-        } catch (error) {
-          // A failed tool comes back AS a result with is_error, not as a dropped block.
-          // Omitting it leaves a tool_use with no answer, which the API rejects.
-          results.push({
-            type: "tool_result",
-            tool_use_id: call.id,
-            content: error instanceof Error ? error.message : "That tool failed.",
-            is_error: true,
-          });
-        }
-      }
-
-      convo.push({ role: "user", content: results });
-      callbacks?.onToolResults?.(toolResults);
-    }
-
-    // Out of rounds. Told to the model rather than hidden, so its answer can admit
-    // something is unfinished instead of sounding complete.
-    convo.push({
-      role: "user",
-      content:
-        "You have used all the tool calls available for this turn. Answer now with what you have, and say plainly if something is still unfinished.",
-    });
-
-    const final = await client.messages.create({
-      model: this.model,
-      max_tokens: 4096,
-      system: system || undefined,
-      messages: convo,
-    });
-    const text = final.content
-      .filter((block): block is Anthropic.TextBlock => block.type === "text")
-      .map((block) => block.text)
-      .join("");
-    callbacks?.onToken?.(text);
-    return { text, toolResults };
   }
 
   async chat(messages: AIMessage[], options?: ChatOptions): Promise<string> {

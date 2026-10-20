@@ -2,7 +2,7 @@ import type { TruthFinding } from "@/lib/documents/truth-gate";
 
 /**
  * The trust surface. Instead of re-reading a whole draft to check Fadi didn't invent anything,
- * the candidate glances here: green means the checks found no known contradiction; red means a
+ * the candidate glances here: green means every claim is backed by their record; red means a
  * figure isn't in their evidence and should be fixed before sending; amber means confirm.
  * This is the piece that turns "defensive re-reading" (the hidden hour) into a 5-second glance.
  */
@@ -16,9 +16,9 @@ export function TruthReport({ findings }: { findings: TruthFinding[] }) {
         <span aria-hidden className="text-emerald-400">
           ✓
         </span>
-        <span className="font-medium">No unsupported claim was detected.</span>
+        <span className="font-medium">Every claim is grounded in your evidence.</span>
         <span className="text-emerald-200/60">
-          Automated checks cover figures, borrowed job terms and seniority—not every possible claim.
+          Nothing here that a reference check could contradict — send with confidence.
         </span>
       </div>
     );

@@ -1,7 +1,6 @@
 "use client";
 
 import { Check, ChevronDown, Compass, Loader2, Plus, Target, Trash2 } from "lucide-react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
@@ -203,16 +202,6 @@ export function TrackSwitcher() {
               <Plus className="size-3.5" aria-hidden="true" />
               New direction…
             </button>
-            {/* The one question Niche Finder answers is asked HERE — while choosing a path —
-                rather than from a permanent icon in the dock. */}
-            <Link
-              href="/dashboard/niche-finder"
-              onClick={() => setOpen(false)}
-              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              <Compass className="size-3.5" aria-hidden="true" />
-              Not sure which path? Compare a few
-            </Link>
           </div>
         </PopoverContent>
       </Popover>

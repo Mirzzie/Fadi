@@ -1,4 +1,4 @@
-import type { ConsequentialResult, FadiTool, FadiToolResult } from "./types";
+import type { FadiTool, FadiToolResult } from "./types";
 
 /**
  * create_career_track — the proof that you can DRIVE Fadi by speaking. When the
@@ -66,37 +66,17 @@ export function validateTrackArgs(args: Record<string, unknown>): ValidateTrackR
 
 export const createTrackTool: FadiTool = {
   name: "create_career_track",
-  risk: "write",
-  effect: "Create a career direction",
   description:
     "Create and switch to a NEW career direction/track when the user wants to pursue a different role or path (e.g. 'start a new direction as a data analyst', 'I want to switch into product management'). Gather a short name, the target role, and their goal first.",
   parameters: {
     type: "object",
     properties: {
-      label: {
-        type: "string",
-        description: "Short user-facing name, e.g. 'Break into Data Analytics'.",
-      },
-      targetRole: {
-        type: "string",
-        description: "The role they're targeting, e.g. 'Data Analyst'.",
-      },
-      careerGoal: {
-        type: "string",
-        description: "What they want from this direction (their goal/timeline).",
-      },
-      domain: {
-        type: "string",
-        description: "Industry/field, e.g. 'Finance', 'Healthcare', 'Information Technology'.",
-      },
-      location: {
-        type: "string",
-        description: "Preferred location, e.g. 'Dublin, Ireland' or 'Remote'.",
-      },
-      experienceLevel: {
-        type: "string",
-        description: "student | entry | junior | mid | senior | lead, if known.",
-      },
+      label: { type: "string", description: "Short user-facing name, e.g. 'Break into Data Analytics'." },
+      targetRole: { type: "string", description: "The role they're targeting, e.g. 'Data Analyst'." },
+      careerGoal: { type: "string", description: "What they want from this direction (their goal/timeline)." },
+      domain: { type: "string", description: "Industry/field, e.g. 'Finance', 'Healthcare', 'Information Technology'." },
+      location: { type: "string", description: "Preferred location, e.g. 'Dublin, Ireland' or 'Remote'." },
+      experienceLevel: { type: "string", description: "student | entry | junior | mid | senior | lead, if known." },
       intent: {
         type: "string",
         enum: [...INTENTS],
@@ -105,11 +85,10 @@ export const createTrackTool: FadiTool = {
     },
     required: ["label", "targetRole", "careerGoal"],
   },
-  async execute(args, ctx): Promise<ConsequentialResult> {
+  async execute(args, ctx): Promise<FadiToolResult> {
     const v = validateTrackArgs(args);
     if (!v.ok) {
       return {
-        outcome: "needs_input",
         summary: `Before I start that direction I need ${v.missing.join(", ")}. Tell me and I'll set it up.`,
         view: "none",
       };
@@ -132,7 +111,6 @@ export const createTrackTool: FadiTool = {
     });
 
     return {
-      outcome: "performed",
       summary: `Done — I created your new direction "${v.input.label}" (${v.input.targetRole}) and switched you to it. Your jobs, documents, and plan now follow this track.`,
       view: "track_created",
       data: { trackId: track.id, label: v.input.label, targetRole: v.input.targetRole },

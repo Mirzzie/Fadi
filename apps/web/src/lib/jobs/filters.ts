@@ -1,7 +1,5 @@
 import { getCountry } from "@/lib/jobs/locations";
 
-import { matchesAnyKeyword } from "./keyword-match";
-
 /**
  * Job filtering — strict location + employment type + work mode + visa. Live
  * sources give sparse/inconsistent metadata, so we INFER from the available
@@ -19,14 +17,6 @@ export type JobFilters = {
   city?: string;
   /** User explicitly chose "Any country" — broaden the live fetch worldwide. */
   worldwide?: boolean;
-  /**
-   * What the person actually typed, as role/skill words.
-   *
-   * The search box parsed these and then dropped them: only location and "remote" survived, so
-   * "graduate IT support in Dublin" searched the active direction instead (reproduced 20 Sep).
-   * A job must match at least one to pass — narrowing the direction's board, never widening it.
-   */
-  keywords?: string[];
   modes?: WorkMode[];
   types?: EmploymentType[];
   visa?: VisaFilter;
@@ -107,30 +97,18 @@ export function passesFilters(j: FilterableJob, f: JobFilters): boolean {
   // Work-mode filter first.
   if (f.modes && f.modes.length > 0 && !f.modes.includes(mode)) return false;
 
-  // Location, mode-aware — but a remote role still has to be one this person could
-  // actually take. Any job whose text said "remote" used to skip the location filter
-  // completely, so a Dublin search led with US-only remote roles and a Berlin advert
-  // (reproduced 20 Sep: "IT Systems Administrator @ Epic — Remote" top of a Dublin board,
-  // an entry-level seeker in Ireland). Remote now bypasses the city, not the country:
-  // the posting must name the searched country, or a region that plainly contains it, or
-  // say it is worldwide. A bare "Remote" with no geography is UNKNOWN, not eligible —
-  // it shows when remote is explicitly chosen, and is labelled by the caller.
-  const remoteAsked = Boolean(f.modes && f.modes.includes("remote"));
-  const remoteAccepted = mode === "remote" && (remoteAsked || remoteEligibleWhereSearched(j, f));
+  // Location, mode-aware: a REMOTE role you'd accept isn't tied to the searched
+  // city — you can do it from there — so it bypasses the strict city match. Onsite
+  // /hybrid roles (and remote roles when you did NOT ask for remote) still must sit
+  // in the location. Fixes "Remote selected + Dublin typed → 0 jobs".
+  const remoteAccepted =
+    mode === "remote" && (!f.modes || f.modes.length === 0 || f.modes.includes("remote"));
   if (!remoteAccepted && !jobMatchesLocation(j, f.country, f.city)) return false;
-
-  if (f.keywords && f.keywords.length > 0) {
-    if (!matchesAnyKeyword({ title: j.title, description: j.description }, f.keywords)) return false;
-  }
 
   if (f.types && f.types.length > 0) {
     const type = jobEmploymentType(j);
-    // A posting that does not STATE its type is not a mismatch — it is silent. Measured on the
-    // owner's board 20 Sep: 1,063 of 1,249 live postings state nothing, so a saved "full-time"
-    // preference emptied the board completely (20 Dublin roles → 0) while the page blamed the
-    // location. Only a posting that states a DIFFERENT type is excluded; the unstated ones are
-    // shown and counted, so the person can see what the filter could not confirm.
-    if (type !== "unknown" && !f.types.includes(type)) return false;
+    // Unknown employment type can't satisfy a strict type filter.
+    if (type === "unknown" || !f.types.includes(type)) return false;
   }
 
   if (f.visa && f.visa !== "any") {
@@ -140,38 +118,4 @@ export function passesFilters(j: FilterableJob, f: JobFilters): boolean {
   }
 
   return true;
-}
-
-/** Regions a remote posting can name that plainly include the searched country. */
-const REGION_OF: Record<string, RegExp> = {
-  ie: /\b(ireland|eu|e\.u\.|european union|eea|emea|europe)\b/,
-  gb: /\b(uk|united kingdom|britain|emea|europe)\b/,
-  de: /\b(germany|deutschland|dach|eu|european union|eea|emea|europe)\b/,
-  fr: /\b(france|eu|european union|eea|emea|europe)\b/,
-  es: /\b(spain|españa|eu|european union|eea|emea|europe)\b/,
-  nl: /\b(netherlands|benelux|eu|european union|eea|emea|europe)\b/,
-  us: /\b(usa|u\.s\.|united states|north america|americas|nam)\b/,
-  ca: /\b(canada|north america|americas)\b/,
-  in: /\b(india|apac|asia)\b/,
-  au: /\b(australia|anz|apac|oceania)\b/,
-};
-
-const WORLDWIDE_RE = /\b(worldwide|anywhere|global|any country|fully remote, anywhere)\b/;
-
-/**
- * Can this remote posting be worked from the place the person searched?
- *
- * Reads only what the posting states. "Remote — Ireland", "Remote (EMEA)" and "Worldwide" are
- * eligible for an Irish search; "Remote — US" and a bare "Remote" are not, because neither says
- * a person in Ireland may hold it. Never guesses in the candidate's favour.
- */
-export function remoteEligibleWhereSearched(j: FilterableJob, f: JobFilters): boolean {
-  if (!f.country && !f.city) return true;
-  const text = `${j.location ?? ""} ${j.remoteMode ?? ""}`.toLowerCase();
-  if (WORLDWIDE_RE.test(text)) return true;
-  const countryName = getCountry(f.country)?.name?.toLowerCase();
-  if (countryName && text.includes(countryName)) return true;
-  if (f.city && text.includes(f.city.toLowerCase())) return true;
-  const region = f.country ? REGION_OF[f.country.toLowerCase()] : undefined;
-  return region ? region.test(text) : false;
 }

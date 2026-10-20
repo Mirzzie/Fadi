@@ -1,10 +1,10 @@
 "use server";
 
-import { createCareerReportsRepository, createEvidenceRepository } from "@careeros/database";
+import { createCareerReportsRepository } from "@careeros/database";
 import { revalidatePath } from "next/cache";
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
-import { approvedCareerEvidence } from "@/lib/career/context";
+import { composeCareerEvidence } from "@/lib/career/evidence";
 import { getCareerReportContext } from "@/lib/career-report/data";
 import { careerIntelligenceReportSchema } from "@/lib/career-report/schema";
 import { getDatabase } from "@/lib/database/client";
@@ -72,7 +72,8 @@ function redactSensitiveErrorText(value: unknown) {
 }
 
 function getProviderErrorDetails(error: unknown): ProviderErrorDetails {
-  const errorRecord = error && typeof error === "object" ? (error as Record<string, unknown>) : {};
+  const errorRecord =
+    error && typeof error === "object" ? (error as Record<string, unknown>) : {};
 
   return {
     name: error instanceof Error ? error.name : "UnknownError",
@@ -102,6 +103,7 @@ function getUserFacingProviderErrorMessage(details: ProviderErrorDetails) {
 
   return "Fadi could not generate the report right now. Please try again later.";
 }
+
 
 export async function generateCareerReportAction(
   input: GenerateCareerReportInput
@@ -181,8 +183,7 @@ export async function generateCareerReportAction(
 
   // Career history can come from LinkedIn (preferred — the full record) OR a
   // resume; require at least one, not the resume specifically.
-  const evidence = await approvedCareerEvidence(user.id, { directionId: context.careerProfileId });
-  const hasHistory = evidence.historySource !== "none";
+  const hasHistory = Boolean(context.resumeText || context.linkedInProfileText);
   if (!hasHistory || !context.careerGoals || !context.targetRole) {
     logger.warn("career_report.generate.context_incomplete", {
       userId: user.id,
@@ -190,8 +191,7 @@ export async function generateCareerReportAction(
 
     return {
       ok: false,
-      message:
-        "Your onboarding data is incomplete. Review your records in Evidence, and add your target role and goals first.",
+      message: "Your onboarding data is incomplete. Add your career history (LinkedIn or resume), target role, and goals first.",
     };
   }
 
@@ -200,7 +200,7 @@ export async function generateCareerReportAction(
   // Per-track cooldown: switching direction lets you generate a fresh report for it.
   const latestReport = await careerReportsRepository.getLatestReadyForUser(
     user.id,
-    context.careerProfileId
+    context.careerProfileId,
   );
   const cooldownEndsAt = getReportCooldown(
     latestReport?.generatedAt ?? latestReport?.createdAt ?? null
@@ -231,7 +231,7 @@ User profile:
 - Career goals: ${truncate(context.careerGoals, 1600)}
 ${labor.summary ? `\nCurrent labor market (real BLS data — use for honest context, not alarm):\n${labor.summary}` : ""}
 
-${evidence.block}
+${composeCareerEvidence({ resumeText: context.resumeText, linkedInText: context.linkedInProfileText }).block}
 `;
 
   try {
@@ -246,7 +246,7 @@ ${evidence.block}
         {
           role: "system",
           content:
-            'You are Fadi, an honest, evidence-based career mentor. GROUNDING IS NON-NEGOTIABLE: every strength, gap, and step must name a SPECIFIC skill, tool, certification, project, or experience from the user\'s actual evidence — or a concrete, named requirement of their target role. BAN generic platitudes: never output bare soft-skill labels like "communication", "leadership", "teamwork", "problem-solving", "adaptability", or "time management" unless anchored to a specific example from their history. A vague item that could describe anyone is worse than no item — prefer FEWER, sharper points over padding to a count. Never invent credentials, employers, dates, numbers, job data, salary facts, or market claims. If the evidence is thin, say so plainly rather than filling space.',
+            "You are Fadi, an honest, evidence-based career mentor. GROUNDING IS NON-NEGOTIABLE: every strength, gap, and step must name a SPECIFIC skill, tool, certification, project, or experience from the user's actual evidence — or a concrete, named requirement of their target role. BAN generic platitudes: never output bare soft-skill labels like \"communication\", \"leadership\", \"teamwork\", \"problem-solving\", \"adaptability\", or \"time management\" unless anchored to a specific example from their history. A vague item that could describe anyone is worse than no item — prefer FEWER, sharper points over padding to a count. Never invent credentials, employers, dates, numbers, job data, salary facts, or market claims. If the evidence is thin, say so plainly rather than filling space.",
         },
         {
           role: "user",
@@ -255,22 +255,12 @@ ${evidence.block}
       ],
       careerIntelligenceReportSchema,
       "career_intelligence_report",
-      { temperature: 0.4, userId: user.id }
+      { temperature: 0.4, userId: user.id },
     );
 
     const report = completion;
 
-    // D08: record how much evidence this was written from, so later staleness can see
-    // removal. A newest-timestamp comparison cannot — deleting evidence makes the newest
-    // survivor older, and deleting all of it makes the timestamp null, which read as
-    // "nothing changed".
-    const evidenceCountAtGeneration = await createEvidenceRepository(getDatabase())
-      .listForUser(user.id)
-      .then((rows) => rows.length)
-      .catch(() => null);
-
     await careerReportsRepository.createForUser(user.id, {
-      evidenceCountAtGeneration,
       careerProfileId: context.careerProfileId,
       resumeId: context.resumeId,
       linkedinProfileId: context.linkedInProfileId,

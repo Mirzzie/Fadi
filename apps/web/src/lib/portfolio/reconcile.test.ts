@@ -129,11 +129,11 @@ describe("comparing the base résumé against the portfolio", () => {
     expect(report.portfolioOnly.map((g) => g.title)).not.toContain("MSc Cybersecurity");
   });
 
-  it("does not auto-match a punctuation-only title similarity without context", () => {
+  it("matches on the name regardless of case, spacing and punctuation", () => {
     const resume = [item({ id: "r", title: "AWS Certified Cloud Practitioner", kind: "certification" })];
     const site = [item({ id: "p", title: "aws certified — cloud practitioner", kind: "certification" })];
 
-    expect(reconcile(resume, site).matched).toHaveLength(0);
+    expect(reconcile(resume, site).matched).toHaveLength(1);
   });
 
   it("does not match the same name across different kinds", () => {

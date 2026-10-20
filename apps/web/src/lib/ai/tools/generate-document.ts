@@ -1,7 +1,7 @@
 import "server-only";
 
 import { generateCareerDocument, type DocKind } from "@/lib/documents/generate";
-import type { ConsequentialResult, FadiTool, FadiToolContext, FadiToolResult } from "./types";
+import type { FadiTool, FadiToolContext, FadiToolResult } from "./types";
 
 /**
  * Fadi drafts a tailored career document and saves it — opening in the editor.
@@ -10,8 +10,6 @@ import type { ConsequentialResult, FadiTool, FadiToolContext, FadiToolResult } f
  */
 export const generateDocument: FadiTool = {
   name: "generate_document",
-  risk: "write",
-  effect: "Draft and save a document",
   description:
     "Draft and save a tailored career document (resume/CV, cover letter, cold email, or value proposition) for a specific role/company, then open it in the editor. Use when the user asks to create, draft, write, generate, build or tailor any of these.",
   parameters: {
@@ -28,19 +26,13 @@ export const generateDocument: FadiTool = {
     required: ["kind"],
   },
 
-  async execute(args, ctx: FadiToolContext): Promise<ConsequentialResult> {
+  async execute(args, ctx: FadiToolContext): Promise<FadiToolResult> {
     if (!ctx.generate) {
-      return {
-        summary: "Document drafting isn't available this turn.",
-        view: "none",
-        outcome: "failed",
-      };
+      return { summary: "Document drafting isn't available this turn.", view: "none" };
     }
-    const kind = (
-      ["resume", "cover_letter", "email", "value_proposition"].includes(String(args.kind))
-        ? String(args.kind)
-        : "resume"
-    ) as DocKind;
+    const kind = (["resume", "cover_letter", "email", "value_proposition"].includes(String(args.kind))
+      ? String(args.kind)
+      : "resume") as DocKind;
 
     const doc = await generateCareerDocument(
       ctx.userId,
@@ -49,12 +41,11 @@ export const generateDocument: FadiTool = {
         jobTitle: typeof args.jobTitle === "string" ? args.jobTitle : undefined,
         company: typeof args.company === "string" ? args.company : undefined,
       },
-      ctx.generate
+      ctx.generate,
     );
 
     const label = kind === "resume" ? "tailored resume" : doc.title.split(" — ")[0].toLowerCase();
     return {
-      outcome: "performed",
       summary: `I've drafted a ${label} grounded in your real experience. Open it to review and edit.`,
       view: "document",
       data: doc,

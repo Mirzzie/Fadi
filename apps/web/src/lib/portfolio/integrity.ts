@@ -21,13 +21,7 @@ const schema = z.object({
         suggestion: z.string().optional().describe("A short, concrete fix."),
       }),
     )
-    .describe("Every real problem found. Empty when the portfolio is consistent.")
-    // A CLEAN PORTFOLIO IS THE COMMON CASE, and a model asked for "every problem found" answers
-    // a clean one with {} as readily as with {"findings": []}. Requiring the key turned that
-    // into a validation error whose raw text — [{"expected":"array","code":"invalid_type"…}] —
-    // was printed in the CMS under "Fadi found no contradictions". Absent means none.
-    .optional()
-    .default([]),
+    .describe("Every real problem found. Empty when the portfolio is consistent."),
 });
 
 const SYSTEM = [
@@ -64,35 +58,13 @@ export async function checkPortfolioIntegrityAI(
     bullets: it.bullets,
   }));
 
-  /**
-   * ONE RETRY, ON LESS.
-   *
-   * The owner hit "answered in a shape Fadi couldn't read" on a 29-item portfolio while the same
-   * check passed on a smaller one. Reasoning models spend completion tokens before they answer,
-   * so a long payload can truncate the JSON mid-object — which is a size problem wearing a
-   * schema problem's clothes. If the first pass cannot be read, ask again over fewer entries
-   * rather than reporting a failure to someone who cannot act on it.
-   */
-  const ask = (limit: number) =>
-    gen.structured(
+  try {
+    const raw = await gen.structured(
       SYSTEM,
-      `Portfolio entries (JSON):\n${JSON.stringify(payload.slice(0, limit)).slice(0, 14_000)}`,
+      `Portfolio entries (JSON):\n${JSON.stringify(payload).slice(0, 14_000)}`,
       schema,
       "portfolio_integrity",
     );
-
-  try {
-    let raw: Awaited<ReturnType<typeof ask>>;
-    try {
-      raw = await ask(payload.length);
-    } catch (first) {
-      logger.info("portfolio.integrity_ai_retry", {
-        userId,
-        items: payload.length,
-        error: first instanceof Error ? first.message.slice(0, 120) : "unknown",
-      });
-      raw = await ask(Math.max(8, Math.ceil(payload.length / 2)));
-    }
     const ids = new Set(items.map((i) => i.id));
     const findings: IntegrityFinding[] = (raw.findings ?? [])
       .filter((f) => f.title?.trim() && f.detail?.trim())
@@ -109,27 +81,7 @@ export async function checkPortfolioIntegrityAI(
       userId,
       error: error instanceof Error ? error.name : "unknown",
     });
-    // A rate-limit or provider error should degrade, not break the CMS — and whatever it says,
-    // the owner reads a sentence, not a validation dump.
-    return { findings: [], aiError: readableAiError(error) };
+    // A rate-limit or provider error should degrade, not break the CMS.
+    return { findings: [], aiError: error instanceof Error ? error.message : "AI check failed" };
   }
-}
-
-/**
- * What to show the owner when the check could not run.
- *
- * Never the raw error: a Zod failure stringifies to its own issue list, and that JSON was
- * rendered in the CMS as if it were a finding. Provider messages about rate limits and keys are
- * worth passing on; anything machine-shaped is replaced with plain English.
- */
-export function readableAiError(error: unknown): string {
-  const message = error instanceof Error ? error.message.trim() : "";
-  if (!message) return "Fadi's AI check couldn't run just now. Nothing was changed.";
-  if (message.startsWith("[") || message.startsWith("{")) {
-    return "Fadi's AI answered in a shape Fadi couldn't read, so nothing was checked. Try again.";
-  }
-  if (/rate.?limit|quota|429/i.test(message)) {
-    return "Your AI provider is rate-limiting right now. Try the check again in a minute.";
-  }
-  return message.length > 200 ? `${message.slice(0, 200)}…` : message;
 }

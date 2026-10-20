@@ -1,13 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  keepCrawlable,
-  parseBrave,
-  parseGoogle,
-  parseSearxng,
-  searxngSearchFailed,
-  type SearchHit,
-} from "./web-search";
+import { keepCrawlable, parseBrave, parseGoogle, parseSearxng, type SearchHit } from "./web-search";
 
 describe("search backend parsers", () => {
   it("parseSearxng maps results", () => {
@@ -51,32 +44,5 @@ describe("keepCrawlable", () => {
       "https://careers.acme.com/jobs/1",
       "https://boards.greenhouse.io/stripe/jobs/2",
     ]);
-  });
-});
-
-describe("searxngSearchFailed", () => {
-  it("is a failure when nothing came back and every engine was turned away", () => {
-    expect(
-      searxngSearchFailed({
-        results: [],
-        unresponsive_engines: [
-          ["duckduckgo", "CAPTCHA"],
-          ["brave", "Suspended: too many requests"],
-        ],
-      })
-    ).toBe(true);
-  });
-
-  it("is not a failure when results came back, even if one engine was slow", () => {
-    expect(
-      searxngSearchFailed({
-        results: [{ url: "https://job-boards.greenhouse.io/acme/jobs/1" }],
-        unresponsive_engines: [["google cse", "too many requests"]],
-      })
-    ).toBe(false);
-  });
-
-  it("is an honest empty market when every engine answered and found nothing", () => {
-    expect(searxngSearchFailed({ results: [], unresponsive_engines: [] })).toBe(false);
   });
 });

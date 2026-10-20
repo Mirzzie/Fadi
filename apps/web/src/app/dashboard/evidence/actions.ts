@@ -2,7 +2,6 @@
 
 import {
   createCareerProfilesRepository,
-  createEvidenceArtifactsRepository,
   createEvidenceRepository,
   createResumesRepository,
 } from "@careeros/database";
@@ -10,8 +9,6 @@ import { revalidatePath } from "next/cache";
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
-import { preserveThenReplace } from "@/lib/career/sources";
-import { logger } from "@/lib/observability/logger";
 import { publish } from "@/lib/events/bus";
 import { extractEvidencePool, normKind, toEvidenceView, type EvidenceView } from "@/lib/evidence/pool";
 
@@ -40,32 +37,13 @@ export async function saveResumeTextAction(
 
   const db = getDatabase();
   const activeTrack = await createCareerProfilesRepository(db).getActiveForUser(user.id);
-  // KEEP WHAT ARRIVED. The résumé row is overwritten per direction, so the previous text used to
-  // vanish — and with it any chance of telling a later import's new work from its rewording.
-  // Identical text reuses its version, so re-saving does not manufacture history.
-  try {
-    await preserveThenReplace(
-      user.id,
-      { sourceKind: "resume", sourceKey: activeTrack?.id ?? "no-direction", content: resumeText },
-      (tx) =>
-        createResumesRepository(tx).upsertLatestForTrack(user.id, activeTrack?.id ?? null, resumeText)
-    );
-  } catch (error) {
-    logger.error("evidence.resume_save_failed", {
-      userId: user.id,
-      error: error instanceof Error ? error.message : "unknown",
-    });
-    return {
-      ok: false,
-      message: "Couldn't save that — your previous CV text is untouched. Try again.",
-    };
-  }
+  await createResumesRepository(db).upsertLatestForTrack(user.id, activeTrack?.id ?? null, resumeText);
   revalidatePath(PATH);
   return { ok: true };
 }
 
 export async function buildEvidencePool(): Promise<
-  { ok: true; items: EvidenceView[]; pendingReview: number } | { ok: false; message: string }
+  { ok: true; items: EvidenceView[] } | { ok: false; message: string }
 > {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
@@ -73,7 +51,7 @@ export async function buildEvidencePool(): Promise<
   if (!res.ok) return { ok: false, message: res.message };
   await publish("evidence.changed", { userId: user.id, reason: "extracted" });
   revalidatePath(PATH);
-  return { ok: true, items: res.items, pendingReview: res.pendingReview };
+  return { ok: true, items: res.items };
 }
 
 export async function saveEvidence(input: {
@@ -85,7 +63,6 @@ export async function saveEvidence(input: {
   detail?: string;
   metrics?: string;
   tags: string[];
-  artifactUrls?: string[];
 }): Promise<{ ok: true; item: EvidenceView } | { ok: false; message: string }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
@@ -109,28 +86,6 @@ export async function saveEvidence(input: {
     ? await repo.update(user.id, input.id, fields)
     : (await admitEvidence(user.id, { ...fields, origin: "manual" })).row;
   if (!row) return { ok: false, message: "I can't find that item." };
-
-  const artifactUrls = [...new Set((input.artifactUrls ?? [])
-    .map((url) => url.trim())
-    .filter((url) => /^https?:\/\//i.test(url))
-  )].slice(0, 20);
-  if (artifactUrls.length > 0 && row.isCanonical && row.reviewStatus === "accepted") {
-    await createEvidenceArtifactsRepository(getDatabase()).addForFact(
-      user.id,
-      row.factId ?? row.id,
-      artifactUrls.map((url, index) => ({
-        kind: /(\.mp4|\.webm|\.mov)(\?|$)|\/video\/upload\//i.test(url)
-          ? "video"
-          : /(\.png|\.jpe?g|\.gif|\.webp|\.svg)(\?|$)|\/image\/upload\//i.test(url)
-            ? "image"
-            : "link",
-        url,
-        label: "Media",
-        sortOrder: index,
-        sourcePortfolioItemId: null,
-      }))
-    );
-  }
   await publish("evidence.changed", {
     userId: user.id,
     reason: input.id ? "updated" : "created",
@@ -138,18 +93,6 @@ export async function saveEvidence(input: {
   });
   revalidatePath(PATH);
   return { ok: true, item: toEvidenceView(row) };
-}
-
-export async function removeEvidenceArtifact(input: {
-  id: string;
-}): Promise<{ ok: true } | { ok: false; message: string }> {
-  const user = await getCurrentAuthUser();
-  if (!user) return { ok: false, message: "Please sign in again." };
-  const removed = await createEvidenceArtifactsRepository(getDatabase()).remove(user.id, input.id);
-  if (!removed) return { ok: false, message: "That media item is unavailable." };
-  await publish("evidence.changed", { userId: user.id, reason: "updated" });
-  revalidatePath(PATH);
-  return { ok: true };
 }
 
 export async function deleteEvidence(input: { id: string }): Promise<{ ok: boolean }> {
@@ -172,12 +115,6 @@ export type SameThingPair = {
   mergeTitle: string;
   confident: boolean;
   reasons: string[];
-  keepContext?: string;
-  mergeContext?: string;
-  keepDetail?: string;
-  mergeDetail?: string;
-  pendingReview?: boolean;
-  canMerge?: boolean;
 };
 
 /**
@@ -192,8 +129,7 @@ export async function findSameEvidence(): Promise<{ ok: boolean; pairs: SameThin
   if (!user) return { ok: false, pairs: [] };
 
   const repo = createEvidenceRepository(getDatabase());
-  const all = await repo.listAllForUser(user.id);
-  const items = all.filter(i => i.isCanonical && i.reviewStatus === "accepted");
+  const items = await repo.listForUser(user.id);
   const { findSameThings } = await import("@/lib/identity/resolve");
 
   const byId = new Map(items.map((i) => [i.id, i]));
@@ -202,11 +138,9 @@ export async function findSameEvidence(): Promise<{ ok: boolean; pairs: SameThin
     kind: i.kind,
     title: i.title,
     organization: i.organization,
-    attribution: i.attribution,
-    metrics: i.metrics,
     period: i.period,
     detail: i.detail,
-    tags: i.tags ?? [],
+    tags: [...(i.tags ?? []), ...(i.marketTags ?? [])],
   }));
 
   // MEANING, for the case the anchors cannot see: two records that share no proper
@@ -234,12 +168,7 @@ export async function findSameEvidence(): Promise<{ ok: boolean; pairs: SameThin
     // No embeddings provider — the deterministic signals still stand on their own.
   }
 
-  const matches = findSameThings(inputs, similarity).filter(m => {
-    const a = byId.get(m.a)!;
-    const b = byId.get(m.b)!;
-    return !(a.distinctFrom ?? []).includes(b.factId ?? b.id) &&
-      !(b.distinctFrom ?? []).includes(a.factId ?? a.id);
-  });
+  const matches = findSameThings(inputs, similarity);
 
   const pairs = matches.map((m) => {
     const a = byId.get(m.a);
@@ -256,26 +185,10 @@ export async function findSameEvidence(): Promise<{ ok: boolean; pairs: SameThin
       mergeTitle: merge!.title,
       confident: m.verdict === "same",
       reasons: m.reasons,
-      keepContext: [keep!.kind, keep!.organization, keep!.period].filter(Boolean).join(" · "),
-      mergeContext: [merge!.kind, merge!.organization, merge!.period].filter(Boolean).join(" · "),
-      keepDetail: keep!.detail,
-      mergeDetail: merge!.detail,
     };
   });
 
-  const reviews: SameThingPair[] = all.filter(i => i.reviewStatus === "pending").map(candidate => {
-    const previous = all.find(i => i.id === candidate.reviewTargetId);
-    const target = items.find(i => (i.factId ?? i.id) === (previous?.factId ?? previous?.id));
-    return {
-      keepId: target?.id ?? candidate.id, keepTitle: target?.title ?? "Previous record unavailable",
-      mergeId: candidate.id, mergeTitle: candidate.title, confident: false,
-      reasons: candidate.reviewReasons ?? [], pendingReview: true, canMerge: Boolean(target),
-      keepContext: target ? [target.kind, target.organization, target.period].filter(Boolean).join(" · ") : "",
-      mergeContext: [candidate.kind, candidate.organization, candidate.period].filter(Boolean).join(" · "),
-      keepDetail: target?.detail ?? "", mergeDetail: candidate.detail,
-    };
-  });
-  return { ok: true, pairs: [...reviews, ...pairs] };
+  return { ok: true, pairs };
 }
 
 /**
@@ -288,51 +201,12 @@ export async function findSameEvidence(): Promise<{ ok: boolean; pairs: SameThin
 export async function mergeEvidence(input: {
   keepId: string;
   mergeId: string;
-}): Promise<{ ok: boolean; message?: string }> {
+}): Promise<{ ok: boolean }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false };
-  try {
-    const selections = await createEvidenceRepository(getDatabase()).mergeInto(
-      user.id,
-      input.keepId,
-      input.mergeId
-    );
-    await publish("evidence.changed", { userId: user.id, reason: "updated", evidenceItemId: input.keepId });
-    revalidatePath("/dashboard/evidence");
-    // SAY IT IF A DECISION WAS UNDONE. The two records had different Include/Exclude choices, so
-    // neither is a decision about the one record that now exists — it is back to Auto, and the
-    // person needs to know rather than discovering it in a document later.
-    return {
-      ok: true,
-      message:
-        selections.cleared.length > 0
-          ? "Joined. They had different include/exclude choices, so that record is back to Auto — choose again when you need to."
-          : undefined,
-    };
-  } catch {
-    return { ok: false };
-  }
-}
-
-/** Persist an explicit distinct-work decision, accepting a pending candidate separately. */
-export async function keepEvidenceSeparate(input: { id: string; otherId: string }): Promise<{ ok: boolean }> {
-  const user = await getCurrentAuthUser();
-  if (!user) return { ok: false };
-  try {
-    await createEvidenceRepository(getDatabase()).keepSeparate(user.id, input.id, input.otherId);
-    await publish("evidence.changed", { userId: user.id, reason: "updated", evidenceItemId: input.id });
-    revalidatePath(PATH);
-    return { ok: true };
-  } catch { return { ok: false }; }
-}
-
-/** A pending import is removable without exposing accepted records to a stale action. */
-export async function discardPendingEvidence(input: { id: string }): Promise<{ ok: boolean }> {
-  const user = await getCurrentAuthUser();
-  if (!user) return { ok: false };
-  const ok = await createEvidenceRepository(getDatabase()).discardPending(user.id, input.id);
-  revalidatePath(PATH);
-  return { ok };
+  await createEvidenceRepository(getDatabase()).mergeInto(user.id, input.keepId, input.mergeId);
+  revalidatePath("/dashboard/evidence");
+  return { ok: true };
 }
 
 /** Undo: the record becomes its own fact again. */
@@ -420,15 +294,16 @@ export async function promoteRendering(input: { id: string }): Promise<{ ok: boo
 
   const repo = createEvidenceRepository(getDatabase());
   const item = await repo.getForUser(user.id, input.id);
-  if (!item || item.reviewStatus !== "accepted") return { ok: false };
-  const leader = await repo.getCanonicalForFact(user.id, item.factId ?? item.id);
-  if (!leader) return { ok: false };
-  // A wording switch cannot silently switch employer, dates or claimed results.
-  const norm = (v: string | null) => (v ?? "").trim().toLowerCase();
-  if (["organization", "period", "metrics", "attribution"].some(key =>
-    norm(item[key as "organization"]) !== norm(leader[key as "organization"])
-  )) return { ok: false };
-  await repo.mergeInto(user.id, item.id, leader.id);
+  if (!item) return { ok: false };
+
+  const fact = item.factId ?? item.id;
+  const all = await repo.listAllForUser(user.id);
+  for (const row of all.filter((r) => (r.factId ?? r.id) === fact)) {
+    const shouldBeCanonical = row.id === input.id;
+    if (row.isCanonical !== shouldBeCanonical) {
+      await repo.update(user.id, row.id, { isCanonical: shouldBeCanonical, factId: fact });
+    }
+  }
   revalidatePath("/dashboard/evidence");
   return { ok: true };
 }

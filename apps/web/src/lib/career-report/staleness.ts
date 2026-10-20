@@ -38,34 +38,9 @@ export function reportStaleness(input: {
   latestEvidenceAt?: Date | string | null;
   latestResumeAt?: Date | string | null;
   latestLinkedInAt?: Date | string | null;
-  /** Evidence items now. */
-  evidenceCount?: number | null;
-  /** Evidence items when the report was written, if recorded. */
-  evidenceCountAtGeneration?: number | null;
 }): ReportStaleness {
   const report = ms(input.reportGeneratedAt);
   if (report == null) return FRESH;
-
-  // D08: REMOVAL IS A CHANGE, AND A TIMESTAMP CANNOT SAY SO.
-  //
-  // Staleness asked "did anything change after the report?" by comparing the newest
-  // evidence timestamp. Deleting evidence makes the newest survivor OLDER, and deleting
-  // all of it makes the timestamp null — which read as "nothing changed". The report
-  // then described a pool that no longer existed and called itself current.
-  //
-  // Counting catches what a maximum cannot. Only compared when the count at generation
-  // was recorded, so reports written before this existed do not suddenly all read stale.
-  const now = input.evidenceCount;
-  const then = input.evidenceCountAtGeneration;
-  if (now != null && then != null && now !== then) {
-    return {
-      stale: true,
-      reason:
-        now < then
-          ? `This was written from ${then} pieces of evidence and ${now === 0 ? "none remain" : `only ${now} remain`}. Regenerate it before relying on what it says.`
-          : `You've added evidence since this was written (${then} → ${now}). Regenerate it to take the new material into account.`,
-    };
-  }
 
   const changedAfter = (source: Date | string | null | undefined): boolean => {
     const t = ms(source);

@@ -25,9 +25,9 @@ const TEMPLATES: Record<ResumeTemplate, TemplateStyle> = {
   },
   modern: {
     root: "space-y-4",
-    header: "border-l-4 border-indigo-600 pl-3",
+    header: "border-l-4 border-teal-600 pl-3",
     name: "text-2xl font-bold tracking-tight text-zinc-900",
-    sectionHeader: "mb-1.5 text-[12px] font-bold uppercase tracking-wider text-indigo-700",
+    sectionHeader: "mb-1.5 text-[12px] font-bold uppercase tracking-wider text-teal-700",
   },
   compact: {
     root: "space-y-2.5 text-[12px]",
@@ -127,29 +127,8 @@ export function ResumePreview({
           <Section title="Projects">
             {data.projects.map((p) => (
               <div key={p.id} className="mb-1.5">
-                <p className="font-semibold">
-                  {p.title || "Project"}
-                  {/* The link was captured in the editor and never printed — so a reviewer could
-                      not reach the thing being described. Plain text: ATS parsers read it, and it
-                      survives a copy into a form. */}
-                  {p.url ? <span className="font-normal text-zinc-600"> · {p.url}</span> : null}
-                </p>
-                {p.description ? (
-                  // Same rule as experience: one line is one bullet. A project written as three
-                  // lines used to print as one grey paragraph.
-                  p.description.includes("\n") ? (
-                    <ul className="ml-4 list-disc text-zinc-700">
-                      {p.description
-                        .split("\n")
-                        .filter(Boolean)
-                        .map((line, i) => (
-                          <li key={i}>{line}</li>
-                        ))}
-                    </ul>
-                  ) : (
-                    <p className="text-zinc-700">{p.description}</p>
-                  )
-                ) : null}
+                <p className="font-semibold">{p.title || "Project"}</p>
+                {p.description ? <p className="text-zinc-700">{p.description}</p> : null}
               </div>
             ))}
           </Section>

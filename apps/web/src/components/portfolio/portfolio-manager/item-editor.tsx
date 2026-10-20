@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { enhanceDescription } from "@/app/dashboard/portfolio/actions";
-import type { EvidenceProjectOption } from "@/app/dashboard/portfolio/actions";
 import { isVideoUrl, mediaUploadConfigured, uploadPortfolioMedia } from "@/lib/portfolio/upload";
 
 import { Modal } from "./modal";
@@ -17,13 +16,11 @@ import { ROLES, SECTION_KEYS, SECTION_META, type ItemForm } from "./shared";
 /** Add / edit a single portfolio item (cover + gallery uploads, AI-enhance, audience tags). */
 export function ItemEditor({
   initial,
-  evidenceProjects,
   pending,
   onSave,
   onClose,
 }: {
   initial: ItemForm;
-  evidenceProjects: EvidenceProjectOption[];
   pending: boolean;
   onSave: (form: ItemForm) => void;
   onClose: () => void;
@@ -53,10 +50,7 @@ export function ItemEditor({
       title: form.title,
       subtitle: form.subtitle,
       tag: form.tag,
-      bullets: form.bulletsText
-        .split("\n")
-        .map((b) => b.trim())
-        .filter(Boolean),
+      bullets: form.bulletsText.split("\n").map((b) => b.trim()).filter(Boolean),
       description: form.description,
     });
     setEnhancing(false);
@@ -64,10 +58,7 @@ export function ItemEditor({
     else set({ description: r.description });
   }
   const canUpload = mediaUploadConfigured();
-  const galleryUrls = form.galleryText
-    .split("\n")
-    .map((u) => u.trim())
-    .filter(Boolean);
+  const galleryUrls = form.galleryText.split("\n").map((u) => u.trim()).filter(Boolean);
 
   async function handleCover(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -116,37 +107,6 @@ export function ItemEditor({
       }
     >
       <div className="space-y-4">
-        {(form.section === "project" || form.section === "achievement") && (
-          <div className="space-y-1.5">
-            <Label>Evidence project</Label>
-            <select
-              value={form.evidenceItemId ?? ""}
-              onChange={(e) => set({ evidenceItemId: e.target.value || undefined })}
-              disabled={Boolean(initial.evidenceItemId)}
-              className="h-8 w-full rounded-lg border border-border bg-background px-2.5 text-sm disabled:opacity-70"
-            >
-              <option value="">Portfolio only</option>
-              {evidenceProjects
-                .filter((project) => !project.isDismissed && project.kind === form.section)
-                .map((project) => (
-                  <option
-                    key={project.id}
-                    value={project.id}
-                    disabled={Boolean(project.linkedItemId && project.linkedItemId !== initial.id)}
-                  >
-                    {project.title}
-                    {project.linkedItemId && project.linkedItemId !== initial.id
-                      ? " · already connected"
-                      : ""}
-                  </option>
-                ))}
-            </select>
-            <p className="text-xs text-muted-foreground">
-              Connect this entry to its single record in Evidence. Media and links stay with that
-              record and remain optional.
-            </p>
-          </div>
-        )}
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label>Section</Label>
@@ -186,11 +146,7 @@ export function ItemEditor({
 
         <div className="space-y-1.5">
           <Label>Source link (URL)</Label>
-          <Input
-            value={form.url}
-            onChange={(e) => set({ url: e.target.value })}
-            placeholder="https://…"
-          />
+          <Input value={form.url} onChange={(e) => set({ url: e.target.value })} placeholder="https://…" />
         </div>
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
@@ -202,27 +158,15 @@ export function ItemEditor({
               className="inline-flex items-center gap-1 text-xs text-primary hover:underline disabled:opacity-50"
               title="Rewrite in your portfolio voice — grounded only in this item's facts"
             >
-              {enhancing ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                <Sparkles className="size-3" />
-              )}
+              {enhancing ? <Loader2 className="size-3 animate-spin" /> : <Sparkles className="size-3" />}
               Enhance with Fadi
             </button>
           </div>
-          <Textarea
-            rows={3}
-            value={form.description}
-            onChange={(e) => set({ description: e.target.value })}
-          />
+          <Textarea rows={3} value={form.description} onChange={(e) => set({ description: e.target.value })} />
         </div>
         <div className="space-y-1.5">
           <Label>Bullets (one per line)</Label>
-          <Textarea
-            rows={3}
-            value={form.bulletsText}
-            onChange={(e) => set({ bulletsText: e.target.value })}
-          />
+          <Textarea rows={3} value={form.bulletsText} onChange={(e) => set({ bulletsText: e.target.value })} />
         </div>
 
         {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
@@ -236,11 +180,7 @@ export function ItemEditor({
                 </div>
               ) : (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={form.imageUrl}
-                  alt=""
-                  className="h-24 w-auto rounded border border-border"
-                />
+                <img src={form.imageUrl} alt="" className="h-24 w-auto rounded border border-border" />
               )}
               <button
                 type="button"
@@ -254,19 +194,9 @@ export function ItemEditor({
           <div className="flex flex-wrap items-center gap-2">
             {canUpload && (
               <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-sm hover:bg-muted">
-                {uploading ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <ImagePlus className="size-4" />
-                )}
+                {uploading ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
                 Upload cover
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleCover}
-                  disabled={uploading}
-                />
+                <input type="file" accept="image/*" className="hidden" onChange={handleCover} disabled={uploading} />
               </label>
             )}
             <Input
@@ -290,17 +220,11 @@ export function ItemEditor({
                     </div>
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={url}
-                      alt=""
-                      className="size-16 rounded border border-border object-cover"
-                    />
+                    <img src={url} alt="" className="size-16 rounded border border-border object-cover" />
                   )}
                   <button
                     type="button"
-                    onClick={() =>
-                      set({ galleryText: galleryUrls.filter((u) => u !== url).join("\n") })
-                    }
+                    onClick={() => set({ galleryText: galleryUrls.filter((u) => u !== url).join("\n") })}
                     className="absolute -right-2 -top-2 rounded-full bg-destructive p-1 text-destructive-foreground"
                   >
                     <Trash2 className="size-3" />
@@ -311,20 +235,9 @@ export function ItemEditor({
           )}
           {canUpload && (
             <label className="inline-flex h-8 w-fit cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-sm hover:bg-muted">
-              {uploading ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <ImagePlus className="size-4" />
-              )}
+              {uploading ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
               Add images / videos
-              <input
-                type="file"
-                accept="image/*,video/*"
-                multiple
-                className="hidden"
-                onChange={handleGallery}
-                disabled={uploading}
-              />
+              <input type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleGallery} disabled={uploading} />
             </label>
           )}
           <Textarea
@@ -339,8 +252,8 @@ export function ItemEditor({
           <Label>Audiences — who is this for?</Label>
           <p className="text-xs text-muted-foreground">
             Free-form tags that power the visitor filter on your public site (your specialties, or
-            the roles you target — e.g. “Paediatric ICU”, “Structural”, “Cloud”). Leave empty to
-            show to everyone.
+            the roles you target — e.g. “Paediatric ICU”, “Structural”, “Cloud”). Leave empty to show
+            to everyone.
           </p>
           <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border p-2">
             {form.roles.map((r) => (
@@ -349,10 +262,7 @@ export function ItemEditor({
                 className="inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs text-primary"
               >
                 {r}
-                <button
-                  type="button"
-                  onClick={() => set({ roles: form.roles.filter((v) => v !== r) })}
-                >
+                <button type="button" onClick={() => set({ roles: form.roles.filter((v) => v !== r) })}>
                   <X className="size-3" />
                 </button>
               </span>

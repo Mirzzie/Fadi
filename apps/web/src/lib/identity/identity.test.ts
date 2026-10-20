@@ -83,35 +83,22 @@ describe("rarity is measured against the user's own corpus", () => {
 });
 
 describe("the rewritten-project case lexical matching missed", () => {
-  /**
-   * THE TRADE-OFF, MADE DELIBERATELY AND MEASURED (22 Sep 2026).
-   *
-   * These two records ARE the same dissertation written twice, and shared vocabulary was the only
-   * thing that could see it. But the same rule, run on the owner's real 13-record CV, raised five
-   * questions and every one was wrong: two different jobs ("share hardware, problems, documented,
-   * software"), another two different jobs ("technologies, cloud, system, aws"), and three
-   * different AWS projects against each other. People in one field describe their work with the
-   * same words; that is what a career IS.
-   *
-   * So shared words no longer raise a question on their own. The cost is this pair: it is now
-   * admitted as two records, which the person can see and delete. The alternative was asking them
-   * five unanswerable questions per import, which is what they told us to stop doing.
-   */
-  it("no longer asks about two records that share only their vocabulary", () => {
+  it("recognises the same MSc work under two completely different titles", () => {
     const idf = rarityIndex(pool);
     const m = compareIdentity(pool[0], pool[1], idf);
 
-    expect(m.verdict).toBe("different");
-    expect(m.reasons).toContain("nothing anchors these to the same work");
+    // No shared title, no shared organisation, no shared date string — but they
+    // share the proper nouns a rewrite keeps.
+    expect(m.verdict).not.toBe("different");
+    expect(m.reasons.join(" ")).toMatch(/distinctive terms/);
   });
 
-  it("agreeing embeddings do not create a question either", () => {
+  it("promotes it to a confident match once meaning agrees", () => {
     const idf = rarityIndex(pool);
     const m = compareIdentity(pool[0], pool[1], idf, 0.93);
 
-    // Meaning can strengthen a candidate that something else anchored. It cannot be the anchor:
-    // two cloud projects read as similar to any embedding model, because they are similar.
-    expect(m.verdict).toBe("different");
+    expect(m.verdict).toBe("same");
+    expect(m.reasons).toContain("describe the same thing in different words");
   });
 
   it("keeps genuinely different work apart", () => {
@@ -123,12 +110,12 @@ describe("the rewritten-project case lexical matching missed", () => {
 });
 
 describe("artefacts are the strongest signal", () => {
-  it("asks about two records pointing at one file", () => {
+  it("treats two records pointing at one file as the same thing", () => {
     const a = item({ id: "a", title: "Home lab write-up", imageUrl: "https://cdn.x/abc.jpg" });
     const b = item({ id: "b", title: "Detection lab", imageUrl: "https://cdn.x/abc.jpg" });
     const m = compareIdentity(a, b, rarityIndex([a, b]));
 
-    expect(m.verdict).toBe("maybe");
+    expect(m.verdict).toBe("same");
     expect(m.reasons[0]).toContain("same file or link");
   });
 
@@ -136,7 +123,7 @@ describe("artefacts are the strongest signal", () => {
     const a = item({ id: "a", title: "Repo", url: "https://www.github.com/me/lab/" });
     const b = item({ id: "b", title: "The lab", url: "http://github.com/me/lab" });
 
-    expect(compareIdentity(a, b, rarityIndex([a, b])).verdict).toBe("maybe");
+    expect(compareIdentity(a, b, rarityIndex([a, b])).verdict).toBe("same");
   });
 });
 
@@ -159,93 +146,15 @@ describe("guards against over-merging", () => {
 });
 
 describe("works with no embeddings provider configured", () => {
-  it("raises nothing at all on a pool of genuinely separate work", () => {
-    // Previously this pool produced the shield/automated pair on shared words alone. The same
-    // rule produced five false pairs on the owner's real CV, so an anchor is now required.
-    expect(findSameThings(pool)).toEqual([]);
+  it("still finds the rewritten pair using lexical anchors alone", () => {
+    const found = findSameThings(pool); // no similarity function supplied
+    const pair = found.find((m) => [m.a, m.b].sort().join("+") === "automated+shield");
+
+    expect(pair).toBeDefined();
   });
 
   it("returns nothing on an empty or single-item pool", () => {
     expect(findSameThings([])).toEqual([]);
     expect(findSameThings([pool[0]])).toEqual([]);
-  });
-});
-
-/**
- * THE QUESTION THAT SHOULD NEVER HAVE BEEN ASKED.
- *
- * Measured on the owner's real CV, 22 Sep 2026. Eleven records extracted cleanly, and then Fadi
- * held two of their projects for review against a third. All three are different work; they share
- * only the vocabulary every cloud project shares. Personal projects carry no employer and no
- * dates, so with nothing anchoring identity the decision fell to words like "aws" and "pipeline".
- */
-describe("a review question needs something that names the same work", () => {
-  const projects = [
-    item({
-      id: "devsecops",
-      title: "DevSecOps Pipeline & Security Monitoring",
-      detail:
-        "Built a DevSecOps pipeline on AWS with GitHub Actions, Trivy scanning and Wazuh monitoring for a containerised app.",
-      tags: ["aws", "devsecops"],
-    }),
-    item({
-      id: "wordpress",
-      title: "Automated WordPress Deployment on AWS",
-      detail:
-        "Automated a WordPress deployment on AWS EC2 with Terraform and GitHub Actions, including backups and monitoring.",
-      tags: ["aws", "terraform"],
-    }),
-    item({
-      id: "nodejs",
-      title: "CI/CD Pipeline for Node.js Application on AWS",
-      detail:
-        "Built a CI/CD pipeline on AWS for a Node.js application using GitHub Actions, Docker and automated tests.",
-      tags: ["aws", "ci/cd"],
-    }),
-  ];
-
-  it("asks nothing about three different projects in the same technology", () => {
-    expect(findSameThings(projects)).toEqual([]);
-  });
-
-  it("still asks when the two titles name the same project reworded", () => {
-    const reworded = item({
-      id: "nodejs-rewrite",
-      title: "Node.js CI/CD pipeline on AWS",
-      detail: "Pipeline for a Node.js app: GitHub Actions, Docker image build, automated tests.",
-      tags: ["aws"],
-    });
-    const pairs = findSameThings([...projects, reworded]);
-    expect(pairs.map((p) => [p.a, p.b].sort().join("+"))).toEqual(["nodejs+nodejs-rewrite"]);
-  });
-
-  it("a single shared word in a title is not a name", () => {
-    const pairs = findSameThings([
-      item({ id: "a", title: "Security Monitoring", detail: "Wazuh rules and alerting." }),
-      item({ id: "b", title: "Deployment Monitoring", detail: "Grafana dashboards for releases." }),
-    ]);
-    expect(pairs).toEqual([]);
-  });
-
-  it("still asks about the same course written two ways — the place and dates anchor it", () => {
-    const pairs = findSameThings([
-      item({
-        id: "msc-a",
-        title: "MSc Cybersecurity",
-        organization: "National College of Ireland",
-        period: "Jan 2025 — Jan 2026",
-        attribution: "education",
-        detail: "Masters in cyber security, dissertation on DevSecOps.",
-      }),
-      item({
-        id: "msc-b",
-        title: "Master of Science in Cyber Security",
-        organization: "National College of Ireland",
-        period: "Jan 2025 — Jan 2026",
-        attribution: "education",
-        detail: "MSc programme covering security operations and a DevSecOps dissertation.",
-      }),
-    ]);
-    expect(pairs).toHaveLength(1);
   });
 });

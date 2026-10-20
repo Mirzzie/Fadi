@@ -39,8 +39,6 @@ export type StoredCareerReport = {
   recommended_actions: Array<{ title: string; detail: string }>;
   recommended_learning_path: Array<{ title: string; detail: string }>;
   model_name: string | null;
-  /** D08: evidence items this report was written from; null predates the column. */
-  evidence_count_at_generation: number | null;
   generated_at: string | null;
   created_at: string;
 };

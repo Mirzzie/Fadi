@@ -2,7 +2,7 @@ import "server-only";
 
 import { z } from "zod";
 
-import { createApplicationsRepository, createCareerProfilesRepository } from "@careeros/database";
+import { createCareerProfilesRepository } from "@careeros/database";
 
 import { getDatabase } from "@/lib/database/client";
 import { getUserDocGenerate } from "@/lib/ai/user-generate";
@@ -63,40 +63,15 @@ export async function suggestProjectsForGap(
   const track = await createCareerProfilesRepository(getDatabase()).getActiveForUser(userId);
   const role = track?.targetRole ?? "the target role";
 
-  // PROBLEMS, NOT TECHNOLOGIES. A hiring manager is not impressed that someone deployed a VPC;
-  // they are impressed by someone who answered a problem their team actually has. So a project
-  // starts from a realistic workplace scenario — taken from the roles this person is pursuing
-  // where there are any — and the technology is how it gets solved. A few strong projects beat
-  // twenty generic ones, so each suggestion must be worth being one of the three or four.
-  const postings = (
-    await createApplicationsRepository(getDatabase()).listForUser(userId, {
-      scope: "active",
-      careerProfileId: track?.id ?? null,
-    })
-  )
-    .map((application) => application.jobDescription?.trim())
-    .filter((text): text is string => Boolean(text))
-    .slice(0, 3)
-    .map((text) => text.slice(0, 700));
-
-  const system = `You turn ONE skill gap into a portfolio project that closes it — for a candidate targeting ${role}${track?.domain ? ` in ${track.domain}` : ""}.
+  const system = `You turn ONE skill gap into the SMALLEST real work that closes it — for a candidate targeting ${role}${track?.domain ? ` in ${track.domain}` : ""}.
 Suggest 2–3 options, strongest first. Each must be:
-- Built around a PROBLEM, not a technology: a realistic situation a ${role} is asked to handle (for example "a company's developers keep committing secrets to repositories", not "learn a secrets scanner"). When job postings are given, take the problem from what they ask for.
-- CONCRETE and completable by one person in days-to-weeks, with a clear deliverable; a specific well-known course or certification only when that is genuinely the better move for this gap.
-- Something to BUILD, then TEST OR BREAK, then FIX — so the finished work shows findings, decisions and trade-offs, not only a working setup.
-- detail: first paragraph = the scenario, in one or two sentences ("A <kind of organisation> has <problem>."). Then a blank line, then 2–3 sentences: what to build, how to prove it works, and what it demonstrates for ${role}.
-- searchQuery: a short search phrase to find materials (NEVER a URL — search terms only)
-Worth being one of only three or four portfolio projects: no filler, no "learn the fundamentals", no tutorial-follow-alongs.`;
+- CONCRETE and completable by one person in days-to-weeks (a buildable project with a clear deliverable; a specific well-known course or certification only when that's genuinely the better move for this gap)
+- RESUME-WORTHY once done: name what the finished thing demonstrates for ${role}
+- detail: 2–3 sentences — exactly what to build/do, and why it closes THIS gap for THIS role
+- searchQuery: a short search phrase to find materials/tutorials (NEVER a URL — search terms only)
+No filler, no "learn the fundamentals" hand-waving. Real deliverables.`;
 
-  const user = [
-    `Skill gap: ${input.gapTitle}`,
-    input.gapDetail ? `Context from the career report: ${input.gapDetail}` : "",
-    postings.length > 0
-      ? `Roles this person is pursuing (excerpts of the postings):\n${postings.map((text, i) => `[${i + 1}] ${text}`).join("\n\n")}`
-      : "",
-  ]
-    .filter(Boolean)
-    .join("\n\n");
+  const user = `Skill gap: ${input.gapTitle}\n${input.gapDetail ? `Context from the career report: ${input.gapDetail}` : ""}`;
 
   try {
     const raw = await generate.structured(system, user, suggestionSchema, "gap_project_suggestions");

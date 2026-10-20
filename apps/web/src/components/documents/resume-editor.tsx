@@ -1,30 +1,22 @@
 "use client";
 
-import { ArrowLeft, BookmarkPlus, ChevronDown, ChevronUp, Download, Loader2, Plus, Trash2, X } from "lucide-react";
+import { ArrowLeft, BookmarkPlus, ChevronDown, ChevronUp, Check, Download, Loader2, Plus, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { ImproveBox } from "@/components/documents/improve-box";
 import { AiTellCheck } from "@/components/documents/ai-tell-check";
 import { DictatableTextarea } from "@/components/documents/dictatable-textarea";
 import { ResumeAdvisor } from "@/components/documents/resume-advisor";
 import { ResumePreview } from "@/components/documents/resume-preview";
-import {
-  DocumentHistoryLink,
-  DocumentSaveIndicator,
-  useVersionedDocumentSave,
-} from "@/components/documents/versioned-save";
 import { AccentPicker } from "@/components/ui/accent-picker";
 import { SelectMenu } from "@/components/ui/select-menu";
 import {
-  checkResumeClaimsAction,
   deleteResumeTemplateAction,
   saveResumeTemplateAction,
+  updateDocumentAction,
 } from "@/app/dashboard/documents/actions";
-import { TruthReport } from "@/components/documents/truth-report";
-import type { TruthFinding } from "@/lib/documents/truth-gate";
 import {
   newId,
   parseResume,
@@ -85,25 +77,15 @@ export function ResumeEditor({
   initialTitle,
   initialContent,
   initialTemplate,
-  initialVersion,
   experienceLevel,
   customTemplates = [],
-  hasJob = false,
-  freshnessAsk = null,
-  initialTruthFindings = [],
 }: {
   id: string;
   initialTitle: string;
   initialContent: string;
   initialTemplate?: string | null;
-  initialVersion: number;
   experienceLevel?: string | null;
   customTemplates?: { id: string; name: string; config: Record<string, unknown> }[];
-  /** Whether this résumé belongs to a posting — Fadi tailors to it when asked to change things. */
-  hasJob?: boolean;
-  /** When the person's record has moved on, the one-click way to act on it. */
-  freshnessAsk?: string | null;
-  initialTruthFindings?: TruthFinding[];
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(initialTitle);
@@ -115,23 +97,16 @@ export function ResumeEditor({
       ? (initialTemplate as ResumeTemplate)
       : "classic",
   );
-  const { status, markDirty, save: saveVersion } = useVersionedDocumentSave(id, initialVersion);
-  const [truthFindings, setTruthFindings] = useState(initialTruthFindings);
-  const [claimCheckError, setClaimCheckError] = useState<string | null>(null);
+  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
   const dirty = useRef(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const save = useCallback(async () => {
-    const content = serializeResume(data);
-    await saveVersion({ title, content, template });
-    const checked = await checkResumeClaimsAction(id, content);
-    if (checked.ok) {
-      setTruthFindings(checked.findings);
-      setClaimCheckError(null);
-    } else {
-      setClaimCheckError(checked.message);
-    }
-  }, [saveVersion, title, data, template, id]);
+    setStatus("saving");
+    const res = await updateDocumentAction({ id, title, content: serializeResume(data), template });
+    setStatus(res.ok ? "saved" : "idle");
+    dirty.current = false;
+  }, [id, title, data, template]);
 
   useEffect(() => {
     if (!dirty.current) return;
@@ -144,7 +119,7 @@ export function ResumeEditor({
 
   function patch(next: Partial<ResumeData>) {
     dirty.current = true;
-    markDirty();
+    setStatus("idle");
     setData((d) => ({ ...d, ...next }));
   }
   function patchPersonal(next: Partial<ResumeData["personal"]>) {
@@ -165,7 +140,7 @@ export function ResumeEditor({
 
   function applyCustomTemplate(config: Record<string, unknown>) {
     dirty.current = true;
-    markDirty();
+    setStatus("idle");
     if (typeof config.baseTemplate === "string") setTemplate(config.baseTemplate as ResumeTemplate);
     setData((d) => ({
       ...d,
@@ -289,7 +264,7 @@ export function ResumeEditor({
             </div>
             <DictatableTextarea
               className={`${field} mt-2 min-h-16`}
-              placeholder="What you built and the impact — one line becomes one bullet"
+              placeholder="What you built and the impact"
               value={p.description}
               onChange={(description) => updateList(data, patch, "projects", i, { description })}
               label="what you built"
@@ -390,7 +365,7 @@ export function ResumeEditor({
   }
 
   return (
-    <div className="flex h-[calc(100vh-9rem)] w-full flex-col gap-3">
+    <div className="mx-auto flex h-[calc(100vh-7rem)] max-w-6xl flex-col gap-3">
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -405,22 +380,33 @@ export function ResumeEditor({
             value={title}
             onChange={(e) => {
               dirty.current = true;
-              markDirty();
+              setStatus("idle");
               setTitle(e.target.value);
             }}
             className="rounded-md bg-transparent px-1 text-sm font-semibold outline-none focus:bg-accent/40"
           />
-          <DocumentSaveIndicator status={status} />
+          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+            {status === "saving" ? (
+              <>
+                <Loader2 className="size-3 animate-spin" aria-hidden="true" /> Saving…
+              </>
+            ) : status === "saved" ? (
+              <>
+                <Check className="size-3 text-emerald-400" aria-hidden="true" /> Saved
+              </>
+            ) : (
+              "Autosaves"
+            )}
+          </span>
         </div>
         <div className="flex items-center gap-2">
-          <DocumentHistoryLink id={id} />
           <SelectMenu
             ariaLabel="Resume template"
             className="min-w-32"
             value={template}
             onChange={(v) => {
               dirty.current = true;
-              markDirty();
+              setStatus("idle");
               setTemplate(v as ResumeTemplate);
             }}
             groups={[{ options: RESUME_TEMPLATES.map((t) => ({ value: t.id, label: t.label })) }]}
@@ -481,7 +467,7 @@ export function ResumeEditor({
             <Download className="size-4" aria-hidden="true" />
             JSON
           </Button>
-          <Button size="sm" onClick={save} disabled={status === "saving" || status === "conflict"}>
+          <Button size="sm" onClick={save}>
             Save
           </Button>
         </div>
@@ -546,36 +532,6 @@ export function ResumeEditor({
 
       {/* Honest reads-human check across the resume's prose */}
       <AiTellCheck text={proseText} />
-
-      {/* The same truth authority as export, refreshed after every autosave so a typed claim does
-          not keep the green state from the server render. */}
-      <TruthReport findings={truthFindings} />
-      {claimCheckError ? (
-        <p role="alert" className="text-xs text-amber-300">
-          Claim check unavailable: {claimCheckError}
-        </p>
-      ) : null}
-
-      {/* Ask for a change and get the change — applied here, autosaved as a new version. */}
-      <ImproveBox
-        documentId={id}
-        hasJob={hasJob}
-        currentContent={() => serializeResume(data)}
-        onApply={(content) => {
-          dirty.current = true;
-          markDirty();
-          setData(parseResume(content));
-        }}
-        quick={[
-          // What changed in their record leads, because it is the only one of these that is
-          // about THIS document being out of date rather than a general improvement.
-          ...(freshnessAsk ? [freshnessAsk] : []),
-          hasJob ? "Tailor it to this posting" : "Sharpen it for my target role",
-          "Stronger bullets — action, thing, outcome",
-          "Cut it to one page",
-          "Lead with my most relevant experience",
-        ]}
-      />
 
       <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-2">
         {/* Live preview (HTML) */}
@@ -738,3 +694,4 @@ function RepeatItem({ children, onRemove }: { children: React.ReactNode; onRemov
     </div>
   );
 }
+

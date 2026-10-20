@@ -1,7 +1,16 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, ClipboardCopy, Compass, Plus, Send, Sparkles, Trash2 } from "lucide-react";
+import {
+  Check,
+  ClipboardCopy,
+  Compass,
+  Plus,
+  Send,
+  Sparkles,
+  Trash2,
+  Users,
+} from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -50,12 +59,12 @@ export function ReferralBoard({ referrals }: { referrals: ReferralView[] }) {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6 pb-12">
-      <header className="space-y-2 border-b border-border pb-7 pt-3">
-        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          People
-        </p>
-        <h1 className="font-heading text-3xl font-semibold tracking-tight">Referrals &amp; warm intros</h1>
+    <div className="mx-auto w-full max-w-3xl space-y-6 p-4 sm:p-6">
+      <header className="space-y-1.5">
+        <div className="flex items-center gap-2">
+          <Users className="size-5 text-primary" aria-hidden="true" />
+          <h1 className="text-lg font-semibold">Referrals &amp; warm intros</h1>
+        </div>
         <p className="text-sm text-muted-foreground">
           A referral is your <span className="text-foreground">highest-leverage move</span> because
           it&apos;s a genuinely independent draw — it routes around the same screening software that

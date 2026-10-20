@@ -9,7 +9,6 @@ import {
   createResumesRepository,
 } from "@careeros/database";
 
-import { preserveCareerSource } from "@/lib/career/sources";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
@@ -89,13 +88,6 @@ export async function completeOnboardingAction(
     const linkedInText = parsed.linkedInProfile?.trim();
 
     if (linkedInText) {
-      // KEEP WHAT ARRIVED, at the FIRST door too. Onboarding is where most people's history
-      // enters Fadi, and it was the one import that kept no version of what they pasted.
-      await preserveCareerSource(user.id, {
-        sourceKind: "linkedin",
-        sourceKey: "self",
-        content: linkedInText,
-      });
       await linkedInProfilesRepository.createForUser(user.id, {
         profileId: profile.id,
         profileUrl: linkedInText.startsWith("http") ? linkedInText : null,
@@ -109,11 +101,6 @@ export async function completeOnboardingAction(
     // guidance layer prompts for a CV afterward. Avoid creating empty rows.
     const resumeText = parsed.resumeText?.trim();
     if (resumeText && resumeText.length >= 20) {
-      await preserveCareerSource(user.id, {
-        sourceKind: "resume",
-        sourceKey: profile.id,
-        content: resumeText,
-      });
       await resumesRepository.createForUser(user.id, {
         profileId: profile.id,
         filePath: `text-paste/${user.id}/${Date.now()}`,

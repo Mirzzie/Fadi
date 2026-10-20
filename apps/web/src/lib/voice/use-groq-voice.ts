@@ -2,30 +2,42 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-export type GroqVoiceState = "idle" | "requesting" | "recording" | "transcribing" | "unsupported";
+/**
+ * Server-side voice input: record the mic, auto-stop on silence, and transcribe
+ * via Whisper (`/api/fadi/transcribe` → Groq free tier). Works in ANY browser —
+ * unlike the Web Speech API, which depends on Google's backend and fails on
+ * Linux Chromium / Brave. No interim results (Whisper is one-shot), so the UI
+ * shows "listening / transcribing" states instead.
+ */
+
+export type GroqVoiceState = "idle" | "recording" | "transcribing" | "unsupported";
+
 type Options = {
   onTranscript?: (text: string) => void;
   onError?: (message: string) => void;
-  /** Dictation defaults to automatic ending; interviews can require an explicit finish. */
-  autoStop?: boolean;
+  /** Auto-stop after this much trailing silence (ms). */
   silenceMs?: number;
+  /** Hard cap on a single utterance (ms). */
   maxMs?: number;
+  /** Give up if the user never speaks within this window (ms). */
   noSpeechMs?: number;
 };
 
-function isAvailable() {
+function isAvailable(): boolean {
   return (
     typeof navigator !== "undefined" &&
     Boolean(navigator.mediaDevices?.getUserMedia) &&
-    typeof MediaRecorder !== "undefined"
+    typeof MediaRecorder !== "undefined" &&
+    typeof window !== "undefined" &&
+    (typeof window.AudioContext !== "undefined" ||
+      typeof (window as unknown as { webkitAudioContext?: unknown }).webkitAudioContext !==
+        "undefined")
   );
 }
 
-/** Each recording owns its stream and response. Cancel never submits an answer. */
 export function useGroqVoice({
   onTranscript,
   onError,
-  autoStop = true,
   silenceMs = 1400,
   maxMs = 30000,
   noSpeechMs = 6000,
@@ -33,223 +45,147 @@ export function useGroqVoice({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const [state, setState] = useState<GroqVoiceState>("idle");
-  const [elapsedMs, setElapsedMs] = useState(0);
-  const attempt = useRef(0);
-  const active = useRef(false);
-  const recorder = useRef<MediaRecorder | null>(null);
-  const stream = useRef<MediaStream | null>(null);
-  const context = useRef<AudioContext | null>(null);
-  const frame = useRef<number | null>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const clock = useRef<ReturnType<typeof setInterval> | null>(null);
-  const request = useRef<AbortController | null>(null);
-  const callbacks = useRef({ onTranscript, onError });
-  useEffect(() => {
-    callbacks.current = { onTranscript, onError };
-  }, [onTranscript, onError]);
+
+  const recRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const ctxRef = useRef<AudioContext | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const maxTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const onTranscriptRef = useRef(onTranscript);
+  onTranscriptRef.current = onTranscript;
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+
   const isSupported = mounted && isAvailable();
 
-  const releaseCapture = useCallback(() => {
-    if (frame.current !== null) cancelAnimationFrame(frame.current);
-    if (timer.current !== null) clearTimeout(timer.current);
-    if (clock.current !== null) clearInterval(clock.current);
-    frame.current = null;
-    timer.current = null;
-    clock.current = null;
-    void context.current?.close().catch(() => {});
-    context.current = null;
-    stream.current?.getTracks().forEach((track) => track.stop());
-    stream.current = null;
+  const teardown = useCallback(() => {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = null;
+    if (maxTimerRef.current) clearTimeout(maxTimerRef.current);
+    maxTimerRef.current = null;
+    ctxRef.current?.close().catch(() => {});
+    ctxRef.current = null;
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
   }, []);
 
-  const dispose = useCallback(() => {
-    attempt.current += 1;
-    active.current = false;
-    request.current?.abort();
-    request.current = null;
-    if (recorder.current) {
-      recorder.current.onstop = null;
-      recorder.current.ondataavailable = null;
-      recorder.current.onerror = null;
-      if (recorder.current.state !== "inactive") recorder.current.stop();
-      recorder.current = null;
-    }
-    releaseCapture();
-  }, [releaseCapture]);
-
-  const cancel = useCallback(() => {
-    dispose();
-    setState("idle");
-    setElapsedMs(0);
-  }, [dispose]);
   const stop = useCallback(() => {
-    if (recorder.current?.state === "recording") recorder.current.stop();
+    if (recRef.current && recRef.current.state !== "inactive") {
+      recRef.current.stop(); // → onstop transcribes
+    }
   }, []);
 
   const start = useCallback(async () => {
     if (!isSupported) {
-      callbacks.current.onError?.(
-        "Voice recording isn't supported in this browser. You can type your answer."
-      );
+      onErrorRef.current?.("Voice recording isn't supported in this browser.");
       return;
     }
-    if (active.current) return;
-    active.current = true;
-    const id = ++attempt.current;
-    const current = () => id === attempt.current;
-    // The callbacks belong to the answer that started capture, not a later question.
-    const ownCallbacks = callbacks.current;
-    setState("requesting");
-    setElapsedMs(0);
-    let input: MediaStream;
+    if (recRef.current && recRef.current.state === "recording") return;
+
+    let stream: MediaStream;
     try {
-      input = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch {
-      if (current()) {
-        active.current = false;
+      onErrorRef.current?.("Couldn't access the microphone. Check it's connected and permitted.");
+      return;
+    }
+    streamRef.current = stream;
+    chunksRef.current = [];
+
+    const rec = new MediaRecorder(stream);
+    recRef.current = rec;
+    rec.ondataavailable = (e) => {
+      if (e.data.size > 0) chunksRef.current.push(e.data);
+    };
+    rec.onstop = async () => {
+      teardown();
+      const blob = new Blob(chunksRef.current, { type: rec.mimeType || "audio/webm" });
+      recRef.current = null;
+      if (blob.size < 1500) {
+        // Too short to be speech — quietly reset.
         setState("idle");
-        ownCallbacks.onError?.(
-          "Couldn't access the microphone. Check permission, or type your answer."
-        );
+        return;
       }
-      return;
-    }
-    if (!current()) {
-      input.getTracks().forEach((track) => track.stop());
-      return;
-    }
-    stream.current = input;
-    try {
-      const rec = new MediaRecorder(input);
-      recorder.current = rec;
-      const chunks: Blob[] = [];
-      rec.ondataavailable = (event) => {
-        if (current() && event.data.size) chunks.push(event.data);
-      };
-      rec.onerror = () => {
-        if (!current()) return;
-        cancel();
-        ownCallbacks.onError?.(
-          "Recording stopped unexpectedly. Please try again or type your answer."
-        );
-      };
-      rec.onstop = async () => {
-        if (!current()) return;
-        releaseCapture();
-        recorder.current = null;
-        const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
-        if (!blob.size) {
-          active.current = false;
+      setState("transcribing");
+      try {
+        const fd = new FormData();
+        fd.append("audio", blob, "audio.webm");
+        const res = await fetch("/api/fadi/transcribe", { method: "POST", body: fd });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          onErrorRef.current?.(data.error ?? "Couldn't transcribe that. Try again.");
           setState("idle");
-          ownCallbacks.onError?.("No audio was recorded. Please try again.");
           return;
         }
-        setState("transcribing");
-        const controller = new AbortController();
-        request.current = controller;
-        try {
-          const form = new FormData();
-          const extension = blob.type.includes("mp4")
-            ? "mp4"
-            : blob.type.includes("ogg")
-              ? "ogg"
-              : "webm";
-          form.append("audio", blob, `audio.${extension}`);
-          // Tell the transcriber what language to expect. Left to guess, it guessed Icelandic
-          // for an English "Hi, hello" — and a command it transcribes into another language
-          // cannot match anything Fadi knows.
-          form.append(
-            "language",
-            typeof navigator !== "undefined" && navigator.language ? navigator.language : "en"
-          );
-          const response = await fetch("/api/fadi/transcribe", {
-            method: "POST",
-            body: form,
-            signal: controller.signal,
-          });
-          const data = (await response.json().catch(() => ({}))) as {
-            text?: string;
-            error?: string;
-          };
-          if (!current()) return;
-          if (!response.ok)
-            throw new Error(data.error ?? "Couldn't transcribe that. Please try again.");
-          if (data.text?.trim()) ownCallbacks.onTranscript?.(data.text.trim());
-          else
-            ownCallbacks.onError?.(
-              "No words were recognised. Please try again or type your answer."
-            );
-        } catch (error) {
-          if (current())
-            ownCallbacks.onError?.(
-              error instanceof Error ? error.message : "Couldn't transcribe that. Please try again."
-            );
-        } finally {
-          if (current()) {
-            request.current = null;
-            active.current = false;
-            setState("idle");
-          }
-        }
-      };
-      rec.start();
-      setState("recording");
-      const startedAt = performance.now();
-      clock.current = setInterval(() => setElapsedMs(performance.now() - startedAt), 250);
-      timer.current = setTimeout(stop, maxMs);
-
-      // Optional dictation convenience. Interviews do not infer finished thoughts from quiet.
-      const Ctx =
-        window.AudioContext ??
-        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (!autoStop || !Ctx) return;
-      const ctx = new Ctx();
-      context.current = ctx;
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 512;
-      ctx.createMediaStreamSource(input).connect(analyser);
-      const buffer = new Uint8Array(analyser.fftSize);
-      let spoke = false;
-      let silenceAt = 0;
-      const tick = () => {
-        if (!current() || rec.state !== "recording") return;
-        analyser.getByteTimeDomainData(buffer);
-        const rms = Math.sqrt(
-          buffer.reduce((sum, value) => sum + ((value - 128) / 128) ** 2, 0) / buffer.length
-        );
-        const now = performance.now();
-        if (rms > 0.018) {
-          spoke = true;
-          silenceAt = 0;
-        } else if (spoke) {
-          if (!silenceAt) silenceAt = now;
-          else if (now - silenceAt > silenceMs) {
-            stop();
-            return;
-          }
-        } else if (now - startedAt > noSpeechMs) {
-          cancel();
-          ownCallbacks.onError?.("No speech detected. Check your microphone and try again.");
-          return;
-        }
-        frame.current = requestAnimationFrame(tick);
-      };
-      frame.current = requestAnimationFrame(tick);
-    } catch {
-      if (current()) {
-        cancel();
-        ownCallbacks.onError?.("Couldn't start recording. Please try again or type your answer.");
+        const { text } = (await res.json()) as { text: string };
+        setState("idle");
+        if (text?.trim()) onTranscriptRef.current?.(text.trim());
+      } catch {
+        onErrorRef.current?.("Couldn't transcribe that. Try again.");
+        setState("idle");
       }
-    }
-  }, [isSupported, autoStop, maxMs, silenceMs, noSpeechMs, releaseCapture, cancel, stop]);
+    };
 
-  useEffect(() => dispose, [dispose]);
+    rec.start();
+    setState("recording");
+
+    // Silence detection so it ends when the user stops talking.
+    const Ctx =
+      window.AudioContext ??
+      (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    const ctx = new Ctx();
+    ctxRef.current = ctx;
+    const analyser = ctx.createAnalyser();
+    analyser.fftSize = 512;
+    ctx.createMediaStreamSource(stream).connect(analyser);
+    const buf = new Uint8Array(analyser.frequencyBinCount);
+    const startedAt = performance.now();
+    let spoke = false;
+    let silenceAt = 0;
+
+    const tick = () => {
+      analyser.getByteTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) {
+        const v = (buf[i] - 128) / 128;
+        sum += v * v;
+      }
+      const rms = Math.sqrt(sum / buf.length);
+      const now = performance.now();
+
+      if (rms > 0.018) {
+        spoke = true;
+        silenceAt = 0;
+      } else if (spoke) {
+        if (silenceAt === 0) silenceAt = now;
+        else if (now - silenceAt > silenceMs) {
+          stop();
+          return;
+        }
+      } else if (now - startedAt > noSpeechMs) {
+        // Never heard anything — stop without transcribing.
+        stop();
+        return;
+      }
+      rafRef.current = requestAnimationFrame(tick);
+    };
+    rafRef.current = requestAnimationFrame(tick);
+    maxTimerRef.current = setTimeout(stop, maxMs);
+  }, [isSupported, silenceMs, maxMs, noSpeechMs, stop, teardown]);
+
+  useEffect(() => {
+    return () => {
+      teardown();
+      recRef.current?.stop();
+    };
+  }, [teardown]);
+
   return {
-    state: isSupported ? state : ("unsupported" as GroqVoiceState),
+    state: isSupported ? state : "unsupported",
     isSupported,
-    elapsedMs,
     start,
     stop,
-    cancel,
   };
 }

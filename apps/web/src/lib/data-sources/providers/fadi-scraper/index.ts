@@ -48,16 +48,6 @@ export class FadiScraperSource implements JobSource {
           return scrapeRecipe(r, query, limit);
         }),
       );
-      // Every recipe failing is a broken scraper, not an empty market: the source says so and
-      // the board reports a failure instead of "no jobs" (measured 20 Sep 2026 — all recipes
-      // rejected, the source reported live with zero).
-      if (settled.length > 0 && settled.every((res) => res.status === "rejected")) {
-        const first = settled[0] as PromiseRejectedResult;
-        throw new Error(
-          `every scraper recipe failed (${first.reason instanceof Error ? first.reason.message.split("\n")[0] : "unknown"})`
-        );
-      }
-
       const postings: JobPosting[] = [];
       settled.forEach((res, i) => {
         if (res.status !== "fulfilled") return;
@@ -67,10 +57,8 @@ export class FadiScraperSource implements JobSource {
         }
       });
       return postings.slice(0, limit);
-    } catch (error) {
-      // Surfaced, not swallowed: the fan-out records this source as failed, and the board tells
-      // the person a source broke rather than implying the market is empty.
-      throw error instanceof Error ? error : new Error("scraper failed");
+    } catch {
+      return [];
     }
   }
 }

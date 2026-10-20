@@ -1,20 +1,11 @@
 "use server";
 
-import {
-  createApplicationsRepository,
-  createCareerProfilesRepository,
-  createInterviewSessionsRepository,
-  createInterviewStoriesRepository,
-  createJobsRepository,
-} from "@careeros/database";
+import { createInterviewStoriesRepository } from "@careeros/database";
 import { revalidatePath } from "next/cache";
 
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
 import { logger } from "@/lib/observability/logger";
-import { finishInterviewSessionWork, linkInterviewSessionToWork } from "@/lib/work/domain-links";
-import { kickOutbox } from "@/lib/outbox";
-import { enqueueOutbox } from "@/lib/outbox/topics";
 import {
   generateStoriesFromEvidence,
   storyFromMockAnswer,
@@ -29,192 +20,29 @@ import {
 } from "@/lib/interview/mock";
 
 const PATH = "/dashboard/interview";
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const STAGES = new Set(["recruiter", "hiring_manager", "technical", "behavioral"]);
-const DURATIONS = new Set([10, 20]);
 
-/** Start one durable, job-aware practice session. */
+/** Start a mock interview — country-aware questions for a role + seniority. */
 export async function startMockInterview(input: {
   role: string;
-  company?: string | null;
   country?: string;
   seniority?: string;
   jobDescription?: string;
-  jobId?: string | null;
-  applicationId?: string | null;
-  stage?: "recruiter" | "hiring_manager" | "technical" | "behavioral";
-  durationMinutes?: 10 | 20;
-}): Promise<
-  | { ok: true; sessionId: string; workItemId: string | null; questions: MockQuestion[] }
-  | { ok: false; message: string }
-> {
+  persona?: string;
+}): Promise<{ ok: true; questions: MockQuestion[] } | { ok: false; message: string }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
-
-  const role = input.role.trim();
-  if (!role || role.length > 200) return { ok: false, message: "Pick a valid role first." };
-  if (input.company && input.company.trim().length > 200) {
-    return { ok: false, message: "That company name is too long." };
-  }
-  if ((input.country?.length ?? 0) > 120 || (input.seniority?.length ?? 0) > 120) {
-    return { ok: false, message: "That interview context is too long." };
-  }
-  if (input.jobDescription && input.jobDescription.length > 50_000) {
-    return { ok: false, message: "That job description is too long." };
-  }
-  if (
-    (input.jobId && !UUID.test(input.jobId)) ||
-    (input.applicationId && !UUID.test(input.applicationId))
-  ) {
-    return { ok: false, message: "That interview context is invalid." };
-  }
-  if (
-    (input.stage && !STAGES.has(input.stage)) ||
-    (input.durationMinutes && !DURATIONS.has(input.durationMinutes))
-  ) {
-    return { ok: false, message: "That interview setup is invalid." };
-  }
-
-  try {
-    const db = getDatabase();
-    const application = input.applicationId
-      ? await createApplicationsRepository(db).getForUser(user.id, input.applicationId)
-      : null;
-    if (input.applicationId && !application) {
-      return { ok: false, message: "That application is unavailable." };
-    }
-
-    const jobId = input.jobId ?? application?.jobId ?? null;
-    if (application?.jobId && input.jobId && application.jobId !== input.jobId) {
-      return { ok: false, message: "That job does not match the application." };
-    }
-    const job = jobId ? await createJobsRepository(db).findByIdForUser(user.id, jobId) : null;
-    if (jobId && !job) return { ok: false, message: "That job is unavailable." };
-
-    const stage = input.stage ?? "hiring_manager";
-    const durationMinutes = input.durationMinutes ?? 10;
-    const generated = await generateMockQuestions(user.id, {
-      role,
-      country: input.country,
-      seniority: input.seniority,
-      jobDescription: input.jobDescription,
-      stage,
-      durationMinutes,
-    });
-    if (!generated.ok) return generated;
-
-    const activeTrack = application?.careerProfileId
-      ? null
-      : await createCareerProfilesRepository(db).getActiveForUser(user.id);
-    const company = input.company?.trim() || application?.company || job?.company || null;
-
-    const linked = await db.transaction(async (tx) => {
-      const session = await createInterviewSessionsRepository(tx).createForUser(user.id, {
-        applicationId: application?.id ?? null,
-        jobId,
-        careerProfileId: application?.careerProfileId ?? activeTrack?.id ?? null,
-        role,
-        company,
-        stage,
-        durationMinutes,
-        questions: generated.questions.map((question) => ({ ...question })),
-      });
-      const work = await linkInterviewSessionToWork(tx, user.id, {
-        sessionId: session.id,
-        role,
-        company,
-        stage,
-        jobId,
-        applicationId: application?.id ?? null,
-        careerProfileId: application?.careerProfileId ?? activeTrack?.id ?? null,
-      });
-      return { session, work };
-    });
-
-    revalidatePath("/dashboard");
-    return {
-      ok: true,
-      sessionId: linked.session.id,
-      workItemId: linked.work?.id ?? null,
-      questions: generated.questions,
-    };
-  } catch (error) {
-    logger.error("interview.start_session_failed", {
-      userId: user.id,
-      error: error instanceof Error ? error.message : "unknown",
-    });
-    return { ok: false, message: "Fadi couldn't start that interview. Please try again." };
-  }
+  return generateMockQuestions(user.id, input);
 }
 
-/** Finish the session and its linked work step together. Repeating the same decision is safe. */
-export async function finishMockInterviewSession(input: {
-  sessionId: string;
-  status: "completed" | "abandoned";
-}): Promise<{ ok: boolean }> {
-  const user = await getCurrentAuthUser();
-  if (!user || !UUID.test(input.sessionId)) return { ok: false };
-
-  try {
-    const db = getDatabase();
-    const finished = await db.transaction(async (tx) => {
-      const session = await createInterviewSessionsRepository(tx).finishForUser(
-        user.id,
-        input.sessionId,
-        input.status
-      );
-      if (!session) return false;
-      await finishInterviewSessionWork(tx, user.id, input.sessionId, input.status);
-      if (input.status === "completed") {
-        await enqueueOutbox(
-          tx,
-          user.id,
-          "interview.completed",
-          { sessionId: input.sessionId },
-          input.sessionId
-        );
-      }
-      return true;
-    });
-    if (finished) kickOutbox();
-    revalidatePath("/dashboard");
-    return { ok: finished };
-  } catch (error) {
-    logger.error("interview.finish_session_failed", {
-      userId: user.id,
-      sessionId: input.sessionId,
-      error: error instanceof Error ? error.message : "unknown",
-    });
-    return { ok: false };
-  }
-}
-
-/** Review one practice answer from its transcript, grounded in what they said. */
+/** Score one practice answer (delivery + content), grounded in what they said. */
 export async function scoreMockAnswer(input: {
   question: string;
   answer: string;
   role?: string;
-  /** The session and question this answer belongs to, so its review outlives the page. */
-  sessionId?: string | null;
-  questionIndex?: number;
 }): Promise<{ ok: true; score: AnswerScore } | { ok: false; message: string }> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
-  const result = await scoreInterviewAnswer(user.id, input);
-  if (
-    result.ok &&
-    input.sessionId &&
-    UUID.test(input.sessionId) &&
-    input.questionIndex !== undefined
-  ) {
-    await createInterviewSessionsRepository(getDatabase())
-      .recordReview(user.id, input.sessionId, input.questionIndex, {
-        scores: result.score.scores,
-        improvements: result.score.improvements.slice(0, 3),
-      })
-      .catch(() => false); // the review is still shown; only the later practice task misses it
-  }
-  return result;
+  return scoreInterviewAnswer(user.id, input);
 }
 
 /** Save a practiced mock answer into the story bank as a reusable STAR+R story. */
@@ -242,7 +70,8 @@ export async function saveMockAnswerAsStory(input: {
 }
 
 export async function generateStoryBank(): Promise<
-  { ok: true; stories: StoryView[] } | { ok: false; message: string }
+  | { ok: true; stories: StoryView[] }
+  | { ok: false; message: string }
 > {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
@@ -278,10 +107,7 @@ export async function saveStory(input: {
   const repo = createInterviewStoriesRepository(getDatabase());
   const fields = {
     title: input.title.trim(),
-    competencies: input.competencies
-      .map((c) => c.toLowerCase().trim())
-      .filter(Boolean)
-      .slice(0, 6),
+    competencies: input.competencies.map((c) => c.toLowerCase().trim()).filter(Boolean).slice(0, 6),
     situation: input.situation.trim(),
     task: input.task.trim(),
     action: input.action.trim(),

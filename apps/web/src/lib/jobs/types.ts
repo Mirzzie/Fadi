@@ -23,8 +23,6 @@ export type RecommendedJob = {
   firstSeenAt: Date;
   matchScore: number;
   matchReason: string;
-  /** Every board this vacancy was listed on — several when the same role was grouped. */
-  sources: string[];
   matchedKeywords: string[];
   /** Whether the job is the right KIND of role for the user (drives relevance filtering). */
   onRole: boolean;

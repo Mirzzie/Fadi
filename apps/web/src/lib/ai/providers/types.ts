@@ -91,7 +91,7 @@ export interface AIProvider {
   /** Optional cheap call to confirm the key/model/endpoint work. */
   validate?(): Promise<{ ok: boolean; message: string }>;
   /** Transcribe an audio clip to text (Whisper). Only STT-capable providers. */
-  transcribe?(file: File, options?: { language?: string }): Promise<string>;
+  transcribe?(file: File): Promise<string>;
 }
 
 // ─── Provider config (for registry) ──────────────────────────────────────────

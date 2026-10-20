@@ -4,7 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { createContext, useContext, useState } from "react";
 
 import { setCareerModeAction } from "@/app/dashboard/mode-actions";
-import type { CareerMode } from "@/app/dashboard/mode";
+import { isPathHiddenInMode, type CareerMode } from "@/app/dashboard/mode";
 
 type Ctx = {
   mode: CareerMode;
@@ -36,9 +36,11 @@ export function CareerModeProvider({
     if (m === mode) return;
     setModeState(m); // optimistic — the shell reshapes immediately
     void setCareerModeAction(m).then(() => {
-      // No page belongs to one phase any more, so switching never strands anyone and never
-      // throws them back to the dashboard mid-task. The content simply re-prioritises.
-      router.refresh();
+      // The switch should transform the view: if the current page belongs to the
+      // OTHER phase (the new mode hides it), move to the dashboard rather than
+      // stranding the user on a hidden page. Otherwise just let the content follow.
+      if (isPathHiddenInMode(pathname, m)) router.push("/dashboard");
+      else router.refresh();
     });
   };
 

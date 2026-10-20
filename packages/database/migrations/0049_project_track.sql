@@ -1,3 +1,0 @@
-ALTER TABLE "project_runs" ADD COLUMN "career_profile_id" uuid;--> statement-breakpoint
-ALTER TABLE "project_runs" ADD CONSTRAINT "project_runs_career_profile_id_career_profiles_id_fk" FOREIGN KEY ("career_profile_id") REFERENCES "public"."career_profiles"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
-CREATE INDEX "project_runs_track_idx" ON "project_runs" USING btree ("user_id","career_profile_id");

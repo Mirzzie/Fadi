@@ -18,17 +18,8 @@ import type { JobPosting, JobSource, SignalQuery } from "./types";
 type JobSourceRun = {
   at: number;
   query: string;
-  sources: Array<{ id: string; status: SourceOutcome; count: number }>;
+  sources: Array<{ id: string; status: "ok" | "error"; count: number }>;
 };
-
-/**
- * What a source did on the last pull, kept apart on purpose.
- *
- * "ok" with zero results used to cover four different situations — a provider that has no
- * coverage for the country, one that failed, one that timed out, and a genuinely empty market.
- * The board then told the person "no jobs", which was only true in the last case.
- */
-export type SourceOutcome = "ok" | "error" | "unsupported_here";
 let _lastJobSourceRun: JobSourceRun | null = null;
 
 export type JobSourceHealth = {
@@ -36,7 +27,7 @@ export type JobSourceHealth = {
   name: string;
   configured: boolean;
   /** Last pull's outcome for this source, when we've run one this process. */
-  lastRun: { status: SourceOutcome; count: number } | null;
+  lastRun: { status: "ok" | "error"; count: number } | null;
 };
 
 /**
@@ -239,7 +230,7 @@ export function getJobSourceCoverage(domain?: string | null): JobSourceCoverage 
 /** Fired as each source settles, so a caller can show live crawl progress. */
 export type SourceProgress = (event: {
   id: string;
-  status: SourceOutcome;
+  status: "ok" | "error";
   count: number;
   done: number;
   total: number;
@@ -287,13 +278,7 @@ export async function discoverJobs(
   // signal-aware source stops wasted work.
   const runSource = async (
     s: JobSource
-  ): Promise<{ id: string; status: SourceOutcome; jobs: JobPosting[] }> => {
-    // A source that knows it does not serve this country is not called at all, and is reported
-    // as unavailable here rather than as a source that ran and found nothing.
-    if (s.covers?.(query) === "no") {
-      logger.info("data_sources.source_unsupported", { source: s.id, country: query.country ?? "" });
-      return { id: s.id, status: "unsupported_here", jobs: [] };
-    }
+  ): Promise<{ id: string; status: "ok" | "error"; jobs: JobPosting[] }> => {
     const ms = BROWSER_SOURCES.has(s.id) ? 120_000 : 12_000;
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout> | undefined;

@@ -22,8 +22,7 @@ export function composeDigestMessage(findings: DigestFinding[]): string {
       f.kind === "portfolio_gap" ||
       f.kind === "portfolio_duplicate" ||
       f.kind === "evidence_link_unconfirmed" ||
-      f.kind === "evidence_needs_decision" ||
-      f.kind === "evidence_captured",
+      f.kind === "evidence_needs_decision",
   );
 
   const parts: string[] = [
@@ -89,8 +88,7 @@ export function composeDigestSubline(findings: DigestFinding[]): string {
     n("portfolio_gap") +
     n("portfolio_duplicate") +
     n("evidence_link_unconfirmed") +
-    n("evidence_needs_decision") +
-    n("evidence_captured");
+    n("evidence_needs_decision");
   if (coherence > 0) {
     counts.push(`${coherence} thing${coherence === 1 ? "" : "s"} to fix in your own record`);
   }

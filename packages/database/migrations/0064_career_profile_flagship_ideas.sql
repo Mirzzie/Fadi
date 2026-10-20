@@ -1,1 +1,0 @@
-ALTER TABLE "career_profiles" ADD COLUMN "flagship_ideas" jsonb;

@@ -1,1 +1,0 @@
-ALTER TABLE "lab_action_requests" ADD COLUMN "kind" text DEFAULT 'action' NOT NULL;

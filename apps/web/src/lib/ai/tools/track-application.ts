@@ -3,8 +3,7 @@ import "server-only";
 import { createApplicationsRepository } from "@careeros/database";
 
 import { getDatabase } from "@/lib/database/client";
-import { syncApplicationWork } from "@/lib/applications/sync-work";
-import type { ConsequentialResult, FadiTool, FadiToolContext } from "./types";
+import type { FadiTool, FadiToolContext, FadiToolResult } from "./types";
 
 /**
  * Fadi ACTS: add a role to the user's application tracker. Approval-gated by the
@@ -13,8 +12,6 @@ import type { ConsequentialResult, FadiTool, FadiToolContext } from "./types";
  */
 export const trackApplication: FadiTool = {
   name: "track_application",
-  risk: "write",
-  effect: "Record an application",
   description:
     "Add a job to the user's application tracker (records company, role, and optionally the job description). Use when the user says things like 'track this', 'add this job', 'I'm applying to X', or 'save this application'.",
   parameters: {
@@ -27,15 +24,11 @@ export const trackApplication: FadiTool = {
     required: ["company", "title"],
   },
 
-  async execute(args, ctx: FadiToolContext): Promise<ConsequentialResult> {
+  async execute(args, ctx: FadiToolContext): Promise<FadiToolResult> {
     const company = typeof args.company === "string" ? args.company.trim() : "";
     const title = typeof args.title === "string" ? args.title.trim() : "";
     if (!company || !title) {
-      return {
-        summary: "I need both a company and a role to add it to your tracker.",
-        view: "none",
-        outcome: "needs_input",
-      };
+      return { summary: "I need both a company and a role to add it to your tracker.", view: "none" };
     }
     const jobDescription =
       typeof args.jobDescription === "string" ? args.jobDescription.trim() : undefined;
@@ -46,10 +39,8 @@ export const trackApplication: FadiTool = {
       jobDescription: jobDescription || null,
       status: "interested",
     });
-    await syncApplicationWork(ctx.userId, app);
 
     return {
-      outcome: "performed",
       summary: `Added "${title}" at ${company} to your application tracker (as Interested). Open Applications to draft a tailored resume for it.`,
       view: "application",
       data: { id: app.id, company, title },

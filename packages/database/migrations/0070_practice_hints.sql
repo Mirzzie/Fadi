@@ -1,1 +1,0 @@
-ALTER TABLE "project_steps" ADD COLUMN "hints_revealed" integer DEFAULT 0 NOT NULL;

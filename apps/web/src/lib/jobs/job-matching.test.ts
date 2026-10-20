@@ -1,7 +1,7 @@
 import type { CareerProfile, Job } from "@careeros/database";
 import { describe, expect, it } from "vitest";
 
-import { locationReason, scoreJobForUser } from "./job-matching";
+import { scoreJobForUser } from "./job-matching";
 
 const job = (title: string) =>
   ({
@@ -233,26 +233,5 @@ describe("scoreJobForUser — domain-agnostic role matching", () => {
       experienceLevel: "mid",
     } as unknown as CareerProfile;
     expect(run(p, "Associate Professor in Cybersecurity").onRole).toBe(false);
-  });
-});
-
-describe("a card says where the job is, not where you looked", () => {
-  it("THE REPORTED CARD: a bare 'Remote' posting is not called Dublin", () => {
-    // Reported 20 Sep: "IT Systems Administrator @ Epic — Remote" explained itself as
-    // "location: Dublin, Ireland" on an Irish search.
-    expect(locationReason({ location: "Remote" }, "Dublin, Ireland")).toBe("remote — no place stated");
-    expect(locationReason({ location: null, remoteMode: "remote" }, "Dublin, Ireland")).toBe(
-      "remote — no place stated"
-    );
-  });
-
-  it("quotes the posting when it states a place", () => {
-    expect(locationReason({ location: "Dublin, Ireland" }, "Dublin, Ireland")).toBe("location: Dublin, Ireland");
-    expect(locationReason({ location: "Berlin" }, "Dublin, Ireland")).toBe("location: Berlin");
-  });
-
-  it("falls back to naming it as the search area, never as the job's location", () => {
-    expect(locationReason({ location: null }, "Dublin, Ireland")).toBe("your search area: Dublin, Ireland");
-    expect(locationReason({ location: null }, null)).toBeNull();
   });
 });

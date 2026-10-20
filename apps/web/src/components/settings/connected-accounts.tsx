@@ -13,22 +13,10 @@ const META: Record<Provider, { label: string; icon: React.ReactNode }> = {
     label: "Google",
     icon: (
       <svg viewBox="0 0 24 24" className="size-4" aria-hidden="true">
-        <path
-          fill="#4285F4"
-          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z"
-        />
-        <path
-          fill="#34A853"
-          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"
-        />
-        <path
-          fill="#FBBC05"
-          d="M5.84 14.1A6.6 6.6 0 0 1 5.49 12c0-.73.13-1.44.35-2.1V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z"
-        />
-        <path
-          fill="#EA4335"
-          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.16-3.16A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"
-        />
+        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.27-4.74 3.27-8.1z" />
+        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z" />
+        <path fill="#FBBC05" d="M5.84 14.1A6.6 6.6 0 0 1 5.49 12c0-.73.13-1.44.35-2.1V7.06H2.18a11 11 0 0 0 0 9.88l3.66-2.84z" />
+        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.16-3.16A11 11 0 0 0 2.18 7.06l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z" />
       </svg>
     ),
   },
@@ -49,9 +37,7 @@ const META: Record<Provider, { label: string; icon: React.ReactNode }> = {
  * LinkedIn paste / "Save to PDF" import on the Profile page.
  */
 export function ConnectedAccounts({ providers }: { providers: Provider[] }) {
-  // Better Auth 1.7 unlinks the stable account row, not every account for a provider.
-  // Keep that identity instead of reducing the response to a provider-name boolean.
-  const [linked, setLinked] = useState<Map<Provider, string> | null>(null);
+  const [linked, setLinked] = useState<Set<string> | null>(null);
   const [pending, setPending] = useState<Provider | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -60,23 +46,12 @@ export function ConnectedAccounts({ providers }: { providers: Provider[] }) {
     (async () => {
       try {
         const res = await authClient.listAccounts();
-        const items = (res?.data ?? []) as Array<{
-          id: string;
-          providerId?: string;
-          provider?: string;
-        }>;
+        const items = (res?.data ?? []) as Array<{ providerId?: string; provider?: string }>;
         if (!cancelled) {
-          const accounts = new Map<Provider, string>();
-          for (const account of items) {
-            const provider = account.providerId ?? account.provider;
-            if ((provider === "google" || provider === "linkedin") && account.id) {
-              accounts.set(provider, account.id);
-            }
-          }
-          setLinked(accounts);
+          setLinked(new Set(items.map((a) => a.providerId ?? a.provider ?? "").filter(Boolean)));
         }
       } catch {
-        if (!cancelled) setLinked(new Map()); // degrade to "Connect" rather than block
+        if (!cancelled) setLinked(new Set()); // degrade to "Connect" rather than block
       }
     })();
     return () => {
@@ -97,23 +72,17 @@ export function ConnectedAccounts({ providers }: { providers: Provider[] }) {
   }
 
   async function disconnect(provider: Provider) {
-    const accountId = linked?.get(provider);
-    if (!accountId) return;
     setPending(provider);
     setError(null);
     try {
-      // better-auth 1.7.7 (the locked version) takes the account id alone (Codex C15-09 was
-      // written against a stale 1.6.14 install; see docs/reviews/2026-10-15-codex-scan.md).
-      await authClient.unlinkAccount({ accountId });
+      await authClient.unlinkAccount({ providerId: provider });
       setLinked((prev) => {
-        const next = new Map(prev);
+        const next = new Set(prev);
         next.delete(provider);
         return next;
       });
     } catch {
-      setError(
-        `Couldn't disconnect ${META[provider].label}. You may need another sign-in method first.`
-      );
+      setError(`Couldn't disconnect ${META[provider].label}. You may need another sign-in method first.`);
     }
     setPending(null);
   }
@@ -156,11 +125,7 @@ export function ConnectedAccounts({ providers }: { providers: Provider[] }) {
                   disabled={busy}
                   className="flex items-center gap-1.5 rounded-full border border-border/70 px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
                 >
-                  {busy ? (
-                    <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
-                  ) : (
-                    <Check className="size-3.5 text-emerald-500" aria-hidden="true" />
-                  )}
+                  {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <Check className="size-3.5 text-emerald-500" aria-hidden="true" />}
                   Disconnect
                 </button>
               ) : (
@@ -169,7 +134,7 @@ export function ConnectedAccounts({ providers }: { providers: Provider[] }) {
                   onClick={() => connect(provider)}
                   disabled={busy || linked === null}
                   className={cn(
-                    "flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/15 disabled:opacity-50"
+                    "flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-primary/15 disabled:opacity-50",
                   )}
                 >
                   {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}

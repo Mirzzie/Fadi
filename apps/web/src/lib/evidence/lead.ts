@@ -108,9 +108,7 @@ const COMPETES_FOR_LEAD = new Set(["experience", "project"]);
 const STRUCTURAL_NOUN: Record<string, string> = {
   education: "qualification",
   achievement: "credential",
-  certification: "certification",
   skill: "skills list",
-  unclassified: "record",
 };
 
 /** The vocabulary of one direction: its role, its field, and its known synonyms. */

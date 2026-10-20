@@ -21,7 +21,6 @@ import { MomentumReflectionCard } from "@/components/resilience/momentum-reflect
 import type { MomentumReflection } from "@/lib/resilience/reflection";
 import type { Briefing } from "@/lib/agents/briefing";
 import type { SetupState } from "@/lib/guidance/setup";
-import type { CareerMode } from "@/app/dashboard/mode";
 import { matchAccent } from "@/lib/jobs/match-accent";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,16 +65,6 @@ type DashboardShellProps = {
   /** Whether the report has drifted out of sync with the user's evidence/résumé. */
   reportStale?: { stale: boolean; reason: string | null } | null;
   recommendedJobsPreview: RecommendedJob[];
-  /**
-   * WHICH PHASE THE USER IS IN — and the dashboard's most conspicuous omission.
-   *
-   * The switcher already declares that Prepare hides the live pipeline (mode.ts:
-   * /dashboard/jobs, /applications, /network) and the dock already honours it. The
-   * dashboard did not: switching to Prepare added a focus block on top and went on
-   * offering three roles with "Apply now" underneath. A mode that changes a label and
-   * a few icons is a toggle, not a mode.
-   */
-  mode: CareerMode;
   momentum: MomentumSummary;
   /** You-vs-past-self + morale read (honest "how am I really doing"). */
   reflection?: MomentumReflection | null;
@@ -95,26 +84,31 @@ export function DashboardShell({
   latestReport,
   reportStale,
   recommendedJobsPreview,
-  mode,
   momentum,
   reflection,
   marketSignals,
   setup,
   openBuilds = 0,
 }: DashboardShellProps) {
-  // One reading of the phase, used everywhere below. "applying" rather than
-  // `mode === "apply"` scattered around, so a third mode later has one place to land.
-  const applying = mode === "apply";
   return (
     <div className="mx-auto max-w-shell space-y-8">
       {/* Fadi greets you first — his proactive, spoken briefing. */}
       {briefing ? <FadiBriefing briefing={briefing} /> : null}
 
       {/* Mission Control hero — greeting + the live opportunities Fadi has lined up.
-          Theme-aware, on Fadi's indigo signal field. */}
-      <section className="border-y border-border bg-card py-7 sm:py-9">
-        <div>
-          <span className="inline-flex items-center gap-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+          Theme-aware, on Fadi's own teal/aurora (was a heavy dark violet banner). */}
+      <section className="relative overflow-hidden rounded-2xl border border-border bg-card p-6 shadow-sm sm:p-8">
+        {/* Soft aurora identity — quiet, so it never fights the content. */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -right-16 -top-24 size-72 rounded-full opacity-[0.12] blur-3xl [background:var(--aurora-2)]"
+        />
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -bottom-24 -left-10 size-64 rounded-full opacity-[0.10] blur-3xl [background:var(--aurora-1)]"
+        />
+        <div className="relative">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/60 px-3 py-1 text-xs font-medium text-muted-foreground">
             <Sparkles className="size-3 text-primary" aria-hidden="true" />
             Mission Control
           </span>
@@ -133,7 +127,7 @@ export function DashboardShell({
                 <Link
                   key={`${opp.label}-${opp.detail}-${i}`}
                   href={opp.href}
-                  className="group border-t border-border bg-muted/20 p-3 text-left transition-colors hover:bg-muted"
+                  className="group rounded-xl border border-border bg-muted/40 p-3 text-left transition-colors hover:border-primary/40 hover:bg-muted"
                 >
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-primary">
@@ -150,7 +144,7 @@ export function DashboardShell({
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <Link
               href="#career-report"
-              className={cn(buttonVariants({ size: "lg" }), "h-10 px-5 text-sm font-semibold")}
+              className={cn(buttonVariants({ size: "lg" }), "h-10 rounded-full px-5 text-sm font-semibold")}
             >
               Generate report
               <ArrowRight className="size-4" aria-hidden="true" />
@@ -159,7 +153,7 @@ export function DashboardShell({
               href="/dashboard/jobs"
               className={cn(
                 buttonVariants({ variant: "outline", size: "lg" }),
-                "h-10 px-5 text-sm font-semibold",
+                "h-10 rounded-full px-5 text-sm font-semibold",
               )}
             >
               Browse jobs
@@ -176,7 +170,7 @@ export function DashboardShell({
       {openBuilds > 0 ? (
         <Link
           href="/dashboard/learning"
-          className="group flex items-center justify-between gap-3 border-y border-primary/25 bg-primary/5 py-4 transition-colors hover:bg-primary/10"
+          className="group flex items-center justify-between gap-3 rounded-2xl border border-primary/25 bg-primary/5 p-4 transition-colors hover:bg-primary/10"
         >
           <div className="flex items-center gap-3">
             <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">
@@ -202,7 +196,7 @@ export function DashboardShell({
           prepare for interviews. One clear thing to do in each. */}
       <section className="grid gap-4 lg:grid-cols-3">
         {/* Add an application */}
-        <div className="flex flex-col border-y border-border bg-card p-5">
+        <div className="flex flex-col rounded-2xl border border-border bg-card p-5 shadow-sm">
           <h3 className="font-heading text-base font-semibold">Add an application</h3>
           <p className="mt-1 text-sm text-muted-foreground">
             Paste a job URL to save it straight to your tracker.
@@ -219,7 +213,7 @@ export function DashboardShell({
         </div>
 
         {/* Tracker stats */}
-        <div className="flex flex-col border-y border-border bg-card p-5">
+        <div className="flex flex-col rounded-2xl border border-border bg-card p-5 shadow-sm">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Quality applications · this {momentum.cadencePeriod}
           </p>
@@ -231,7 +225,7 @@ export function DashboardShell({
           </div>
           <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
             <div
-              className="h-full rounded-full bg-primary"
+              className="h-full rounded-full bg-gradient-to-r from-primary to-[oklch(0.66_0.22_285)]"
               style={{
                 width: `${Math.min(100, Math.round(((momentum.qualityApplicationsThisPeriod ?? 0) / Math.max(momentum.cadenceTarget ?? 0, 1)) * 100))}%`,
               }}
@@ -249,7 +243,7 @@ export function DashboardShell({
         </div>
 
         {/* Prepare for interviews — accent card */}
-        <div className="flex flex-col border-y border-primary/20 bg-primary/5 p-5">
+        <div className="flex flex-col rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/12 to-[oklch(0.55_0.2_285)]/10 p-5 shadow-sm">
           <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-primary/25 bg-card/60 px-2.5 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-primary">
             Next up
           </span>
@@ -289,20 +283,15 @@ export function DashboardShell({
           value={latestReport?.resume_quality_score != null ? String(latestReport.resume_quality_score) : "—"}
           sub="clarity of evidence"
         />
-        {/* "Top job match" is a fact about live postings — an Apply number. In Prepare
-            the useful question is not how well you match today's openings but what you
-            have to show, so the tile answers that instead of going blank. */}
         <StatCard
           icon={BriefcaseBusiness}
-          label={applying ? "Top job match" : "Builds in progress"}
+          label="Top job match"
           value={
-            applying
-              ? recommendedJobsPreview.length > 0
-                ? `${Math.max(...recommendedJobsPreview.map((j) => j.matchScore ?? 0))}%`
-                : "—"
-              : String(openBuilds)
+            recommendedJobsPreview.length > 0
+              ? `${Math.max(...recommendedJobsPreview.map((j) => j.matchScore ?? 0))}%`
+              : "—"
           }
-          sub={applying ? "best current fit" : "in your Prepare plan"}
+          sub="best current fit"
         />
         <StatCard
           icon={Sparkles}
@@ -314,17 +303,11 @@ export function DashboardShell({
       </section>
 
       {/* Zone: Your momentum — the anti-give-up core, all in one place */}
-      {/* Your momentum is a COMMITMENT TO APPLY — "quality applications this week",
-          measured against a cadence target. In Prepare, applications are exactly what the
-          mode sets aside, so the panel was asking the user to be behind on work they had
-          just chosen not to do. */}
-      {applying ? (
       <section className="space-y-3">
         <ZoneHeading>Your momentum</ZoneHeading>
         <MomentumPanel momentum={toMomentumView(momentum)} />
         {reflection ? <MomentumReflectionCard reflection={reflection} /> : null}
       </section>
-      ) : null}
 
       {/* Zone: Your profile & report — compact. The full report lives on /dashboard/report
           so the dashboard stays a launchpad, not a document. */}
@@ -420,15 +403,10 @@ export function DashboardShell({
         </div>
       </section>
 
-      {/* Zone: What's out there.
-          In Prepare the live pipeline is gone, but the MARKET is not — knowing what
-          employers are asking for is exactly what tells you what to build next. So the
-          roles disappear and the signals stay, and the layout closes up rather than
-          leaving a hole where the job list was. */}
+      {/* Zone: What's out there */}
       <section className="space-y-3">
-        <ZoneHeading>{applying ? "What's out there" : "What the market is asking for"}</ZoneHeading>
-        <div className={applying ? "grid gap-4 lg:grid-cols-[1.4fr_1fr]" : "grid gap-4"}>
-        {applying ? (
+        <ZoneHeading>What&apos;s out there</ZoneHeading>
+        <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
         <Card id="recommended-jobs">
         <CardHeader className="flex flex-row items-start gap-4 space-y-0">
           <div className="grid size-10 place-items-center rounded-md bg-primary/10 text-primary">
@@ -457,7 +435,7 @@ export function DashboardShell({
                   className="flex flex-col rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40"
                 >
                   <div className="flex items-start gap-3">
-                    <span className="grid size-10 shrink-0 place-items-center rounded-md bg-primary font-heading text-sm font-bold text-primary-foreground">
+                    <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-primary to-[oklch(0.5_0.2_285)] font-heading text-sm font-bold text-primary-foreground">
                       {job.company?.slice(0, 1)?.toUpperCase() ?? "?"}
                     </span>
                     <div className="min-w-0 flex-1">
@@ -499,7 +477,6 @@ export function DashboardShell({
         </CardContent>
       </Card>
 
-        ) : null}
         <MarketSignalsCard signals={marketSignals} />
         </div>
       </section>
@@ -641,7 +618,7 @@ function StatCard({
           <p className="mt-1 text-sm font-medium">{label}</p>
           <p className="text-xs capitalize text-muted-foreground">{sub}</p>
         </div>
-        <div className="grid size-10 shrink-0 place-items-center rounded-md bg-muted text-foreground ring-1 ring-border">
+        <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-primary/20 to-[oklch(0.66_0.22_285)]/15 text-primary ring-1 ring-primary/15">
           <Icon className="size-5" aria-hidden="true" />
         </div>
       </div>

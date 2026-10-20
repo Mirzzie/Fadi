@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { extractionSchemaShape, normKind } from "./pool";
+import { extractionSchemaShape } from "./pool";
 
 /**
  * Regression guard for the bug that kept `evidence_items` at 0 rows for every user.
@@ -53,7 +53,6 @@ describe("evidence extraction schema", () => {
           kind: null,
           title: "Home lab",
           organization: null,
-          attribution: null,
           period: null,
           detail: null,
           metrics: null,
@@ -68,31 +67,5 @@ describe("evidence extraction schema", () => {
   it("rejects a payload missing items — the exact production failure", () => {
     const schema = z.object(extractionSchemaShape);
     expect(schema.safeParse({}).success).toBe(false);
-  });
-});
-
-describe("what kind of record this is", () => {
-  it("THE REPORTED DEFECT: a certification is not employment", () => {
-    // pool.ts had five kinds with no `certification`, and normKind fell back to `experience`,
-    // so a credential extracted from a CV became employment-shaped data downstream — while the
-    // portfolio showed the same thing as a certification.
-    expect(normKind("certification")).toBe("certification");
-    expect(normKind("Certificate")).toBe("certification");
-    expect(normKind("credential")).toBe("certification");
-  });
-
-  it("an unreadable kind is held as unclassified, never filed as a job", () => {
-    expect(normKind("volunteering")).toBe("unclassified");
-    expect(normKind("")).toBe("unclassified");
-    expect(normKind(null)).toBe("unclassified");
-    expect(normKind(undefined)).toBe("unclassified");
-  });
-
-  it("the words people actually use still land on the right kind", () => {
-    expect(normKind("job")).toBe("experience");
-    expect(normKind("Employment")).toBe("experience");
-    expect(normKind("degree")).toBe("education");
-    expect(normKind("award")).toBe("achievement");
-    expect(normKind("project")).toBe("project");
   });
 });

@@ -4,12 +4,9 @@ import { revalidatePath } from "next/cache";
 
 import {
   createDocumentsRepository,
-  createJobsRepository,
   createResumeTemplatesRepository,
   type DocumentKind,
 } from "@careeros/database";
-import { preserveCareerSource } from "@/lib/career/sources";
-import { fileFingerprint } from "@/lib/career/uploaded-file";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getUserDocGenerate } from "@/lib/ai/user-generate";
 import { getDatabase } from "@/lib/database/client";
@@ -18,19 +15,10 @@ import { rawTextToResumeContent, structureResumeText } from "@/lib/documents/imp
 import { fromJsonResume, parseJsonResume } from "@/lib/documents/json-resume";
 import { serializeResume } from "@/lib/documents/resume";
 import { logger } from "@/lib/observability/logger";
-import { checkDocumentTruth } from "@/lib/documents/corpus";
-import type { TruthFinding } from "@/lib/documents/truth-gate";
 
 const MAX_IMPORT_BYTES = 8 * 1024 * 1024; // 8 MB — resumes are small
-const MAX_CLAIM_CHECK_CHARS = 200_000;
 
-type Result = {
-  ok: boolean;
-  message: string;
-  id?: string;
-  version?: number;
-  conflict?: boolean;
-};
+type Result = { ok: boolean; message: string; id?: string };
 
 const DEFAULT_TITLES: Record<string, string> = {
   resume: "Untitled resume",
@@ -39,35 +27,6 @@ const DEFAULT_TITLES: Record<string, string> = {
   value_proposition: "Untitled value proposition",
   note: "Untitled note",
 };
-
-/**
- * Re-check the exact résumé text currently in the editor against the canonical career record.
- * This is a projection of the existing truth gate, not a second claim store. Ownership is checked
- * through the document before any supplied content is examined.
- */
-export async function checkResumeClaimsAction(
-  documentId: string,
-  content: string,
-): Promise<{ ok: true; findings: TruthFinding[] } | { ok: false; message: string }> {
-  const user = await getCurrentAuthUser();
-  if (!user) return { ok: false, message: "Please sign in again." };
-  if (content.length > MAX_CLAIM_CHECK_CHARS) {
-    return { ok: false, message: "This résumé is too large to check safely." };
-  }
-
-  const db = getDatabase();
-  const document = await createDocumentsRepository(db).getForUser(user.id, documentId);
-  if (!document || document.kind !== "resume") {
-    return { ok: false, message: "That résumé is unavailable." };
-  }
-  const job = document.jobId
-    ? await createJobsRepository(db).findByIdForUser(user.id, document.jobId)
-    : null;
-  return {
-    ok: true,
-    findings: await checkDocumentTruth(user.id, content, job?.description ?? null),
-  };
-}
 
 export async function createDocumentAction(input: {
   kind: DocumentKind;
@@ -104,14 +63,6 @@ export async function importJsonResumeAction(jsonText: string, title?: string): 
 
   let content: string;
   let resolvedTitle: string;
-  // KEEP WHAT ARRIVED. Everything below is a rewording of this text, and until now the text
-  // itself was never stored — so "where did this claim come from?" had no answer.
-  await preserveCareerSource(user.id, {
-    sourceKind: "resume",
-    sourceKey: "json-import",
-    content: jsonText,
-  });
-
   try {
     const jr = parseJsonResume(jsonText);
     const data = fromJsonResume(jr);
@@ -176,21 +127,6 @@ export async function importResumeFileAction(formData: FormData): Promise<Result
       return { ok: false, message: "Couldn't read meaningful text from that file (is it a scan/image?)." };
     }
 
-    // Two versions, because they answer different questions: the extracted text says what the CV
-    // SAID, and the fingerprint says which FILE said it — two exports of the same CV extract to
-    // different text, so the text alone cannot tell you it is the same document. The bytes
-    // themselves are deliberately not kept; see lib/career/uploaded-file.ts.
-    await preserveCareerSource(user.id, {
-      sourceKind: "resume",
-      sourceKey: "file-import",
-      content: text,
-    });
-    await preserveCareerSource(user.id, {
-      sourceKind: "resume-file",
-      sourceKey: "file-import",
-      content: fileFingerprint({ name: file.name, size: file.size, type: file.type, bytes: buffer }),
-    });
-
     const generate = await getUserDocGenerate(user.id);
     if (generate) {
       const data = await structureResumeText(text, generate);
@@ -230,109 +166,29 @@ export async function importResumeFileAction(formData: FormData): Promise<Result
 
 export async function updateDocumentAction(input: {
   id: string;
-  expectedVersion: number;
   title?: string;
   content?: string;
   template?: string | null;
 }): Promise<Result> {
   const user = await getCurrentAuthUser();
   if (!user) return { ok: false, message: "Please sign in again." };
-  if (!Number.isInteger(input.expectedVersion) || input.expectedVersion < 1) {
-    return { ok: false, message: "Reload this document before saving." };
-  }
 
   try {
-    const result = await createDocumentsRepository(getDatabase()).updateForUser(
-      user.id,
-      input.id,
-      input.expectedVersion,
-      {
-        ...(input.title !== undefined ? { title: input.title.trim() || "Untitled" } : {}),
-        ...(input.content !== undefined ? { content: input.content } : {}),
-        ...(input.template !== undefined ? { template: input.template } : {}),
-      }
-    );
-    if (result.status === "not_found") {
-      return { ok: false, message: "Document not found." };
-    }
-    if (result.status === "conflict") {
-      return {
-        ok: false,
-        conflict: true,
-        version: result.document.version,
-        message: "This document changed in another tab. Reload before saving.",
-      };
-    }
+    const updated = await createDocumentsRepository(getDatabase()).updateForUser(user.id, input.id, {
+      ...(input.title !== undefined ? { title: input.title.trim() || "Untitled" } : {}),
+      ...(input.content !== undefined ? { content: input.content } : {}),
+      ...(input.template !== undefined ? { template: input.template } : {}),
+    });
+    if (!updated) return { ok: false, message: "Document not found." };
     revalidatePath("/dashboard/documents");
     revalidatePath(`/dashboard/documents/${input.id}`);
-    return { ok: true, message: "Saved.", version: result.document.version };
+    return { ok: true, message: "Saved." };
   } catch (error) {
     logger.error("documents.update_failed", {
       userId: user.id,
       error: error instanceof Error ? error.message : "unknown",
     });
     return { ok: false, message: "Couldn't save the document." };
-  }
-}
-
-/** Restore by creating a new head version; prior revisions remain immutable. */
-export async function restoreDocumentRevisionAction(input: {
-  id: string;
-  revisionVersion: number;
-  expectedVersion: number;
-}): Promise<Result> {
-  const user = await getCurrentAuthUser();
-  if (!user) return { ok: false, message: "Please sign in again." };
-  if (
-    !Number.isInteger(input.revisionVersion) ||
-    input.revisionVersion < 1 ||
-    !Number.isInteger(input.expectedVersion) ||
-    input.expectedVersion < 1
-  ) {
-    return { ok: false, message: "Reload the revision history and try again." };
-  }
-
-  try {
-    const repo = createDocumentsRepository(getDatabase());
-    const revision = await repo.getRevisionForUser(user.id, input.id, input.revisionVersion);
-    if (!revision) return { ok: false, message: "Revision not found." };
-
-    const result = await repo.updateForUser(user.id, input.id, input.expectedVersion, {
-      title: revision.snapshot.title,
-      content: revision.snapshot.content,
-      format: revision.snapshot.format,
-      template: revision.snapshot.template,
-      jobContext: revision.snapshot.jobContext,
-      metadata: revision.snapshot.metadata,
-    });
-    if (result.status === "not_found") {
-      return { ok: false, message: "Document not found." };
-    }
-    if (result.status === "conflict") {
-      return {
-        ok: false,
-        conflict: true,
-        version: result.document.version,
-        message: "The document changed while history was open. Review the latest version first.",
-      };
-    }
-
-    revalidatePath("/dashboard/documents");
-    revalidatePath(`/dashboard/documents/${input.id}`);
-    revalidatePath(`/dashboard/documents/${input.id}/history`);
-    return {
-      ok: true,
-      message: `Version ${input.revisionVersion} restored as version ${result.document.version}.`,
-      version: result.document.version,
-    };
-  } catch (error) {
-    logger.error("documents.restore_revision_failed", {
-      userId: user.id,
-      documentId: input.id,
-      revisionVersion: input.revisionVersion,
-      error: error instanceof Error ? error.message : "unknown",
-    });
-    return { ok: false, message: "Couldn't restore that revision." };
   }
 }
 

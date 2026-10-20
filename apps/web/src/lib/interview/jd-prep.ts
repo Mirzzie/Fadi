@@ -38,7 +38,7 @@ const prepSchema = z.object({
         result: z.string(),
         basedOn: z.string().nullable(),
         needsRealExample: z.boolean().nullable(),
-      })
+      }),
     )
     .max(8),
 });
@@ -55,7 +55,7 @@ For each question, write a STAR answer (Situation, Task, Action, Result) using O
 
 /** Compact list of the candidate's existing stories for the prompt. */
 export function summarizeStoriesForPrep(
-  stories: Array<{ title: string; competencies: string[]; result: string }>
+  stories: Array<{ title: string; competencies: string[]; result: string }>,
 ): string {
   if (stories.length === 0) return "(no saved stories yet)";
   return stories
@@ -83,58 +83,53 @@ export type PrepResult =
 
 export async function prepareInterviewForJob(
   userId: string,
-  input: {
-    jobDescription: string;
-    jobTitle?: string;
-    company?: string;
-    applicationId?: string;
-    directionId?: string;
-    jobId?: string;
-  }
+  input: { jobDescription: string; jobTitle?: string; company?: string },
 ): Promise<PrepResult> {
   const jd = (input.jobDescription ?? "").trim();
   if (!jd) {
-    return {
-      ok: false,
-      reason: "no_jd",
-      message: "Add the job description and I'll prep you with questions tailored to it.",
-    };
+    return { ok: false, reason: "no_jd", message: "Add the job description and I'll prep you with questions tailored to it." };
   }
 
-  const [{ approvedCareerEvidence }, { getUserDocGenerate }] = await Promise.all([
-    import("@/lib/career/context"),
-    import("@/lib/ai/user-generate"),
-  ]);
-  const evidence = await approvedCareerEvidence(userId, {
-    applicationId: input.applicationId,
-    directionId: input.directionId,
-    jobId: input.jobId,
+  const [{ getCareerReportContext }, { composeCareerEvidence }, { getUserDocGenerate }, { listStories }] =
+    await Promise.all([
+      import("@/lib/career-report/data"),
+      import("@/lib/career/evidence"),
+      import("@/lib/ai/user-generate"),
+      import("@/lib/interview/story-bank"),
+    ]);
+
+  const ctx = await getCareerReportContext(userId);
+  const evidence = composeCareerEvidence({
+    resumeText: ctx?.resumeText,
+    linkedInText: ctx?.linkedInProfileText,
   });
   if (evidence.historySource === "none") {
     return {
       ok: false,
       reason: "no_evidence",
       message:
-        "I don't know your background yet. Add and review your career records in Evidence, and I'll prep you from your real experience.",
+        "I don't know your background yet. Paste your LinkedIn (your achievements, roles and projects) or upload a résumé, and I'll prep you from your real experience.",
     };
   }
 
   const generate = await getUserDocGenerate(userId);
   if (!generate) {
-    return {
-      ok: false,
-      reason: "no_provider",
-      message: "Connect an AI provider in Settings and I'll prep you for this role.",
-    };
+    return { ok: false, reason: "no_provider", message: "Connect an AI provider in Settings and I'll prep you for this role." };
   }
 
+  const [stories, topEvidence] = await Promise.all([
+    listStories(userId),
+    import("@/lib/evidence/pool").then((m) => m.topEvidenceForPrompt(userId)),
+  ]);
   const user = [
     `JOB — ${input.jobTitle ?? "(title n/a)"}${input.company ? ` at ${input.company}` : ""}:`,
     jd.slice(0, 6000),
     "",
     evidence.block,
+    topEvidence ? `\n${topEvidence}` : "",
     "",
-    "Saved story drafts are not included as factual sources; build answers only from the selected records.",
+    "The candidate's existing story bank (reuse where it fits):",
+    summarizeStoriesForPrep(stories),
   ].join("\n");
 
   try {
@@ -152,18 +147,10 @@ export async function prepareInterviewForJob(
         needsRealExample: q.needsRealExample ?? false,
       }));
     if (questions.length === 0) {
-      return {
-        ok: false,
-        reason: "error",
-        message: "I couldn't draft prep just now — please try again.",
-      };
+      return { ok: false, reason: "error", message: "I couldn't draft prep just now — please try again." };
     }
     return { ok: true, prep: { questions } };
   } catch {
-    return {
-      ok: false,
-      reason: "error",
-      message: "I couldn't draft prep just now — please try again.",
-    };
+    return { ok: false, reason: "error", message: "I couldn't draft prep just now — please try again." };
   }
 }

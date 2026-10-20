@@ -1,1 +1,0 @@
-ALTER TABLE "project_steps" ADD COLUMN "completion" text;

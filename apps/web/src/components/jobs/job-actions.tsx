@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Bookmark, BookmarkCheck, ExternalLink, Loader2 } from "lucide-react";
+import { Bookmark, BookmarkCheck, ExternalLink, Loader2, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useState, useTransition } from "react";
 
@@ -8,9 +8,21 @@ import {
   saveJobAction,
   type JobActionResult,
   unsaveJobAction,
+  updateApplicationStatusAction,
 } from "@/app/dashboard/jobs/actions";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { FadiGuardianCallout } from "@/components/workspace/fadi-guardian-callout";
+import { FadiGuardianVoice } from "@/components/os/fadi-guardian-voice";
 import type { ApplicationStatus } from "@/lib/jobs/types";
+
+const applicationStatuses: Array<{ value: ApplicationStatus; label: string }> = [
+  { value: "interested", label: "Interested" },
+  { value: "applied", label: "Applied" },
+  { value: "interviewing", label: "Interviewing" },
+  { value: "offer", label: "Offer" },
+  { value: "rejected", label: "Rejected" },
+  { value: "withdrawn", label: "Withdrawn" },
+];
 
 type JobActionsProps = {
   jobId: string;
@@ -33,18 +45,10 @@ export function JobActions({ jobId, isSaved, applicationStatus, url }: JobAction
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <Link
-          href={`/dashboard/applications/${jobId}/workspace`}
-          className={buttonVariants({ variant: "default", size: "sm" })}
-        >
-          {workspaceAction(applicationStatus)}
-          <ArrowRight className="size-4" aria-hidden="true" />
-        </Link>
+      <div className="flex flex-col gap-2 sm:flex-row">
         <Button
           type="button"
-          size="sm"
-          variant="outline"
+          variant={isSaved ? "secondary" : "default"}
           disabled={isPending}
           onClick={() => runAction(() => (isSaved ? unsaveJobAction(jobId) : saveJobAction(jobId)))}
         >
@@ -57,18 +61,43 @@ export function JobActions({ jobId, isSaved, applicationStatus, url }: JobAction
           )}
           {isSaved ? "Saved" : "Save job"}
         </Button>
+        <Link
+          href={`/dashboard/applications/${jobId}/workspace`}
+          className={buttonVariants({ variant: "outline" })}
+        >
+          <Sparkles className="size-4" aria-hidden="true" />
+          Open workspace
+        </Link>
         {url ? (
           <a
             href={url}
             target="_blank"
             rel="noreferrer"
-            className={buttonVariants({ variant: "ghost", size: "sm" })}
+            className={buttonVariants({ variant: "outline" })}
             title="Open the original posting on the source site to apply directly"
           >
             <ExternalLink className="size-4" aria-hidden="true" />
             View original
           </a>
         ) : null}
+        <select
+          value={applicationStatus ?? ""}
+          disabled={isPending}
+          className="h-10 rounded-md border bg-background px-3 text-sm"
+          aria-label="Application status"
+          onChange={(event) => {
+            if (event.target.value) {
+              runAction(() => updateApplicationStatusAction(jobId, event.target.value));
+            }
+          }}
+        >
+          <option value="">Set status</option>
+          {applicationStatuses.map((status) => (
+            <option key={status.value} value={status.value}>
+              {status.label}
+            </option>
+          ))}
+        </select>
       </div>
       {result?.message ? (
         <p
@@ -78,22 +107,12 @@ export function JobActions({ jobId, isSaved, applicationStatus, url }: JobAction
           {result.message}
         </p>
       ) : null}
+      {result?.guardian ? (
+        <>
+          <FadiGuardianCallout verdict={result.guardian} />
+          <FadiGuardianVoice verdict={result.guardian} />
+        </>
+      ) : null}
     </div>
   );
-}
-
-export function workspaceAction(status: ApplicationStatus | null): string {
-  switch (status) {
-    case "applied":
-    case "interviewing":
-      return "Prepare for interview";
-    case "offer":
-    case "rejected":
-    case "withdrawn":
-      return "Review outcome";
-    case "interested":
-      return "Continue application";
-    default:
-      return "Review role";
-  }
 }

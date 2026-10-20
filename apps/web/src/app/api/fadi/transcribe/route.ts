@@ -31,25 +31,15 @@ export async function POST(req: NextRequest) {
     windowMs: 5 * 60 * 1000,
   });
   if (!rate.allowed) {
-    return Response.json(
-      { error: "Too much dictation too fast — pause a moment and continue." },
-      { status: 429 }
-    );
+    return Response.json({ error: "Too much dictation too fast — pause a moment and continue." }, { status: 429 });
   }
 
   // Read + validate the audio upload first.
   let file: File | null = null;
-  // What language to expect. Sent by the caller from the browser, because a person's speech is
-  // not a property of the server. Narrowed to the base tag — Whisper wants "en", not "en-IE".
-  let language = "en";
   try {
     const form = await req.formData();
     const f = form.get("audio");
     if (f instanceof File && f.size > 0) file = f;
-    const asked = form.get("language");
-    if (typeof asked === "string" && /^[a-z]{2}/i.test(asked)) {
-      language = asked.slice(0, 5).split("-")[0]!.toLowerCase();
-    }
   } catch {
     /* bad form */
   }
@@ -57,10 +47,7 @@ export async function POST(req: NextRequest) {
   // Reject oversize uploads before they're forwarded (or held in memory) — Whisper
   // would 400 anyway, but bounding it here protects our own process.
   if (file.size > MAX_AUDIO_BYTES) {
-    return Response.json(
-      { error: "That recording is too long — keep dictation to short takes." },
-      { status: 413 }
-    );
+    return Response.json({ error: "That recording is too long — keep dictation to short takes." }, { status: 413 });
   }
 
   // Prefer a local, keyless Whisper server (faster-whisper) when configured — fully
@@ -68,7 +55,7 @@ export async function POST(req: NextRequest) {
   const localBase = process.env.FADI_STT_LOCAL_BASE?.trim();
   if (localBase) {
     try {
-      const text = await transcribeLocal(file, localBase, language);
+      const text = await transcribeLocal(file, localBase);
       return Response.json({ text });
     } catch (err) {
       logger.error("fadi.transcribe.local_failed", {
@@ -85,15 +72,12 @@ export async function POST(req: NextRequest) {
   const provider = cfg ? createUserProvider(cfg) : null;
   if (!provider?.isConfigured || !provider.transcribe) {
     return Response.json(
-      {
-        error:
-          "Voice needs a local Whisper server (FADI_STT_LOCAL_BASE) or a Groq/OpenAI key in Settings.",
-      },
-      { status: 422 }
+      { error: "Voice needs a local Whisper server (FADI_STT_LOCAL_BASE) or a Groq/OpenAI key in Settings." },
+      { status: 422 },
     );
   }
   try {
-    const text = await provider.transcribe(file, { language });
+    const text = await provider.transcribe(file);
     return Response.json({ text: text.trim() });
   } catch (err) {
     logger.error("fadi.transcribe.failed", {
@@ -106,12 +90,11 @@ export async function POST(req: NextRequest) {
 }
 
 /** Transcribe via a local, keyless OpenAI-compatible Whisper server (faster-whisper). */
-async function transcribeLocal(file: File, base: string, language: string): Promise<string> {
+async function transcribeLocal(file: File, base: string): Promise<string> {
   const fd = new FormData();
   fd.append("file", file, file.name || "audio.webm");
   fd.append("model", process.env.FADI_STT_LOCAL_MODEL || "Systran/faster-whisper-small.en");
   fd.append("response_format", "json");
-  fd.append("language", language);
   const res = await fetch(`${base}/audio/transcriptions`, {
     method: "POST",
     body: fd,
