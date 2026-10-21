@@ -371,6 +371,28 @@ They are not the primary Evidence page experience.
 
 ## Visual system
 
+### Owner-requested Conversion reference — 21 October 2026
+
+The owner additionally selected [Conversion](https://conversion.framer.media/) to give the
+public-facing experience more warmth and character. For the landing page, adapt its focused
+composition, restrained coral accent, editorial serif emphasis, soft horizon light and compact
+FAQ disclosure. This is an explicit brand-moment exception to the routine-work decoration rules
+below, not permission to turn dashboards, editors or labs into marketing pages.
+
+Keep Pipecat's live-surface discipline and Paperclip's work organisation. Preserve the owner's
+four-destination hideable bottom dock; do not reintroduce destination tabs in the top bar.
+Conversion's marketing navigation is not an authenticated app-shell pattern.
+
+The reference's coral is `#ff4533`. Use a contrasting dark foreground for small text on this
+colour, and a darker coral foreground in light mode. Its observed typography is Satoshi plus
+Instrument Serif; the first adaptation retains Fadi's existing Inter family and uses a system
+serif emphasis rather than claiming an exact font match or importing unlicensed font files.
+The reference remained dark under an emulated light preference: Fadi must supply a separately
+tested light counterpart and respect its existing explicit theme selection.
+
+Do not copy template testimonials, client counts, client logos, imagery or outcome promises.
+Illustrative product previews must say they are examples, not the person's account state.
+
 ### Primary direction: Pipecat
 
 The interface uses Pipecat's visual discipline as its main reference:
