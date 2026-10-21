@@ -24,8 +24,8 @@ export function AiTellCheck({ text, className }: { text: string; className?: str
       className={cn(
         "flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border px-3 py-2 text-xs",
         clean
-          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-          : "border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-200",
+          ? "border-success/30 bg-success/10 text-success"
+          : "border-warning/40 bg-warning/10 text-warning",
         className,
       )}
       role="status"
@@ -33,16 +33,16 @@ export function AiTellCheck({ text, className }: { text: string; className?: str
     >
       {clean ? (
         <>
-          <CircleCheck className="size-3.5 shrink-0 text-emerald-600 dark:text-emerald-400" aria-hidden="true" />
+          <CircleCheck className="size-3.5 shrink-0 text-success" aria-hidden="true" />
           <span className="font-medium">No common AI clichés found.</span>
-          <span className="w-full text-emerald-700/80 dark:text-emerald-300/70">
+          <span className="w-full text-foreground">
             This only checks for filler phrases — what truly reads human is specificity: real numbers,
             project and company names, and examples only you could write.
           </span>
         </>
       ) : (
         <>
-          <TriangleAlert className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
+          <TriangleAlert className="size-3.5 shrink-0 text-warning" aria-hidden="true" />
           <span className="font-medium">
             {tells.length} AI cliché{tells.length === 1 ? "" : "s"} to rewrite:
           </span>
@@ -50,13 +50,13 @@ export function AiTellCheck({ text, className }: { text: string; className?: str
             {tells.map((t) => (
               <code
                 key={t}
-                className="rounded bg-amber-500/15 px-1.5 py-0.5 font-mono text-[0.7rem] text-amber-900 dark:text-amber-100"
+                className="rounded bg-card px-1.5 py-0.5 font-mono text-[0.7rem] text-warning"
               >
                 {t}
               </code>
             ))}
           </span>
-          <span className="w-full text-amber-700/80 dark:text-amber-200/70">
+          <span className="w-full text-foreground">
             Swap these for plain, specific wording grounded in your real experience — that&apos;s what reads human.
           </span>
         </>

@@ -58,12 +58,12 @@ export function ProjectReadiness({
           <li key={check.id} className="flex gap-2 text-xs">
             {check.level === "ok" ? (
               <CheckCircle2
-                className="mt-0.5 size-3.5 shrink-0 text-emerald-500"
+                className="mt-0.5 size-3.5 shrink-0 text-success"
                 aria-hidden="true"
               />
             ) : check.level === "warn" ? (
               <AlertTriangle
-                className="mt-0.5 size-3.5 shrink-0 text-amber-500"
+                className="mt-0.5 size-3.5 shrink-0 text-warning"
                 aria-hidden="true"
               />
             ) : (

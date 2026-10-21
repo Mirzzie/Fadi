@@ -19,9 +19,9 @@ import type { FadiState } from "./fadi-presence";
  * and made the whole UI feel slow. Honors prefers-reduced-motion.
  */
 
-const INDIGO = "#7d87ff";
-const VIOLET = "#584dfc";
-const INDIGO_HALO = "color-mix(in oklab, #7d87ff 50%, transparent)";
+const INDIGO = "var(--primary)";
+const VIOLET = "var(--brand-soft)";
+const INDIGO_HALO = "color-mix(in oklab, var(--primary) 50%, transparent)";
 
 // Ring spin period (s) + overall energy per state.
 const SPIN: Record<FadiState, number> = {
@@ -150,7 +150,7 @@ export function FadiCore({
         style={{
           width: size * 0.5,
           height: size * 0.5,
-          background: `radial-gradient(circle at 35% 30%, #e0e7ff, ${VIOLET} 72%)`,
+          background: `radial-gradient(circle at 35% 30%, var(--card), ${VIOLET} 72%)`,
           boxShadow: `0 0 18px ${INDIGO}, inset 0 0 10px oklch(1 0 0 / 0.45)`,
           animationDuration: speaking ? "0.9s" : undefined,
         }}

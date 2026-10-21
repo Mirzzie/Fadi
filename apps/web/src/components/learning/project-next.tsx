@@ -170,7 +170,7 @@ export function Checked({ items, next }: { items: ConductorItem[]; next?: Conduc
             <Icon
               className={`mt-0.5 size-4 shrink-0 ${
                 item.state === "done"
-                  ? "text-emerald-500"
+                  ? "text-success"
                   : item.state === "waiting"
                     ? "text-muted-foreground/50"
                     : "text-primary"

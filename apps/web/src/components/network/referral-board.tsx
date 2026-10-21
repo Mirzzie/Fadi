@@ -57,10 +57,9 @@ export function ReferralBoard({ referrals }: { referrals: ReferralView[] }) {
         </p>
         <h1 className="font-heading text-3xl font-semibold tracking-tight">Referrals &amp; warm intros</h1>
         <p className="text-sm text-muted-foreground">
-          A referral is your <span className="text-foreground">highest-leverage move</span> because
-          it&apos;s a genuinely independent draw — it routes around the same screening software that
-          rejects your cold applications in a correlated batch. A different door, not the same judge
-          again. Track who you can ask, and let Fadi draft the message.
+          Keep track of people who may offer context, feedback or an introduction. Prepare a message
+          you can review before sending, then record what happened. An introduction is another route
+          to explore, not a guarantee of an interview.
         </p>
         {items.length > 0 ? (
           <p className="text-xs text-muted-foreground">

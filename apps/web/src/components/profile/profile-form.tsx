@@ -136,8 +136,8 @@ export function ProfileForm({
             className={cn(
               "flex items-start gap-2 rounded-lg border p-3 text-sm",
               status.ok
-                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                : "border-amber-500/30 bg-amber-500/10 text-amber-200"
+                ? "border-success/30 bg-success/10 text-success"
+                : "border-warning/30 bg-warning/10 text-warning"
             )}
           >
             {status.ok ? (

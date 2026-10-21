@@ -44,13 +44,13 @@ export function TodayView({ today }: { today: Today }) {
 
   return (
     <div className="mx-auto max-w-5xl pb-10">
-      <header className="border-b border-border pb-10 pt-4 sm:pb-14 sm:pt-8">
+      <header className="border-b border-border pb-6 pt-2 sm:pb-8">
         <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Today</p>
-        <h1 className="mt-3 font-heading text-4xl font-semibold tracking-[-0.04em] sm:text-6xl">
+        <h1 className="mt-3 font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
           Hey {today.firstName}.
         </h1>
         <p className="mt-4 max-w-xl text-muted-foreground">
-          One goal, one next move, and a clear record of what Fadi has done.
+          Review your direction, continue the next useful step and keep track of what changes.
         </p>
         <CareerFocus />
       </header>

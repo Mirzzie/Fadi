@@ -1,4 +1,7 @@
 @import "tailwindcss";
+@import "../../../web/src/app/appearance.css";
+
+@custom-variant dark (&:is(.dark *));
 
 /* Tailwind v4 scans ONLY what it is pointed at — it does not follow imports into sibling
    workspace packages. The page renders <PortfolioTemplate> from @careeros/portfolio, so
@@ -11,15 +14,17 @@
 @source "../";
 
 @theme inline {
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-inter-tight);
+  --font-mono: var(--font-jetbrains-mono);
 }
 
 /* Backdrop ONLY on html (the canvas). An opaque body background paints ABOVE the
    BlobField (fixed, z-index:-10) and would hide the animated orbs — the exact bug. */
 html {
-  background: #0a0a0b;
+  background: var(--background);
+  color: var(--foreground);
 }
 body {
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
 }

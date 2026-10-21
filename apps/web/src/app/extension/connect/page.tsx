@@ -24,7 +24,7 @@ export default async function ExtensionConnectPage() {
       <main style={wrap}>
         <h1 style={{ fontSize: 22, marginBottom: 8 }}>Connect the Fadi extension</h1>
         <p style={{ opacity: 0.8, marginBottom: 20 }}>
-          Sign in to Fadi first, then come back here to get your one-time connection code for the
+          Sign in to Fadi first, then come back here to get a connection code for the
           browser extension.
         </p>
         <Link
@@ -33,8 +33,8 @@ export default async function ExtensionConnectPage() {
             display: "inline-block",
             padding: "10px 16px",
             borderRadius: 8,
-            background: "#0f766e",
-            color: "#fff",
+            background: "var(--primary)",
+            color: "var(--primary-foreground)",
             fontWeight: 600,
             textDecoration: "none",
           }}

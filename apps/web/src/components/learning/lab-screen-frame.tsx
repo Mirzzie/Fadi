@@ -115,7 +115,7 @@ export function LabScreenFrame({ src, title }: { src: string; title: string }) {
         >
           <Maximize2 className="size-3.5" aria-hidden="true" /> Full screen
         </button>
-        {note ? <p className="w-full px-2 text-xs text-amber-600">{note}</p> : null}
+        {note ? <p className="w-full px-2 text-xs text-warning">{note}</p> : null}
         {typing ? (
           <div className="flex w-full items-center gap-2 px-2 text-xs text-muted-foreground">
             Typing into the machine… {typing.done.toLocaleString()} of{" "}
@@ -178,7 +178,7 @@ function TypeConfirm({
   const lines = text.split("\n");
   const preview = lines.slice(0, 6).join("\n");
   return (
-    <div className="w-full space-y-2 rounded-lg border border-amber-500/40 bg-amber-500/5 p-3 text-xs">
+    <div className="w-full space-y-2 rounded-lg border border-warning/40 bg-warning/5 p-3 text-xs">
       <p className="font-medium text-foreground">
         Type {lines.length === 1 ? "this" : `these ${lines.length} lines`} into the machine?
       </p>

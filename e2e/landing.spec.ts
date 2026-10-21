@@ -34,9 +34,9 @@ for (const colorScheme of ["light", "dark"] as const) {
           return { background: surface.backgroundColor, ink: surface.color };
         });
         expect(colors.background).toBe(
-          colorScheme === "dark" ? "rgb(9, 9, 9)" : "rgb(251, 250, 248)"
+          colorScheme === "dark" ? "rgb(16, 14, 13)" : "rgb(251, 250, 248)"
         );
-        expect(colors.ink).toBe(colorScheme === "dark" ? "rgb(247, 246, 243)" : "rgb(23, 23, 23)");
+        expect(colors.ink).toBe(colorScheme === "dark" ? "rgb(247, 243, 237)" : "rgb(33, 30, 27)");
       });
     }
   });

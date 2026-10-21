@@ -55,7 +55,7 @@ export function CareerBlueprint({ role }: { role: string | null }) {
       </div>
 
       {error ? (
-        <p className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm">{error}</p>
+        <p className="mt-3 rounded-md border border-warning/40 bg-warning/10 p-2 text-sm">{error}</p>
       ) : null}
 
       {blueprint ? (

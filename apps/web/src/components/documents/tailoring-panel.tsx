@@ -83,7 +83,7 @@ export function TailoringPanel({
 
       <p className="mt-2 text-[11px] text-muted-foreground">{standard.notes}</p>
 
-      {message ? <p className="mt-3 text-xs text-amber-500">{message}</p> : null}
+      {message ? <p className="mt-3 text-xs text-warning">{message}</p> : null}
 
       {review ? (
         <div className="mt-4 space-y-3 border-t border-border/60 pt-3">

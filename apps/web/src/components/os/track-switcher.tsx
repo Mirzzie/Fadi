@@ -100,8 +100,9 @@ export function TrackSwitcher() {
     <>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
-          title="Switch career track"
-          className="flex max-w-[12rem] items-center gap-1.5 rounded-full border border-border/70 bg-muted/40 px-2.5 py-1 font-medium text-foreground transition-colors hover:bg-muted"
+          title={`Switch direction: ${active?.label ?? "your direction"}`}
+          aria-label={`Switch direction: ${active?.label ?? "your direction"}`}
+          className="flex min-w-0 max-w-[5rem] items-center gap-1 rounded-full border border-border/70 bg-muted/40 px-2 py-1 font-medium text-foreground transition-colors hover:bg-muted sm:max-w-[12rem] sm:gap-1.5 sm:px-2.5"
         >
           <Target className="size-3 shrink-0 text-primary" aria-hidden="true" />
           <span className="truncate">{active?.label ?? "Career track"}</span>

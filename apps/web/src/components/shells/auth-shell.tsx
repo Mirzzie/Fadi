@@ -14,17 +14,17 @@ type AuthShellProps = {
 };
 
 const signUpPoints = [
-  "Turn your real evidence into tailored applications",
-  "Surface jobs that match your actual skills",
-  "Close your gaps with a clear learning path",
-  "Track every application in one place",
+  "Bring your experience and constraints into view",
+  "Compare opportunities with your chosen direction",
+  "Practise the work and review what you learned",
+  "Keep applications and outcomes connected",
 ];
 
 const signInPoints = [
-  "New job matches since your last visit",
-  "Updated recommendations for your target market",
-  "Your active learning path, continued",
-  "Everything, in one calm workspace",
+  "Review your current direction and next step",
+  "Continue saved applications and practice",
+  "Record outcomes, not just completed tasks",
+  "Change course when your circumstances change",
 ];
 
 /**
@@ -62,12 +62,12 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
                 Your career, as one system
               </p>
               <h1 className="max-w-xl font-heading text-5xl font-semibold leading-[0.98] tracking-[-0.04em] text-balance xl:text-6xl">
-                {isSignUp ? "Everything you need, in one place." : "Welcome back."}
+                {isSignUp ? "Start with your next move." : "Welcome back."}
               </h1>
               <p className="max-w-md leading-relaxed text-muted-foreground">
                 {isSignUp
-                  ? "Evidence in, applications out — nothing invented. Fadi helps you claim every true thing at its full strength."
-                  : "Pick up exactly where you left off. Fadi kept working while you were away."}
+                  ? "Connect your experience, the work you want and the steps you take. Review what goes into your career record."
+                  : "Return to your plans, applications and practice. Review what changed before deciding what to do next."}
               </p>
             </div>
 
@@ -87,9 +87,9 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
 
             <div className="max-w-lg border-l-2 border-primary pl-4">
               <p className="text-xs leading-relaxed text-muted-foreground">
-                <span className="font-medium text-foreground">Private by default.</span> Every external action —
-                applications, messages, profile updates — needs your explicit sign-off. Nothing leaves the system
-                without you.
+                <span className="font-medium text-foreground">Review before acting.</span> Approving a draft
+                is separate from sending or publishing it. AI features process relevant content with your
+                selected provider; check your connections and permissions in Settings.
               </p>
             </div>
           </div>

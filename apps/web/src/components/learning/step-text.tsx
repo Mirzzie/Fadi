@@ -112,7 +112,7 @@ export function CommandBlock({
             >
               {typed ? (
                 <>
-                  <Check className="size-3 text-emerald-400" aria-hidden="true" /> Typed
+                  <Check className="size-3 text-success" aria-hidden="true" /> Typed
                 </>
               ) : (
                 <>
@@ -129,7 +129,7 @@ export function CommandBlock({
           >
             {copied ? (
               <>
-                <Check className="size-3 text-emerald-400" aria-hidden="true" /> Copied
+                <Check className="size-3 text-success" aria-hidden="true" /> Copied
               </>
             ) : (
               <>

@@ -12,12 +12,12 @@ export function TruthReport({ findings }: { findings: TruthFinding[] }) {
 
   if (findings.length === 0) {
     return (
-      <div className="flex items-center gap-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-2.5 text-sm text-emerald-100">
-        <span aria-hidden className="text-emerald-400">
+      <div className="flex items-center gap-2.5 rounded-lg border border-success/30 bg-success/5 px-4 py-2.5 text-sm text-success">
+        <span aria-hidden className="text-success">
           ✓
         </span>
         <span className="font-medium">No unsupported claim was detected.</span>
-        <span className="text-emerald-200/60">
+        <span className="text-foreground">
           Automated checks cover figures, borrowed job terms and seniority—not every possible claim.
         </span>
       </div>
@@ -56,16 +56,16 @@ function Section({
   const styles =
     tone === "block"
       ? {
-          box: "border-red-500/30 bg-red-500/5",
-          head: "text-red-100",
-          dot: "bg-red-400",
-          chip: "bg-red-500/15 text-red-100",
+          box: "border-destructive/30 bg-destructive/5",
+          head: "text-destructive",
+          dot: "bg-destructive",
+          chip: "bg-card text-destructive",
         }
       : {
-          box: "border-amber-500/30 bg-amber-500/5",
-          head: "text-amber-100",
-          dot: "bg-amber-400",
-          chip: "bg-amber-500/15 text-amber-100",
+          box: "border-warning/30 bg-warning/5",
+          head: "text-warning",
+          dot: "bg-warning",
+          chip: "bg-card text-warning",
         };
 
   return (

@@ -7,10 +7,10 @@ import { ChevronRight } from "lucide-react";
 import { listComputerLabsAction, type ComputerLabView } from "@/app/dashboard/learning/lab-actions";
 
 function dot(phase: string) {
-  if (phase === "ready") return "bg-emerald-500";
+  if (phase === "ready") return "bg-success";
   if (phase === "failed") return "bg-destructive";
   if (phase === "stopped") return "bg-muted-foreground/40";
-  return "animate-pulse bg-amber-500";
+  return "animate-pulse bg-warning";
 }
 
 /** Each project's lab on this computer; starting and stopping happen in the project. */

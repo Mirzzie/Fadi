@@ -96,7 +96,8 @@ export function LearningShell({
           Learning and practice
         </h1>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-          Build toward {direction}. Continue your work or explore a new project.
+          Practise toward {direction} through projects, work simulations and interview preparation.
+          Continue your work, review feedback and keep a record of what you completed.
         </p>
       </header>
 

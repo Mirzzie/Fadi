@@ -88,9 +88,9 @@ export function LabDisks() {
             <span
               className={`size-2 shrink-0 rounded-full ${
                 lab.running
-                  ? "bg-emerald-500"
+                  ? "bg-success"
                   : lab.suggestRemoval
-                    ? "bg-amber-500"
+                    ? "bg-warning"
                     : "bg-muted-foreground/40"
               }`}
               aria-hidden="true"

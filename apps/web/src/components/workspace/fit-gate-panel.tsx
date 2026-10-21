@@ -9,14 +9,14 @@ import { evaluateJobFit } from "@/app/dashboard/applications/actions";
 import type { FitEvaluation, FitVerdict } from "@/lib/jobs/fit";
 
 const VERDICT_META: Record<FitVerdict, { label: string; cls: string; bar: string }> = {
-  apply: { label: "Worth applying", cls: "text-emerald-300 border-emerald-500/40 bg-emerald-500/10", bar: "bg-emerald-400" },
-  stretch: { label: "A stretch", cls: "text-amber-300 border-amber-500/40 bg-amber-500/10", bar: "bg-amber-400" },
-  skip: { label: "Probably skip", cls: "text-rose-300 border-rose-500/40 bg-rose-500/10", bar: "bg-rose-400" },
+  apply: { label: "Worth applying", cls: "text-success border-success/40 bg-success/10", bar: "bg-success" },
+  stretch: { label: "A stretch", cls: "text-warning border-warning/40 bg-warning/10", bar: "bg-warning" },
+  skip: { label: "Probably skip", cls: "text-destructive border-destructive/40 bg-destructive/10", bar: "bg-destructive" },
   // Gate outcomes, deliberately not on the green→red scale: they are the absence of a
   // recommendation, not a weak one. Rendering "blocked" as a slightly worse "skip"
   // would put it back on the axis the gate exists to leave.
-  check: { label: "Needs checking", cls: "text-sky-300 border-sky-500/40 bg-sky-500/10", bar: "bg-sky-400" },
-  blocked: { label: "Ruled out", cls: "text-rose-200 border-rose-500/60 bg-rose-500/20", bar: "bg-rose-500" },
+  check: { label: "Needs checking", cls: "text-info border-info/40 bg-info/10", bar: "bg-info" },
+  blocked: { label: "Ruled out", cls: "text-destructive border-destructive/50 bg-destructive/10", bar: "bg-destructive" },
 };
 
 export function FitGatePanel({

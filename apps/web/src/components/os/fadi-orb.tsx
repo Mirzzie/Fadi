@@ -44,6 +44,7 @@ export function FadiOrb({ tucked = false }: { tucked?: boolean } = {}) {
     <>
       {/* Ambient orb + proactive nudge — hidden while the panel is open. */}
       <div
+        inert={open || tucked}
         className={cn(
           "fixed bottom-20 right-5 z-40 flex flex-col items-end gap-2",
           (open || tucked) && "pointer-events-none opacity-0"
@@ -77,7 +78,7 @@ export function FadiOrb({ tucked = false }: { tucked?: boolean } = {}) {
 
         {/* What Fadi just heard and said. Already spoken — this is for whoever can see. */}
         {voice.on && voice.voiceProblem ? (
-          <div className="max-w-[18rem] rounded-2xl border border-amber-500/40 bg-amber-500/10 p-3 text-xs text-amber-200 shadow-xl backdrop-blur-xl">
+          <div className="max-w-[18rem] rounded-lg border border-warning/40 bg-card p-3 text-xs text-warning shadow-lg">
             {voice.voiceProblem}
           </div>
         ) : null}

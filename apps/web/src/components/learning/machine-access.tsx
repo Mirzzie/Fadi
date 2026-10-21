@@ -164,7 +164,7 @@ export function MachineAccess() {
         <History className="size-4 text-muted-foreground" aria-hidden="true" />
         <span className="flex-1">Everything Fadi did or tried</span>
         {denials.length > 0 ? (
-          <span className="text-xs text-amber-600 dark:text-amber-500">
+          <span className="text-xs text-warning">
             {denials.length} blocked
           </span>
         ) : null}
@@ -267,7 +267,7 @@ function RecordMachine({ found, onDone }: { found: Discovered; onDone: () => voi
   const [busy, start] = useTransition();
 
   return (
-    <div className="space-y-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/5 p-2.5">
+    <div className="space-y-1.5 rounded-md border border-success/40 bg-success/5 p-2.5">
       <p className="text-xs font-medium">
         {found.ip}
         {found.name ? " (" + found.name + ")" : ""} answered.

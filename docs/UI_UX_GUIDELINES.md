@@ -1,7 +1,7 @@
 # Fadi UI and UX guidelines
 
 **Status:** Current product standard for every new or changed surface
-**Updated:** 19 October 2026
+**Updated:** 21 October 2026
 
 Fadi should feel like one calm, capable career partner guiding one career journey. A screen is
 successful when a person can answer three questions without learning Fadi's architecture:
@@ -91,9 +91,10 @@ Use the navigation source in `apps/web/src/components/os/navigation.ts`:
 Profile and Settings belong to the account menu. Machines, permissions, provider health, audit
 events and raw logs are contextual or advanced controls.
 
-The four destinations remain visible. Desktop may use a slim, collapsible left rail when this
-improves scanning; mobile uses four labelled bottom destinations. Lab focus mode may collapse
-navigation so it never covers the remote desktop, terminal or primary action.
+The four destinations live in the owner's compact, hideable bottom dock on desktop and mobile.
+Do not add a competing left rail or destination tabs to the top utility bar. Lab focus mode may
+collapse navigation so it never covers the remote desktop, terminal or primary action. Reserve
+space for the dock while visible and keep its reveal control keyboard accessible.
 
 ## Product shell
 
@@ -393,6 +394,12 @@ tested light counterpart and respect its existing explicit theme selection.
 Do not copy template testimonials, client counts, client logos, imagery or outcome promises.
 Illustrative product previews must say they are examples, not the person's account state.
 
+The additional [Mara Voss reference](https://diligent-tetragon-837366.framer.app/) contributes
+warm layered surfaces, compact translucent navigation and brief hover transitions. REA observed
+14px navigation blur and roughly 150ms transitions. Its Bone/Tangerine/Ink backdrop selector is
+not evidence of automatic light/dark support. Do not transfer its huge portfolio typography,
+portrait composition or continuous decorative motion to task screens.
+
 ### Primary direction: Pipecat
 
 The interface uses Pipecat's visual discipline as its main reference:
@@ -425,16 +432,21 @@ Do not copy Paperclip's agent-company dashboard density, org chart, budgets or a
 
 Fadi retains:
 
-- a Pipecat-inspired indigo signal family on zinc neutrals, with restrained yellow reserved for attention;
+- three semantic palettes: Ember (warm coral), Iris (violet), Cobalt (blue, not teal/cyan);
 - the four career destinations;
 - approachable career language;
 - the Fadi presence mark, integrated into the shell rather than floating over work;
 - dark focus mode where it improves labs, terminals and live interviews;
-- light and dark themes with the same hierarchy and contrast.
+- Light, Dark and Follow system modes with the same hierarchy and contrast.
 
-Existing gradients, aurora backgrounds, glass panels, large corner radii, glowing card borders and
-floating navigation are legacy patterns unless a specific brand moment justifies them. They are not
-the default visual system.
+`apps/web/src/app/appearance.css` owns palette and surface tokens, including public portfolio
+and export aliases. Browser-local preferences use the existing theme key plus one palette key;
+they are not account-synchronised or published as the portfolio owner's branding. Settings and
+the public appearance disclosure use the same preference implementation.
+
+Subtle glass belongs to navigation and overlays, with opaque fallbacks for unsupported blur,
+reduced transparency, high contrast and forced colours. Editors, assessments, approvals and lab
+work remain opaque. Avoid glowing card borders, repeating background grids and oversized radii.
 
 ### Component grammar
 
@@ -447,9 +459,18 @@ the default visual system.
 - Use semantic colours for success, caution, danger and blocked state.
 - Keep colour, type, spacing, radius, shadow and motion in one token source.
 
-Hierarchy comes from structure, typography and whitespace. Glass, glow, animated grids and
-holographic decoration are limited to rare brand moments and Fadi presence. They do not wrap routine
-content or compete with state and action.
+Hierarchy comes from structure, typography and whitespace. Glass is restrained chrome, not a
+substitute for readable contrast. Glow and decorative texture are limited to brand moments and
+Fadi presence; they do not wrap routine content or compete with state and action.
+
+### Content follows the product contract
+
+Describe the current direction, applications, practice, career record and outcomes concretely.
+The Adaptive Career Loop is the wider direction, not permission to advertise unfinished research,
+strategy, continuous monitoring or automated eligibility decisions as available. Separate current
+capability from planned capability. Keep person-stated choices distinct from observed evidence and
+verified checks; do not flatten them into one score. Avoid guaranteed jobs, universal eligibility,
+"nothing invented", "always working" or "nothing leaves" claims without enforceable evidence.
 
 Motion has named tokens and a purpose: orient, acknowledge or show continuity. Respect reduced
 motion. Do not use ambient animation around urgent decisions, text entry or remote desktops.

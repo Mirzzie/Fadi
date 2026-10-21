@@ -398,10 +398,10 @@ export function ProjectWorkspace({ runId }: { runId: string }) {
               <span
                 className={`size-2 shrink-0 rounded-full ${
                   conductor?.ready
-                    ? "bg-emerald-500"
+                    ? "bg-success"
                     : runtime?.phase === "failed"
                       ? "bg-destructive"
-                      : "bg-amber-500"
+                      : "bg-warning"
                 }`}
                 aria-hidden="true"
               />
@@ -680,7 +680,7 @@ function CurrentStep({
 
       {step.verify ? (
         <p className="mt-3 text-sm">
-          <span className="font-medium text-emerald-600 dark:text-emerald-400">Done when </span>
+          <span className="font-medium text-success">Done when </span>
           <span className="text-muted-foreground">{step.verify}</span>
         </p>
       ) : null}
@@ -1019,7 +1019,7 @@ function StartPracticeOver({ runId }: { runId: string }) {
       <Button size="sm" variant="ghost" disabled={busy} onClick={() => setAsking(false)}>
         Cancel
       </Button>
-      {note ? <span className="w-full text-amber-600">{note}</span> : null}
+      {note ? <span className="w-full text-warning">{note}</span> : null}
     </div>
   );
 }
@@ -1134,7 +1134,7 @@ function Replan({ runId, onReplanned }: { runId: string; onReplanned: () => Prom
       >
         Cancel
       </Button>
-      {note ? <span className="w-full text-amber-600">{note}</span> : null}
+      {note ? <span className="w-full text-warning">{note}</span> : null}
     </div>
   );
 }
@@ -1204,7 +1204,7 @@ function FreshStart({ runId, onPlanned }: { runId: string; onPlanned: () => Prom
       >
         {busy ? "Planning…" : "Plan the steps"}
       </Button>
-      {note ? <p className="mt-2 text-xs text-amber-600">{note}</p> : null}
+      {note ? <p className="mt-2 text-xs text-warning">{note}</p> : null}
     </section>
   );
 }
@@ -1229,7 +1229,7 @@ function PassedNote({
   onClose: () => void;
 }) {
   return (
-    <section className="border border-emerald-500/30 bg-card px-5 py-4">
+    <section className="border border-success/30 bg-card px-5 py-4">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-medium">“{passed.title}” passed.</p>
         <button

@@ -4,10 +4,10 @@ import { cn } from "@/lib/utils";
  * Fadi logo — a calligraphic nod to فادي ("one who helps / saves"). The mark is
  * a flowing brush form of the Arabic letter ف (fā, the initial of فادي): an open
  * bowl that sweeps into a rising tail, crowned by the letter's single dot. Rendered
- * in the product signal gradient (indigo → violet).
+ * using the current palette's accessible primary signal.
  *
- * - variant="tile"  → rounded app-icon square (white mark on the gradient).
- * - variant="mark"  → the stroke alone in the gradient, on a transparent ground.
+ * - variant="tile"  → rounded app-icon square (contrasting mark on the signal).
+ * - variant="mark"  → the signal-coloured stroke on a transparent ground.
  * Size with a className (e.g. `size-5`).
  */
 export function FadiLogo({
@@ -22,7 +22,7 @@ export function FadiLogo({
   // Deterministic id (no hook → works in Server Components). Duplicate defs across
   // instances are harmless: url(#id) resolves to the first, and the stops match.
   const gid = `fadi-logo-${variant}`;
-  const stroke = variant === "tile" ? "white" : `url(#${gid})`;
+  const stroke = variant === "tile" ? "var(--primary-foreground, white)" : `url(#${gid})`;
 
   return (
     <svg
@@ -34,8 +34,8 @@ export function FadiLogo({
       <title>{title}</title>
       <defs>
         <linearGradient id={gid} x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#7d87ff" />
-          <stop offset="1" stopColor="#584dfc" />
+          <stop offset="0" stopColor="var(--primary, #b93224)" />
+          <stop offset="1" stopColor="var(--primary, #b93224)" />
         </linearGradient>
       </defs>
 

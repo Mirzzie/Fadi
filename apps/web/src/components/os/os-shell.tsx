@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 
 import { CareerModeProvider, useCareerMode } from "./career-mode";
 import type { CareerMode } from "@/app/dashboard/mode";
@@ -55,6 +56,7 @@ function OsShellInner({
 }) {
   const pathname = usePathname();
   const { mode } = useCareerMode();
+  const [dockHidden, setDockHidden] = useState(false);
   // LAB FOCUS: a project's workspace holds a remote machine. The dock and the floating orb sat
   // on top of its taskbar and terminal (16 Oct 2026); there, navigation is the project's own back
   // link and Fadi opens from its state in the menu bar.
@@ -66,7 +68,7 @@ function OsShellInner({
     <div className="relative flex min-h-screen flex-col">
       <MenuBar working={working} />
       <main
-        className={`flex-1 ${focusWorkspace ? "px-2 pb-3 pt-3 sm:px-3" : "px-4 pb-24 pt-4 md:pt-5"}`}
+        className={`flex-1 ${focusWorkspace ? "px-2 pb-3 pt-3 sm:px-3" : `px-4 pt-4 md:pt-5 ${dockHidden ? "pb-[calc(3rem+env(safe-area-inset-bottom))]" : "pb-[calc(6rem+env(safe-area-inset-bottom))]"}`}`}
       >
         {/* Keyed by route + active direction + phase. Any of the three changing remounts the
             page so its content follows — client state re-seeds and the switch is felt. The
@@ -78,7 +80,7 @@ function OsShellInner({
           {children}
         </div>
       </main>
-      {focusWorkspace ? null : <Dock />}
+      {focusWorkspace ? null : <Dock hidden={dockHidden} onHiddenChange={setDockHidden} />}
       <CommandBar />
       <FadiOrb tucked={focusWorkspace} />
     </div>

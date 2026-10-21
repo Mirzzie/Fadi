@@ -1,14 +1,17 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Inter } from "next/font/google";
+import { Inter, Inter_Tight, JetBrains_Mono } from "next/font/google";
+import Script from "next/script";
+
+import { AppearanceRuntime } from "../../../web/src/components/providers/appearance-runtime";
+import { APPEARANCE_BOOTSTRAP } from "../../../web/src/lib/appearance/preferences";
 
 import "./globals.css";
 import data from "@export/data/portfolio.json";
 
-// Same faces as the live app (apps/web/src/app/layout.tsx) so the export matches:
-// Geist = sans (body + hero), Geist Mono = the mono eyebrows/labels, Inter = display.
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
-const inter = Inter({ variable: "--font-display", subsets: ["latin"] });
+// The same self-hosted faces and device-local appearance contract as the app.
+const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
+const interTight = Inter_Tight({ variable: "--font-inter-tight", subsets: ["latin"] });
+const jetbrainsMono = JetBrains_Mono({ variable: "--font-jetbrains-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: [data.site.title, data.site.headline].filter(Boolean).join(" | "),
@@ -19,9 +22,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} ${inter.variable} dark h-full antialiased`}
+      suppressHydrationWarning
+      data-palette="ember"
+      data-appearance="system"
+      className={`${inter.variable} ${interTight.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body style={{ margin: 0 }}>{children}</body>
+      <body style={{ margin: 0 }}>
+        <Script id="theme-init" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: APPEARANCE_BOOTSTRAP }} />
+        <AppearanceRuntime />
+        {children}
+      </body>
     </html>
   );
 }

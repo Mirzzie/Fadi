@@ -568,7 +568,7 @@ function ScoreCard({
         </div>
       ) : null}
       {score.strengths.length > 0 ? (
-        <Lines title="Strengths" items={score.strengths} tone="text-emerald-400" />
+        <Lines title="Strengths" items={score.strengths} tone="text-success" />
       ) : null}
       {score.improvements.length > 0 ? (
         <Lines title="To improve" items={score.improvements} tone="text-primary" />
@@ -587,7 +587,7 @@ function ScoreCard({
       {/* Close the loop — a practiced answer becomes a reusable story (your words, never invented). */}
       <div className="flex items-center gap-2 border-t pt-2">
         {saveState === "saved" ? (
-          <span className="flex items-center gap-1.5 text-xs text-emerald-400">
+          <span className="flex items-center gap-1.5 text-xs text-success">
             <Check className="size-3.5" aria-hidden="true" /> Saved to your story bank
           </span>
         ) : (
@@ -614,7 +614,7 @@ function Lines({ title, items, tone }: { title: string; items: string[]; tone: s
             key={i}
             className={cn(
               "text-sm",
-              tone === "text-emerald-400" ? "text-foreground/90" : "text-foreground/90"
+              tone === "text-success" ? "text-foreground/90" : "text-foreground/90"
             )}
           >
             • {it}

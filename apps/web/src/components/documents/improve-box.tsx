@@ -202,7 +202,7 @@ export function ImproveBox({
       {warnings.length > 0 ? (
         <ul className="mt-2 space-y-1">
           {warnings.map((warning) => (
-            <li key={warning} className="text-xs text-amber-500">
+            <li key={warning} className="text-xs text-warning">
               {warning}
             </li>
           ))}

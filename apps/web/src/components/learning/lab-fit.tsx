@@ -115,12 +115,12 @@ export function LabFit({ title, detail }: { title: string; detail?: string | nul
       ) : (
         <div className="mt-1.5 space-y-1">
           {plan.fits.map((f) => (
-            <p key={f.id} className="flex items-center gap-1.5 text-emerald-400">
+            <p key={f.id} className="flex items-center gap-1.5 text-success">
               <Check className="size-3.5 shrink-0" aria-hidden="true" /> {f.label}
             </p>
           ))}
           {plan.unverified.map((u) => (
-            <p key={u.id} className="flex items-start gap-1.5 text-amber-300">
+            <p key={u.id} className="flex items-start gap-1.5 text-warning">
               <HelpCircle className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
               <span>
                 {u.label} — not enough recorded to say. {u.checks.join("; ")}.
@@ -433,9 +433,9 @@ function DetectHere({ onSaved }: { onSaved: () => void }) {
   // so "allow" means something specific rather than "allow everything, presumably".
   if (needsGrant.length > 0) {
     return (
-      <div className="w-full space-y-2 rounded-md border border-amber-500/40 bg-amber-500/5 p-2.5">
+      <div className="w-full space-y-2 rounded-md border border-warning/40 bg-warning/5 p-2.5">
         <p className="flex items-center gap-1.5 text-xs font-medium">
-          <ShieldQuestion className="size-3.5 text-amber-600" aria-hidden="true" />
+          <ShieldQuestion className="size-3.5 text-warning" aria-hidden="true" />
           Fadi needs your permission first
         </p>
         {needsGrant.map((g) => (
@@ -571,7 +571,7 @@ function FindOnNetwork() {
 
   if (ask) {
     return (
-      <div className="w-full space-y-1.5 rounded-md border border-amber-500/40 bg-amber-500/5 p-2.5">
+      <div className="w-full space-y-1.5 rounded-md border border-warning/40 bg-warning/5 p-2.5">
         <p className="text-[11px] font-medium">{ask.summary}</p>
         <p className="text-[11px] text-muted-foreground">{ask.limit}</p>
         <div className="flex gap-2">

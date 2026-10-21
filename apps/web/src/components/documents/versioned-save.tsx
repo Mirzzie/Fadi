@@ -90,7 +90,7 @@ export function DocumentSaveIndicator({ status }: { status: DocumentSaveStatus }
   if (status === "saved") {
     return (
       <span className="flex items-center gap-1 text-xs text-muted-foreground">
-        <Check className="size-3 text-emerald-400" aria-hidden="true" /> Saved
+        <Check className="size-3 text-success" aria-hidden="true" /> Saved
       </span>
     );
   }
@@ -98,7 +98,7 @@ export function DocumentSaveIndicator({ status }: { status: DocumentSaveStatus }
     return (
       <button
         type="button"
-        className="flex items-center gap-1 text-xs font-medium text-amber-500 underline-offset-2 hover:underline"
+        className="flex items-center gap-1 text-xs font-medium text-warning underline-offset-2 hover:underline"
         onClick={() => window.open(window.location.href, "_blank", "noopener,noreferrer")}
         title="Your edits stay in this tab so you can compare or copy them"
       >

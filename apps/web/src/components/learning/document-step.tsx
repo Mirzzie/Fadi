@@ -152,7 +152,7 @@ export function DocumentStep({
         <ol className="mt-3 space-y-1.5 rounded-lg bg-muted/50 p-3 text-sm leading-relaxed">
           {hints.map((hint, index) => (
             <li key={index} className="flex gap-2">
-              <Lightbulb className="mt-0.5 size-4 shrink-0 text-amber-500" aria-hidden="true" />
+              <Lightbulb className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
               <span>{hint}</span>
             </li>
           ))}
@@ -343,9 +343,9 @@ export function ReviewResult({ review }: { review: ReviewView }) {
         {review.results.map((result) => (
           <li key={result.id} className="flex gap-2 text-sm">
             {result.level === "not_yet" ? (
-              <X className="mt-0.5 size-4 shrink-0 text-amber-600" aria-hidden="true" />
+              <X className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
             ) : (
-              <Check className="mt-0.5 size-4 shrink-0 text-emerald-500" aria-hidden="true" />
+              <Check className="mt-0.5 size-4 shrink-0 text-success" aria-hidden="true" />
             )}
             <div className="min-w-0">
               <p>

@@ -2,6 +2,7 @@ import { ArrowDown, ArrowRight, Check, Plus } from "lucide-react";
 import Link from "next/link";
 
 import { FadiLogo } from "@/components/brand/fadi-logo";
+import { AppearanceSettings } from "@/components/settings/appearance-settings";
 import styles from "./home.module.css";
 
 const steps = [
@@ -26,6 +27,10 @@ const steps = [
 ];
 
 const questions = [
+  {
+    question: "Is Fadi a fully automatic career planner?",
+    answer: "Not yet. This workspace connects your direction, applications, practice and career record. Broader source-backed research and adaptive strategies are being developed; a generated suggestion is not a checked eligibility decision or a promise of a job.",
+  },
   {
     question: "Where should I start?",
     answer:
@@ -60,7 +65,7 @@ export default function Home() {
         Skip to content
       </a>
       <header className={styles.header}>
-        <nav className={styles.nav} aria-label="Main navigation">
+        <nav className={`${styles.nav} fadi-glass`} aria-label="Main navigation">
           <Link href="/" className={styles.brand} aria-label="Fadi home">
             <span aria-hidden="true">
               <FadiLogo />
@@ -77,7 +82,7 @@ export default function Home() {
         </nav>
       </header>
       <main id="main">
-        <section className={styles.hero} aria-labelledby="hero-title">
+        <section className={`${styles.hero} fadi-appear`} aria-labelledby="hero-title">
           <p className={styles.eyebrow}>
             <span aria-hidden="true" /> Your career work, connected
           </p>
@@ -87,7 +92,7 @@ export default function Home() {
             career move into a <em>plan.</em>
           </h1>
           <p className={styles.intro}>
-            Find a direction. Practise the work. Prepare your next application.
+                Choose a direction. Practise the work. Prepare your next application.
             <br className={styles.desktopBreak} /> One workspace for the steps in between.
           </p>
           <div className={styles.actions}>
@@ -192,6 +197,10 @@ export default function Home() {
       </main>
       <footer className={styles.footer}>
         <span>Fadi</span>
+        <details className={styles.appearance}>
+          <summary>Appearance</summary>
+          <AppearanceSettings compact />
+        </details>
         <p>AI assistance for career work. Review recommendations before acting.</p>
         <a href="/auth/sign-in">
           Sign in <ArrowRight aria-hidden="true" />

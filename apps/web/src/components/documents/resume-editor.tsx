@@ -551,7 +551,7 @@ export function ResumeEditor({
           not keep the green state from the server render. */}
       <TruthReport findings={truthFindings} />
       {claimCheckError ? (
-        <p role="alert" className="text-xs text-amber-300">
+        <p role="alert" className="text-xs text-warning">
           Claim check unavailable: {claimCheckError}
         </p>
       ) : null}

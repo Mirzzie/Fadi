@@ -103,7 +103,7 @@ export function ChecksSetup({ runId, tick }: { runId: string; tick: number }) {
           </span>
         </div>
       ) : null}
-      {note ? <p className="mt-2 text-amber-600">{note}</p> : null}
+      {note ? <p className="mt-2 text-warning">{note}</p> : null}
     </div>
   );
 }
