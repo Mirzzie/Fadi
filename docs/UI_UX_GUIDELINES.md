@@ -1,7 +1,7 @@
 # Fadi UI and UX guidelines
 
 **Status:** Current product standard for every new or changed surface
-**Updated:** 21 October 2026
+**Updated:** 25 October 2026
 
 Fadi should feel like one calm, capable career partner guiding one career journey. A screen is
 successful when a person can answer three questions without learning Fadi's architecture:
@@ -386,8 +386,9 @@ Conversion's marketing navigation is not an authenticated app-shell pattern.
 
 The reference's coral is `#ff4533`. Use a contrasting dark foreground for small text on this
 colour, and a darker coral foreground in light mode. Its observed typography is Satoshi plus
-Instrument Serif; the first adaptation retains Fadi's existing Inter family and uses a system
-serif emphasis rather than claiming an exact font match or importing unlicensed font files.
+Instrument Serif. The initial adaptation retained Inter; the composition pass uses self-hosted
+Mona Sans (also observed on Mara Voss) plus Instrument Serif editorial accents and JetBrains Mono
+for identifiers. This deliberately does not claim Satoshi and Mona Sans are identical faces.
 The reference remained dark under an emulated light preference: Fadi must supply a separately
 tested light counterpart and respect its existing explicit theme selection.
 
@@ -474,6 +475,15 @@ verified checks; do not flatten them into one score. Avoid guaranteed jobs, univ
 
 Motion has named tokens and a purpose: orient, acknowledge or show continuity. Respect reduced
 motion. Do not use ambient animation around urgent decisions, text entry or remote desktops.
+
+### Contextual orb guidance
+
+Guidance is explicitly requested through **Show me**. Reposition the existing orb beside an
+application-registered target; never add a second assistant or replace the person's cursor.
+Keep the target clickable, its action unchanged and Stop/Escape available. Highlighting or
+dismissing guidance never completes work. Target removal, disabling, hiding or leaving the visible
+viewport cancels the presentation. Reduced motion removes travel. The first slice is local UI
+guidance, not a new model-command capability or an automatic cross-route tour.
 
 ## Content and feedback
 

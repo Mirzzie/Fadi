@@ -1,7 +1,8 @@
-import { ArrowDown, ArrowRight, Check, Plus } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUpRight, Check, Plus } from "lucide-react";
 import Link from "next/link";
 
 import { FadiLogo } from "@/components/brand/fadi-logo";
+import { CareerPathArt } from "@/components/brand/career-path-art";
 import { AppearanceSettings } from "@/components/settings/appearance-settings";
 import styles from "./home.module.css";
 
@@ -82,7 +83,7 @@ export default function Home() {
         </nav>
       </header>
       <main id="main">
-        <section className={`${styles.hero} fadi-appear`} aria-labelledby="hero-title">
+        <section className={styles.hero} aria-labelledby="hero-title">
           <p className={styles.eyebrow}>
             <span aria-hidden="true" /> Your career work, connected
           </p>
@@ -92,12 +93,12 @@ export default function Home() {
             career move into a <em>plan.</em>
           </h1>
           <p className={styles.intro}>
-                Choose a direction. Practise the work. Prepare your next application.
+            Choose a direction. Practise the work. Prepare your next application.
             <br className={styles.desktopBreak} /> One workspace for the steps in between.
           </p>
           <div className={styles.actions}>
             <a className={styles.primary} href="/auth/sign-up">
-              Create your account <ArrowRight aria-hidden="true" />
+              Create your account <span className={styles.buttonArrow}><ArrowUpRight aria-hidden="true" /></span>
             </a>
             <a className={styles.secondary} href="#how">
               See how it works <ArrowDown aria-hidden="true" />
@@ -108,35 +109,8 @@ export default function Home() {
             <figcaption>
               One connected workflow <span>Illustrative example · not account data</span>
             </figcaption>
-            <div className={styles.example}>
-              <div className={styles.exampleContext}>
-                <span>YOUR DIRECTION</span>
-                <p>Work worth moving toward.</p>
-                <small>Opportunities → Practice → Your record</small>
-              </div>
-              <div className={styles.exampleSteps}>
-                <div>
-                  <span className={styles.stepMarker}>01</span>
-                  <p>
-                    Choose a role<small>Compare requirements with your experience.</small>
-                  </p>
-                </div>
-                <div>
-                  <span className={styles.stepMarker}>02</span>
-                  <p>
-                    Prepare the work<small>Draft, practise and review what needs attention.</small>
-                  </p>
-                </div>
-                <div>
-                  <span className={styles.stepMarker}>
-                    <Check aria-hidden="true" />
-                  </span>
-                  <p>
-                    Keep the outcome<small>Record what happened before taking the next step.</small>
-                  </p>
-                </div>
-              </div>
-            </div>
+            <CareerPathArt />
+            <p className={styles.artDescription}>Your direction → space to practise → a record to build on.</p>
           </figure>
         </section>
         <section id="how" className={styles.section} aria-labelledby="how-title">
@@ -151,14 +125,16 @@ export default function Home() {
           </div>
           <ol className={styles.steps}>
             {steps.map((step) => (
-              <li key={step.number}>
+              <li key={step.number} className={styles.chapter}>
                 <span className={styles.number}>{step.number}</span>
                 <div>
                   <p className={styles.kicker}>{step.label}</p>
                   <h3>{step.title}</h3>
                   <p>{step.body}</p>
                 </div>
-                <ArrowRight className={styles.stepArrow} aria-hidden="true" />
+                <div className={styles.chapterArt} aria-hidden="true">
+                  {step.number === "01" ? <><span /><span /><span /></> : step.number === "02" ? <><i /><ArrowUpRight /><i /></> : <><span /><Check /><span /></>}
+                </div>
               </li>
             ))}
           </ol>
@@ -191,7 +167,7 @@ export default function Home() {
           </h2>
           <p>Your experience, your direction, one useful step.</p>
           <a className={styles.primary} href="/auth/sign-up">
-            Create your account <ArrowRight aria-hidden="true" />
+            Create your account <span className={styles.buttonArrow}><ArrowUpRight aria-hidden="true" /></span>
           </a>
         </section>
       </main>

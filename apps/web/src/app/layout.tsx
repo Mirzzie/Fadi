@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Inter_Tight, JetBrains_Mono } from "next/font/google";
+import { Instrument_Serif, JetBrains_Mono, Mona_Sans } from "next/font/google";
 import Script from "next/script";
 
 import { QueryProvider } from "@/components/providers/query-provider";
@@ -13,13 +13,16 @@ import "./globals.css";
 // hydration — unlike a raw <script> element, which React 19 flags ("scripts inside
 // React components are never executed on the client").
 
-const inter = Inter({
+// Keep the legacy CSS variable name so existing consumers share the same new face.
+const inter = Mona_Sans({
   variable: "--font-inter",
   subsets: ["latin"],
 });
 
-const interTight = Inter_Tight({
-  variable: "--font-inter-tight",
+const editorial = Instrument_Serif({
+  variable: "--font-editorial",
+  weight: "400",
+  style: ["normal", "italic"],
   subsets: ["latin"],
 });
 
@@ -55,7 +58,7 @@ export default function RootLayout({
       suppressHydrationWarning
       data-palette="ember"
       data-appearance="system"
-      className={`${inter.variable} ${interTight.variable} ${jetbrainsMono.variable} h-full antialiased`}
+      className={`${inter.variable} ${editorial.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
         <Script id="theme-init" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: APPEARANCE_BOOTSTRAP }} />

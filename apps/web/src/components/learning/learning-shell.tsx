@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BookOpen, GraduationCap, Map, MonitorPlay, Target } from "lucide-react";
+import { ArrowUpRight, BookOpen, GraduationCap, Map, MonitorPlay, Target } from "lucide-react";
 
 import type { RunView } from "@/app/dashboard/learning/lab-actions";
 import { CommitmentsList, GapGrowth } from "@/components/learning/gap-growth";
@@ -13,6 +13,7 @@ import { buildPracticeHome } from "@/lib/learning/practice-home";
 import { learningResources } from "@/lib/learning/resources";
 import { installedActivities } from "@/lib/practice/packs";
 import { practiceSimulation } from "@/lib/learning/practice-simulation";
+import styles from "./learning-shell.module.css";
 
 /** Free reference links for a skill. ("Build a project" lives in the AI suggest
  *  button below — one concept, one control, no duplicate.) */
@@ -54,13 +55,8 @@ type Props = {
 };
 
 /**
- * CONTINUE, RECOMMENDED NEXT, AND EVERYTHING ELSE — laid out wide, nothing folded away.
- *
- * This page used to lay out the running projects, the report's route, every gap, a second
- * generated plan and the commitments one under another, and leave the person to work out which
- * one mattered. Fadi makes that call now (lib/learning/practice-home.ts) and puts its two
- * answers side by side at the top. The rest sits in open panels below: hidden content behind
- * dropdowns was harder to find than a wide page, so nothing here collapses.
+ * One continuation, then deliberately quieter discovery. buildPracticeHome remains the
+ * authority for what is current; composition adds no local progress or completion state.
  */
 export function LearningShell({
   report,
@@ -87,69 +83,64 @@ export function LearningShell({
   ];
 
   return (
-    <div className="workspace-page space-y-6 pb-8">
-      <header className="border-b border-border pb-5 pt-2">
-        <p className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          Practice
-        </p>
-        <h1 className="max-w-4xl font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
-          Learning and practice
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-          Practise toward {direction} through projects, work simulations and interview preparation.
-          Continue your work, review feedback and keep a record of what you completed.
-        </p>
+    <div className={`workspace-page ${styles.page}`}>
+      <header className={styles.header}>
+        <div>
+          <p className={styles.eyebrow}>Practice / Learning</p>
+          <h1 className={styles.title}>
+            Make room for <span>real work.</span>
+          </h1>
+          <p className={styles.introduction}>
+            Build, rehearse and learn from feedback. Keep a record of the work you complete.
+          </p>
+        </div>
+        <div className={styles.direction}>
+          <span className={styles.directionMark} aria-hidden="true">
+            <Target size={20} />
+          </span>
+          <div>
+            <p className={styles.eyebrow}>Your direction</p>
+            <p className={styles.directionName}>{direction}</p>
+          </div>
+        </div>
       </header>
 
-      {home.continue ? (
-        <section className="space-y-3">
-          <SectionHeading icon={MonitorPlay} eyebrow="Continue" title="Where you left off" />
-          {home.continue?.kind === "run" ? (
-            <ProjectCard run={home.continue.run} featured />
-          ) : home.continue?.kind === "commitment" ? (
-            <CommitmentsList commitments={[home.continue.commitment]} heading={null} />
-          ) : (
-            <p className="border-y border-dashed border-border py-5 text-sm text-muted-foreground">
-              Nothing in progress. Take on one of the flagship projects below.
-            </p>
-          )}
-        </section>
-      ) : null}
-
-      {simulation ? (
-        <details className="group border-y border-border">
-          <summary className="cursor-pointer py-4 text-sm font-semibold">
-            Explore a work simulation
-          </summary>
-          <section className="border-t border-border bg-card py-5">
-            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Work simulation{simulation.experimental ? " · experimental" : ""}
-            </p>
-            <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-              <div className="max-w-2xl">
-                <h2 className="font-heading text-2xl font-semibold tracking-tight">
-                  {simulation.title}
-                </h2>
-                <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                  {simulation.description}
-                  {simulation.experimental ? " Not yet practitioner-reviewed." : ""}
-                </p>
-              </div>
-              <Link
-                href={simulation.href}
-                className="inline-flex h-10 shrink-0 items-center justify-center rounded-md border border-border px-4 text-sm font-medium hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
-              >
-                View simulation
-              </Link>
+      <div className={home.continue && simulation ? styles.focusGrid : styles.focusSingle}>
+        {home.continue ? (
+          <section className={styles.continuation}>
+            <SectionHeading icon={MonitorPlay} eyebrow="Continue" title="Where you left off" />
+            <div className={styles.currentWork}>
+              {home.continue.kind === "run" ? (
+                <ProjectCard run={home.continue.run} featured />
+              ) : (
+                <CommitmentsList commitments={[home.continue.commitment]} heading={null} />
+              )}
             </div>
           </section>
-        </details>
-      ) : null}
+        ) : null}
+
+        {simulation ? (
+          <section className={styles.simulation}>
+            <div className={styles.simulationTop}>
+              <p className={styles.eyebrow}>Explore a work simulation</p>
+              <BookOpen size={18} aria-hidden="true" />
+            </div>
+            <h2>{simulation.title}</h2>
+            <p className={styles.simulationDescription}>{simulation.description}</p>
+            {simulation.experimental ? (
+              <p className={styles.experimental}>Experimental · not yet practitioner-reviewed</p>
+            ) : null}
+            <Link href={simulation.href} className={styles.simulationLink}>
+              View simulation <ArrowUpRight size={16} aria-hidden="true" />
+            </Link>
+          </section>
+        ) : null}
+      </div>
 
       {/* Two or three substantial projects beat a pile of small ones. Each answers a problem
           organisations are dealing with now, cited, so the finished work reads as someone who
           can take such a problem on — the smaller gap-closing steps sit below. */}
-      <section className="space-y-3">
+      <section className={styles.flagships}>
         <SectionHeading
           icon={Target}
           eyebrow="Flagship projects"
@@ -164,8 +155,8 @@ export function LearningShell({
         />
       </section>
 
-      <details className="group border-y border-border">
-        <summary className="flex cursor-pointer list-none items-center justify-between py-4 text-sm font-semibold marker:hidden">
+      <details className={`group ${styles.disclosure}`}>
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 py-4 text-sm font-semibold marker:hidden">
           <span>Browse other learning work</span>
           <span className="font-mono text-xs font-normal text-muted-foreground group-open:hidden">
             {inProgressCount + gapList.length + browse.finished.length} items
@@ -254,7 +245,7 @@ export function LearningShell({
         </div>
       </details>
 
-      <details className="group border-y border-border">
+      <details className={`group ${styles.disclosure}`}>
         <summary className="cursor-pointer list-none py-4 marker:hidden">
           <SectionHeading icon={Map} eyebrow="Longer plan" title="Where this leads" />
         </summary>
@@ -302,7 +293,7 @@ function SectionHeading({
   detail?: string;
 }) {
   return (
-    <div className="flex items-start gap-2.5">
+    <div className={styles.sectionHeading}>
       <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       <div>
         <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">

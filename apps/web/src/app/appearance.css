@@ -1,5 +1,9 @@
 /* Authoritative app palette. Themes change tokens, never a page's workflow/layout. */
 :root[data-palette] {
+  --font-inter-tight: var(--font-inter);
+  --ease-surface: cubic-bezier(.22, 1, .36, 1);
+  --motion-enter: 600ms;
+  --surface-shadow: 0 16px 48px color-mix(in srgb, var(--foreground) 5%, transparent), inset 0 1px 0 color-mix(in srgb, var(--card) 80%, transparent);
   --background: #fbfaf8;
   --foreground: #211e1b;
   --card: #ffffff;
@@ -140,7 +144,7 @@
   .fadi-glass { background: Canvas; border: 1px solid CanvasText; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  :root[data-palette] { --motion-fast: 0ms; }
+  :root[data-palette] { --motion-fast: 0ms; --motion-enter: 0ms; }
 }
 .appearance-settings { scroll-margin-top: 5rem; padding-block: 1.5rem; border-block: 1px solid var(--border); }
 .appearance-choice { display: flex; align-items: center; gap: .65rem; min-height: 44px; padding: .5rem .75rem; border: 1px solid var(--border); border-radius: var(--surface-radius); background: var(--card); color: var(--foreground); cursor: pointer; font-size: .875rem; }

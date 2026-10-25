@@ -76,5 +76,5 @@ test("blocked storage retains a usable session and explains that it is not saved
 test("reduced motion stops the decorative entry transition", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/");
-  expect(await page.locator(".fadi-appear").evaluate(x => getComputedStyle(x).animationName)).toBe("none");
+  expect(await page.getByRole("heading", { level: 1 }).evaluate(x => getComputedStyle(x).animationName)).toBe("none");
 });

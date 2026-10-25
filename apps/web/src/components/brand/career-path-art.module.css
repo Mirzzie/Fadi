@@ -1,0 +1,188 @@
+.scene {
+  position: relative;
+  min-height: 350px;
+  width: 100%;
+  isolation: isolate;
+}
+.light {
+  position: absolute;
+  inset: 8% 5%;
+  z-index: -1;
+  background: radial-gradient(
+    ellipse,
+    color-mix(in srgb, var(--brand-soft) 22%, transparent),
+    transparent 67%
+  );
+}
+.paths {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  stroke: color-mix(in srgb, var(--primary) 24%, var(--border));
+  stroke-width: 0.8;
+}
+.paths ellipse:first-child {
+  stroke-dasharray: 2 7;
+}
+.note {
+  position: absolute;
+  width: 25%;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--surface-shadow);
+  color: var(--foreground);
+  text-align: left;
+  animation: arrive var(--motion-enter) var(--ease-surface) backwards;
+}
+.noteTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted-foreground);
+}
+.noteTop svg {
+  width: 14px;
+  height: 14px;
+}
+.noteTop svg:last-child {
+  margin-left: auto;
+}
+.noteTop span {
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 8px;
+  letter-spacing: 0.06em;
+}
+.note p {
+  margin-top: 18px;
+  font-family: var(--font-inter), sans-serif;
+  font-size: clamp(18px, 2.3vw, 25px);
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+}
+.note p em {
+  font-family: var(--font-editorial), Georgia, serif;
+  font-weight: 400;
+}
+.note > span {
+  font-size: 10px;
+  color: var(--muted-foreground);
+}
+.rule {
+  height: 1px;
+  margin: 18px 0 10px;
+  background: var(--border);
+}
+.direction {
+  left: 5%;
+  top: 22%;
+  transform: rotate(-5deg);
+  animation-delay: 80ms;
+}
+.work {
+  left: 37.5%;
+  top: 38%;
+  transform: rotate(2deg);
+  animation-delay: 160ms;
+}
+.record {
+  right: 5%;
+  top: 16%;
+  transform: rotate(5deg);
+  animation-delay: 240ms;
+}
+.core {
+  position: absolute;
+  left: calc(50% - 31px);
+  top: 13%;
+  display: grid;
+  width: 62px;
+  height: 62px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--card);
+  box-shadow: var(--surface-shadow);
+  transform: rotate(-8deg);
+}
+.core svg {
+  width: 42px;
+  height: 42px;
+}
+@keyframes arrive {
+  from {
+    opacity: 0;
+    translate: 0 18px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+@media (max-width: 640px) {
+  .scene {
+    min-height: 310px;
+  }
+  .note {
+    width: 43%;
+    padding: 13px;
+  }
+  .noteTop {
+    gap: 5px;
+  }
+  .noteTop svg {
+    width: 12px;
+    height: 12px;
+  }
+  .noteTop span {
+    font-size: 7px;
+  }
+  .noteTop svg:last-child {
+    display: none;
+  }
+  .note p {
+    font-size: 19px;
+    margin-top: 12px;
+  }
+  .note > span {
+    font-size: 9px;
+  }
+  .rule {
+    margin: 12px 0 7px;
+  }
+  .direction {
+    top: 8%;
+    left: 4%;
+  }
+  .work {
+    top: 43%;
+    left: 29%;
+    z-index: 1;
+  }
+  .record {
+    top: 7%;
+    right: 3%;
+  }
+  .core {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .note {
+    animation: none;
+  }
+}
+@media (forced-colors: active) {
+  .light {
+    display: none;
+  }
+  .note,
+  .core {
+    border-color: CanvasText;
+  }
+  .paths {
+    stroke: CanvasText;
+  }
+}
