@@ -1,5 +1,13 @@
 /** Local presentation only: target IDs are app-owned, never arbitrary model selectors. */
-export type GuideTargetId = "today.next" | "demo.direction" | "demo.practice";
+export type GuideTargetId =
+  | "today.next"
+  | "jobs.search"
+  | "documents.create"
+  | "record.add"
+  | "portfolio.preview"
+  | "interview.start"
+  | "demo.direction"
+  | "demo.practice";
 export type GuideTarget = {
   id: GuideTargetId;
   element: HTMLElement;

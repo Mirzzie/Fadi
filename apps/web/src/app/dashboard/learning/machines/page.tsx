@@ -3,6 +3,7 @@ import { Laptop } from "lucide-react";
 import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { PageIntro } from "@/components/layout/page-intro";
 import { ComputerLabs } from "@/components/learning/computer-labs";
 import { LabDisks } from "@/components/learning/lab-disks";
 import { LearningNavigation } from "@/components/learning/learning-navigation";
@@ -27,14 +28,16 @@ export default async function LearningMachinesPage() {
 
   return (
     <AppShell>
-      <main className="mx-auto w-full max-w-5xl space-y-6 pb-28">
+      <div className="mx-auto w-full max-w-5xl space-y-6 pb-12">
         <LearningNavigation />
 
         <section className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h1 className="font-heading text-3xl font-semibold tracking-tight">Machines</h1>
-            <MachineRegistration />
-          </div>
+          <PageIntro
+            eyebrow="Practice environments"
+            title="Machines"
+            description="Review where projects run and what Fadi is allowed to access."
+            actions={<MachineRegistration />}
+          />
           {/* The laptop is where labs run by default. It was never listed, so projects said
               "No machine selected" while a lab was running on it. */}
           <div className="overflow-hidden rounded-xl border border-border bg-card">
@@ -57,7 +60,7 @@ export default async function LearningMachinesPage() {
           <h2 className="text-sm font-semibold">Access</h2>
           <MachineAccess />
         </section>
-      </main>
+      </div>
     </AppShell>
   );
 }

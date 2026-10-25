@@ -101,7 +101,7 @@ export function InterviewPrepPanel({
       ) : null}
 
       {error ? (
-        <p className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm">
+        <p className="mt-2 rounded-md border border-warning/40 bg-warning/10 p-2 text-sm">
           {error}
         </p>
       ) : null}
@@ -120,7 +120,7 @@ export function InterviewPrepPanel({
               </div>
 
               {q.needsRealExample ? (
-                <p className="mt-1.5 rounded border-l-2 border-amber-500/50 bg-amber-500/10 py-1 pl-2 text-xs text-amber-200/90">
+                <p className="mt-1.5 rounded border-l-2 border-warning/50 bg-warning/10 py-1 pl-2 text-xs text-warning/90">
                   No real example on file for this yet — prepare one from your experience; Fadi
                   won&apos;t invent it.
                 </p>

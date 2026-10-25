@@ -39,10 +39,10 @@ function healthOf(s: JobSourceHealth): Health {
 }
 
 const DOT: Record<Health, string> = {
-  returning: "bg-emerald-400",
-  "live-empty": "bg-amber-400",
-  error: "bg-rose-400",
-  idle: "bg-sky-400",
+  returning: "bg-success",
+  "live-empty": "bg-warning",
+  error: "bg-destructive",
+  idle: "bg-info",
   "needs-key": "bg-muted-foreground/40",
   "off-optin": "bg-muted-foreground/40",
   "no-coverage": "bg-muted-foreground/40",
@@ -141,7 +141,7 @@ export function JobControlBar({
               {pending ? "Saving…" : "Save"}
             </button>
           ) : saved ? (
-            <span className="inline-flex items-center gap-1 text-xs text-emerald-500">
+            <span className="inline-flex items-center gap-1 text-xs text-success">
               <Check className="size-3.5" aria-hidden="true" /> Saved
             </span>
           ) : null}

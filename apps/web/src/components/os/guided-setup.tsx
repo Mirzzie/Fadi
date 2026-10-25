@@ -62,8 +62,8 @@ export function GuidedSetup({ setup }: { setup: SetupState }) {
               className={cn(
                 "grid size-5 shrink-0 place-items-center rounded-full border text-[0.7rem]",
                 step.done
-                  ? "border-emerald-400/40 bg-emerald-400/15 text-emerald-400"
-                  : "border-border/60 text-muted-foreground",
+                  ? "border-success/40 bg-success/15 text-success"
+                  : "border-border/60 text-muted-foreground"
               )}
             >
               {step.done ? <Check className="size-3" aria-hidden="true" /> : null}
@@ -71,7 +71,7 @@ export function GuidedSetup({ setup }: { setup: SetupState }) {
             <span
               className={cn(
                 "min-w-0 flex-1 text-sm",
-                step.done ? "text-muted-foreground line-through decoration-muted-foreground/40" : "",
+                step.done ? "text-muted-foreground line-through decoration-muted-foreground/40" : ""
               )}
             >
               {step.title}
@@ -94,7 +94,9 @@ export function GuidedSetup({ setup }: { setup: SetupState }) {
           className="flex items-center gap-2 border-t border-border/50 px-5 py-3 text-sm text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground"
         >
           <Compass className="size-4 shrink-0 text-primary" aria-hidden="true" />
-          <span className="flex-1">Not sure which path fits? Explore your options in the Niche Finder.</span>
+          <span className="flex-1">
+            Not sure which path fits? Explore your options in the Niche Finder.
+          </span>
           <ArrowRight className="size-3.5 shrink-0" aria-hidden="true" />
         </Link>
       ) : null}

@@ -33,7 +33,8 @@ export function AiProviderForm({ descriptors, initial }: Props) {
   const [fallbackOn, setFallbackOn] = useState(Boolean(initial?.fallbackProvider));
   const [fallback, setFallback] = useState<Slot>({
     provider: initial?.fallbackProvider ?? "ollama",
-    model: initial?.fallbackModel ?? findDesc(initial?.fallbackProvider ?? "ollama")?.defaultModel ?? "",
+    model:
+      initial?.fallbackModel ?? findDesc(initial?.fallbackProvider ?? "ollama")?.defaultModel ?? "",
     apiKey: "",
     baseUrl: initial?.fallbackBaseUrl ?? "",
   });
@@ -71,7 +72,7 @@ export function AiProviderForm({ descriptors, initial }: Props) {
           descriptors={descriptors}
           slot={primary}
           onChange={setPrimary}
-          savedHint={initial?.provider === primary.provider ? initial?.keyHint ?? null : null}
+          savedHint={initial?.provider === primary.provider ? (initial?.keyHint ?? null) : null}
         />
         <Button
           variant="outline"
@@ -94,7 +95,12 @@ export function AiProviderForm({ descriptors, initial }: Props) {
             </p>
           </div>
           {fallbackOn ? (
-            <Button variant="ghost" size="icon-sm" onClick={() => setFallbackOn(false)} aria-label="Remove fallback">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setFallbackOn(false)}
+              aria-label="Remove fallback"
+            >
               <X className="size-4" aria-hidden="true" />
             </Button>
           ) : (
@@ -110,7 +116,11 @@ export function AiProviderForm({ descriptors, initial }: Props) {
               descriptors={descriptors}
               slot={fallback}
               onChange={setFallback}
-              savedHint={initial?.fallbackProvider === fallback.provider ? initial?.fallbackKeyHint ?? null : null}
+              savedHint={
+                initial?.fallbackProvider === fallback.provider
+                  ? (initial?.fallbackKeyHint ?? null)
+                  : null
+              }
             />
             <Button
               variant="outline"
@@ -123,7 +133,7 @@ export function AiProviderForm({ descriptors, initial }: Props) {
                     baseUrl: fallback.baseUrl,
                     apiKey: fallback.apiKey,
                     role: "fallback",
-                  }),
+                  })
                 )
               }
               disabled={pending}
@@ -141,7 +151,7 @@ export function AiProviderForm({ descriptors, initial }: Props) {
             "flex items-start gap-2 rounded-lg border p-3 text-sm",
             status.ok
               ? "border-success/30 bg-success/10 text-success"
-              : "border-warning/30 bg-warning/10 text-warning",
+              : "border-warning/30 bg-warning/10 text-warning"
           )}
         >
           {status.ok ? (
@@ -160,7 +170,11 @@ export function AiProviderForm({ descriptors, initial }: Props) {
           Save
         </Button>
         {initial ? (
-          <Button variant="ghost" onClick={() => run(() => removeAiSettingsAction())} disabled={pending}>
+          <Button
+            variant="ghost"
+            onClick={() => run(() => removeAiSettingsAction())}
+            disabled={pending}
+          >
             Remove all
           </Button>
         ) : null}
@@ -199,7 +213,7 @@ function ProviderFields({
               "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
               slot.provider === d.id
                 ? "border-primary bg-primary/10 text-primary ring-1 ring-primary/30"
-                : "border-border text-muted-foreground hover:border-primary/40",
+                : "border-border text-muted-foreground hover:border-primary/40"
             )}
           >
             {d.label}
@@ -212,11 +226,15 @@ function ProviderFields({
           className={cn(
             "rounded-lg border px-3 py-2 text-xs",
             descriptor.cost === "paid"
-              ? "border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400"
-              : "border-emerald-500/25 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400",
+              ? "border-warning/30 bg-warning/5 text-warning "
+              : "border-success/25 bg-success/5 text-success "
           )}
         >
-          {descriptor.cost === "free" ? "✓ Free · " : descriptor.cost === "local" ? "✓ Local · " : "⚠ Paid · "}
+          {descriptor.cost === "free"
+            ? "✓ Free · "
+            : descriptor.cost === "local"
+              ? "✓ Local · "
+              : "⚠ Paid · "}
           {descriptor.note}
         </p>
       ) : null}
@@ -232,7 +250,9 @@ function ProviderFields({
             className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15"
           />
           <datalist id={`models-${descriptor?.id}`}>
-            {descriptor?.models.map((m) => <option key={m} value={m} />)}
+            {descriptor?.models.map((m) => (
+              <option key={m} value={m} />
+            ))}
           </datalist>
         </div>
 

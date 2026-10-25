@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { Suspense } from "react";
 
 import { ForgotPasswordForm } from "@/components/auth/forgot-password-form";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { PageIntro } from "@/components/layout/page-intro";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 
 export const metadata: Metadata = {
@@ -21,12 +22,13 @@ export default async function ForgotPasswordPage() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-background px-4">
-      <Card className="fadi-glow-sm w-full max-w-md">
+      <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-xl">Reset your password</CardTitle>
-          <CardDescription>
-            Enter your account email and we&apos;ll send a reset link.
-          </CardDescription>
+          <PageIntro
+            compact
+            title="Reset your password"
+            description="Enter your account email to request a reset link."
+          />
         </CardHeader>
         <CardContent className="space-y-5">
           <Suspense fallback={null}>
@@ -34,7 +36,10 @@ export default async function ForgotPasswordPage() {
           </Suspense>
           <p className="text-center text-sm text-muted-foreground">
             Remembered it?{" "}
-            <Link href="/auth/sign-in" className="font-medium text-primary underline-offset-4 hover:underline">
+            <Link
+              href="/auth/sign-in"
+              className="font-medium text-primary underline-offset-4 hover:underline"
+            >
               Sign in
             </Link>
           </p>

@@ -9,14 +9,30 @@ import { evaluateJobFit } from "@/app/dashboard/applications/actions";
 import type { FitEvaluation, FitVerdict } from "@/lib/jobs/fit";
 
 const VERDICT_META: Record<FitVerdict, { label: string; cls: string; bar: string }> = {
-  apply: { label: "Worth applying", cls: "text-success border-success/40 bg-success/10", bar: "bg-success" },
-  stretch: { label: "A stretch", cls: "text-warning border-warning/40 bg-warning/10", bar: "bg-warning" },
-  skip: { label: "Probably skip", cls: "text-destructive border-destructive/40 bg-destructive/10", bar: "bg-destructive" },
+  apply: {
+    label: "Worth applying",
+    cls: "text-success border-success/40 bg-success/10",
+    bar: "bg-success",
+  },
+  stretch: {
+    label: "A stretch",
+    cls: "text-warning border-warning/40 bg-warning/10",
+    bar: "bg-warning",
+  },
+  skip: {
+    label: "Probably skip",
+    cls: "text-destructive border-destructive/40 bg-destructive/10",
+    bar: "bg-destructive",
+  },
   // Gate outcomes, deliberately not on the green→red scale: they are the absence of a
   // recommendation, not a weak one. Rendering "blocked" as a slightly worse "skip"
   // would put it back on the axis the gate exists to leave.
   check: { label: "Needs checking", cls: "text-info border-info/40 bg-info/10", bar: "bg-info" },
-  blocked: { label: "Ruled out", cls: "text-destructive border-destructive/50 bg-destructive/10", bar: "bg-destructive" },
+  blocked: {
+    label: "Ruled out",
+    cls: "text-destructive border-destructive/50 bg-destructive/10",
+    bar: "bg-destructive",
+  },
 };
 
 export function FitGatePanel({
@@ -58,31 +74,41 @@ export function FitGatePanel({
           <Gauge className="size-4 text-primary" aria-hidden="true" />
           <h2 className="text-sm font-semibold">Should you apply?</h2>
         </div>
-        <Button size="sm" variant={evaluation ? "outline" : "default"} onClick={run} disabled={pending || !hasJd}>
+        <Button
+          size="sm"
+          variant={evaluation ? "outline" : "default"}
+          onClick={run}
+          disabled={pending || !hasJd}
+        >
           {pending ? "Checking…" : evaluation ? "Re-check" : "Run fit check"}
         </Button>
       </div>
 
       {!hasJd ? (
         <p className="mt-2 text-sm text-muted-foreground">
-          Add the job description below and I&apos;ll tell you honestly whether it&apos;s worth your
-          time — before you spend it. Applying to fewer, closer-fit roles beats spraying.
+          Add the job description to compare its requirements with your experience before deciding
+          whether to spend time on the application.
         </p>
       ) : !evaluation && !error ? (
         <p className="mt-2 text-sm text-muted-foreground">
-          A 10-second honest read on whether this role is worth your time — graded against your real
-          experience, not hype. Focus is the strategy.
+          Compare the posting with your career record. Review the supporting facts and gaps before
+          deciding whether to apply.
         </p>
       ) : null}
 
       {error ? (
-        <p className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm">{error}</p>
+        <p className="mt-2 rounded-md border border-warning/40 bg-warning/10 p-2 text-sm">
+          {error}
+        </p>
       ) : null}
 
       {evaluation && meta ? (
         <div className="mt-3 space-y-4">
           <div className="flex items-center gap-3">
-            <span className="text-2xl font-semibold tabular-nums">{evaluation.overall.toFixed(1)}<span className="text-sm text-muted-foreground">/5</span></span>
+            <span className="text-2xl font-semibold tabular-nums">
+              {evaluation.overall.toFixed(1)}
+              <span className="text-sm text-muted-foreground">/5</span>
+            </span>
             <span className={cn("rounded-full border px-2.5 py-0.5 text-xs font-medium", meta.cls)}>
               {meta.label}
             </span>
@@ -92,7 +118,11 @@ export function FitGatePanel({
           {/* Dimension breakdown */}
           <div className="grid gap-1.5">
             {evaluation.dimensions.map((d) => (
-              <div key={d.id} className="grid grid-cols-[8.5rem_1fr_2rem] items-center gap-2" title={d.note}>
+              <div
+                key={d.id}
+                className="grid grid-cols-[8.5rem_1fr_2rem] items-center gap-2"
+                title={d.note}
+              >
                 <span className="truncate text-xs text-muted-foreground">{d.label}</span>
                 <span className="h-1.5 overflow-hidden rounded-full bg-muted">
                   <span
@@ -100,19 +130,31 @@ export function FitGatePanel({
                     style={{ width: `${(d.score / 5) * 100}%` }}
                   />
                 </span>
-                <span className="text-right text-xs tabular-nums text-muted-foreground">{d.score.toFixed(1)}</span>
+                <span className="text-right text-xs tabular-nums text-muted-foreground">
+                  {d.score.toFixed(1)}
+                </span>
               </div>
             ))}
           </div>
 
           {evaluation.topReasons.length > 0 ? (
-            <List icon={Check} tone="text-emerald-400" title="Why" items={evaluation.topReasons} />
+            <List icon={Check} tone="text-success" title="Why" items={evaluation.topReasons} />
           ) : null}
           {evaluation.gapsToClose.length > 0 ? (
-            <List icon={ArrowRight} tone="text-primary" title="To close the gap" items={evaluation.gapsToClose} />
+            <List
+              icon={ArrowRight}
+              tone="text-primary"
+              title="To close the gap"
+              items={evaluation.gapsToClose}
+            />
           ) : null}
           {evaluation.redFlags.length > 0 ? (
-            <List icon={AlertTriangle} tone="text-amber-400" title="Red flags" items={evaluation.redFlags} />
+            <List
+              icon={AlertTriangle}
+              tone="text-warning"
+              title="Red flags"
+              items={evaluation.redFlags}
+            />
           ) : null}
 
           <p className="text-xs text-muted-foreground">

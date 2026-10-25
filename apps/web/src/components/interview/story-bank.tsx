@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { MessageSquareQuote, Mic, Pencil, Plus, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { Mic, Pencil, Plus, Sparkles, Trash2, Wand2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageIntro } from "@/components/layout/page-intro";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { formatStoryAsAnswer, pickBestStory, type StoryView } from "@/lib/interview/story-format";
@@ -61,17 +62,11 @@ export function StoryBank({ stories: initial }: { stories: StoryView[] }) {
 
   return (
     <div className="mx-auto w-full space-y-6 pb-12">
-      <header className="space-y-1.5">
-        <div className="flex items-center gap-2">
-          <MessageSquareQuote className="size-5 text-primary" aria-hidden="true" />
-          <h1 className="text-lg font-semibold">Interview story bank</h1>
-        </div>
-        <p className="text-sm text-muted-foreground">
-          Most behavioral questions are answered by the same{" "}
-          <span className="text-foreground">5–10 strong stories</span>. Build them once — in STAR +
-          Reflection shape, from your real experience — and reuse them in every interview.
-        </p>
-      </header>
+      <PageIntro
+        eyebrow="My career · Interview preparation"
+        title="Your interview stories"
+        description="Build a small bank of examples from your experience: the situation, your task, what you did, the result and what you learned. Adapt each story to the question."
+      />
 
       <div className="flex flex-wrap gap-2">
         <Button size="sm" onClick={generate} disabled={pending}>

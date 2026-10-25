@@ -1,9 +1,12 @@
 /* Authoritative app palette. Themes change tokens, never a page's workflow/layout. */
 :root[data-palette] {
+  color-scheme: light;
   --font-inter-tight: var(--font-inter);
-  --ease-surface: cubic-bezier(.22, 1, .36, 1);
+  --ease-surface: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-enter: 600ms;
-  --surface-shadow: 0 16px 48px color-mix(in srgb, var(--foreground) 5%, transparent), inset 0 1px 0 color-mix(in srgb, var(--card) 80%, transparent);
+  --surface-shadow:
+    0 16px 48px color-mix(in srgb, var(--foreground) 5%, transparent),
+    inset 0 1px 0 color-mix(in srgb, var(--card) 80%, transparent);
   --background: #fbfaf8;
   --foreground: #211e1b;
   --card: #ffffff;
@@ -45,6 +48,10 @@
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
   --chart-1: var(--primary);
+  --chart-2: var(--warning);
+  --chart-3: var(--info);
+  --chart-4: var(--success);
+  --chart-5: var(--destructive);
   --aurora-1: var(--primary);
   --aurora-2: var(--brand-soft);
   --aurora-3: var(--warning);
@@ -54,6 +61,7 @@
   --glass-border: color-mix(in srgb, var(--foreground) 15%, transparent);
 }
 :root.dark[data-palette] {
+  color-scheme: dark;
   --background: #100e0d;
   --foreground: #f7f3ed;
   --card: #1b1816;
@@ -138,26 +146,118 @@
   }
 }
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
-  .fadi-glass { background: var(--card); border-color: var(--foreground); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .fadi-glass {
+    background: var(--card);
+    border-color: var(--foreground);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
 @media (forced-colors: active) {
-  .fadi-glass { background: Canvas; border: 1px solid CanvasText; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .fadi-glass {
+    background: Canvas;
+    border: 1px solid CanvasText;
+    box-shadow: none;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  :root[data-palette] { --motion-fast: 0ms; --motion-enter: 0ms; }
+  :root[data-palette] {
+    --motion-fast: 0ms;
+    --motion-enter: 0ms;
+  }
 }
-.appearance-settings { scroll-margin-top: 5rem; padding-block: 1.5rem; border-block: 1px solid var(--border); }
-.appearance-choice { display: flex; align-items: center; gap: .65rem; min-height: 44px; padding: .5rem .75rem; border: 1px solid var(--border); border-radius: var(--surface-radius); background: var(--card); color: var(--foreground); cursor: pointer; font-size: .875rem; }
-.appearance-choice:has(input:checked) { border-color: var(--primary); background: color-mix(in srgb, var(--card) 95%, var(--primary)); }
-.appearance-choice:focus-within { outline: 2px solid var(--ring); outline-offset: 3px; }
-.appearance-choice input { accent-color: var(--primary); width: 1rem; height: 1rem; }
-.fadi-appear { animation: fadi-appear 320ms ease-out both; }
-@keyframes fadi-appear { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-@media (prefers-reduced-motion: reduce) { .fadi-appear { animation: none; } }
-.appearance-swatch { display: inline-block; width: .8rem; height: .8rem; border-radius: 50%; background: #b93224; }
-.appearance-swatch[data-swatch="iris"] { background: #6941c6; }
-.appearance-swatch[data-swatch="cobalt"] { background: #2457c5; }
+.appearance-settings {
+  scroll-margin-top: 5rem;
+  padding-block: 1.5rem;
+  border-block: 1px solid var(--border);
+}
+.appearance-choice {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--surface-radius);
+  background: var(--card);
+  color: var(--foreground);
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+.appearance-choice:has(input:checked) {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--card) 95%, var(--primary));
+}
+.appearance-choice:focus-within {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.appearance-choice input {
+  accent-color: var(--primary);
+  width: 1rem;
+  height: 1rem;
+}
+.fadi-appear {
+  animation: fadi-appear 320ms ease-out both;
+}
+@keyframes fadi-appear {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fadi-appear {
+    animation: none;
+  }
+}
+.appearance-swatch {
+  display: inline-block;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  background: #b93224;
+}
+.appearance-swatch[data-swatch="iris"] {
+  background: #6941c6;
+}
+.appearance-swatch[data-swatch="cobalt"] {
+  background: #2457c5;
+}
 /* Shared task surfaces stay opaque, readable and restrained. */
-:root[data-palette] [data-slot="card"] { box-shadow: 0 1px 2px rgb(0 0 0 / 3%); }
-:root[data-palette] [data-slot="dialog-content"] { max-height: min(90dvh, 52rem); overflow-y: auto; }
-::selection { background: color-mix(in srgb, var(--primary) 22%, var(--background)); color: var(--foreground); }
+:root[data-palette] [data-slot="card"] {
+  box-shadow: 0 1px 2px rgb(0 0 0 / 3%);
+}
+:root[data-palette] [data-slot="dialog-content"] {
+  max-height: min(90dvh, 52rem);
+  overflow-y: auto;
+}
+
+/* Consistent touch targets without inflating desktop editor toolbars. */
+@media (pointer: coarse) {
+  :root[data-palette] [data-slot="button"],
+  :root[data-palette] [data-slot="input"],
+  :root[data-palette] [data-slot="tabs-trigger"] {
+    min-height: 44px;
+  }
+  :root[data-palette] [data-slot="button"] {
+    min-width: 44px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root[data-palette] [data-slot="button"],
+  :root[data-palette] [data-slot="tabs-trigger"],
+  :root[data-palette] [data-slot="sheet-content"] {
+    transition: none;
+  }
+}
+::selection {
+  background: color-mix(in srgb, var(--primary) 22%, var(--background));
+  color: var(--foreground);
+}

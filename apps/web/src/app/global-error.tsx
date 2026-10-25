@@ -45,28 +45,40 @@ export default function GlobalError({
           padding: "1.5rem",
           fontFamily:
             "ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-          backgroundColor: "#ffffff",
-          color: "#0a0a0a",
+          backgroundColor: "#fbfaf8",
+          color: "#211e1b",
         }}
       >
         <style>{`
           @media (prefers-color-scheme: dark) {
-            body { background-color: #0a0a0a !important; color: #fafafa !important; }
-            .ge-muted { color: #a1a1aa !important; }
-            .ge-button { background-color: #fafafa !important; color: #0a0a0a !important; }
+            body { background-color: #100e0d !important; color: #f7f3ed !important; }
+            .ge-muted { color: #bfb5a9 !important; }
+            .ge-button { background-color: #ff9b88 !important; color: #30120b !important; }
             .ge-digest { color: #71717a !important; }
           }
         `}</style>
         <main style={{ maxWidth: "28rem", textAlign: "center" }}>
-          <h1 style={{ fontSize: "1.125rem", fontWeight: 600, margin: "0 0 0.75rem" }}>
-            Something broke on our side
+          <h1
+            style={{
+              fontSize: "2rem",
+              fontWeight: 500,
+              letterSpacing: "-.03em",
+              margin: "0 0 0.75rem",
+            }}
+          >
+            This page couldn’t load
           </h1>
           <p
             className="ge-muted"
-            style={{ fontSize: "0.875rem", lineHeight: 1.6, color: "#52525b", margin: "0 0 1.25rem" }}
+            style={{
+              fontSize: "0.875rem",
+              lineHeight: 1.6,
+              color: "#52525b",
+              margin: "0 0 1.25rem",
+            }}
           >
-            That&apos;s on us, not you. Nothing you saved has been lost. Reloading usually clears
-            it — if it doesn&apos;t, sign out and back in.
+            Try again before continuing. If you were editing, check the latest saved version when
+            the page returns.
           </p>
           <button
             className="ge-button"
@@ -76,11 +88,11 @@ export default function GlobalError({
               cursor: "pointer",
               border: "none",
               borderRadius: "0.375rem",
-              padding: "0.5rem 1rem",
+              padding: "0.75rem 1rem",
               fontSize: "0.875rem",
               fontWeight: 500,
-              backgroundColor: "#0a0a0a",
-              color: "#fafafa",
+              backgroundColor: "#b93224",
+              color: "#ffffff",
             }}
           >
             Try again

@@ -32,20 +32,20 @@ Do not average the four styles. A Fadi screen should look and feel closest to Pi
 like Paperclip, speak in Fadi's career language, and use UniMad only to check that the job-seeker
 journey is complete.
 
-| Reference | Use in Fadi | Do not copy |
-|---|---|---|
-| Paperclip | Goal-aligned work, one attention queue, work threads containing activity and decisions, persistent status, inline approvals, traceable execution | Org charts, agent employees, budgets, ticket administration, dense operator dashboards |
-| Pipecat | One live multimodal session, explicit listening/thinking/speaking/acting states, natural turn detection, interruption, typed screen commands, cancellable progress | Provider selectors, pipeline internals, developer controls, an always-on microphone |
-| UniMad | One profile grounding the job-search journey, low-clutter presentation, role positioning before documents, discovery connected to applications and interviews | A new UniBoard destination, visible specialist-agent topology, ATS scores presented as truth, marketing and coaching funnels inside the product |
-| Current Fadi | Four human destinations, career direction, canonical career record and trustworthy evidence | Card walls, infrastructure-first controls, duplicate conductors, raw logs as the experience |
+| Reference    | Use in Fadi                                                                                                                                                        | Do not copy                                                                                                                                     |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Paperclip    | Goal-aligned work, one attention queue, work threads containing activity and decisions, persistent status, inline approvals, traceable execution                   | Org charts, agent employees, budgets, ticket administration, dense operator dashboards                                                          |
+| Pipecat      | One live multimodal session, explicit listening/thinking/speaking/acting states, natural turn detection, interruption, typed screen commands, cancellable progress | Provider selectors, pipeline internals, developer controls, an always-on microphone                                                             |
+| UniMad       | One profile grounding the job-search journey, low-clutter presentation, role positioning before documents, discovery connected to applications and interviews      | A new UniBoard destination, visible specialist-agent topology, ATS scores presented as truth, marketing and coaching funnels inside the product |
+| Current Fadi | Four human destinations, career direction, canonical career record and trustworthy evidence                                                                        | Card walls, infrastructure-first controls, duplicate conductors, raw logs as the experience                                                     |
 
 The references support these choices:
 
 - Paperclip presents work as goal-aligned tasks with conversations, activity and decisions attached
-to the task, and centralises human decisions instead of scattering them across pages.
+  to the task, and centralises human decisions instead of scattering them across pages.
 - Pipecat separates the voice conversation from a UI worker that receives screen context and emits
-typed UI commands. Its turn detection and interruption model treat a pause as distinct from the end
-of a person's turn.
+  typed UI commands. Its turn detection and interruption model treat a pause as distinct from the end
+  of a person's turn.
 
 Sources: [Paperclip](https://paperclip.ing/), [Paperclip tasks](https://docs.paperclip.ing/guides/day-to-day/issues/),
 [Paperclip decisions](https://docs.paperclip.ing/guides/day-to-day/decisions/),
@@ -81,12 +81,12 @@ approval store or activity log.
 
 Use the navigation source in `apps/web/src/components/os/navigation.ts`:
 
-| Destination | User question | Areas |
-|---|---|---|
-| Today | What matters now? | Today, full picture, career report |
-| Opportunities | Where can I go and what is happening? | Roles, applications, people |
-| Practice | What should I learn, build, or rehearse? | Learning, interview practice |
-| My career | What is true about me and what do I share? | Record, documents, portfolio, directions |
+| Destination   | User question                              | Areas                                    |
+| ------------- | ------------------------------------------ | ---------------------------------------- |
+| Today         | What matters now?                          | Today, full picture, career report       |
+| Opportunities | Where can I go and what is happening?      | Roles, applications, people              |
+| Practice      | What should I learn, build, or rehearse?   | Learning, interview practice             |
+| My career     | What is true about me and what do I share? | Record, documents, portfolio, directions |
 
 Profile and Settings belong to the account menu. Machines, permissions, provider health, audit
 events and raw logs are contextual or advanced controls.
@@ -189,13 +189,13 @@ needs evidence that it represents a distinct user decision.
 One object has one authoritative state and one conductor. Views may project it, but must not own
 separate polling, readiness, approval or completion logic.
 
-| Concept | Authority | Projections |
-|---|---|---|
-| Work progress | Work kernel and executions | Today, relevant workspace, Fadi presence |
-| Human decisions | Shared attention/approval record | Inline action, Today queue, shell count |
-| Career truth | Canonical career record and history | Résumé, portfolio, interview, public campaign |
-| Lab readiness | Project conductor and observed checks | Next action, compact Environment line |
-| Fadi live state | Shared agent session | Shell, orb, active work surface |
+| Concept         | Authority                             | Projections                                   |
+| --------------- | ------------------------------------- | --------------------------------------------- |
+| Work progress   | Work kernel and executions            | Today, relevant workspace, Fadi presence      |
+| Human decisions | Shared attention/approval record      | Inline action, Today queue, shell count       |
+| Career truth    | Canonical career record and history   | Résumé, portfolio, interview, public campaign |
+| Lab readiness   | Project conductor and observed checks | Next action, compact Environment line         |
+| Fadi live state | Shared agent session                  | Shell, orb, active work surface               |
 
 A projection never silently repairs or overwrites its source.
 
@@ -450,6 +450,22 @@ reduced transparency, high contrast and forced colours. Editors, assessments, ap
 work remain opaque. Avoid glowing card borders, repeating background grids and oversized radii.
 
 ### Component grammar
+
+Use `PageIntro` for account and work-index headings: one visible h1, a bounded description and
+optional contextual actions. Keep custom editorial composition on Today, Practice and the public
+landing page. The shell owns the main landmark and horizontal gutter; its child pages must not
+add another main or double the gutter. Routine work indexes use a 74rem maximum; document and
+lab workspaces retain their wider task-specific containers.
+
+Shared fields and standard buttons are 40px high, with 44px minimum targets on coarse pointers.
+Small desktop toolbar actions may use the compact button size. Editor toolbars wrap instead of
+overflowing; mobile editors use normal document flow rather than forcing nested viewport-height
+scroll regions. Preserve paper-template colours in exported documents and the independent root
+error fallback: these have different rendering constraints from application chrome.
+
+Contextual Pipeline/Documents views belong to the URL (`view=documents`), with browser Back and
+Forward support. Keep inactive panels mounted to preserve local drafts, while excluding their
+hidden controls from orb guidance. These are work-local views, not top-level destination tabs.
 
 - Prefer one bounded work surface over several rounded cards.
 - Use separators and spacing before adding containers.

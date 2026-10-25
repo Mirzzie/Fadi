@@ -5,6 +5,8 @@ import { BookmarkPlus, Check, ChevronRight, Mic, Square, Volume2, Wand2 } from "
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageIntro } from "@/components/layout/page-intro";
+import { useGuideTarget } from "@/components/os/use-guide-target";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -63,6 +65,11 @@ export function MockInterview({
   job?: PracticeJob | null;
   initialSession?: PracticeSession | null;
 }) {
+  const interviewGuide = useGuideTarget<HTMLButtonElement>(
+    "interview.start",
+    "Start when you are ready",
+    "Check the role and interview settings first. Starting may use your configured AI provider; guidance does not start it or turn on your microphone."
+  );
   // Practising for a specific posting: the questions come from THAT job's description and title,
   // not the profile's generic direction. Everything stays editable — this is a starting point.
   const [config, setConfig] = useState(
@@ -288,15 +295,13 @@ export function MockInterview({
   // ── Setup screen ──
   if (!questions) {
     return (
-      <section className="space-y-4 border-y border-border bg-card py-6">
+      <section className="space-y-5">
         <div>
-          <p className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Interview practice
-          </p>
-          <h1 className="font-heading text-3xl font-semibold tracking-tight">Practise an interview</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Practise one question at a time. Speak or type your answer, then review the feedback.
-          </p>
+          <PageIntro
+            eyebrow="Practice"
+            title="Practise an interview"
+            description="Practise one question at a time. Speak or type your answer, then review the feedback."
+          />
           {job ? (
             <p className="mt-2 rounded-md bg-muted px-3 py-2 text-sm">
               Practising for <span className="font-medium">{job.title}</span> at{" "}
@@ -395,7 +400,12 @@ export function MockInterview({
           </Button>
         </div>
         {error ? <p className="text-sm text-destructive">{error}</p> : null}
-        <Button size="sm" onClick={start} disabled={pending || !config.role.trim()}>
+        <Button
+          ref={interviewGuide}
+          size="sm"
+          onClick={start}
+          disabled={pending || !config.role.trim()}
+        >
           <Wand2 className="size-4" aria-hidden="true" />
           {pending ? "Setting up…" : "Start interview"}
         </Button>

@@ -61,7 +61,7 @@ export function HistoryCapture({
           rows={5}
           placeholder="Or paste your CV text / a summary of your experience…"
         />
-        {error ? <p className="text-xs text-amber-600 dark:text-amber-500">{error}</p> : null}
+        {error ? <p className="text-xs text-warning ">{error}</p> : null}
         <Button size="sm" onClick={save} disabled={pending || text.trim().length < 20}>
           <Sparkles className="size-4" aria-hidden="true" />
           {pending ? "Saving…" : "Save and build my evidence"}

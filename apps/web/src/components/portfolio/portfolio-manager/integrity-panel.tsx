@@ -1,6 +1,15 @@
 "use client";
 
-import { AlertTriangle, Clock, Copy, Info, Loader2, ShieldAlert, ShieldCheck, Sparkles } from "lucide-react";
+import {
+  AlertTriangle,
+  Clock,
+  Copy,
+  Info,
+  Loader2,
+  ShieldAlert,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { IntegrityFinding, IntegritySeverity } from "@careeros/portfolio";
@@ -9,10 +18,26 @@ const SEVERITY: Record<
   IntegritySeverity,
   { label: string; cls: string; Icon: typeof AlertTriangle }
 > = {
-  contradiction: { label: "Contradiction", cls: "border-destructive/40 bg-destructive/10 text-destructive", Icon: ShieldAlert },
-  timeline: { label: "Timeline", cls: "border-orange-500/40 bg-orange-500/10 text-orange-400", Icon: Clock },
-  duplicate: { label: "Duplicate", cls: "border-warning/40 bg-warning/10 text-warning", Icon: Copy },
-  anomaly: { label: "Anomaly", cls: "border-yellow-500/40 bg-yellow-500/10 text-yellow-500", Icon: AlertTriangle },
+  contradiction: {
+    label: "Contradiction",
+    cls: "border-destructive/40 bg-destructive/10 text-destructive",
+    Icon: ShieldAlert,
+  },
+  timeline: {
+    label: "Timeline",
+    cls: "border-orange-500/40 bg-orange-500/10 text-orange-400",
+    Icon: Clock,
+  },
+  duplicate: {
+    label: "Duplicate",
+    cls: "border-warning/40 bg-warning/10 text-warning",
+    Icon: Copy,
+  },
+  anomaly: {
+    label: "Anomaly",
+    cls: "border-warning/40 bg-warning/10 text-warning",
+    Icon: AlertTriangle,
+  },
   info: { label: "Note", cls: "border-border bg-muted/40 text-muted-foreground", Icon: Info },
 };
 
@@ -79,7 +104,8 @@ export function IntegrityPanel({
           // "might be the same" is a question, and bulk-answering questions is how you
           // lose real work.
           const sure = findings.filter(
-            (f) => f.severity === "duplicate" && f.dropId && f.title === "The same work, written twice",
+            (f) =>
+              f.severity === "duplicate" && f.dropId && f.title === "The same work, written twice"
           );
           if (!onResolveAll || sure.length < 2) return null;
           return (
@@ -122,7 +148,9 @@ export function IntegrityPanel({
                 className="rounded-lg border border-border bg-background/40 p-3 text-sm"
               >
                 <div className="flex items-center gap-2">
-                  <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${s.cls}`}>
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${s.cls}`}
+                  >
                     <s.Icon className="size-3" aria-hidden="true" /> {s.label}
                   </span>
                   <span className="font-medium">{f.title}</span>

@@ -159,7 +159,7 @@ export function ConnectedAccounts({ providers }: { providers: Provider[] }) {
                   {busy ? (
                     <Loader2 className="size-3.5 animate-spin" aria-hidden="true" />
                   ) : (
-                    <Check className="size-3.5 text-emerald-500" aria-hidden="true" />
+                    <Check className="size-3.5 text-success" aria-hidden="true" />
                   )}
                   Disconnect
                 </button>

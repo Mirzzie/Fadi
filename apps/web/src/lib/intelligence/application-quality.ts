@@ -27,7 +27,11 @@ export interface ApplicationQualityResult {
     specificity: { score: number; assessment: string };
     roleFit: { score: number; assessment: string };
   };
-  topImprovements: Array<{ priority: "critical" | "high" | "medium"; action: string; impact: string }>;
+  topImprovements: Array<{
+    priority: "critical" | "high" | "medium";
+    action: string;
+    impact: string;
+  }>;
   estimatedRecruiterReadTime: string;
   atsRisk: "high" | "medium" | "low";
   aiGeneratedRisk: "high" | "medium" | "low";
@@ -61,13 +65,15 @@ const aqsSchema = z.object({
       assessment: z.string(),
     }),
   }),
-  topImprovements: z.array(
-    z.object({
-      priority: z.enum(["critical", "high", "medium"]),
-      action: z.string(),
-      impact: z.string(),
-    }),
-  ).max(5),
+  topImprovements: z
+    .array(
+      z.object({
+        priority: z.enum(["critical", "high", "medium"]),
+        action: z.string(),
+        impact: z.string(),
+      })
+    )
+    .max(5),
   estimatedRecruiterReadTime: z.string(),
   atsRisk: z.enum(["high", "medium", "low"]),
   aiGeneratedRisk: z.enum(["high", "medium", "low"]),
@@ -87,7 +93,7 @@ Be accurate and honest. A score of 70+ means viable; 85+ means strong. Do not in
 
 export async function scoreApplication(
   input: ApplicationQualityInput,
-  userId?: string,
+  userId?: string
 ): Promise<ApplicationQualityResult> {
   // Use the candidate's own provider chain (BYO key) — same path as fit/prep/brief.
   const generate = userId ? await getUserDocGenerate(userId) : null;
@@ -114,7 +120,12 @@ ${truncatedResume}
 Produce an honest, specific assessment. The topImprovements should be concrete, actionable changes — not generic advice like "tailor your resume". Name specific skills, specific sections, specific keyword gaps.`;
 
   try {
-    const result = await generate.structured(AQS_SYSTEM, user, aqsSchema, "application_quality_score");
+    const result = await generate.structured(
+      AQS_SYSTEM,
+      user,
+      aqsSchema,
+      "application_quality_score"
+    );
 
     logger.info("aqs.scored", {
       userId,
@@ -162,26 +173,28 @@ function buildFallbackScore(): ApplicationQualityResult {
 // ─── Score interpretation helpers ─────────────────────────────────────────────
 
 export function getScoreColor(score: number): string {
-  if (score >= 88) return "text-emerald-400";
-  if (score >= 75) return "text-green-400";
-  if (score >= 58) return "text-amber-400";
-  if (score >= 40) return "text-orange-400";
-  return "text-red-400";
+  if (score >= 75) return "text-success";
+  if (score >= 40) return "text-warning";
+  return "text-destructive";
 }
 
 export function getScoreBg(score: number): string {
-  if (score >= 88) return "bg-emerald-400/15";
-  if (score >= 75) return "bg-green-400/15";
-  if (score >= 58) return "bg-amber-400/15";
-  if (score >= 40) return "bg-orange-400/15";
-  return "bg-red-400/15";
+  if (score >= 75) return "bg-success/15";
+  if (score >= 40) return "bg-warning/15";
+  return "bg-destructive/15";
 }
 
-export function getSendLabel(recommendation: ApplicationQualityResult["sendRecommendation"]): string {
+export function getSendLabel(
+  recommendation: ApplicationQualityResult["sendRecommendation"]
+): string {
   switch (recommendation) {
-    case "strong": return "Ready to send — strong application";
-    case "ready": return "Ready to send";
-    case "improve_first": return "Improve before sending";
-    case "do_not_send": return "Not ready — significant gaps";
+    case "strong":
+      return "Ready to send — strong application";
+    case "ready":
+      return "Ready to send";
+    case "improve_first":
+      return "Improve before sending";
+    case "do_not_send":
+      return "Not ready — significant gaps";
   }
 }

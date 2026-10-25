@@ -4,16 +4,16 @@ import { cn } from "@/lib/utils";
 import type { MomentumReflection, MoraleState, PastSelfTrend } from "@/lib/resilience/reflection";
 
 const STATE_META: Record<MoraleState, { label: string; cls: string }> = {
-  thriving: { label: "Thriving", cls: "text-emerald-300" },
+  thriving: { label: "Thriving", cls: "text-success" },
   steady: { label: "Building", cls: "text-primary" },
   quiet: { label: "Quiet", cls: "text-muted-foreground" },
   // Never alarm-red — a struggling stretch is met with warmth, not a failure signal.
-  struggling: { label: "A hard stretch", cls: "text-amber-300" },
+  struggling: { label: "A hard stretch", cls: "text-warning" },
 };
 
 function TrendIcon({ trend }: { trend: PastSelfTrend }) {
-  if (trend === "up") return <TrendingUp className="size-4 text-emerald-400" aria-hidden="true" />;
-  if (trend === "down") return <TrendingDown className="size-4 text-amber-400" aria-hidden="true" />;
+  if (trend === "up") return <TrendingUp className="size-4 text-success" aria-hidden="true" />;
+  if (trend === "down") return <TrendingDown className="size-4 text-warning" aria-hidden="true" />;
   return <History className="size-4 text-muted-foreground" aria-hidden="true" />;
 }
 

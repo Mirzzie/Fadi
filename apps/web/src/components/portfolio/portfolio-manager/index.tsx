@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { PageIntro } from "@/components/layout/page-intro";
+import { useGuideTarget } from "@/components/os/use-guide-target";
 import { driftNote } from "@/lib/portfolio/freshness";
 import { GithubPublishPanel } from "@/components/portfolio/github-publish";
 import { HistoryCapture } from "@/components/evidence/history-capture";
@@ -302,104 +304,113 @@ export function PortfolioManager({
     run(() => reorderItems({ ids }));
   }
 
+  const previewGuide = useGuideTarget<HTMLAnchorElement>(
+    "portfolio.preview",
+    "Review what you share",
+    "Preview the site before changing its publication state. This link opens your portfolio; it does not publish or export anything."
+  );
   const rows = grouped[activeTab] ?? [];
   const meta = SECTION_META[activeTab];
 
   return (
     <div className="mx-auto w-full max-w-6xl pb-12 pt-4">
       {/* Header — mirrors the original portfolio CMS */}
-      <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-primary">Portfolio CMS</p>
-          <h1 className="mt-1 font-heading text-3xl font-semibold tracking-tight md:text-4xl">
-            Manage content
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Add, edit, and remove anything on your portfolio. Changes appear live.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider ${
-              isPublished
-                ? "border border-primary/40 bg-primary/10 text-primary"
-                : "bg-muted text-muted-foreground"
-            }`}
-          >
-            {isPublished ? "Published" : "Draft"}
-          </span>
-          <Button size="sm" variant="outline" onClick={togglePublishSite} disabled={pending}>
-            {isPublished ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-            {isPublished ? "Unpublish" : "Publish"}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            nativeButton={false}
-            render={<a href={publicUrl} target="_blank" rel="noreferrer" />}
-          >
-            <ExternalLink className="size-4" /> Preview site
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setAudienceOpen(true)}>
-            <Eye className="size-4" aria-hidden="true" />
-            Who&apos;s looking
-          </Button>
-          {/* One direction, one claim — the antidote to a site that spans four. */}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setFocusOpen(true)}
-            disabled={items.length === 0}
-          >
-            <Crosshair className="size-4" aria-hidden="true" />
-            Focus
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setGithubOpen(true)}>
-            <Rocket className="size-4" /> Host on the web
-          </Button>
-          {items.length > 0 && (
-            <Button size="sm" variant="outline" onClick={sync} disabled={pending}>
-              <Sparkles className="size-4" /> Sync evidence
+      <PageIntro
+        className="mb-8"
+        eyebrow="My career"
+        title="Your portfolio"
+        description="Manage the work you share. Published sites reflect your saved changes."
+        actions={
+          <>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider ${
+                isPublished
+                  ? "border border-primary/40 bg-primary/10 text-primary"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {isPublished ? "Published" : "Draft"}
+            </span>
+            <Button size="sm" variant="outline" onClick={togglePublishSite} disabled={pending}>
+              {isPublished ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              {isPublished ? "Unpublish" : "Publish"}
             </Button>
-          )}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={doExport}
-            disabled={pending || items.length === 0}
-          >
-            <Download className="size-4" /> Export
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => fileRef.current?.click()}
-            disabled={pending}
-          >
-            <Upload className="size-4" /> Import
-          </Button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="application/json,.json"
-            className="hidden"
-            onChange={onImportFile}
-          />
-          <Button size="sm" variant="outline" onClick={() => setDevOpen(true)}>
-            <Code2 className="size-4" /> API &amp; SDK
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setSettingsOpen(true)}>
-            <Settings className="size-4" /> Settings
-          </Button>
-        </div>
-      </header>
+            <Button
+              size="sm"
+              variant="outline"
+              nativeButton={false}
+              render={<a ref={previewGuide} href={publicUrl} target="_blank" rel="noreferrer" />}
+            >
+              <ExternalLink className="size-4" /> Preview site
+            </Button>
+            <details className="relative">
+              <summary className="cursor-pointer rounded-lg border border-border bg-card px-3 py-2 text-sm">
+                Portfolio tools
+              </summary>
+              <div className="fadi-glass absolute right-0 z-30 mt-2 flex w-72 max-w-[calc(100vw-2rem)] flex-col items-stretch gap-2 rounded-xl border p-3 shadow-lg">
+                <Button size="sm" variant="outline" onClick={() => setAudienceOpen(true)}>
+                  <Eye className="size-4" aria-hidden="true" />
+                  Who&apos;s looking
+                </Button>
+                {/* One direction, one claim — the antidote to a site that spans four. */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setFocusOpen(true)}
+                  disabled={items.length === 0}
+                >
+                  <Crosshair className="size-4" aria-hidden="true" />
+                  Focus
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setGithubOpen(true)}>
+                  <Rocket className="size-4" /> Host on the web
+                </Button>
+                {items.length > 0 && (
+                  <Button size="sm" variant="outline" onClick={sync} disabled={pending}>
+                    <Sparkles className="size-4" /> Sync evidence
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={doExport}
+                  disabled={pending || items.length === 0}
+                >
+                  <Download className="size-4" /> Export
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={pending}
+                >
+                  <Upload className="size-4" /> Import
+                </Button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="application/json,.json"
+                  className="hidden"
+                  onChange={onImportFile}
+                />
+                <Button size="sm" variant="outline" onClick={() => setDevOpen(true)}>
+                  <Code2 className="size-4" /> API &amp; SDK
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setSettingsOpen(true)}>
+                  <Settings className="size-4" /> Settings
+                </Button>
+              </div>
+            </details>
+          </>
+        }
+      />
 
       {/* PUBLISHED AND OUT OF DATE is worse than missing: a stale document is only the owner's
           problem, while a stale public page is a claim a stranger reads. Named, never acted on
           automatically — see lib/portfolio/freshness.ts. */}
       {drift.withdrawn.length + drift.reworded.length > 0 ? (
-        <div className="mb-6 flex items-start gap-3 border-y border-amber-500/30 bg-amber-500/5 p-4">
-          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-amber-500/10 text-amber-500">
+        <div className="mb-6 flex items-start gap-3 border-y border-warning/30 bg-warning/5 p-4">
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-warning/10 text-warning">
             <History className="size-4" aria-hidden="true" />
           </span>
           <div className="min-w-0 space-y-1">

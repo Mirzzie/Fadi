@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 
 import { FadiLogo } from "@/components/brand/fadi-logo";
+import { PageIntro } from "@/components/layout/page-intro";
 import { FadiCore } from "@/components/os/fadi-core";
 import { AuthForm } from "@/components/auth/auth-form";
 import { SocialButtons } from "@/components/auth/social-buttons";
@@ -44,7 +45,7 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
       </div>
 
       {/* Header */}
-      <header className="relative z-10 border-b border-border px-5 py-5 sm:px-8">
+      <header className="fadi-glass relative z-10 border-b border-border px-5 py-4 sm:px-8">
         <Link href="/" className="inline-flex items-center gap-2.5">
           <FadiLogo className="size-8" />
           <span className="font-heading text-lg font-semibold tracking-tight">Fadi</span>
@@ -61,9 +62,9 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
               <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-primary">
                 Your career, as one system
               </p>
-              <h1 className="max-w-xl font-heading text-5xl font-semibold leading-[0.98] tracking-[-0.04em] text-balance xl:text-6xl">
+              <p className="max-w-xl font-heading text-5xl font-medium leading-[1.06] tracking-[-0.04em] text-balance xl:text-6xl">
                 {isSignUp ? "Start with your next move." : "Welcome back."}
-              </h1>
+              </p>
               <p className="max-w-md leading-relaxed text-muted-foreground">
                 {isSignUp
                   ? "Connect your experience, the work you want and the steps you take. Review what goes into your career record."
@@ -87,9 +88,10 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
 
             <div className="max-w-lg border-l-2 border-primary pl-4">
               <p className="text-xs leading-relaxed text-muted-foreground">
-                <span className="font-medium text-foreground">Review before acting.</span> Approving a draft
-                is separate from sending or publishing it. AI features process relevant content with your
-                selected provider; check your connections and permissions in Settings.
+                <span className="font-medium text-foreground">Review before acting.</span> Approving
+                a draft is separate from sending or publishing it. AI features process relevant
+                content with your selected provider; check your connections and permissions in
+                Settings.
               </p>
             </div>
           </div>
@@ -100,17 +102,22 @@ export function AuthShell({ mode, socialProviders = [] }: AuthShellProps) {
               <FadiCore state="ready" size={40} />
               <span className="font-heading font-semibold tracking-tight">Fadi</span>
             </div>
-            <h2 className="font-heading text-xl font-semibold tracking-tight">
-              {isSignUp ? "Create your account" : "Sign in"}
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {isSignUp ? "Start with your real evidence." : "Return to your workspace."}
-            </p>
+            <PageIntro
+              compact
+              title={isSignUp ? "Create your account" : "Sign in"}
+              description={
+                isSignUp
+                  ? "Bring what you have. You can refine it later."
+                  : "Return to your workspace."
+              }
+            />
             <div className="mt-5 space-y-5">
               <SocialButtons providers={socialProviders} />
               <Suspense
                 fallback={
-                  <div className="rounded-lg border border-border p-3 text-sm text-muted-foreground">Loading…</div>
+                  <div className="rounded-lg border border-border p-3 text-sm text-muted-foreground">
+                    Loading…
+                  </div>
                 }
               >
                 <AuthForm mode={mode} />

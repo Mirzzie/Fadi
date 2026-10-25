@@ -6,5 +6,5 @@ import { redirect } from "next/navigation";
 // stays exactly where it was — every link to it still works. This just retires the old
 // standalone list page so a bookmark lands somewhere real instead of 404-ing.
 export default function DocumentsLibraryRedirect() {
-  redirect("/dashboard/applications");
+  redirect("/dashboard/applications?view=documents");
 }

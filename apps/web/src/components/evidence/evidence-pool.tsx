@@ -7,7 +7,6 @@ import {
   ChevronDown,
   ExternalLink,
   ImagePlus,
-  Layers,
   Loader2,
   MessageSquareQuote,
   Pencil,
@@ -20,6 +19,8 @@ import {
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageIntro } from "@/components/layout/page-intro";
+import { useGuideTarget } from "@/components/os/use-guide-target";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -83,6 +84,12 @@ export function EvidencePool({
     });
   }
 
+  const recordGuide = useGuideTarget<HTMLButtonElement>(
+    "record.add",
+    "Keep your record current",
+    "Use this to add new work or outcomes. Review proposed facts before accepting them into your record."
+  );
+
   function remove(id: string) {
     startTransition(async () => {
       await deleteEvidence({ id });
@@ -100,25 +107,25 @@ export function EvidencePool({
 
   return (
     <div className="mx-auto w-full max-w-4xl space-y-8 pb-12 lg:pt-5">
-      <header className="max-w-3xl space-y-3">
-        <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-          <Layers className="size-4" aria-hidden="true" />
-          My career
-        </p>
-        <h1 className="font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
-          A record you can defend.
-        </h1>
-        <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-          Store each real experience once. Fadi uses this record for your CV, portfolio and
-          interview preparation, without changing the underlying truth.
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Current direction: {track ? <span className="text-foreground">{track.role}</span> : "not set"}.
-          {track
-            ? " Relevance changes with direction; your record does not."
-            : " Add a direction when you want tailored ordering."}
-        </p>
-      </header>
+      <PageIntro
+        eyebrow="My career"
+        title="Your working record"
+        description={
+          <>
+            <p>
+              Keep your experience, completed work and outcomes together. Review the facts you use
+              in documents, your portfolio and interview preparation.
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Current direction:{" "}
+              {track ? <span className="text-foreground">{track.role}</span> : "not set"}.
+              {track
+                ? " Relevance changes with direction; your record does not."
+                : " Add a direction when you want tailored ordering."}
+            </p>
+          </>
+        }
+      />
 
       {ranked.length > 0 ? (
         <section className="border-y border-border py-5 sm:flex sm:items-center sm:justify-between sm:gap-6">
@@ -130,6 +137,7 @@ export function EvidencePool({
             </p>
           </div>
           <Button
+            ref={recordGuide}
             className="mt-4 shrink-0 sm:mt-0"
             onClick={() => setCapturing((v) => !v)}
             disabled={pending}
@@ -157,7 +165,7 @@ export function EvidencePool({
         </p>
       ) : null}
       {error ? (
-        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm">{error}</p>
+        <p className="rounded-md border border-warning/40 bg-warning/10 p-2 text-sm">{error}</p>
       ) : null}
 
       {/* Duplicates are caught HERE because the pool is what every other surface
@@ -179,32 +187,32 @@ export function EvidencePool({
       {ranked.length === 0 ? (
         editing !== "new" ? (
           <div className="space-y-3">
-          {hasStoredHistory ? (
-            /* A CV saved with nothing built from it was the commonest broken state: the text was
+            {hasStoredHistory ? (
+              /* A CV saved with nothing built from it was the commonest broken state: the text was
                on file, the record was empty, and every other screen quietly had nothing to work
                with. Say that plainly, and make the fix one button. */
-            <div className="rounded-lg border border-border/70 bg-muted/20 p-4">
-              <p className="text-sm font-medium">
-                Your CV is saved — Fadi hasn&apos;t read it yet.
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Reading it turns it into records you can check and correct. Everything else —
-                documents, your portfolio, interview prep — works from those records, not from the
-                CV text.
-              </p>
-              <Button size="sm" className="mt-3" onClick={build} disabled={pending}>
-                <Wand2 className="size-4" aria-hidden="true" />
-                {pending ? "Reading your CV…" : "Read it and build my record"}
-              </Button>
-            </div>
-          ) : (
-            <HistoryCapture
-              onSaved={() => {
-                setError(null);
-                build();
-              }}
-            />
-          )}
+              <div className="rounded-lg border border-border/70 bg-muted/20 p-4">
+                <p className="text-sm font-medium">
+                  Your CV is saved — Fadi hasn&apos;t read it yet.
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Reading it turns it into records you can check and correct. Everything else —
+                  documents, your portfolio, interview prep — works from those records, not from the
+                  CV text.
+                </p>
+                <Button size="sm" className="mt-3" onClick={build} disabled={pending}>
+                  <Wand2 className="size-4" aria-hidden="true" />
+                  {pending ? "Reading your CV…" : "Read it and build my record"}
+                </Button>
+              </div>
+            ) : (
+              <HistoryCapture
+                onSaved={() => {
+                  setError(null);
+                  build();
+                }}
+              />
+            )}
           </div>
         ) : null
       ) : (
@@ -375,7 +383,7 @@ function EvidenceCard({
       {/* Per-track framing — the graph in action. */}
       {hasTrack ? (
         score > 0 ? (
-          <p className="mt-2 text-xs text-emerald-400">
+          <p className="mt-2 text-xs text-success">
             Strong evidence for {trackRole}
             {matched.length ? ` (matches: ${matched.join(", ")})` : ""}
           </p>

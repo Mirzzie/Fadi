@@ -130,7 +130,7 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
 
   return (
     <AppShell>
-      <main className="mx-auto w-full max-w-5xl space-y-4 pb-12">
+      <div className="mx-auto w-full max-w-5xl space-y-4 pb-12">
         <header>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-lg font-semibold">
@@ -272,7 +272,7 @@ export default async function ApplicationWorkspacePage({ params }: Props) {
             </details>
           </div>
         )}
-      </main>
+      </div>
     </AppShell>
   );
 }

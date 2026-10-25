@@ -188,7 +188,7 @@ export function ApplicationOutcomePanel({
                   "rounded-full border px-3 py-1 text-xs transition-colors",
                   stage === opt.value
                     ? "border-primary bg-primary/10 text-primary"
-                    : "border-border text-muted-foreground hover:border-primary/50",
+                    : "border-border text-muted-foreground hover:border-primary/50"
                 )}
               >
                 {opt.label}
@@ -210,9 +210,7 @@ export function ApplicationOutcomePanel({
             </p>
           ) : null}
           {nudge ? (
-            <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm">
-              {nudge}
-            </p>
+            <p className="rounded-md border border-warning/40 bg-warning/10 p-2 text-sm">{nudge}</p>
           ) : null}
           <p className="text-sm text-muted-foreground">
             A two-minute autopsy is where the real value is — it turns a &ldquo;no&rdquo; into your
@@ -254,7 +252,9 @@ export function ApplicationOutcomePanel({
                 <Search className="size-4 text-primary" aria-hidden="true" />
                 {reward.insight.pattern.name}
               </div>
-              <p className="mt-1 text-xs text-muted-foreground">{reward.insight.pattern.evidence}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {reward.insight.pattern.evidence}
+              </p>
             </div>
           ) : null}
 
@@ -269,7 +269,10 @@ export function ApplicationOutcomePanel({
                   const added = addedSteps.has(i);
                   return (
                     <li key={i} className="flex items-start gap-2 text-sm">
-                      <ArrowRight className="mt-0.5 size-3.5 shrink-0 text-primary" aria-hidden="true" />
+                      <ArrowRight
+                        className="mt-0.5 size-3.5 shrink-0 text-primary"
+                        aria-hidden="true"
+                      />
                       <span className="flex-1 text-muted-foreground">{step}</span>
                       <Button
                         type="button"
@@ -293,8 +296,8 @@ export function ApplicationOutcomePanel({
                 })}
               </ul>
               <p className="text-xs text-muted-foreground">
-                Adding a move turns it into a commitment in your Prepare plan for this direction — the
-                loop from a “no” to your next build.
+                Adding a move turns it into a commitment in your Prepare plan for this direction —
+                the loop from a “no” to your next build.
               </p>
             </div>
           ) : null}

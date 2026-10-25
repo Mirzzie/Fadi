@@ -76,18 +76,19 @@ export function DocumentEditor({
     window.open(`/api/documents/${id}/docx`, "_blank");
   }
   function applyTemplate(t: DocTemplate) {
-    if (content.trim() && !window.confirm("Replace the current content with this template?")) return;
+    if (content.trim() && !window.confirm("Replace the current content with this template?"))
+      return;
     onChange({ content: t.content });
   }
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-9rem)] w-full max-w-4xl flex-col gap-3">
+    <div className="mx-auto flex min-h-[70dvh] w-full min-w-0 max-w-4xl flex-col gap-3 lg:h-[calc(100dvh-9rem)]">
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3">
+        <div className="flex min-w-0 flex-wrap items-center gap-3">
           <Link
             href="/dashboard/documents"
-            className="grid size-8 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="grid size-10 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
             aria-label="Back to documents"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
@@ -97,7 +98,7 @@ export function DocumentEditor({
           </span>
           <DocumentSaveIndicator status={status} />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <DocumentHistoryLink id={id} />
           <DocTemplatePicker kind={kind as DocKind} onPick={applyTemplate} />
           <Button variant="outline" size="sm" onClick={exportDocx}>
@@ -117,12 +118,14 @@ export function DocumentEditor({
       {/* Page */}
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden border border-border bg-card">
         <input
+          aria-label="Document title"
           value={title}
           onChange={(e) => onChange({ title: e.target.value })}
           placeholder="Document title"
           className="border-b border-border/60 bg-transparent px-5 py-3 text-lg font-semibold outline-none"
         />
         <textarea
+          aria-label="Document content"
           value={content}
           onChange={(e) => onChange({ content: e.target.value })}
           placeholder="Start writing, or ask Fadi to draft this for a specific role…"

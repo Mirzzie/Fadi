@@ -35,7 +35,10 @@ export function BatchPrep({ candidates }: { candidates: BatchCandidate[] }) {
 
     for (const c of candidates) {
       if (cancelled.current) {
-        setItems((prev) => ({ ...prev, [c.jobId]: { status: "failed", note: "skipped (cancelled)" } }));
+        setItems((prev) => ({
+          ...prev,
+          [c.jobId]: { status: "failed", note: "skipped (cancelled)" },
+        }));
         continue;
       }
       setItems((prev) => ({ ...prev, [c.jobId]: { status: "running" } }));
@@ -44,7 +47,10 @@ export function BatchPrep({ candidates }: { candidates: BatchCandidate[] }) {
         setItems((prev) => ({
           ...prev,
           [c.jobId]: res.ok
-            ? { status: "done", note: res.created > 0 ? `${res.created} drafted` : "already prepared" }
+            ? {
+                status: "done",
+                note: res.created > 0 ? `${res.created} drafted` : "already prepared",
+              }
             : { status: "failed", note: res.message },
         }));
         // A no-history / no-provider failure will repeat for every role — stop honestly.
@@ -52,7 +58,10 @@ export function BatchPrep({ candidates }: { candidates: BatchCandidate[] }) {
           cancelled.current = true;
         }
       } catch {
-        setItems((prev) => ({ ...prev, [c.jobId]: { status: "failed", note: "failed — try it from its workspace" } }));
+        setItems((prev) => ({
+          ...prev,
+          [c.jobId]: { status: "failed", note: "failed — try it from its workspace" },
+        }));
       }
     }
     setRunning(false);
@@ -68,9 +77,9 @@ export function BatchPrep({ candidates }: { candidates: BatchCandidate[] }) {
             {candidates.length} role{candidates.length === 1 ? "" : "s"} ready for documents
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            One click drafts the full packet for each — resume, cover letter, cold email, value prop —
-            from your direction&apos;s base resume, in your own words. Runs on your AI key
-            (~4 documents per role); you give each a final human pass before sending.
+            One click drafts the full packet for each — resume, cover letter, cold email, value prop
+            — from your direction&apos;s base resume, in your own words. Runs on your AI key (~4
+            documents per role); you give each a final human pass before sending.
           </p>
         </div>
         {running ? (
@@ -93,18 +102,26 @@ export function BatchPrep({ candidates }: { candidates: BatchCandidate[] }) {
             return (
               <li key={c.jobId} className="flex items-center gap-2 text-xs">
                 {it.status === "running" ? (
-                  <Loader2 className="size-3.5 shrink-0 animate-spin text-primary" aria-hidden="true" />
+                  <Loader2
+                    className="size-3.5 shrink-0 animate-spin text-primary"
+                    aria-hidden="true"
+                  />
                 ) : it.status === "done" ? (
-                  <Check className="size-3.5 shrink-0 text-emerald-400" aria-hidden="true" />
+                  <Check className="size-3.5 shrink-0 text-success" aria-hidden="true" />
                 ) : it.status === "failed" ? (
-                  <X className="size-3.5 shrink-0 text-rose-400" aria-hidden="true" />
+                  <X className="size-3.5 shrink-0 text-destructive" aria-hidden="true" />
                 ) : (
-                  <span className="size-3.5 shrink-0 rounded-full border border-border" aria-hidden="true" />
+                  <span
+                    className="size-3.5 shrink-0 rounded-full border border-border"
+                    aria-hidden="true"
+                  />
                 )}
                 <span className="truncate">
                   {c.title} · {c.company}
                 </span>
-                {it.note ? <span className="shrink-0 text-muted-foreground">— {it.note}</span> : null}
+                {it.note ? (
+                  <span className="shrink-0 text-muted-foreground">— {it.note}</span>
+                ) : null}
               </li>
             );
           })}

@@ -76,17 +76,19 @@ function FadiStateChip({ state, working }: { state: FadiState; working: string |
             : state === "blocked"
               ? "bg-destructive shadow-[0_0_6px_var(--color-destructive)]"
               : state === "waiting_for_approval"
-                ? "bg-amber-400 shadow-[0_0_6px_var(--color-amber-400,#fbbf24)] animate-pulse"
+                ? "bg-warning shadow-[0_0_6px_var(--warning)] animate-pulse"
                 : busy
                   ? "bg-primary shadow-[0_0_6px_var(--color-primary)] animate-pulse"
-                  : "bg-emerald-400 shadow-[0_0_6px_var(--color-emerald-400,#34d399)]"
+                  : "bg-success shadow-[0_0_6px_var(--success)]"
         )}
       />
       {/* What it is doing beats what it is. "Fadi active" on every screen of a product that
           runs plans is a light that is always on. */}
       {showLabel ? (
         <span className="hidden max-w-[16rem] truncate sm:inline">
-          {state === "ready" && working ? `On: ${working}` : `Fadi ${FADI_STATE_LABEL[state].toLowerCase()}`}
+          {state === "ready" && working
+            ? `On: ${working}`
+            : `Fadi ${FADI_STATE_LABEL[state].toLowerCase()}`}
         </span>
       ) : null}
     </button>

@@ -54,8 +54,8 @@ export function ImportJobLink() {
   return (
     <div className="w-full space-y-2 rounded-lg border border-border/60 p-3">
       <p className="text-xs text-muted-foreground">
-        Paste the link to a job posting. Fadi reads what the page states — title, company,
-        location, description — and adds it to your board.
+        Paste the link to a job posting. Fadi reads what the page states — title, company, location,
+        description — and adds it to your board.
       </p>
       <div className="flex flex-wrap gap-2">
         <Input
@@ -81,7 +81,9 @@ export function ImportJobLink() {
         <p className="text-xs">
           Added <span className="font-medium">{imported.title}</span> at {imported.company}
           {imported.location ? ` — ${imported.location}` : ""}.{" "}
-          {imported.hasDescription ? "" : "The page gave no description, so add it by hand for a tailored CV. "}
+          {imported.hasDescription
+            ? ""
+            : "The page gave no description, so add it by hand for a tailored CV. "}
           <Link
             href={`/dashboard/applications/${imported.jobId}/workspace`}
             className="font-medium text-primary hover:underline"
@@ -92,7 +94,7 @@ export function ImportJobLink() {
       ) : null}
 
       {error ? (
-        <p className="text-xs text-amber-500">
+        <p className="text-xs text-warning">
           {error.message}{" "}
           {error.manual ? (
             <Link href="/dashboard/applications" className="font-medium underline">

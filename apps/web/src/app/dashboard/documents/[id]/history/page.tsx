@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { PageIntro } from "@/components/layout/page-intro";
 import { RestoreRevisionButton } from "@/components/documents/restore-revision-button";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
@@ -50,7 +51,7 @@ export default async function DocumentHistoryPage({ params }: { params: Promise<
 
   return (
     <AppShell>
-      <main className="mx-auto max-w-4xl space-y-6">
+      <div className="mx-auto max-w-4xl space-y-6">
         <header className="flex items-start gap-3">
           <Link
             href={`/dashboard/documents/${document.id}`}
@@ -59,16 +60,12 @@ export default async function DocumentHistoryPage({ params }: { params: Promise<
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
           </Link>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Document history
-            </p>
-            <h1 className="text-2xl font-semibold">{document.title}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Every accepted save is retained. Restoring creates a new version and does not erase
-              later work.
-            </p>
-          </div>
+          <PageIntro
+            compact
+            eyebrow="Document history"
+            title={document.title}
+            description="Every accepted save is retained. Restoring creates a new version and does not erase later work."
+          />
         </header>
 
         <section className="space-y-3">
@@ -85,7 +82,7 @@ export default async function DocumentHistoryPage({ params }: { params: Promise<
                     <div className="flex items-center gap-2">
                       <h2 className="font-semibold">Version {revision.version}</h2>
                       {isCurrent ? (
-                        <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-500">
+                        <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
                           Current
                         </span>
                       ) : null}
@@ -122,7 +119,7 @@ export default async function DocumentHistoryPage({ params }: { params: Promise<
             );
           })}
         </section>
-      </main>
+      </div>
     </AppShell>
   );
 }

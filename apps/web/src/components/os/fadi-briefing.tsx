@@ -17,7 +17,11 @@ const VOICE_PREF_KEY = "fadi-voice-enabled";
  */
 export function FadiBriefing({ briefing }: { briefing: Briefing }) {
   const { speak, stop, state, isSupported } = useSpeechOutput({ rate: 1.0 });
-  const mounted = useSyncExternalStore(() => () => {}, () => true, () => false);
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
   const tried = useRef(false);
 
   useEffect(() => {
@@ -38,7 +42,7 @@ export function FadiBriefing({ briefing }: { briefing: Briefing }) {
   }
 
   return (
-    <section className="border-y border-border bg-card py-4 sm:py-5">
+    <section className="rounded-xl border border-border bg-card p-5 sm:p-6">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2.5">
           <span className="grid size-8 shrink-0 place-items-center rounded-md border border-border bg-muted text-foreground">
@@ -58,7 +62,7 @@ export function FadiBriefing({ briefing }: { briefing: Briefing }) {
               "flex shrink-0 items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium transition-colors",
               speaking
                 ? "border-primary/40 bg-primary/10 text-primary"
-                : "border-border/60 text-muted-foreground hover:text-foreground",
+                : "border-border/60 text-muted-foreground hover:text-foreground"
             )}
           >
             {speaking ? (

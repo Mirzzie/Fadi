@@ -5,6 +5,7 @@ import { Check, ClipboardCopy, Compass, Plus, Send, Sparkles, Trash2 } from "luc
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { PageIntro } from "@/components/layout/page-intro";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -31,7 +32,7 @@ const STATUS_META: Record<ReferralStatus, { label: string; tone: string }> = {
   identified: { label: "Identified", tone: "text-muted-foreground" },
   asked: { label: "Asked", tone: "text-primary" },
   responded: { label: "Responded", tone: "text-primary" },
-  referred: { label: "Referred ✓", tone: "text-emerald-400" },
+  referred: { label: "Referred ✓", tone: "text-success" },
   declined: { label: "No / passed", tone: "text-muted-foreground" },
 };
 
@@ -51,23 +52,25 @@ export function ReferralBoard({ referrals }: { referrals: ReferralView[] }) {
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-6 pb-12">
-      <header className="space-y-2 border-b border-border pb-7 pt-3">
-        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-          People
-        </p>
-        <h1 className="font-heading text-3xl font-semibold tracking-tight">Referrals &amp; warm intros</h1>
-        <p className="text-sm text-muted-foreground">
-          Keep track of people who may offer context, feedback or an introduction. Prepare a message
-          you can review before sending, then record what happened. An introduction is another route
-          to explore, not a guarantee of an interview.
-        </p>
-        {items.length > 0 ? (
-          <p className="text-xs text-muted-foreground">
-            {asked} {asked === 1 ? "ask" : "asks"} in motion · {items.length} target
-            {items.length === 1 ? "" : "s"}
-          </p>
-        ) : null}
-      </header>
+      <PageIntro
+        eyebrow="Opportunities · People"
+        title="Referrals & warm intros"
+        description={
+          <>
+            <p>
+              Keep track of people who may offer context, feedback or an introduction. Prepare a
+              message you can review before sending, then record what happened. An introduction is
+              another route to explore, not a guarantee of an interview.
+            </p>
+            {items.length > 0 ? (
+              <p className="text-xs text-muted-foreground">
+                {asked} {asked === 1 ? "ask" : "asks"} in motion · {items.length} target
+                {items.length === 1 ? "" : "s"}
+              </p>
+            ) : null}
+          </>
+        }
+      />
 
       <AddReferralForm onAdded={upsert} />
 
@@ -79,7 +82,12 @@ export function ReferralBoard({ referrals }: { referrals: ReferralView[] }) {
       ) : (
         <ul className="space-y-3">
           {items.map((item) => (
-            <ReferralCard key={item.id} item={item} onChange={upsert} onRemove={(id) => setItems((p) => p.filter((x) => x.id !== id))} />
+            <ReferralCard
+              key={item.id}
+              item={item}
+              onChange={upsert}
+              onRemove={(id) => setItems((p) => p.filter((x) => x.id !== id))}
+            />
           ))}
         </ul>
       )}
@@ -108,7 +116,13 @@ function AddReferralForm({ onAdded }: { onAdded: (r: ReferralView) => void }) {
         return;
       }
       onAdded(res.referral);
-      setForm({ company: "", roleTitle: "", contactName: "", contactRole: "", relationship: "cold" });
+      setForm({
+        company: "",
+        roleTitle: "",
+        contactName: "",
+        contactRole: "",
+        relationship: "cold",
+      });
       setOpen(false);
     });
   }
@@ -158,7 +172,9 @@ function AddReferralForm({ onAdded }: { onAdded: (r: ReferralView) => void }) {
           <select
             aria-label="How you'd connect"
             value={form.relationship}
-            onChange={(e) => setForm((f) => ({ ...f, relationship: e.target.value as Relationship }))}
+            onChange={(e) =>
+              setForm((f) => ({ ...f, relationship: e.target.value as Relationship }))
+            }
             className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
           >
             {RELATIONSHIPS.map((r) => (
@@ -260,7 +276,11 @@ function ReferralCard({
           <span className={cn("text-xs font-medium", status.tone)}>{status.label}</span>
           <button
             type="button"
-            onClick={() => startTransition(() => { void removeReferral({ id: item.id }).then(() => onRemove(item.id)); })}
+            onClick={() =>
+              startTransition(() => {
+                void removeReferral({ id: item.id }).then(() => onRemove(item.id));
+              })
+            }
             className="text-muted-foreground/60 transition-colors hover:text-destructive"
             title="Remove"
             aria-label="Remove target"
@@ -283,7 +303,10 @@ function ReferralCard({
         <ul className="mt-2 space-y-1.5">
           {referralStrategy(item.company).map((tip, i) => (
             <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
-              <span className="mt-1 size-1 shrink-0 rounded-full bg-primary/60" aria-hidden="true" />
+              <span
+                className="mt-1 size-1 shrink-0 rounded-full bg-primary/60"
+                aria-hidden="true"
+              />
               <span>{tip}</span>
             </li>
           ))}
@@ -299,8 +322,7 @@ function ReferralCard({
           </Button>
           {item.status === "identified" ? (
             <Button size="sm" onClick={doMarkAsked} disabled={pending}>
-              <Send className="size-3.5" aria-hidden="true" />
-              I reached out
+              <Send className="size-3.5" aria-hidden="true" />I reached out
             </Button>
           ) : null}
         </div>
@@ -335,7 +357,7 @@ function ReferralCard({
                 "rounded-full border px-2.5 py-0.5 text-xs transition-colors",
                 item.status === s
                   ? "border-primary bg-primary/10 text-primary"
-                  : "border-border text-muted-foreground hover:border-primary/50",
+                  : "border-border text-muted-foreground hover:border-primary/50"
               )}
             >
               {STATUS_META[s].label}

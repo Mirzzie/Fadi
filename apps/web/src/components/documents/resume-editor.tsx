@@ -1,6 +1,16 @@
 "use client";
 
-import { ArrowLeft, BookmarkPlus, ChevronDown, ChevronUp, Download, Loader2, Plus, Trash2, X } from "lucide-react";
+import {
+  ArrowLeft,
+  BookmarkPlus,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  Loader2,
+  Plus,
+  Trash2,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -113,7 +123,7 @@ export function ResumeEditor({
   const [template, setTemplate] = useState<ResumeTemplate>(
     RESUME_TEMPLATES.some((t) => t.id === initialTemplate)
       ? (initialTemplate as ResumeTemplate)
-      : "classic",
+      : "classic"
   );
   const { status, markDirty, save: saveVersion } = useVersionedDocumentSave(id, initialVersion);
   const [truthFindings, setTruthFindings] = useState(initialTruthFindings);
@@ -210,7 +220,7 @@ export function ResumeEditor({
       ]
         .filter(Boolean)
         .join("\n"),
-    [data.summary, data.experiences, data.projects],
+    [data.summary, data.experiences, data.projects]
   );
 
   function exportPdf() {
@@ -225,25 +235,44 @@ export function ResumeEditor({
 
   function addSectionItem(key: ResumeSectionKey) {
     if (key === "experiences")
-      patch({ experiences: [...data.experiences, { id: newId(), title: "", company: "", location: "", period: "", bullets: "" }] });
+      patch({
+        experiences: [
+          ...data.experiences,
+          { id: newId(), title: "", company: "", location: "", period: "", bullets: "" },
+        ],
+      });
     else if (key === "projects")
       patch({ projects: [...data.projects, { id: newId(), title: "", url: "", description: "" }] });
     else if (key === "education")
-      patch({ education: [...data.education, { id: newId(), degree: "", school: "", location: "", period: "" }] });
+      patch({
+        education: [
+          ...data.education,
+          { id: newId(), degree: "", school: "", location: "", period: "" },
+        ],
+      });
     else if (key === "certifications")
-      patch({ certifications: [...data.certifications, { id: newId(), name: "", issuer: "", date: "" }] });
+      patch({
+        certifications: [...data.certifications, { id: newId(), name: "", issuer: "", date: "" }],
+      });
     else if (key === "languages")
       patch({ languages: [...data.languages, { id: newId(), name: "", level: "" }] });
     else if (key === "awards")
       patch({ awards: [...data.awards, { id: newId(), title: "", awarder: "", date: "" }] });
     else if (key === "volunteer")
-      patch({ volunteer: [...data.volunteer, { id: newId(), organization: "", role: "", period: "", summary: "" }] });
+      patch({
+        volunteer: [
+          ...data.volunteer,
+          { id: newId(), organization: "", role: "", period: "", summary: "" },
+        ],
+      });
     else if (key === "references")
       patch({ references: [...data.references, { id: newId(), name: "", reference: "" }] });
     else if (key === "interests")
       patch({ interests: [...data.interests, { id: newId(), name: "", keywords: "" }] });
     else if (key === "publications")
-      patch({ publications: [...data.publications, { id: newId(), name: "", publisher: "", date: "" }] });
+      patch({
+        publications: [...data.publications, { id: newId(), name: "", publisher: "", date: "" }],
+      });
   }
 
   function renderSectionForm(key: ResumeSectionKey): React.ReactNode {
@@ -260,12 +289,43 @@ export function ResumeEditor({
         );
       case "experiences":
         return data.experiences.map((exp, i) => (
-          <RepeatItem key={exp.id} onRemove={() => patch({ experiences: data.experiences.filter((_, j) => j !== i) })}>
+          <RepeatItem
+            key={exp.id}
+            onRemove={() => patch({ experiences: data.experiences.filter((_, j) => j !== i) })}
+          >
             <div className="grid gap-2 sm:grid-cols-2">
-              <input className={field} placeholder="Title" value={exp.title} onChange={(e) => updateList(data, patch, "experiences", i, { title: e.target.value })} />
-              <input className={field} placeholder="Company" value={exp.company} onChange={(e) => updateList(data, patch, "experiences", i, { company: e.target.value })} />
-              <input className={field} placeholder="Location" value={exp.location} onChange={(e) => updateList(data, patch, "experiences", i, { location: e.target.value })} />
-              <input className={field} placeholder="Period (e.g. Jan 2024 – Present)" value={exp.period} onChange={(e) => updateList(data, patch, "experiences", i, { period: e.target.value })} />
+              <input
+                className={field}
+                placeholder="Title"
+                value={exp.title}
+                onChange={(e) =>
+                  updateList(data, patch, "experiences", i, { title: e.target.value })
+                }
+              />
+              <input
+                className={field}
+                placeholder="Company"
+                value={exp.company}
+                onChange={(e) =>
+                  updateList(data, patch, "experiences", i, { company: e.target.value })
+                }
+              />
+              <input
+                className={field}
+                placeholder="Location"
+                value={exp.location}
+                onChange={(e) =>
+                  updateList(data, patch, "experiences", i, { location: e.target.value })
+                }
+              />
+              <input
+                className={field}
+                placeholder="Period (e.g. Jan 2024 – Present)"
+                value={exp.period}
+                onChange={(e) =>
+                  updateList(data, patch, "experiences", i, { period: e.target.value })
+                }
+              />
             </div>
             {/* Bullets are where under-claiming happens: people TYPE "helped with
                 support" but SAY the three specific things they actually did. Select a
@@ -282,10 +342,23 @@ export function ResumeEditor({
         ));
       case "projects":
         return data.projects.map((p, i) => (
-          <RepeatItem key={p.id} onRemove={() => patch({ projects: data.projects.filter((_, j) => j !== i) })}>
+          <RepeatItem
+            key={p.id}
+            onRemove={() => patch({ projects: data.projects.filter((_, j) => j !== i) })}
+          >
             <div className="grid gap-2 sm:grid-cols-2">
-              <input className={field} placeholder="Project title" value={p.title} onChange={(e) => updateList(data, patch, "projects", i, { title: e.target.value })} />
-              <input className={field} placeholder="URL" value={p.url} onChange={(e) => updateList(data, patch, "projects", i, { url: e.target.value })} />
+              <input
+                className={field}
+                placeholder="Project title"
+                value={p.title}
+                onChange={(e) => updateList(data, patch, "projects", i, { title: e.target.value })}
+              />
+              <input
+                className={field}
+                placeholder="URL"
+                value={p.url}
+                onChange={(e) => updateList(data, patch, "projects", i, { url: e.target.value })}
+              />
             </div>
             <DictatableTextarea
               className={`${field} mt-2 min-h-16`}
@@ -298,80 +371,251 @@ export function ResumeEditor({
         ));
       case "education":
         return data.education.map((ed, i) => (
-          <RepeatItem key={ed.id} onRemove={() => patch({ education: data.education.filter((_, j) => j !== i) })}>
+          <RepeatItem
+            key={ed.id}
+            onRemove={() => patch({ education: data.education.filter((_, j) => j !== i) })}
+          >
             <div className="grid gap-2 sm:grid-cols-2">
-              <input className={field} placeholder="Degree" value={ed.degree} onChange={(e) => updateList(data, patch, "education", i, { degree: e.target.value })} />
-              <input className={field} placeholder="School" value={ed.school} onChange={(e) => updateList(data, patch, "education", i, { school: e.target.value })} />
-              <input className={field} placeholder="Location" value={ed.location} onChange={(e) => updateList(data, patch, "education", i, { location: e.target.value })} />
-              <input className={field} placeholder="Period" value={ed.period} onChange={(e) => updateList(data, patch, "education", i, { period: e.target.value })} />
+              <input
+                className={field}
+                placeholder="Degree"
+                value={ed.degree}
+                onChange={(e) =>
+                  updateList(data, patch, "education", i, { degree: e.target.value })
+                }
+              />
+              <input
+                className={field}
+                placeholder="School"
+                value={ed.school}
+                onChange={(e) =>
+                  updateList(data, patch, "education", i, { school: e.target.value })
+                }
+              />
+              <input
+                className={field}
+                placeholder="Location"
+                value={ed.location}
+                onChange={(e) =>
+                  updateList(data, patch, "education", i, { location: e.target.value })
+                }
+              />
+              <input
+                className={field}
+                placeholder="Period"
+                value={ed.period}
+                onChange={(e) =>
+                  updateList(data, patch, "education", i, { period: e.target.value })
+                }
+              />
             </div>
           </RepeatItem>
         ));
       case "certifications":
         return data.certifications.map((c, i) => (
-          <RepeatItem key={c.id} onRemove={() => patch({ certifications: data.certifications.filter((_, j) => j !== i) })}>
+          <RepeatItem
+            key={c.id}
+            onRemove={() =>
+              patch({ certifications: data.certifications.filter((_, j) => j !== i) })
+            }
+          >
             <div className="grid gap-2 sm:grid-cols-2">
-              <input className={field} placeholder="Certification / license (e.g. RN, CPA, AWS SAA)" value={c.name} onChange={(e) => updateList(data, patch, "certifications", i, { name: e.target.value })} />
-              <input className={field} placeholder="Issuer (e.g. NMBI, AWS)" value={c.issuer} onChange={(e) => updateList(data, patch, "certifications", i, { issuer: e.target.value })} />
-              <input className={field} placeholder="Date (e.g. 2024)" value={c.date} onChange={(e) => updateList(data, patch, "certifications", i, { date: e.target.value })} />
+              <input
+                className={field}
+                placeholder="Certification / license (e.g. RN, CPA, AWS SAA)"
+                value={c.name}
+                onChange={(e) =>
+                  updateList(data, patch, "certifications", i, { name: e.target.value })
+                }
+              />
+              <input
+                className={field}
+                placeholder="Issuer (e.g. NMBI, AWS)"
+                value={c.issuer}
+                onChange={(e) =>
+                  updateList(data, patch, "certifications", i, { issuer: e.target.value })
+                }
+              />
+              <input
+                className={field}
+                placeholder="Date (e.g. 2024)"
+                value={c.date}
+                onChange={(e) =>
+                  updateList(data, patch, "certifications", i, { date: e.target.value })
+                }
+              />
             </div>
           </RepeatItem>
         ));
       case "languages":
         return data.languages.map((l, i) => (
-          <RepeatItem key={l.id} onRemove={() => patch({ languages: data.languages.filter((_, j) => j !== i) })}>
+          <RepeatItem
+            key={l.id}
+            onRemove={() => patch({ languages: data.languages.filter((_, j) => j !== i) })}
+          >
             <div className="grid gap-2 sm:grid-cols-2">
-              <input className={field} placeholder="Language (e.g. English)" value={l.name} onChange={(e) => updateList(data, patch, "languages", i, { name: e.target.value })} />
-              <input className={field} placeholder="Level (e.g. Native, Fluent)" value={l.level} onChange={(e) => updateList(data, patch, "languages", i, { level: e.target.value })} />
+              <input
+                className={field}
+                placeholder="Language (e.g. English)"
+                value={l.name}
+                onChange={(e) => updateList(data, patch, "languages", i, { name: e.target.value })}
+              />
+              <input
+                className={field}
+                placeholder="Level (e.g. Native, Fluent)"
+                value={l.level}
+                onChange={(e) => updateList(data, patch, "languages", i, { level: e.target.value })}
+              />
             </div>
           </RepeatItem>
         ));
       case "awards":
         return data.awards.map((a, i) => (
-          <RepeatItem key={a.id} onRemove={() => patch({ awards: data.awards.filter((_, j) => j !== i) })}>
+          <RepeatItem
+            key={a.id}
+            onRemove={() => patch({ awards: data.awards.filter((_, j) => j !== i) })}
+          >
             <div className="grid gap-2 sm:grid-cols-2">
-              <input className={field} placeholder="Award / honour" value={a.title} onChange={(e) => updateList(data, patch, "awards", i, { title: e.target.value })} />
-              <input className={field} placeholder="Awarded by" value={a.awarder} onChange={(e) => updateList(data, patch, "awards", i, { awarder: e.target.value })} />
-              <input className={field} placeholder="Date (e.g. 2024)" value={a.date} onChange={(e) => updateList(data, patch, "awards", i, { date: e.target.value })} />
+              <input
+                className={field}
+                placeholder="Award / honour"
+                value={a.title}
+                onChange={(e) => updateList(data, patch, "awards", i, { title: e.target.value })}
+              />
+              <input
+                className={field}
+                placeholder="Awarded by"
+                value={a.awarder}
+                onChange={(e) => updateList(data, patch, "awards", i, { awarder: e.target.value })}
+              />
+              <input
+                className={field}
+                placeholder="Date (e.g. 2024)"
+                value={a.date}
+                onChange={(e) => updateList(data, patch, "awards", i, { date: e.target.value })}
+              />
             </div>
           </RepeatItem>
         ));
       case "volunteer":
         return data.volunteer.map((v, i) => (
-          <RepeatItem key={v.id} onRemove={() => patch({ volunteer: data.volunteer.filter((_, j) => j !== i) })}>
+          <RepeatItem
+            key={v.id}
+            onRemove={() => patch({ volunteer: data.volunteer.filter((_, j) => j !== i) })}
+          >
             <div className="grid gap-2 sm:grid-cols-2">
-              <input className={field} placeholder="Organisation" value={v.organization} onChange={(e) => updateList(data, patch, "volunteer", i, { organization: e.target.value })} />
-              <input className={field} placeholder="Role" value={v.role} onChange={(e) => updateList(data, patch, "volunteer", i, { role: e.target.value })} />
-              <input className={field} placeholder="Period" value={v.period} onChange={(e) => updateList(data, patch, "volunteer", i, { period: e.target.value })} />
-              <input className={field} placeholder="What you did" value={v.summary} onChange={(e) => updateList(data, patch, "volunteer", i, { summary: e.target.value })} />
+              <input
+                className={field}
+                placeholder="Organisation"
+                value={v.organization}
+                onChange={(e) =>
+                  updateList(data, patch, "volunteer", i, { organization: e.target.value })
+                }
+              />
+              <input
+                className={field}
+                placeholder="Role"
+                value={v.role}
+                onChange={(e) => updateList(data, patch, "volunteer", i, { role: e.target.value })}
+              />
+              <input
+                className={field}
+                placeholder="Period"
+                value={v.period}
+                onChange={(e) =>
+                  updateList(data, patch, "volunteer", i, { period: e.target.value })
+                }
+              />
+              <input
+                className={field}
+                placeholder="What you did"
+                value={v.summary}
+                onChange={(e) =>
+                  updateList(data, patch, "volunteer", i, { summary: e.target.value })
+                }
+              />
             </div>
           </RepeatItem>
         ));
       case "references":
         return data.references.map((r, i) => (
-          <RepeatItem key={r.id} onRemove={() => patch({ references: data.references.filter((_, j) => j !== i) })}>
+          <RepeatItem
+            key={r.id}
+            onRemove={() => patch({ references: data.references.filter((_, j) => j !== i) })}
+          >
             <div className="grid gap-2 sm:grid-cols-2">
-              <input className={field} placeholder="Name" value={r.name} onChange={(e) => updateList(data, patch, "references", i, { name: e.target.value })} />
-              <input className={field} placeholder="Relationship & contact" value={r.reference} onChange={(e) => updateList(data, patch, "references", i, { reference: e.target.value })} />
+              <input
+                className={field}
+                placeholder="Name"
+                value={r.name}
+                onChange={(e) => updateList(data, patch, "references", i, { name: e.target.value })}
+              />
+              <input
+                className={field}
+                placeholder="Relationship & contact"
+                value={r.reference}
+                onChange={(e) =>
+                  updateList(data, patch, "references", i, { reference: e.target.value })
+                }
+              />
             </div>
           </RepeatItem>
         ));
       case "publications":
         return data.publications.map((p, i) => (
-          <RepeatItem key={p.id} onRemove={() => patch({ publications: data.publications.filter((_, j) => j !== i) })}>
+          <RepeatItem
+            key={p.id}
+            onRemove={() => patch({ publications: data.publications.filter((_, j) => j !== i) })}
+          >
             <div className="grid gap-2 sm:grid-cols-2">
-              <input className={field} placeholder="Title" value={p.name} onChange={(e) => updateList(data, patch, "publications", i, { name: e.target.value })} />
-              <input className={field} placeholder="Publisher / journal" value={p.publisher} onChange={(e) => updateList(data, patch, "publications", i, { publisher: e.target.value })} />
-              <input className={field} placeholder="Date (e.g. 2024)" value={p.date} onChange={(e) => updateList(data, patch, "publications", i, { date: e.target.value })} />
+              <input
+                className={field}
+                placeholder="Title"
+                value={p.name}
+                onChange={(e) =>
+                  updateList(data, patch, "publications", i, { name: e.target.value })
+                }
+              />
+              <input
+                className={field}
+                placeholder="Publisher / journal"
+                value={p.publisher}
+                onChange={(e) =>
+                  updateList(data, patch, "publications", i, { publisher: e.target.value })
+                }
+              />
+              <input
+                className={field}
+                placeholder="Date (e.g. 2024)"
+                value={p.date}
+                onChange={(e) =>
+                  updateList(data, patch, "publications", i, { date: e.target.value })
+                }
+              />
             </div>
           </RepeatItem>
         ));
       case "interests":
         return data.interests.map((it, i) => (
-          <RepeatItem key={it.id} onRemove={() => patch({ interests: data.interests.filter((_, j) => j !== i) })}>
+          <RepeatItem
+            key={it.id}
+            onRemove={() => patch({ interests: data.interests.filter((_, j) => j !== i) })}
+          >
             <div className="grid gap-2 sm:grid-cols-2">
-              <input className={field} placeholder="Interest (e.g. Photography)" value={it.name} onChange={(e) => updateList(data, patch, "interests", i, { name: e.target.value })} />
-              <input className={field} placeholder="Keywords (comma-separated)" value={it.keywords} onChange={(e) => updateList(data, patch, "interests", i, { keywords: e.target.value })} />
+              <input
+                className={field}
+                placeholder="Interest (e.g. Photography)"
+                value={it.name}
+                onChange={(e) => updateList(data, patch, "interests", i, { name: e.target.value })}
+              />
+              <input
+                className={field}
+                placeholder="Keywords (comma-separated)"
+                value={it.keywords}
+                onChange={(e) =>
+                  updateList(data, patch, "interests", i, { keywords: e.target.value })
+                }
+              />
             </div>
           </RepeatItem>
         ));
@@ -381,7 +625,9 @@ export function ResumeEditor({
             className={`${field} min-h-16`}
             value={data.skills}
             onChange={(e) => patch({ skills: e.target.value })}
-            placeholder={"One group per line, e.g.\nCloud: AWS, Azure, Docker\nLanguages: Python, JavaScript"}
+            placeholder={
+              "One group per line, e.g.\nCloud: AWS, Azure, Docker\nLanguages: Python, JavaScript"
+            }
           />
         );
       default:
@@ -390,29 +636,30 @@ export function ResumeEditor({
   }
 
   return (
-    <div className="flex h-[calc(100vh-9rem)] w-full flex-col gap-3">
+    <div className="flex w-full min-w-0 flex-col gap-3 lg:h-[calc(100dvh-9rem)]">
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <Link
             href="/dashboard/documents"
-            className="grid size-8 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="grid size-10 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
             aria-label="Back to documents"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
           </Link>
           <input
+            aria-label="Document title"
             value={title}
             onChange={(e) => {
               dirty.current = true;
               markDirty();
               setTitle(e.target.value);
             }}
-            className="rounded-md bg-transparent px-1 text-sm font-semibold outline-none focus:bg-accent/40"
+            className="h-10 min-w-0 flex-1 rounded-md bg-transparent px-1 text-sm font-semibold outline-none focus:bg-accent/40"
           />
           <DocumentSaveIndicator status={status} />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <DocumentHistoryLink id={id} />
           <SelectMenu
             ariaLabel="Resume template"
@@ -477,7 +724,12 @@ export function ResumeEditor({
             <Download className="size-4" aria-hidden="true" />
             PDF
           </Button>
-          <Button variant="outline" size="sm" onClick={exportJson} title="Export as JSON Resume (open standard)">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportJson}
+            title="Export as JSON Resume (open standard)"
+          >
             <Download className="size-4" aria-hidden="true" />
             JSON
           </Button>
@@ -489,7 +741,7 @@ export function ResumeEditor({
 
       {/* Save-as-template: name input when saving, plus apply/delete for saved styles */}
       {templateName !== null ? (
-        <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2">
           <input
             autoFocus
             value={templateName}
@@ -499,9 +751,14 @@ export function ResumeEditor({
               if (e.key === "Escape") setTemplateName(null);
             }}
             placeholder="Name this template (e.g. My clean serif)"
-            className="h-8 flex-1 rounded-md border border-border bg-background px-2.5 text-sm outline-none focus:border-primary/40"
+            aria-label="Saved template name"
+            className="h-10 min-w-0 flex-1 rounded-md border border-border bg-background px-2.5 text-sm outline-none focus:border-primary/40"
           />
-          <Button size="sm" disabled={tplBusy || !templateName.trim()} onClick={saveCurrentAsTemplate}>
+          <Button
+            size="sm"
+            disabled={tplBusy || !templateName.trim()}
+            onClick={saveCurrentAsTemplate}
+          >
             {tplBusy ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
             Save template
           </Button>
@@ -577,36 +834,68 @@ export function ResumeEditor({
         ]}
       />
 
-      <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-2">
+      <div className="grid min-h-0 min-w-0 flex-1 gap-5 lg:grid-cols-2">
         {/* Live preview (HTML) */}
-        <div className="nice-scrollbar min-h-0 overflow-y-auto rounded-xl border border-border/60 bg-white p-8 text-[13px] text-zinc-800 shadow-sm lg:p-10">
+        <div className="nice-scrollbar min-h-0 min-w-0 overflow-auto rounded-xl border border-border/60 bg-white p-5 text-[13px] text-zinc-800 shadow-sm sm:p-8 lg:p-10">
           <ResumePreview data={data} template={template} />
         </div>
 
         {/* Form */}
-        <div className="nice-scrollbar min-h-0 space-y-4 overflow-y-auto pr-2">
+        <div className="nice-scrollbar min-h-0 min-w-0 space-y-4 overflow-y-auto pr-2">
           <Section title="Personal details">
             <div className="grid gap-2 sm:grid-cols-2">
               <Labeled label="Full name">
-                <input className={field} value={data.personal.name} onChange={(e) => patchPersonal({ name: e.target.value })} />
+                <input
+                  className={field}
+                  value={data.personal.name}
+                  onChange={(e) => patchPersonal({ name: e.target.value })}
+                />
               </Labeled>
               <Labeled label="Headline">
-                <input className={field} value={data.personal.headline} onChange={(e) => patchPersonal({ headline: e.target.value })} placeholder="IT Support Engineer" />
+                <input
+                  className={field}
+                  value={data.personal.headline}
+                  onChange={(e) => patchPersonal({ headline: e.target.value })}
+                  placeholder="IT Support Engineer"
+                />
               </Labeled>
               <Labeled label="Email">
-                <input className={field} value={data.personal.email} onChange={(e) => patchPersonal({ email: e.target.value })} />
+                <input
+                  className={field}
+                  value={data.personal.email}
+                  onChange={(e) => patchPersonal({ email: e.target.value })}
+                />
               </Labeled>
               <Labeled label="Phone">
-                <input className={field} value={data.personal.phone} onChange={(e) => patchPersonal({ phone: e.target.value })} />
+                <input
+                  className={field}
+                  value={data.personal.phone}
+                  onChange={(e) => patchPersonal({ phone: e.target.value })}
+                />
               </Labeled>
               <Labeled label="Location">
-                <input className={field} value={data.personal.location} onChange={(e) => patchPersonal({ location: e.target.value })} placeholder="Dublin, Ireland" />
+                <input
+                  className={field}
+                  value={data.personal.location}
+                  onChange={(e) => patchPersonal({ location: e.target.value })}
+                  placeholder="Dublin, Ireland"
+                />
               </Labeled>
               <Labeled label="Links">
-                <input className={field} value={data.personal.links} onChange={(e) => patchPersonal({ links: e.target.value })} placeholder="LinkedIn · GitHub · Portfolio" />
+                <input
+                  className={field}
+                  value={data.personal.links}
+                  onChange={(e) => patchPersonal({ links: e.target.value })}
+                  placeholder="LinkedIn · GitHub · Portfolio"
+                />
               </Labeled>
               <Labeled label="Photo URL (optional)">
-                <input className={field} value={data.personal.photo ?? ""} onChange={(e) => patchPersonal({ photo: e.target.value })} placeholder="https://…/headshot.jpg — shows on templates that support a photo" />
+                <input
+                  className={field}
+                  value={data.personal.photo ?? ""}
+                  onChange={(e) => patchPersonal({ photo: e.target.value })}
+                  placeholder="https://…/headshot.jpg — shows on templates that support a photo"
+                />
               </Labeled>
             </div>
           </Section>
@@ -657,10 +946,10 @@ function updateList(
       ResumeReference &
       ResumeInterest &
       ResumePublication
-  >,
+  >
 ) {
   const list = (data[key] as Array<Record<string, unknown>>).map((item, j) =>
-    j === index ? { ...item, ...changes } : item,
+    j === index ? { ...item, ...changes } : item
   );
   patch({ [key]: list } as Partial<ResumeData>);
 }
