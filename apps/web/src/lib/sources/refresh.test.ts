@@ -4,6 +4,7 @@ import type { SourceEntry } from "./registry";
 import {
   type Fetcher,
   ckanMetadataModified,
+  decodeEntities,
   extractPublisherDate,
   fetcherFor,
   isChanged,
@@ -63,6 +64,18 @@ describe("normalizeContent", () => {
   it("keeps a changed figure visible", () => {
     expect(normalizeContent("<p>Fee €40,904</p>")).not.toBe(normalizeContent("<p>Fee €45,000</p>"));
   });
+  // Codex regression: entities must decode to their semantic characters, not be erased.
+  it("decodes entities to their characters", () => {
+    expect(decodeEntities("salary &euro;40000")).toBe("salary €40000");
+    expect(decodeEntities("hours &lt; 40")).toBe("hours < 40");
+    expect(decodeEntities("rate &#8364;5")).toBe("rate €5");
+  });
+  it("distinguishes a currency-symbol change (€ vs £) at the same figure", () => {
+    expect(normalizeContent("<p>salary &euro;40000</p>")).not.toBe(normalizeContent("<p>salary &pound;40000</p>"));
+  });
+  it("distinguishes an inequality change (< vs >) at the same figure", () => {
+    expect(normalizeContent("<p>hours &lt; 40</p>")).not.toBe(normalizeContent("<p>hours &gt; 40</p>"));
+  });
 });
 
 describe("extractPublisherDate — never relabel an effective date as 'updated'", () => {
@@ -110,6 +123,15 @@ describe("page_date change detection (the core P1 regression)", () => {
     expect(second.changed).toBe(true);
   });
 
+  it("a currency-symbol change with the same date IS a change (entities preserved)", async () => {
+    const d = "as of 1 March 2026";
+    const { fetcher: f1 } = canned(`<p>salary &euro;40000 ${d}</p>`);
+    const { fetcher: f2 } = canned(`<p>salary &pound;40000 ${d}</p>`);
+    const first = await readSource(entry({}), undefined, f1, at);
+    const second = await readSource(entry({}), { digest: first.digest, observedDate: first.observedDate }, f2, at);
+    expect(second.changed).toBe(true);
+  });
+
   it("rejects a block/challenge page instead of recording it as content", async () => {
     const { fetcher } = canned("<html><body>Access Denied — incident id 123</body></html>");
     const r = await readSource(entry({}), undefined, fetcher, at);
@@ -131,10 +153,10 @@ describe("structured mechanisms fail closed on bad payloads (P1)", () => {
     expect(r.ok).toBe(false);
   });
   it("rejects a JSON-stat endpoint that returns no dataset", async () => {
-    const { fetcher } = canned(JSON.stringify({ updated: "2026", error: "bad" }), 200, { "content-type": "application/json" });
+    const { fetcher } = canned(JSON.stringify({ updated: "2026", note: "landing page json" }), 200, { "content-type": "application/json" });
     const r = await readSource(entry({ apiStandard: "json_stat", change: { mechanism: "api_version" } }), undefined, fetcher, at);
     expect(r.ok).toBe(false);
-    expect(r.error).toMatch(/json-stat/i);
+    expect(r.error).toMatch(/dataset/i);
   });
   it("accepts a real JSON-stat dataset", async () => {
     const body = JSON.stringify({ updated: "2026-07-31", dimension: { time: {} }, value: [1, 2] });
@@ -142,6 +164,25 @@ describe("structured mechanisms fail closed on bad payloads (P1)", () => {
     const r = await readSource(entry({ apiStandard: "json_stat", change: { mechanism: "api_version" } }), undefined, fetcher, at);
     expect(r.ok).toBe(true);
     expect(r.observedDate).toBe("2026-07-31");
+  });
+  // Codex regression: a 200 JSON *error envelope* must be a gap, for sdmx-labelled sources too.
+  it("rejects a 200 JSON error envelope on a Eurostat (sdmx) source", async () => {
+    const body = JSON.stringify({ error: { code: 400, message: "dataset unavailable" } });
+    const { fetcher } = canned(body, 200, { "content-type": "application/json" });
+    const r = await readSource(entry({ apiStandard: "sdmx", change: { mechanism: "api_version" } }), undefined, fetcher, at);
+    expect(r.ok).toBe(false);
+    expect(r.error).toMatch(/error envelope|dataset/i);
+  });
+  it("rejects an SDMX JSON message/error class", async () => {
+    const body = JSON.stringify({ class: "message", errors: ["bad query"] });
+    const { fetcher } = canned(body, 200, { "content-type": "application/json" });
+    const r = await readSource(entry({ apiStandard: "sdmx", change: { mechanism: "api_version" } }), undefined, fetcher, at);
+    expect(r.ok).toBe(false);
+  });
+  it("rejects a content-API 200 body without identifying fields", async () => {
+    const { fetcher } = canned(JSON.stringify({ anything: true }), 200, { "content-type": "application/json" });
+    const r = await readSource(entry({ change: { mechanism: "content_api_updated" } }), undefined, fetcher, at);
+    expect(r.ok).toBe(false);
   });
   it("rejects an empty stable-id feed instead of hashing the empty string", async () => {
     const { fetcher } = canned(JSON.stringify({ results: [] }), 200, { "content-type": "application/json" });
