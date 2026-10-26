@@ -40,6 +40,8 @@ export interface SourceReading {
   observedDate?: string;
   /** What kind of date `observedDate` is — never silently treat an effective date as "updated". */
   dateKind?: DateKind;
+  /** The normalizer/fingerprint version the digest was produced under (compare only within a version). */
+  fingerprintVersion?: string;
   /** True when this reading differs from the prior one (digest OR observedDate moved). */
   changed?: boolean;
   summary?: string;
@@ -66,19 +68,45 @@ export interface Fetcher {
 
 export const sha256 = (s: string): string => createHash("sha256").update(s).digest("hex");
 
+/** Version of the normalization/fingerprint algorithm. A change here means re-interpret, not compare. */
+export const FINGERPRINT_VERSION = "1";
+
+/** Named entities whose SEMANTIC character must survive normalization (currency, inequality, units). */
+const NAMED_ENTITY: Record<string, string> = {
+  amp: "&", lt: "<", gt: ">", quot: '"', apos: "'", nbsp: " ",
+  euro: "€", pound: "£", cent: "¢", yen: "¥", curren: "¤", dollar: "$",
+  percnt: "%", permil: "‰", deg: "°", middot: "·", sect: "§",
+  le: "≤", ge: "≥", ne: "≠", lt_: "<", plusmn: "±", times: "×", divide: "÷", minus: "−", frac12: "½",
+};
+function safeCodePoint(cp: number): string {
+  try {
+    return Number.isFinite(cp) && cp > 0 && cp <= 0x10ffff ? String.fromCodePoint(cp) : " ";
+  } catch {
+    return " ";
+  }
+}
+/** Decode HTML entities to their characters, KEEPING semantic symbols (€, £, <, >, %, …). */
+export function decodeEntities(s: string): string {
+  return s
+    .replace(/&#x([0-9a-f]+);/gi, (_, h: string) => safeCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d: string) => safeCodePoint(parseInt(d, 10)))
+    .replace(/&([a-z][a-z0-9]*);/gi, (_, n: string) => NAMED_ENTITY[n.toLowerCase()] ?? " ");
+}
+
 /**
  * Normalize HTML to its salient text so a per-request nonce, script or markup change does not look
- * like a content change, while a changed figure or table DOES. Strips scripts/styles/comments/tags
- * and long opaque tokens, decodes nothing, collapses whitespace, lowercases.
+ * like a content change, while a changed figure, currency, inequality or unit DOES. Strips
+ * scripts/styles/comments/tags and long opaque tokens, then DECODES entities (preserving their
+ * meaning), collapses whitespace, lowercases. Versioned by `FINGERPRINT_VERSION`.
  */
 export function normalizeContent(html: string): string {
-  return html
+  const stripped = html
     .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
     .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
     .replace(/<!--[\s\S]*?-->/g, " ")
-    .replace(/<[^>]+>/g, " ") // strip tags → removes attribute nonces/csrf tokens
-    .replace(/&[a-z#0-9]+;/gi, " ")
-    .replace(/\b[A-Fa-f0-9]{24,}\b/g, " ") // long hex/opaque tokens printed in text
+    .replace(/<[^>]+>/g, " "); // strip tags → removes attribute nonces/csrf tokens
+  return decodeEntities(stripped)
+    .replace(/\b[A-Fa-f0-9]{24,}\b/g, " ") // long opaque tokens printed in text
     .replace(/\s+/g, " ")
     .trim()
     .toLowerCase();
@@ -162,6 +190,26 @@ function isJsonStatDataset(parsed: unknown): boolean {
   return !!o && typeof o === "object" && !!o.dimension && (o.value !== undefined || Array.isArray(o.value));
 }
 
+/** Reject a JSON *error* envelope returned with HTTP 200 (Eurostat/SDMX/REST fault shapes). */
+function assertNotErrorEnvelope(parsed: unknown): void {
+  const o = parsed as Record<string, unknown>;
+  if (o.error !== undefined) throw new Error("JSON error envelope");
+  if (o.class === "message" || o.class === "error") throw new Error("SDMX error message");
+  if (typeof o.faultstring === "string") throw new Error("fault response");
+  if (Array.isArray(o.errors) && o.errors.length > 0) throw new Error("errors array present");
+}
+
+/** A GOV.UK content-API document carries at least one of these identifying fields. */
+function hasContentApiShape(parsed: unknown): boolean {
+  const o = parsed as Record<string, unknown>;
+  return (
+    typeof o.public_updated_at === "string" ||
+    typeof o.first_published_at === "string" ||
+    typeof o.document_type === "string" ||
+    typeof o.content_id === "string"
+  );
+}
+
 /**
  * Changed when the content identity (digest) OR the publisher date moved — compared independently,
  * so a changed date is never ignored because the digest matched, and vice versa. When neither can
@@ -206,6 +254,7 @@ export async function readSource(
       let parsed: unknown;
       try {
         parsed = parseJsonStrict(res.body, res.headers["content-type"]);
+        assertNotErrorEnvelope(parsed); // a 200 JSON error body is a gap, not data
       } catch (e) {
         return { ...base, error: `invalid payload: ${e instanceof Error ? e.message : "parse failed"}` };
       }
@@ -245,9 +294,16 @@ export async function readSource(
         };
       }
 
-      // Statistical datasets must look like a dataset, not an error envelope or download page.
-      if (entry.apiStandard === "json_stat" && !isJsonStatDataset(parsed))
-        return { ...base, error: "expected a JSON-stat dataset (dimension/value absent)" };
+      // Statistical datasets (JSON-stat or Eurostat/OECD SDMX JSON) must look like a dataset,
+      // not an error envelope or download page. The guard runs per adapter, not one label.
+      if (
+        (entry.apiStandard === "json_stat" || entry.apiStandard === "sdmx") &&
+        !isJsonStatDataset(parsed)
+      )
+        return { ...base, error: "expected a dataset (dimension/value absent)" };
+      // GOV.UK content API must carry an identifying field, not an arbitrary 200 JSON body.
+      if (mech === "content_api_updated" && !hasContentApiShape(parsed))
+        return { ...base, error: "content API response missing identifying fields" };
 
       const observedDate = jsonObservedDate(parsed);
       const digest = sha256(res.body); // validated JSON body is the canonical identity
@@ -258,6 +314,7 @@ export async function readSource(
         digest,
         observedDate,
         dateKind: observedDate ? "updated" : undefined,
+        fingerprintVersion: FINGERPRINT_VERSION,
         changed: isChanged({ digest, observedDate }, prior),
         summary: `${entry.publisher}: dataset pulled${observedDate ? `, updated ${observedDate}` : ""}`,
       };
@@ -283,6 +340,7 @@ export async function readSource(
         digest,
         observedDate,
         dateKind,
+        fingerprintVersion: FINGERPRINT_VERSION,
         changed: isChanged({ digest, observedDate }, prior),
         summary: `${entry.publisher}${observedDate ? ` · ${dateKind} ${observedDate}` : ""}`,
       };
