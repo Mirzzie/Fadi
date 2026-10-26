@@ -168,6 +168,36 @@
     --motion-enter: 0ms;
   }
 }
+.public-appearance {
+  width: 100%;
+  max-width: 64rem;
+  margin-inline: auto;
+  padding: 0 1.25rem 2rem;
+  color: var(--muted-foreground);
+  font-size: 0.875rem;
+}
+@media (min-width: 40rem) {
+  .public-appearance {
+    padding-inline: 1.5rem;
+  }
+}
+body:has([data-pf-template="case"]) .public-appearance {
+  max-width: 48rem;
+  padding-inline: 1.5rem;
+}
+.public-appearance summary {
+  width: fit-content;
+  min-height: 44px;
+  padding-block: 0.75rem;
+  cursor: pointer;
+}
+.public-appearance summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+.public-appearance .appearance-settings {
+  color: var(--foreground);
+}
 .appearance-settings {
   scroll-margin-top: 5rem;
   padding-block: 1.5rem;

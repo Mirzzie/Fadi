@@ -62,7 +62,7 @@ export function CaseStudyTemplate({
           ← Back to portfolio
         </Link>
 
-        <header className="mt-7 border-b border-[var(--pf-line)] pb-8">
+        <header data-fadi-reveal className="mt-7 border-b border-[var(--pf-line)] pb-8">
           <span className="font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--pf-accent)]">
             {sectionLabel}
             {item.tag ? ` · ${item.tag}` : ""}

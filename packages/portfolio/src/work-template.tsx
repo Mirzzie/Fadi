@@ -53,9 +53,8 @@ import type { PageLabels } from "./work-index";
  * skills are derived, empty sections vanish, and the ordering is by evidence. Adding
  * a project should never mean editing this file. See `work-index.ts` for that logic.
  *
- * Colours are explicit rather than themed: this renders both inside Fadi (whose
- * <html> is always `dark`) and as a standalone static export, and it must look the
- * same in both.
+ * Hosts share appearance tokens and device-local preferences. The same template
+ * renders in the app and static export without changing the owner's published data.
  */
 export function WorkTemplate({
   data,
@@ -121,7 +120,7 @@ export function WorkTemplate({
             An earlier version put the name in the corner and led with a project. That was
             a designer's instinct, not a reader's: someone landing here needs to know what
             you ARE before they can judge what you've made. Position first, then proof. */}
-        <header className="border-b border-[var(--pf-line)] py-12 md:py-16">
+        <header data-fadi-reveal className="border-b border-[var(--pf-line)] py-12 md:py-16">
           <h1 className="text-[clamp(34px,5.4vw,56px)] font-extrabold leading-[1.02] tracking-[-0.032em]">
             {name}
           </h1>
@@ -182,7 +181,7 @@ export function WorkTemplate({
 
         {/* WHAT I'VE DONE — the strongest-evidenced piece, chosen not named. */}
         {lead ? (
-          <section className="py-10">
+          <section data-fadi-reveal className="py-10">
             <h2 className="mb-6 font-mono text-[11px] uppercase tracking-[0.16em] text-[var(--pf-ink-3)]">
               {L.featured}
             </h2>

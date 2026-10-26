@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "../../../web/src/app/appearance.css";
+@import "../../../web/src/app/motion.css";
 
 @custom-variant dark (&:is(.dark *));
 
@@ -17,6 +18,7 @@
   --font-sans: var(--font-inter);
   --font-display: var(--font-inter-tight);
   --font-mono: var(--font-jetbrains-mono);
+  --color-muted-foreground: var(--muted-foreground);
 }
 
 /* Backdrop ONLY on html (the canvas). An opaque body background paints ABOVE the

@@ -1,8 +1,8 @@
 "use client";
 
 import { useId, useState, useSyncExternalStore } from "react";
-import { appearanceSnapshot, currentAppearance, saveAppearance, subscribeAppearance } from "@/lib/appearance/browser";
-import { MODES, PALETTES, type AppearanceMode, type Palette } from "@/lib/appearance/preferences";
+import { appearanceSnapshot, currentAppearance, saveAppearance, subscribeAppearance } from "../../lib/appearance/browser";
+import { MODES, PALETTES, type AppearanceMode, type Palette } from "../../lib/appearance/preferences";
 
 const paletteNames = { ember: "Ember · warm coral", iris: "Iris · soft violet", cobalt: "Cobalt · clear blue" };
 const modeNames = { system: "Follow system", light: "Light", dark: "Dark" };

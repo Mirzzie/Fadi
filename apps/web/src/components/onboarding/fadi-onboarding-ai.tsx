@@ -291,6 +291,7 @@ export function FadiOnboardingAI({
             <button
               type="button"
               onClick={onUseForm}
+              disabled={!mounted}
               className="hover:text-foreground hover:underline"
             >
               Prefer a form?

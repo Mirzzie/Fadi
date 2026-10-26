@@ -38,8 +38,8 @@ export function ResumeButton({
   const label = specific ? `${labelForInterest(interest!)} CV` : "Download CV";
   const cls =
     variant === "solid"
-      ? "border border-[var(--pf-accent)] bg-[var(--pf-accent)] text-black hover:bg-[color-mix(in_srgb,var(--pf-accent)_90%,transparent)]"
-      : "border border-zinc-700 text-zinc-200 hover:border-[var(--pf-accent)] hover:text-[var(--pf-accent)]";
+      ? "border border-[var(--pf-accent)] bg-[var(--pf-accent)] text-[var(--primary-foreground)] hover:opacity-90"
+      : "border border-[var(--pf-line)] text-[var(--pf-ink)] hover:border-[var(--pf-accent)] hover:text-[var(--pf-accent)]";
 
   return (
     <a

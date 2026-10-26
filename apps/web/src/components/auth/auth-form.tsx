@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { authClient } from "@/lib/auth/client";
 import { authFormSchema, type AuthFormValues } from "@/lib/auth/validation";
+import { useHydrated } from "@/lib/ui/use-hydrated";
 
 type AuthFormProps = {
   mode: "sign-in" | "sign-up";
@@ -47,6 +48,7 @@ function getDefaultDisplayName(email: string) {
 }
 
 export function AuthForm({ mode }: AuthFormProps) {
+  const hydrated = useHydrated();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
@@ -139,7 +141,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           placeholder="you@example.com"
           autoComplete="email"
           aria-invalid={Boolean(form.formState.errors.email)}
-          disabled={isPending}
+          disabled={isPending || !hydrated}
           {...form.register("email")}
         />
         {form.formState.errors.email?.message ? (
@@ -165,7 +167,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           placeholder="********"
           autoComplete={isSignUp ? "new-password" : "current-password"}
           aria-invalid={Boolean(form.formState.errors.password)}
-          disabled={isPending}
+          disabled={isPending || !hydrated}
           {...form.register("password")}
         />
         {form.formState.errors.password?.message ? (
@@ -173,7 +175,7 @@ export function AuthForm({ mode }: AuthFormProps) {
         ) : null}
       </div>
 
-      <Button className="w-full" type="submit" disabled={isPending}>
+      <Button className="w-full" type="submit" disabled={isPending || !hydrated}>
         {isPending ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : null}
         {isPending ? "Working..." : isSignUp ? "Create account" : "Sign in"}
       </Button>
