@@ -238,3 +238,32 @@ export const capabilityManifestSchema = z
   })
   .strict();
 export type CapabilityManifest = z.infer<typeof capabilityManifestSchema>;
+
+// ── Generic event validation (static half of the seam) ──────────────────────────────────────────
+export type EventRejection = {
+  reason: "stale_descriptor" | "stale_instance" | "undeclared_action" | "missing_payload";
+  message: string;
+};
+
+/**
+ * The statically checkable half of handling a `SurfaceEventV1`: the event names a declared action
+ * and its revisions still match the descriptor (stale → re-fetch). This is NOT authorization, NOT
+ * replay dedupe, and NOT approval: the server re-resolves the action against the installed
+ * definition, the current instance/work revision, the authenticated tenant and current permissions,
+ * dedupes by `(tenant, eventId)`, and re-checks any kernel-owned approval at commit. A `via:"voice"`
+ * event is audit context only.
+ */
+export function validateEvent(
+  descriptor: CapabilitySurfaceDescriptor,
+  event: SurfaceEventV1
+): { ok: true; action: SurfaceAction } | ({ ok: false } & EventRejection) {
+  if (event.expectedDescriptorRevision !== descriptor.identity.descriptorRevision)
+    return { ok: false, reason: "stale_descriptor", message: "descriptor revision moved — re-fetch before acting" };
+  if (event.expectedInstanceRevision !== descriptor.identity.instanceRevision)
+    return { ok: false, reason: "stale_instance", message: "instance revision moved — re-fetch before acting" };
+  const action = descriptor.actions.find((a) => a.id === event.actionId);
+  if (!action) return { ok: false, reason: "undeclared_action", message: `action '${event.actionId}' is not declared` };
+  if ((action.kind === "fill" || action.kind === "record") && action.inputSchemaRef && event.payload == null)
+    return { ok: false, reason: "missing_payload", message: `action '${action.id}' requires a payload` };
+  return { ok: true, action };
+}
