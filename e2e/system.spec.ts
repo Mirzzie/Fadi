@@ -24,7 +24,8 @@ for (const palette of ["ember", "iris", "cobalt"])
           false
         );
         const input = await page.getByLabel("Working title").boundingBox();
-        expect(input!.height).toBeGreaterThanOrEqual(40);
+        // Animated subpixel positions can produce 39.99997px for a 40px input.
+        expect(input!.height).toBeGreaterThanOrEqual(39.99);
       }
       await page.getByLabel("Working title").fill("A small next step");
       await page.getByRole("button", { name: "Save example", exact: true }).click();

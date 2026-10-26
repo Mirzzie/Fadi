@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { FileText, Loader2, Upload } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -67,10 +67,11 @@ export function SettingsModal({
     email?: string;
   };
   const [title, setTitle] = useState(site.title);
+  const formId = useId();
   const [handleInput, setHandleInput] = useState(handle);
   const [headline, setHeadline] = useState(site.headline ?? "");
   const [bookingUrl, setBookingUrl] = useState(
-    ((site.profile as { bookingUrl?: string } | undefined)?.bookingUrl ?? ""),
+    (site.profile as { bookingUrl?: string } | undefined)?.bookingUrl ?? ""
   );
   // Every heading on the public page, editable. Seeded with what the page currently
   // shows so the fields are never mysteriously blank.
@@ -119,7 +120,10 @@ export function SettingsModal({
         bio: bio.trim(),
         email: email.trim(),
         bookingUrl: bookingUrl.trim(),
-        links: linksText.split("\n").map((l) => l.trim()).filter(Boolean),
+        links: linksText
+          .split("\n")
+          .map((l) => l.trim())
+          .filter(Boolean),
       },
     });
   }
@@ -143,41 +147,53 @@ export function SettingsModal({
       <div className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label>Site title</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+            <Label htmlFor={`${formId}-title`}>Site title</Label>
+            <Input
+              id={`${formId}-title`}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
           </div>
           <div className="space-y-1.5">
-            <Label>Handle (public URL)</Label>
-            <Input value={handleInput} onChange={(e) => setHandleInput(e.target.value)} />
-            <p className="text-xs text-muted-foreground">yoursite.com/p/{handleInput || "…"}</p>
+            <Label htmlFor={`${formId}-handle`}>Handle (public URL)</Label>
+            <Input
+              id={`${formId}-handle`}
+              value={handleInput}
+              onChange={(e) => setHandleInput(e.target.value)}
+            />
+            <p className="break-all text-xs text-muted-foreground">/p/{handleInput || "…"}</p>
           </div>
         </div>
         <div className="space-y-1.5">
-          <Label>Headline</Label>
+          <Label htmlFor={`${formId}-headline`}>Headline</Label>
           <Input
+            id={`${formId}-headline`}
             value={headline}
             onChange={(e) => setHeadline(e.target.value)}
             placeholder="e.g. IT Operations &amp; Security Engineer"
           />
           <p className="text-[11px] text-muted-foreground">
-            One position, not a list. A headline that claims three disciplines at once reads as
-            unfocused to a recruiter or an examiner — the strongest thing you can do here is pick
-            the role you are applying for and say it plainly.
+            Describe your focus in a short line that fits the work you want to share.
           </p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label>Display name</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} />
+            <Label htmlFor={`${formId}-name`}>Display name</Label>
+            <Input id={`${formId}-name`} value={name} onChange={(e) => setName(e.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <Label>Location</Label>
-            <Input value={location} onChange={(e) => setLocation(e.target.value)} />
+            <Label htmlFor={`${formId}-location`}>Location</Label>
+            <Input
+              id={`${formId}-location`}
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+            />
           </div>
         </div>
         <div className="space-y-1.5">
-          <Label>Booking link (Calendly, Cal.com…)</Label>
+          <Label htmlFor={`${formId}-booking`}>Booking link (Calendly, Cal.com…)</Label>
           <Input
+            id={`${formId}-booking`}
             value={bookingUrl}
             onChange={(e) => setBookingUrl(e.target.value)}
             placeholder="https://calendly.com/you/30min"
@@ -189,8 +205,9 @@ export function SettingsModal({
         </div>
 
         <div className="space-y-1.5">
-          <Label>Contact email</Label>
+          <Label htmlFor={`${formId}-email`}>Contact email</Label>
           <Input
+            id={`${formId}-email`}
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -202,8 +219,9 @@ export function SettingsModal({
           </p>
         </div>
         <div className="space-y-1.5">
-          <Label>Intro / bio</Label>
+          <Label htmlFor={`${formId}-bio`}>Intro / bio</Label>
           <Textarea
+            id={`${formId}-bio`}
             rows={3}
             value={bio}
             onChange={(e) => setBio(e.target.value)}
@@ -214,8 +232,14 @@ export function SettingsModal({
           </p>
         </div>
         <div className="space-y-1.5">
-          <Label>Links (one per line)</Label>
-          <Textarea rows={2} value={linksText} onChange={(e) => setLinksText(e.target.value)} placeholder={"https://github.com/you\nhttps://linkedin.com/in/you"} />
+          <Label htmlFor={`${formId}-links`}>Links (one per line)</Label>
+          <Textarea
+            id={`${formId}-links`}
+            rows={2}
+            value={linksText}
+            onChange={(e) => setLinksText(e.target.value)}
+            placeholder={"https://github.com/you\nhttps://linkedin.com/in/you"}
+          />
         </div>
 
         <details className="rounded-lg border border-border p-3">
@@ -239,8 +263,8 @@ export function SettingsModal({
               </label>
             ))}
             <p className="text-[11px] text-muted-foreground">
-              Clear a field to return it to the default. These are the words a visitor reads, so
-              use whatever your own field actually calls things.
+              Clear a field to return it to the default. These are the words a visitor reads, so use
+              whatever your own field actually calls things.
             </p>
           </div>
         </details>
@@ -253,15 +277,25 @@ export function SettingsModal({
           </p>
           {uploadErr && <p className="text-xs text-destructive">{uploadErr}</p>}
           {RESUME_KEYS.map(({ key, label }) => (
-            <div key={key} className="flex items-center gap-2">
-              <span className="w-24 shrink-0 text-xs text-muted-foreground">{label}</span>
+            <div
+              key={key}
+              className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 sm:grid-cols-[6rem_minmax(0,1fr)_auto_auto]"
+            >
+              <label
+                htmlFor={`${formId}-resume-${key}`}
+                className="col-span-full text-xs text-muted-foreground sm:col-span-1"
+              >
+                {label}
+              </label>
               <Input
+                id={`${formId}-resume-${key}`}
+                className="min-w-0"
                 value={resumeLinks[key] ?? ""}
                 onChange={(e) => setResumeLinks((s) => ({ ...s, [key]: e.target.value }))}
                 placeholder="https://… or upload →"
               />
               <label
-                className="inline-flex h-8 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-border bg-background px-2.5 text-xs hover:bg-muted"
+                className="inline-flex h-10 shrink-0 cursor-pointer items-center gap-1 rounded-lg border border-border bg-background px-2.5 text-xs hover:bg-muted focus-within:outline-2 focus-within:outline-ring"
                 title="Upload a PDF"
               >
                 {uploadingKey === key ? (
@@ -271,15 +305,22 @@ export function SettingsModal({
                 )}
                 PDF
                 <input
+                  aria-label={`Upload ${label} PDF`}
                   type="file"
                   accept="application/pdf,.pdf"
-                  className="hidden"
+                  className="sr-only"
                   onChange={(e) => uploadResume(key, e)}
                   disabled={uploadingKey !== null}
                 />
               </label>
               {resumeLinks[key] && (
-                <a href={resumeLinks[key]} target="_blank" rel="noreferrer" className="text-primary" title="Preview">
+                <a
+                  href={resumeLinks[key]}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="grid size-10 place-items-center rounded-md text-primary hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
+                  aria-label={`Preview ${label} PDF`}
+                >
                   <FileText className="size-4" />
                 </a>
               )}

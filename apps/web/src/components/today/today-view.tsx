@@ -46,15 +46,13 @@ export function TodayView({ today }: { today: Today }) {
 
   return (
     <div className={styles.page}>
-      <header className={styles.header}>
+      <header className={styles.header} data-fadi-surface data-fadi-reveal>
         <div>
           <p className={styles.eyebrow}>Your day, in focus</p>
           <h1 className={styles.heading}>
             Hey <span>{today.firstName}.</span>
           </h1>
-          <p className={styles.introduction}>
-            A clear direction. One useful next step.
-          </p>
+          <p className={styles.introduction}>A clear direction. One useful next step.</p>
         </div>
         <CareerFocus />
       </header>
@@ -75,7 +73,11 @@ export function TodayView({ today }: { today: Today }) {
         <Suggestions today={today} />
       </div>
 
-      {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
 
       <p className={styles.footer}>
         <Link href="/dashboard/overview" className={styles.overviewLink}>
@@ -105,10 +107,7 @@ function CareerFocus() {
             role="tab"
             aria-selected={mode === choice.mode}
             onClick={() => setMode(choice.mode)}
-            className={cn(
-              styles.focusChoice,
-              mode === choice.mode && styles.focusChoiceSelected,
-            )}
+            className={cn(styles.focusChoice, mode === choice.mode && styles.focusChoiceSelected)}
           >
             {choice.label}
           </button>
@@ -132,9 +131,7 @@ function Section({
   return (
     <section className={styles.section}>
       <div className={styles.sectionHeader}>
-        <h2 className={styles.sectionTitle}>
-          {title}
-        </h2>
+        <h2 className={styles.sectionTitle}>{title}</h2>
         {aside}
       </div>
       <div className={styles.sectionContent}>{children}</div>
@@ -162,7 +159,11 @@ function Working({ today, pending, onRun }: { today: Today; pending: boolean; on
           <p className="text-sm text-muted-foreground">
             Nothing set. Say what you are working towards and Fadi will keep the rest pointed at it.
           </p>
-          <Button variant={today.action ? "outline" : "default"} size="sm" onClick={() => setNaming(true)}>
+          <Button
+            variant={today.action ? "outline" : "default"}
+            size="sm"
+            onClick={() => setNaming(true)}
+          >
             Set a goal
           </Button>
         </div>
@@ -235,7 +236,11 @@ function NextAction({ today, pending, onRun }: { today: Today; pending: boolean;
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
   const action = today.action;
-  const guideRef = useGuideTarget<HTMLAnchorElement>("today.next", action?.title ?? "Your next step", "Use this control when you are ready. I’m pointing it out—not opening it or marking the work complete.");
+  const guideRef = useGuideTarget<HTMLAnchorElement>(
+    "today.next",
+    action?.title ?? "Your next step",
+    "Use this control when you are ready. I’m pointing it out—not opening it or marking the work complete."
+  );
 
   return (
     <Section
@@ -253,7 +258,12 @@ function NextAction({ today, pending, onRun }: { today: Today; pending: boolean;
             <p className="mt-1 text-sm text-muted-foreground">{action.reason}</p>
           ) : null}
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button nativeButton={false} variant={today.plan?.fadiCanContinue || today.proposal ? "outline" : "default"} size="sm" render={<Link ref={guideRef} href={action.href} />}>
+            <Button
+              nativeButton={false}
+              variant={today.plan?.fadiCanContinue || today.proposal ? "outline" : "default"}
+              size="sm"
+              render={<Link ref={guideRef} href={action.href} />}
+            >
               {action.cta} <ArrowRight />
             </Button>
             {action.id ? (
@@ -316,10 +326,7 @@ function NextAction({ today, pending, onRun }: { today: Today; pending: boolean;
       {today.alsoOpen.length > 0 ? (
         <ul className="mt-3 space-y-1.5">
           {today.alsoOpen.map((step) => (
-            <li
-              key={step.id}
-              className={styles.openStep}
-            >
+            <li key={step.id} className={styles.openStep}>
               <span className="min-w-0">{step.title}</span>
               <span className={styles.openStepActions}>
                 <Button
@@ -515,7 +522,9 @@ function WhatFadiDid({ today }: { today: Today }) {
                 {RECEIPT_NOTE[receipt.status] ? (
                   <span className="text-muted-foreground"> — {RECEIPT_NOTE[receipt.status]}</span>
                 ) : null}
-                {receipt.error ? <span className="text-destructive"> — {receipt.error}</span> : null}
+                {receipt.error ? (
+                  <span className="text-destructive"> — {receipt.error}</span>
+                ) : null}
               </div>
             </li>
           ))}

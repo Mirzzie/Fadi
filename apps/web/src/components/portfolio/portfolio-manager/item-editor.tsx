@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Film, ImagePlus, Loader2, Sparkles, Trash2, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ export function ItemEditor({
   onClose: () => void;
 }) {
   const [form, setForm] = useState<ItemForm>(initial);
+  const formId = useId();
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [enhancing, setEnhancing] = useState(false);
@@ -118,12 +119,13 @@ export function ItemEditor({
       <div className="space-y-4">
         {(form.section === "project" || form.section === "achievement") && (
           <div className="space-y-1.5">
-            <Label>Evidence project</Label>
+            <Label htmlFor={`${formId}-evidence`}>Record connection</Label>
             <select
+              id={`${formId}-evidence`}
               value={form.evidenceItemId ?? ""}
               onChange={(e) => set({ evidenceItemId: e.target.value || undefined })}
               disabled={Boolean(initial.evidenceItemId)}
-              className="h-8 w-full rounded-lg border border-border bg-background px-2.5 text-sm disabled:opacity-70"
+              className="h-10 w-full rounded-lg border border-input bg-card px-3 text-sm disabled:opacity-70"
             >
               <option value="">Portfolio only</option>
               {evidenceProjects
@@ -142,18 +144,19 @@ export function ItemEditor({
                 ))}
             </select>
             <p className="text-xs text-muted-foreground">
-              Connect this entry to its single record in Evidence. Media and links stay with that
-              record and remain optional.
+              Connect this entry to its career record. Media and links stay with that record and
+              remain optional.
             </p>
           </div>
         )}
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label>Section</Label>
+            <Label htmlFor={`${formId}-section`}>Section</Label>
             <select
+              id={`${formId}-section`}
               value={form.section}
               onChange={(e) => set({ section: e.target.value })}
-              className="h-8 w-full rounded-lg border border-border bg-background px-2.5 text-sm"
+              className="h-10 w-full rounded-lg border border-input bg-card px-3 text-sm"
             >
               {SECTION_KEYS.map((s) => (
                 <option key={s} value={s}>
@@ -163,30 +166,51 @@ export function ItemEditor({
             </select>
           </div>
           <div className="space-y-1.5">
-            <Label>Title</Label>
-            <Input value={form.title} onChange={(e) => set({ title: e.target.value })} />
+            <Label htmlFor={`${formId}-title`}>Title</Label>
+            <Input
+              id={`${formId}-title`}
+              value={form.title}
+              onChange={(e) => set({ title: e.target.value })}
+            />
           </div>
           <div className="space-y-1.5">
-            <Label>Organization / subtitle</Label>
-            <Input value={form.subtitle} onChange={(e) => set({ subtitle: e.target.value })} />
+            <Label htmlFor={`${formId}-subtitle`}>Organization / subtitle</Label>
+            <Input
+              id={`${formId}-subtitle`}
+              value={form.subtitle}
+              onChange={(e) => set({ subtitle: e.target.value })}
+            />
           </div>
           <div className="space-y-1.5">
-            <Label>Location</Label>
-            <Input value={form.location} onChange={(e) => set({ location: e.target.value })} />
+            <Label htmlFor={`${formId}-location`}>Location</Label>
+            <Input
+              id={`${formId}-location`}
+              value={form.location}
+              onChange={(e) => set({ location: e.target.value })}
+            />
           </div>
           <div className="space-y-1.5">
-            <Label>Date range</Label>
-            <Input value={form.dateRange} onChange={(e) => set({ dateRange: e.target.value })} />
+            <Label htmlFor={`${formId}-dates`}>Date range</Label>
+            <Input
+              id={`${formId}-dates`}
+              value={form.dateRange}
+              onChange={(e) => set({ dateRange: e.target.value })}
+            />
           </div>
           <div className="space-y-1.5">
-            <Label>Tag</Label>
-            <Input value={form.tag} onChange={(e) => set({ tag: e.target.value })} />
+            <Label htmlFor={`${formId}-tag`}>Tag</Label>
+            <Input
+              id={`${formId}-tag`}
+              value={form.tag}
+              onChange={(e) => set({ tag: e.target.value })}
+            />
           </div>
         </div>
 
         <div className="space-y-1.5">
-          <Label>Source link (URL)</Label>
+          <Label htmlFor={`${formId}-url`}>Source link (URL)</Label>
           <Input
+            id={`${formId}-url`}
             value={form.url}
             onChange={(e) => set({ url: e.target.value })}
             placeholder="https://…"
@@ -194,7 +218,7 @@ export function ItemEditor({
         </div>
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <Label>Description</Label>
+            <Label htmlFor={`${formId}-description`}>Description</Label>
             <button
               type="button"
               onClick={enhance}
@@ -211,23 +235,29 @@ export function ItemEditor({
             </button>
           </div>
           <Textarea
+            id={`${formId}-description`}
             rows={3}
             value={form.description}
             onChange={(e) => set({ description: e.target.value })}
           />
         </div>
         <div className="space-y-1.5">
-          <Label>Bullets (one per line)</Label>
+          <Label htmlFor={`${formId}-bullets`}>Bullets (one per line)</Label>
           <Textarea
+            id={`${formId}-bullets`}
             rows={3}
             value={form.bulletsText}
             onChange={(e) => set({ bulletsText: e.target.value })}
           />
         </div>
 
-        {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
+        {uploadError && (
+          <p role="alert" className="text-sm text-destructive">
+            {uploadError}
+          </p>
+        )}
         <div className="space-y-1.5">
-          <Label>Cover image</Label>
+          <Label htmlFor={`${formId}-cover`}>Cover image URL</Label>
           {form.imageUrl && (
             <div className="relative inline-block">
               {isVideoUrl(form.imageUrl) ? (
@@ -244,6 +274,7 @@ export function ItemEditor({
               )}
               <button
                 type="button"
+                aria-label="Remove cover image"
                 onClick={() => set({ imageUrl: "" })}
                 className="absolute -right-2 -top-2 rounded-full bg-destructive p-1 text-destructive-foreground"
               >
@@ -253,7 +284,7 @@ export function ItemEditor({
           )}
           <div className="flex flex-wrap items-center gap-2">
             {canUpload && (
-              <label className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-sm hover:bg-muted">
+              <label className="inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-sm hover:bg-muted focus-within:outline-2 focus-within:outline-ring">
                 {uploading ? (
                   <Loader2 className="size-4 animate-spin" />
                 ) : (
@@ -263,13 +294,14 @@ export function ItemEditor({
                 <input
                   type="file"
                   accept="image/*"
-                  className="hidden"
+                  className="sr-only"
                   onChange={handleCover}
                   disabled={uploading}
                 />
               </label>
             )}
             <Input
+              id={`${formId}-cover`}
               value={form.imageUrl}
               onChange={(e) => set({ imageUrl: e.target.value })}
               placeholder={canUpload ? "…or paste a URL" : "Paste an image URL"}
@@ -279,7 +311,7 @@ export function ItemEditor({
         </div>
 
         <div className="space-y-1.5">
-          <Label>Gallery — images &amp; video</Label>
+          <Label htmlFor={`${formId}-gallery`}>Gallery — images &amp; video URLs</Label>
           {galleryUrls.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {galleryUrls.map((url) => (
@@ -298,6 +330,7 @@ export function ItemEditor({
                   )}
                   <button
                     type="button"
+                    aria-label={`Remove gallery media ${galleryUrls.indexOf(url) + 1}`}
                     onClick={() =>
                       set({ galleryText: galleryUrls.filter((u) => u !== url).join("\n") })
                     }
@@ -310,7 +343,7 @@ export function ItemEditor({
             </div>
           )}
           {canUpload && (
-            <label className="inline-flex h-8 w-fit cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-sm hover:bg-muted">
+            <label className="inline-flex h-10 w-fit cursor-pointer items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 text-sm hover:bg-muted focus-within:outline-2 focus-within:outline-ring">
               {uploading ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (
@@ -321,13 +354,14 @@ export function ItemEditor({
                 type="file"
                 accept="image/*,video/*"
                 multiple
-                className="hidden"
+                className="sr-only"
                 onChange={handleGallery}
                 disabled={uploading}
               />
             </label>
           )}
           <Textarea
+            id={`${formId}-gallery`}
             rows={2}
             value={form.galleryText}
             onChange={(e) => set({ galleryText: e.target.value })}
@@ -336,7 +370,7 @@ export function ItemEditor({
         </div>
 
         <div className="space-y-1.5">
-          <Label>Audiences — who is this for?</Label>
+          <Label htmlFor={`${formId}-audience`}>Audiences — who is this for?</Label>
           <p className="text-xs text-muted-foreground">
             Free-form tags that power the visitor filter on your public site (your specialties, or
             the roles you target — e.g. “Paediatric ICU”, “Structural”, “Cloud”). Leave empty to
@@ -351,6 +385,7 @@ export function ItemEditor({
                 {r}
                 <button
                   type="button"
+                  aria-label={`Remove audience ${r}`}
                   onClick={() => set({ roles: form.roles.filter((v) => v !== r) })}
                 >
                   <X className="size-3" />
@@ -358,6 +393,7 @@ export function ItemEditor({
               </span>
             ))}
             <input
+              id={`${formId}-audience`}
               value={roleInput}
               onChange={(e) => setRoleInput(e.target.value)}
               onKeyDown={(e) => {
@@ -368,7 +404,7 @@ export function ItemEditor({
               }}
               onBlur={() => roleInput && addRole(roleInput)}
               placeholder="add an audience + Enter"
-              className="h-6 min-w-[9rem] flex-1 bg-transparent text-xs outline-none"
+              className="h-10 min-w-0 flex-1 bg-transparent text-sm outline-none"
             />
           </div>
           {ROLES.filter((r) => !form.roles.includes(r.value)).length > 0 && (

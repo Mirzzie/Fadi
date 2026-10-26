@@ -73,10 +73,7 @@ function OsShellInner({
         {/* Keyed by route + active direction + phase. Any of the three changing remounts the
             page so its content follows — client state re-seeds and the switch is felt. The
             transition (fade + a small rise) matches the shell's own dock/menu motion. */}
-        <div
-          key={`${pathname}:${activeTrackKey}:${mode}`}
-          className="duration-300 animate-in fade-in slide-in-from-bottom-1 motion-reduce:animate-none"
-        >
+        <div key={`${pathname}:${activeTrackKey}:${mode}`} className="min-w-0">
           {children}
         </div>
       </main>

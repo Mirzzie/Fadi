@@ -1,11 +1,15 @@
 "use client";
 
-import { ExternalLink, FileText, Loader2, Plus, Sparkles, X } from "lucide-react";
+import { ExternalLink, FileText, Loader2, Plus, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useId, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { PageIntro } from "@/components/layout/page-intro";
 import { cn } from "@/lib/utils";
 import {
@@ -69,6 +73,8 @@ export function ApplicationsBoard({
   const router = useRouter();
   const [selected, setSelected] = useState<AppView | null>(null);
   const [adding, setAdding] = useState(false);
+  // The URL still owns the view. A mounted inactive panel must not leave a portal over the library.
+  const isActive = useSearchParams().get("view") !== "documents";
 
   return (
     <div className="mx-auto max-w-shell space-y-8 pb-12 pt-4">
@@ -168,10 +174,15 @@ export function ApplicationsBoard({
       </div>
 
       {adding ? (
-        <AddDialog onClose={() => setAdding(false)} onDone={() => router.refresh()} />
+        <AddDialog
+          open={isActive}
+          onClose={() => setAdding(false)}
+          onDone={() => router.refresh()}
+        />
       ) : null}
       {selected ? (
         <DetailDialog
+          open={isActive}
           app={selected}
           docs={documents.filter(
             (d) => d.applicationId === selected.id || (selected.jobId && d.jobId === selected.jobId)
@@ -183,58 +194,85 @@ export function ApplicationsBoard({
   );
 }
 
-function Overlay({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+function Overlay({
+  open,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <button
-        aria-label="Close"
-        onClick={onClose}
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-      />
-      <div className="relative z-10 w-full max-w-lg rounded-xl border border-border/60 bg-card p-5 shadow-2xl">
-        {children}
-      </div>
-    </div>
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!nextOpen) onClose();
+      }}
+    >
+      <DialogContent className="block p-5 sm:max-w-lg">{children}</DialogContent>
+    </Dialog>
   );
 }
 
-function AddDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+function AddDialog({
+  open,
+  onClose,
+  onDone,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onDone: () => void;
+}) {
   const router = useRouter();
   const [company, setCompany] = useState("");
   const [title, setTitle] = useState("");
   const [jd, setJd] = useState("");
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
-
-  const input =
-    "w-full rounded-md border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15";
+  const formId = useId();
 
   return (
-    <Overlay onClose={onClose}>
-      <h3 className="mb-1 font-semibold">Paste a job</h3>
-      <p className="mb-3 text-xs text-muted-foreground">
-        Drop in a job from anywhere — Fadi tailors your documents to its exact description.
-      </p>
-      <div className="space-y-2">
-        <input
-          className={input}
-          placeholder="Role / job title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-        <input
-          className={input}
-          placeholder="Company"
-          value={company}
-          onChange={(e) => setCompany(e.target.value)}
-        />
-        <textarea
-          className={`${input} min-h-32 resize-none`}
-          placeholder="Paste the full job description here…"
-          value={jd}
-          onChange={(e) => setJd(e.target.value)}
-        />
-        {error ? <p className="text-xs text-destructive">{error}</p> : null}
+    <Overlay open={open} onClose={onClose}>
+      <DialogTitle className="mb-2 pr-8 text-xl">Add an opportunity</DialogTitle>
+      <DialogDescription className="mb-5 text-sm leading-relaxed">
+        Save the role and its description to your application tracker. You can prepare documents
+        after reviewing it.
+      </DialogDescription>
+      <div className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor={`${formId}-role`}>Role / job title</Label>
+          <Input
+            id={`${formId}-role`}
+            placeholder="Role / job title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor={`${formId}-company`}>Company</Label>
+          <Input
+            id={`${formId}-company`}
+            placeholder="Company"
+            value={company}
+            onChange={(e) => setCompany(e.target.value)}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor={`${formId}-description`}>Job description</Label>
+          <Textarea
+            id={`${formId}-description`}
+            className="min-h-32 resize-y"
+            placeholder="Paste the full job description here…"
+            value={jd}
+            onChange={(e) => setJd(e.target.value)}
+          />
+        </div>
+        {error ? (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
       </div>
       <div className="mt-4 flex justify-end gap-2">
         <Button variant="ghost" size="sm" onClick={onClose}>
@@ -263,10 +301,12 @@ function AddDialog({ onClose, onDone }: { onClose: () => void; onDone: () => voi
 }
 
 function DetailDialog({
+  open,
   app,
   docs,
   onClose,
 }: {
+  open: boolean;
   app: AppView;
   docs: DocView[];
   onClose: () => void;
@@ -310,28 +350,21 @@ function DetailDialog({
   }
 
   return (
-    <Overlay onClose={onClose}>
+    <Overlay open={open} onClose={onClose}>
       <div className="mb-3 flex items-start justify-between">
         <div>
-          <h3 className="font-semibold leading-tight">{app.title}</h3>
-          <p className="text-sm text-muted-foreground">{app.company}</p>
+          <DialogTitle className="pr-8 text-xl leading-tight">{app.title}</DialogTitle>
+          <DialogDescription className="mt-1 text-sm">{app.company}</DialogDescription>
           {app.jobId ? (
             <Link
               href={`/dashboard/applications/${app.jobId}/workspace`}
               className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
             >
-              Open full workspace — fit check, quality score, red-pen review, interview prep
+              Open full workspace
               <ExternalLink className="size-3" aria-hidden="true" />
             </Link>
           ) : null}
         </div>
-        <button
-          onClick={onClose}
-          aria-label="Close"
-          className="grid size-7 place-items-center rounded-md text-muted-foreground hover:bg-accent"
-        >
-          <X className="size-4" aria-hidden="true" />
-        </button>
       </div>
 
       {/* Status */}
@@ -344,6 +377,7 @@ function DetailDialog({
               type="button"
               onClick={() => setStatus(c.status)}
               disabled={pending}
+              aria-pressed={app.status === c.status}
               className={cn(
                 "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
                 app.status === c.status
@@ -377,6 +411,7 @@ function DetailDialog({
           )}
         </div>
         <textarea
+          aria-label="Job description"
           value={jd}
           onChange={(e) => {
             setJd(e.target.value);

@@ -1,7 +1,7 @@
 # Fadi UI and UX guidelines
 
 **Status:** Current product standard for every new or changed surface
-**Updated:** 25 October 2026
+**Updated:** 26 October 2026
 
 Fadi should feel like one calm, capable career partner guiding one career journey. A screen is
 successful when a person can answer three questions without learning Fadi's architecture:
@@ -491,6 +491,27 @@ verified checks; do not flatten them into one score. Avoid guaranteed jobs, univ
 
 Motion has named tokens and a purpose: orient, acknowledge or show continuity. Respect reduced
 motion. Do not use ambient animation around urgent decisions, text entry or remote desktops.
+
+### Reference motion rollout — owner request, 26 October 2026
+
+The owner requested the Conversion/Mara Voss effects throughout Fadi, not solely on the landing
+page. `motion.css` owns the shared timing/easing for surface entrances, controls, menus and dialogs.
+Use one surface-entry mechanism rather than stacking a route transition and a card transition on
+the same content. `SurfaceEffects` provides viewport entrances and pointer lighting across shared
+intros/cards and explicitly marked editorial regions. Content remains readable when JavaScript
+or an observer is unavailable; entering a viewport never changes work status.
+
+The 16px palette-aware trailing dot is decorative and pointer-transparent; the native pointer stays
+visible. It is not another assistant or the orb guide. Stop it while typing, scrolling, in focused
+lab/simulation workspaces, on touch, or when reduced motion is requested. Reduced motion cancels
+active decorative animations. High contrast/forced colours and printing omit the trail and lighting.
+Do not mutate streamed React content attributes for animation: native animation effects and a
+private stylesheet avoid introducing hydration differences.
+
+Portfolio and application dialogs reuse the shared dialog primitive for naming, focus containment,
+Escape and return focus. Long portfolio forms retain a visible header and action footer. Labels
+must identify their actual fields. Inactive mounted work tabs must close their portals while
+preserving the underlying local draft; the URL remains the view authority.
 
 ### Contextual orb guidance
 

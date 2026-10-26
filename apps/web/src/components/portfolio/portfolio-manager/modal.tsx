@@ -1,6 +1,6 @@
 "use client";
 
-import { X } from "lucide-react";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 /** Shared modal shell for the portfolio CMS dialogs. */
 export function Modal({
@@ -15,27 +15,25 @@ export function Modal({
   footer?: React.ReactNode;
 }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-      onClick={onClose}
+    <Dialog
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
     >
-      <div
-        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-border bg-background p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-lg font-semibold">{title}</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground"
-          >
-            <X className="size-5" />
-          </button>
+      <DialogContent className="grid max-h-[90dvh] grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 sm:max-w-2xl">
+        <div className="border-b border-border px-5 py-5 pr-14 sm:px-6 sm:pr-14">
+          <DialogTitle className="text-xl leading-tight tracking-tight">{title}</DialogTitle>
         </div>
-        {children}
-        {footer && <div className="mt-6 flex justify-end gap-2">{footer}</div>}
-      </div>
-    </div>
+        <div className="nice-scrollbar min-h-0 overflow-y-auto overscroll-contain p-5 sm:p-6">
+          {children}
+        </div>
+        {footer ? (
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border bg-muted/30 px-5 py-4 sm:px-6">
+            {footer}
+          </div>
+        ) : null}
+      </DialogContent>
+    </Dialog>
   );
 }

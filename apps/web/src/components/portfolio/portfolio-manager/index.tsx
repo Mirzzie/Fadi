@@ -607,62 +607,24 @@ export function PortfolioManager({
       )}
 
       {items.length === 0 && (
-        <div className="mb-6 rounded-xl border border-primary/40 bg-primary/5 p-6">
-          <p className="text-lg font-semibold">Let&apos;s build your portfolio</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            No blank canvas — Fadi turns your career data into a site in a few clicks.
+        <div
+          className="mb-6 rounded-xl border border-border bg-card p-5 sm:p-6"
+          data-fadi-surface
+          data-fadi-reveal
+        >
+          <h2 className="text-xl font-medium tracking-tight">Start with work you want to share</h2>
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+            Bring in projects and experience from your career record, then review each entry. You
+            can also add an item below. Preview before publishing.
           </p>
-          <ol className="mt-4 grid gap-3 sm:grid-cols-3">
-            <li className="rounded-lg border border-border bg-background/40 p-3">
-              <p className="text-sm font-medium">
-                <span className="text-primary">1.</span> Add your content
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Seed it from your Fadi evidence — projects, experience, skills.
-              </p>
-              <Button size="sm" onClick={seed} disabled={pending} className="mt-3">
-                {pending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Sparkles className="size-4" />
-                )}
-                Seed from evidence
-              </Button>
-            </li>
-            <li className="rounded-lg border border-border bg-background/40 p-3">
-              <p className="text-sm font-medium">
-                <span className="text-primary">2.</span> Pick a look
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Choose a template in Settings — Noir &amp; Gold, Aurora, or Minimal.
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setSettingsOpen(true)}
-                className="mt-3"
-              >
-                <Settings className="size-4" /> Choose template
-              </Button>
-            </li>
-            <li className="rounded-lg border border-border bg-background/40 p-3">
-              <p className="text-sm font-medium">
-                <span className="text-primary">3.</span> Publish
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Go live at your handle — or export it to host on your own domain.
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={togglePublishSite}
-                disabled={pending}
-                className="mt-3"
-              >
-                <Eye className="size-4" /> Publish site
-              </Button>
-            </li>
-          </ol>
+          <Button onClick={seed} disabled={pending} className="mt-5">
+            {pending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Sparkles className="size-4" />
+            )}
+            Add from my record
+          </Button>
 
           {/* Seeding needs a CV on file. Rather than sending the user to Evidence (and
               from there to Profile), capture it here and retry the seed immediately —

@@ -4,6 +4,7 @@ import Script from "next/script";
 
 import { QueryProvider } from "@/components/providers/query-provider";
 import { AppearanceRuntime } from "@/components/providers/appearance-runtime";
+import { SurfaceEffects } from "@/components/providers/surface-effects";
 import { APPEARANCE_BOOTSTRAP } from "@/lib/appearance/preferences";
 
 import "./globals.css";
@@ -36,7 +37,8 @@ export const metadata: Metadata = {
     default: "Fadi",
     template: "%s | Fadi",
   },
-  description: "Plan career moves, prepare applications, practise the work, and keep a useful record.",
+  description:
+    "Plan career moves, prepare applications, practise the work, and keep a useful record.",
 };
 
 export const viewport: Viewport = {
@@ -61,8 +63,13 @@ export default function RootLayout({
       className={`${inter.variable} ${editorial.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
-        <Script id="theme-init" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: APPEARANCE_BOOTSTRAP }} />
+        <Script
+          id="theme-init"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: APPEARANCE_BOOTSTRAP }}
+        />
         <AppearanceRuntime />
+        <SurfaceEffects />
         <QueryProvider>{children}</QueryProvider>
       </body>
     </html>

@@ -84,7 +84,7 @@ export function LearningShell({
 
   return (
     <div className={`workspace-page ${styles.page}`}>
-      <header className={styles.header}>
+      <header className={styles.header} data-fadi-surface data-fadi-reveal>
         <div>
           <p className={styles.eyebrow}>Practice / Learning</p>
           <h1 className={styles.title}>
@@ -107,7 +107,7 @@ export function LearningShell({
 
       <div className={home.continue && simulation ? styles.focusGrid : styles.focusSingle}>
         {home.continue ? (
-          <section className={styles.continuation}>
+          <section className={styles.continuation} data-fadi-surface data-fadi-reveal>
             <SectionHeading icon={MonitorPlay} eyebrow="Continue" title="Where you left off" />
             <div className={styles.currentWork}>
               {home.continue.kind === "run" ? (
@@ -120,7 +120,7 @@ export function LearningShell({
         ) : null}
 
         {simulation ? (
-          <section className={styles.simulation}>
+          <section className={styles.simulation} data-fadi-surface data-fadi-reveal>
             <div className={styles.simulationTop}>
               <p className={styles.eyebrow}>Explore a work simulation</p>
               <BookOpen size={18} aria-hidden="true" />

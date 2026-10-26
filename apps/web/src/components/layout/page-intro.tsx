@@ -21,6 +21,7 @@ export function PageIntro({
   return (
     <header
       data-slot="page-intro"
+      data-fadi-reveal
       className={cn(styles.header, compact && styles.compact, className)}
     >
       <div className={styles.copy}>

@@ -6,8 +6,12 @@ import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { PageIntro } from "@/components/layout/page-intro";
 import { RestoreRevisionButton } from "@/components/documents/restore-revision-button";
+import { ResumePreview } from "@/components/documents/resume-preview";
+import { LetterPreview } from "@/components/documents/letter-preview";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
+import { parseResume, resumeToPlainText, type ResumeTemplate } from "@/lib/documents/resume";
+import { isProseKind, parseLetter, letterToPlainText } from "@/lib/documents/letter";
 import { createDocumentsRepository, type DocumentRevisionSnapshot } from "@careeros/database";
 
 export const metadata: Metadata = { title: "Document history" };
@@ -55,7 +59,7 @@ export default async function DocumentHistoryPage({ params }: { params: Promise<
         <header className="flex items-start gap-3">
           <Link
             href={`/dashboard/documents/${document.id}`}
-            className="mt-1 grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="mt-1 grid size-10 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
             aria-label="Back to document"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
@@ -71,7 +75,13 @@ export default async function DocumentHistoryPage({ params }: { params: Promise<
         <section className="space-y-3">
           {revisions.map((revision) => {
             const isCurrent = revision.version === document.version;
-            const excerpt = revision.snapshot.content.replace(/\s+/g, " ").trim();
+            const readable =
+              document.kind === "resume"
+                ? resumeToPlainText(parseResume(revision.snapshot.content))
+                : isProseKind(document.kind)
+                  ? letterToPlainText(parseLetter(revision.snapshot.content, document.kind))
+                  : revision.snapshot.content;
+            const excerpt = readable.replace(/\s+/g, " ").trim();
             return (
               <article
                 key={revision.id}
@@ -101,18 +111,33 @@ export default async function DocumentHistoryPage({ params }: { params: Promise<
                   ) : null}
                 </div>
 
-                <p className="mt-3 text-sm font-medium">{revision.snapshot.title}</p>
-                <p className="mt-1 line-clamp-3 text-sm text-muted-foreground">
+                <p className="mt-3 break-words text-sm font-medium">{revision.snapshot.title}</p>
+                <p className="mt-1 line-clamp-3 break-words text-sm leading-relaxed text-muted-foreground">
                   {excerpt || "Empty document"}
                 </p>
-                {excerpt.length > 240 ? (
+                {revision.snapshot.content.trim() ? (
                   <details className="mt-3 rounded-md border border-border/60 bg-background/60 p-3">
                     <summary className="cursor-pointer text-xs font-medium">
-                      View stored content
+                      Preview this version
                     </summary>
-                    <pre className="nice-scrollbar mt-3 max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
-                      {revision.snapshot.content}
-                    </pre>
+                    <div className="nice-scrollbar mt-3 max-h-80 min-w-0 overflow-auto rounded-md bg-white p-4 text-sm text-zinc-800">
+                      {document.kind === "resume" ? (
+                        <ResumePreview
+                          embedded
+                          data={parseResume(revision.snapshot.content)}
+                          template={(revision.snapshot.template ?? "classic") as ResumeTemplate}
+                        />
+                      ) : isProseKind(document.kind) ? (
+                        <LetterPreview
+                          data={parseLetter(revision.snapshot.content, document.kind)}
+                          kind={document.kind}
+                        />
+                      ) : (
+                        <div className="whitespace-pre-wrap break-words leading-relaxed">
+                          {readable}
+                        </div>
+                      )}
+                    </div>
                   </details>
                 ) : null}
               </article>
