@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { PageIntro } from "@/components/layout/page-intro";
 import { useGuideTarget } from "@/components/os/use-guide-target";
 import { driftNote } from "@/lib/portfolio/freshness";
@@ -85,6 +86,12 @@ export function PortfolioManager({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<PortfolioItemView | null>(null);
+  const [importChoice, setImportChoice] = useState<{
+    payload: unknown;
+    name: string;
+    replace: boolean;
+  } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("project");
   const [editing, setEditing] = useState<ItemForm | null>(null);
@@ -249,16 +256,20 @@ export function PortfolioManager({
       setError("That file isn't valid JSON.");
       return;
     }
-    const mode = confirm("OK = ADD to existing content.\nCancel = REPLACE all items (destructive).")
-      ? "merge"
-      : confirm("Really REPLACE all current items? This cannot be undone.")
-        ? "replace"
-        : null;
-    if (!mode) return;
+    setImportChoice({ payload, name: file.name, replace: false });
+  }
+
+  function applyImport(mode: "merge" | "replace") {
+    if (!importChoice) return;
+    const payload = importChoice.payload;
+    setError(null);
     startTransition(async () => {
       const r = await importPortfolio({ payload: payload as never, mode });
       if (!r.ok) setError(r.message);
-      else router.refresh();
+      else {
+        setImportChoice(null);
+        router.refresh();
+      }
     });
   }
 
@@ -695,13 +706,7 @@ export function PortfolioManager({
               onDragEnd={() => setDragId(null)}
               onDrop={() => onDropOn(item.id)}
               onEdit={() => setEditing(toForm(item))}
-              onDelete={() => {
-                const connected = Boolean(item.evidenceItemId);
-                const question = connected
-                  ? `Remove “${item.title}” from this portfolio? Its fact and proof stay in Evidence, and it will stay under Not shown until you undo that choice.`
-                  : `Delete “${item.title}”? Proof-bearing projects must be saved to Evidence first.`;
-                if (confirm(question)) run(() => deleteItem({ id: item.id }));
-              }}
+              onDelete={() => setDeleting(item)}
               onTogglePublish={() =>
                 run(() => setItemPublished({ id: item.id, published: !item.isPublished }))
               }
@@ -753,6 +758,83 @@ export function PortfolioManager({
             and host it for free on your own account.
           </p>
           <GithubPublishPanel isPublished={isPublished} />
+        </Modal>
+      )}
+      <ConfirmDialog
+        open={Boolean(deleting)}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+        title={deleting?.evidenceItemId ? "Remove from portfolio?" : "Delete portfolio item?"}
+        description={
+          deleting?.evidenceItemId
+            ? `Remove “${deleting.title}” from this portfolio? Its fact and proof stay in your career record; the item remains under Not shown.`
+            : `Delete “${deleting?.title ?? ""}”? This removes the portfolio-only item.`
+        }
+        confirmLabel={deleting?.evidenceItemId ? "Remove from portfolio" : "Delete item"}
+        destructive
+        busy={pending}
+        onConfirm={() => {
+          if (deleting) {
+            const id = deleting.id;
+            setDeleting(null);
+            run(() => deleteItem({ id }));
+          }
+        }}
+      />
+      {importChoice && (
+        <Modal
+          title={importChoice.replace ? "Replace current portfolio items?" : "Import portfolio"}
+          onClose={() => {
+            if (!pending) setImportChoice(null);
+          }}
+        >
+          <p className="text-sm text-muted-foreground">
+            {importChoice.replace
+              ? "This removes all current portfolio items and imports the file in their place. This cannot be undone here. Your canonical career record is separate."
+              : `Choose how to import “${importChoice.name}”. Adding keeps current items; replacing removes them.`}
+          </p>
+          {error && (
+            <p role="alert" className="mt-3 text-sm text-destructive">
+              {error}
+            </p>
+          )}
+          <div className="mt-5 flex flex-wrap justify-end gap-2">
+            <Button variant="ghost" disabled={pending} onClick={() => setImportChoice(null)}>
+              Cancel
+            </Button>
+            {importChoice.replace ? (
+              <>
+                <Button
+                  variant="outline"
+                  disabled={pending}
+                  onClick={() => setImportChoice({ ...importChoice, replace: false })}
+                >
+                  Back
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={pending}
+                  onClick={() => applyImport("replace")}
+                >
+                  Replace items
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  disabled={pending}
+                  onClick={() => setImportChoice({ ...importChoice, replace: true })}
+                >
+                  Replace current items…
+                </Button>
+                <Button disabled={pending} onClick={() => applyImport("merge")}>
+                  Add to current items
+                </Button>
+              </>
+            )}
+          </div>
         </Modal>
       )}
     </div>

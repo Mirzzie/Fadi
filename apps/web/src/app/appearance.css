@@ -1,4 +1,9 @@
 /* Authoritative app palette. Themes change tokens, never a page's workflow/layout. */
+/* Native keyboard focus must stop above the floating dock, not underneath it. */
+html:has([data-fadi-dock]) {
+  scroll-padding-top: 4rem;
+  scroll-padding-bottom: calc(7rem + env(safe-area-inset-bottom));
+}
 :root[data-palette] {
   color-scheme: light;
   --font-inter-tight: var(--font-inter);
@@ -273,6 +278,8 @@ body:has([data-pf-template="case"]) .public-appearance {
 @media (pointer: coarse) {
   :root[data-palette] [data-slot="button"],
   :root[data-palette] [data-slot="input"],
+  :root[data-palette] input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="hidden"]),
+  :root[data-palette] select,
   :root[data-palette] [data-slot="tabs-trigger"] {
     min-height: 44px;
   }

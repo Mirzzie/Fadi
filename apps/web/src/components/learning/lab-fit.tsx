@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { cloneElement, useId, useCallback, useEffect, useState, useTransition } from "react";
 import { Check, Cpu, HelpCircle, Loader2, Plus, Radar, ShieldQuestion, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -256,7 +256,7 @@ function AddVmwareResource({ onDone, onCancel }: { onDone: () => void; onCancel:
           onChange={(event) => setLabel(event.target.value)}
           aria-label="Machine name"
           placeholder="Name, e.g. Windows lab"
-          className="h-8 text-xs"
+          className="h-10 text-base md:text-sm"
           autoFocus
         />
         <Input
@@ -264,7 +264,7 @@ function AddVmwareResource({ onDone, onCancel }: { onDone: () => void; onCancel:
           onChange={(event) => setPath(event.target.value)}
           aria-label="VMX file path"
           placeholder="/absolute/path/to/machine.vmx"
-          className="h-8 font-mono text-xs"
+          className="h-10 font-mono text-base md:text-sm"
           spellCheck={false}
         />
       </div>
@@ -332,44 +332,55 @@ function AddResource({ onDone, onCancel }: { onDone: () => void; onCancel: () =>
       }
     });
 
-  const field = "h-8 rounded-md border border-input bg-background px-2 text-xs";
+  const field =
+    "h-10 w-full rounded-lg border border-input bg-card px-3 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring md:text-sm";
 
   return (
     <div className="mt-2 space-y-2">
       <div className="grid gap-2 sm:grid-cols-2">
-        <Input
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          placeholder="What do you call it? e.g. the ThinkPad"
-          className="h-8 text-xs"
-          autoFocus
-        />
-        <select value={kind} onChange={(e) => setKind(e.target.value)} className={field}>
-          <option value="laptop">Laptop</option>
-          <option value="server">Spare machine / server</option>
-          <option value="hypervisor">Hypervisor (Proxmox, ESXi)</option>
-          <option value="sbc">Single-board computer (Pi)</option>
-          <option value="microcontroller">Microcontroller (ESP32)</option>
-          <option value="cloud">Cloud free tier</option>
-        </select>
-        <select value={arch} onChange={(e) => setArch(e.target.value)} className={field}>
-          <option value="x86_64">Intel / AMD (x86_64)</option>
-          <option value="arm64">ARM (Pi, Apple silicon)</option>
-          <option value="mcu">Microcontroller</option>
-        </select>
-        <select value={virt} onChange={(e) => setVirt(e.target.value)} className={field}>
-          <option value="none">Runs neither containers nor VMs</option>
-          <option value="containers">Docker / containers</option>
-          <option value="vms">Virtual machines</option>
-          <option value="nested">VMs, with nested virtualisation</option>
-        </select>
-        <Input
-          value={memoryGb}
-          onChange={(e) => setMemoryGb(e.target.value.replace(/[^0-9.]/g, ""))}
-          placeholder="RAM in GB (leave blank if unsure)"
-          className="h-8 text-xs"
-          inputMode="decimal"
-        />
+        <MachineField label="Machine name">
+          <Input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="What do you call it? e.g. the ThinkPad"
+            className="h-10 text-base md:text-sm"
+            autoFocus
+          />
+        </MachineField>
+        <MachineField label="Machine type">
+          <select value={kind} onChange={(e) => setKind(e.target.value)} className={field}>
+            <option value="laptop">Laptop</option>
+            <option value="server">Spare machine / server</option>
+            <option value="hypervisor">Hypervisor (Proxmox, ESXi)</option>
+            <option value="sbc">Single-board computer (Pi)</option>
+            <option value="microcontroller">Microcontroller (ESP32)</option>
+            <option value="cloud">Cloud free tier</option>
+          </select>
+        </MachineField>
+        <MachineField label="Architecture">
+          <select value={arch} onChange={(e) => setArch(e.target.value)} className={field}>
+            <option value="x86_64">Intel / AMD (x86_64)</option>
+            <option value="arm64">ARM (Pi, Apple silicon)</option>
+            <option value="mcu">Microcontroller</option>
+          </select>
+        </MachineField>
+        <MachineField label="Virtualisation">
+          <select value={virt} onChange={(e) => setVirt(e.target.value)} className={field}>
+            <option value="none">Runs neither containers nor VMs</option>
+            <option value="containers">Docker / containers</option>
+            <option value="vms">Virtual machines</option>
+            <option value="nested">VMs, with nested virtualisation</option>
+          </select>
+        </MachineField>
+        <MachineField label="Memory (GB)">
+          <Input
+            value={memoryGb}
+            onChange={(e) => setMemoryGb(e.target.value.replace(/[^0-9.]/g, ""))}
+            placeholder="RAM in GB (leave blank if unsure)"
+            className="h-10 text-base md:text-sm"
+            inputMode="decimal"
+          />
+        </MachineField>
         <label className="flex items-center gap-2 text-[11px] text-muted-foreground">
           <input
             type="checkbox"
@@ -656,5 +667,23 @@ function FindOnNetwork() {
       )}
       Find machines on my network
     </Button>
+  );
+}
+
+function MachineField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactElement<{ id?: string }>;
+}) {
+  const id = useId();
+  return (
+    <div className="space-y-1 text-sm">
+      <label htmlFor={id} className="text-muted-foreground">
+        {label}
+      </label>
+      {cloneElement(children, { id })}
+    </div>
   );
 }

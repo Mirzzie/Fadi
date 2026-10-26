@@ -622,6 +622,7 @@ export function ResumeEditor({
       case "skills":
         return (
           <textarea
+            aria-label="Skills"
             className={`${field} min-h-16`}
             value={data.skills}
             onChange={(e) => patch({ skills: e.target.value })}

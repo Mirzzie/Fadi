@@ -14,11 +14,7 @@ export const metadata: Metadata = { title: "Print" };
 export const dynamic = "force-dynamic";
 
 /** Standalone print page (no app chrome) → browser print → PDF. */
-export default async function DocumentPrintPage({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default async function DocumentPrintPage({ params }: { params: Promise<{ id: string }> }) {
   const user = await getCurrentAuthUser();
   if (!user) redirect("/auth/sign-in");
 
@@ -27,8 +23,12 @@ export default async function DocumentPrintPage({
   if (!doc) notFound();
 
   return (
-    <div className="min-h-screen bg-zinc-100 py-8 text-[13px] text-zinc-800">
+    <main
+      aria-label="Printable document"
+      className="min-h-screen bg-zinc-100 py-8 text-[13px] text-zinc-800"
+    >
       <PrintNow />
+      {isProseKind(doc.kind) ? <h1 className="sr-only print:hidden">{doc.title}</h1> : null}
       <div className="mx-auto max-w-[800px] bg-white p-12 shadow-md print:p-0 print:shadow-none">
         {doc.kind === "resume" ? (
           <ResumePreview
@@ -44,6 +44,6 @@ export default async function DocumentPrintPage({
           </article>
         )}
       </div>
-    </div>
+    </main>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import { CheckCircle2, ExternalLink, Loader2, Plus, X, XCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -194,6 +194,7 @@ function ProviderFields({
   onChange: (s: Slot) => void;
   savedHint: string | null;
 }) {
+  const fieldId = useId();
   const descriptor = descriptors.find((d) => d.id === slot.provider) ?? descriptors[0];
 
   function pickProvider(id: string) {
@@ -208,6 +209,7 @@ function ProviderFields({
           <button
             key={d.id}
             type="button"
+            aria-pressed={slot.provider === d.id}
             onClick={() => pickProvider(d.id)}
             className={cn(
               "rounded-lg border px-3 py-2 text-left text-sm transition-colors",
@@ -241,15 +243,18 @@ function ProviderFields({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <label className="text-sm font-medium">Model</label>
+          <label htmlFor={`${fieldId}-model`} className="text-sm font-medium">
+            Model
+          </label>
           <input
+            id={`${fieldId}-model`}
             value={slot.model}
             onChange={(e) => onChange({ ...slot, model: e.target.value })}
             placeholder={descriptor?.defaultModel}
-            list={`models-${descriptor?.id}`}
+            list={`${fieldId}-models`}
             className="h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15"
           />
-          <datalist id={`models-${descriptor?.id}`}>
+          <datalist id={`${fieldId}-models`}>
             {descriptor?.models.map((m) => (
               <option key={m} value={m} />
             ))}
@@ -259,7 +264,9 @@ function ProviderFields({
         {descriptor?.requiresApiKey ? (
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">API key</label>
+              <label htmlFor={`${fieldId}-key`} className="text-sm font-medium">
+                API key
+              </label>
               {descriptor.docsUrl ? (
                 <a
                   href={descriptor.docsUrl}
@@ -272,6 +279,7 @@ function ProviderFields({
               ) : null}
             </div>
             <input
+              id={`${fieldId}-key`}
               type="password"
               value={slot.apiKey}
               onChange={(e) => onChange({ ...slot, apiKey: e.target.value })}
@@ -284,8 +292,11 @@ function ProviderFields({
 
       {slot.provider === "ollama" ? (
         <div className="space-y-1.5">
-          <label className="text-sm font-medium">Base URL</label>
+          <label htmlFor={`${fieldId}-url`} className="text-sm font-medium">
+            Base URL
+          </label>
           <input
+            id={`${fieldId}-url`}
             value={slot.baseUrl}
             onChange={(e) => onChange({ ...slot, baseUrl: e.target.value })}
             placeholder="http://localhost:11434/v1"

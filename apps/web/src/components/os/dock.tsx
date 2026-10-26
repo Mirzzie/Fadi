@@ -52,6 +52,7 @@ export function Dock({ hidden, onHiddenChange }: { hidden: boolean; onHiddenChan
   return (
     <div className="pointer-events-none fixed inset-x-0 bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-40 flex justify-center px-2 sm:px-3">
       <nav
+        data-fadi-dock
         aria-label="Sections"
         className="fadi-glass pointer-events-auto flex w-full max-w-xl items-stretch justify-around rounded-xl border p-1.5"
       >

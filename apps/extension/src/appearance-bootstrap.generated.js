@@ -1,0 +1,2 @@
+// Generated from the shared before-paint bootstrap.
+(function(){var p='ember',m='system';try{var s=localStorage.getItem('fadi:palette');if(["ember","iris","cobalt"].includes(s))p=s;}catch(e){}try{var t=localStorage.getItem('theme');if(["system","light","dark"].includes(t))m=t;}catch(e){}var d=m==='dark';try{if(m==='system')d=matchMedia('(prefers-color-scheme:dark)').matches;}catch(e){}var r=document.documentElement;r.dataset.palette=p;r.dataset.appearance=m;r.classList.toggle('dark',d);r.style.colorScheme=d?'dark':'light';})();

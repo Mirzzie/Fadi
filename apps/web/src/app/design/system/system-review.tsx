@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { AppearanceSettings } from "@/components/settings/appearance-settings";
+import { CommandBlock } from "@/components/learning/step-text";
 
 /** Actual shared primitives with local-only examples, not copied account screens. */
 export function SystemReview() {
@@ -171,6 +172,13 @@ export function SystemReview() {
           </TabsContent>
         </Tabs>
         <AppearanceSettings />
+        <section aria-label="Command fallback example">
+          <h2 className="mb-3 text-lg font-semibold">Manual command fallback</h2>
+          <p className="mb-3 text-sm text-muted-foreground">
+            Sample text only. Copying does not run it.
+          </p>
+          <CommandBlock code={'printf "local example"'} lang="sh" typeable={false} />
+        </section>
       </main>
     </>
   );

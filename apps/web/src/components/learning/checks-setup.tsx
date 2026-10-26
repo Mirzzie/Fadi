@@ -91,7 +91,7 @@ export function ChecksSetup({ runId, tick }: { runId: string; tick: number }) {
             id="checks-account"
             value={account}
             onChange={(event) => setAccount(event.target.value)}
-            className="h-7 w-40 rounded-md border border-border bg-background px-2"
+            className="h-10 w-48 rounded-lg border border-input bg-card px-3 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring md:text-sm"
           />
           <Button size="sm" className="h-7" disabled={pending || !canType} onClick={setUp}>
             Type setup into the machine

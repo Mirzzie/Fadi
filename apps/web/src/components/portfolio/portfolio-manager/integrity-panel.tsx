@@ -12,6 +12,8 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { IntegrityFinding, IntegritySeverity } from "@careeros/portfolio";
 
 const SEVERITY: Record<
@@ -25,7 +27,7 @@ const SEVERITY: Record<
   },
   timeline: {
     label: "Timeline",
-    cls: "border-orange-500/40 bg-orange-500/10 text-orange-400",
+    cls: "border-info/40 bg-info/10 text-info",
     Icon: Clock,
   },
   duplicate: {
@@ -82,6 +84,7 @@ export function IntegrityPanel({
   onResolveAll?: (input: { dropIds: string[] }) => void;
   resolving?: boolean;
 }) {
+  const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(null);
   const clean = findings.length === 0;
   return (
     <div className="mb-6 rounded-xl border border-border bg-muted/20 p-4">
@@ -190,9 +193,7 @@ export function IntegrityPanel({
                         disabled={resolving}
                         onClick={() => {
                           const name = titleOf(f.dropId!) ?? "this entry";
-                          if (confirm(`Permanently delete “${name}”? This cannot be undone.`)) {
-                            onResolve({ dropId: f.dropId!, mode: "delete" });
-                          }
+                          setDeleting({ id: f.dropId!, name });
                         }}
                         className="text-destructive hover:text-destructive"
                       >
@@ -208,6 +209,23 @@ export function IntegrityPanel({
       )}
 
       {aiNote && <p className="mt-2 text-xs text-muted-foreground">{aiNote}</p>}
+      <ConfirmDialog
+        open={Boolean(deleting)}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+        title="Delete portfolio item?"
+        description={`Permanently delete “${deleting?.name ?? ""}”? This cannot be undone.`}
+        confirmLabel="Delete item"
+        destructive
+        busy={resolving}
+        onConfirm={() => {
+          if (deleting && onResolve) {
+            onResolve({ dropId: deleting.id, mode: "delete" });
+            setDeleting(null);
+          }
+        }}
+      />
     </div>
   );
 }

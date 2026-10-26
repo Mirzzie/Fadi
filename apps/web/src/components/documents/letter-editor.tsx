@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AiTellCheck } from "@/components/documents/ai-tell-check";
 import { ImproveBox } from "@/components/documents/improve-box";
 import { DocAdvisor } from "@/components/documents/doc-advisor";
@@ -32,7 +33,7 @@ import {
 } from "@/lib/documents/resume";
 
 const field =
-  "nice-scrollbar w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15";
+  "nice-scrollbar min-h-10 w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15";
 
 /**
  * Structured editor for the prose document kinds (cover letter / cold email /
@@ -60,6 +61,8 @@ export function LetterEditor({
 }) {
   const fields = LETTER_FIELDS[kind];
   const [title, setTitle] = useState(initialTitle);
+  const [templateToApply, setTemplateToApply] = useState<DocTemplate | null>(null);
+  const templateTrigger = useRef<HTMLButtonElement>(null);
   const [data, setData] = useState<LetterData>(() => parseLetter(initialContent, kind));
   const { status, markDirty, save: saveVersion } = useVersionedDocumentSave(id, initialVersion);
   const dirty = useRef(false);
@@ -91,7 +94,7 @@ export function LetterEditor({
   }
 
   function applyTemplate(t: DocTemplate) {
-    if (data.body.trim() && !window.confirm("Replace the current body with this template?")) return;
+    if (data.body.trim()) return setTemplateToApply(t);
     patch({ body: t.content });
   }
 
@@ -104,6 +107,7 @@ export function LetterEditor({
 
   return (
     <div className="flex w-full min-w-0 flex-col gap-3 lg:h-[calc(100dvh-9rem)]">
+      <h1 className="sr-only">{title || "Letter editor"}</h1>
       {/* Toolbar */}
       <div className="flex flex-col gap-3">
         <div className="flex min-w-0 items-center gap-3">
@@ -160,7 +164,11 @@ export function LetterEditor({
               </option>
             ))}
           </select>
-          <DocTemplatePicker kind={kind as DocKind} onPick={applyTemplate} />
+          <DocTemplatePicker
+            kind={kind as DocKind}
+            onPick={applyTemplate}
+            triggerRef={templateTrigger}
+          />
           <Button variant="outline" size="sm" onClick={exportDocx}>
             <Download className="size-4" aria-hidden="true" />
             DOCX
@@ -254,6 +262,7 @@ export function LetterEditor({
             <Section title="Date">
               <input
                 className={field}
+                aria-label="Date"
                 value={data.date}
                 onChange={(e) => patch({ date: e.target.value })}
                 placeholder="13 June 2026"
@@ -301,6 +310,7 @@ export function LetterEditor({
             <Section title={fields.subjectLabel}>
               <input
                 className={field}
+                aria-label={fields.subjectLabel}
                 value={data.subject}
                 onChange={(e) => patch({ subject: e.target.value })}
               />
@@ -311,6 +321,7 @@ export function LetterEditor({
             <Section title="Greeting">
               <input
                 className={field}
+                aria-label="Greeting"
                 value={data.greeting}
                 onChange={(e) => patch({ greeting: e.target.value })}
                 placeholder="Dear Hiring Manager,"
@@ -320,6 +331,7 @@ export function LetterEditor({
 
           <Section title={fields.bodyLabel}>
             <textarea
+              aria-label={fields.bodyLabel}
               className={`${field} min-h-60`}
               value={data.body}
               onChange={(e) => patch({ body: e.target.value })}
@@ -331,6 +343,7 @@ export function LetterEditor({
             <Section title="Sign-off">
               <input
                 className={field}
+                aria-label="Sign-off"
                 value={data.signOff}
                 onChange={(e) => patch({ signOff: e.target.value })}
                 placeholder="Sincerely,"
@@ -342,6 +355,7 @@ export function LetterEditor({
             <Section title="Signature">
               <input
                 className={field}
+                aria-label="Signature"
                 value={data.signature}
                 onChange={(e) => patch({ signature: e.target.value })}
                 placeholder={data.sender.name || "Your name"}
@@ -350,6 +364,20 @@ export function LetterEditor({
           ) : null}
         </div>
       </div>
+      <ConfirmDialog
+        open={Boolean(templateToApply)}
+        onOpenChange={(open) => {
+          if (!open) setTemplateToApply(null);
+        }}
+        title="Replace document text?"
+        description={`Use “${templateToApply?.name ?? ""}” in place of the current text. Existing saved revisions remain in History.`}
+        confirmLabel="Use template"
+        finalFocus={templateTrigger}
+        onConfirm={() => {
+          if (templateToApply) patch({ body: templateToApply.content });
+          setTemplateToApply(null);
+        }}
+      />
     </div>
   );
 }

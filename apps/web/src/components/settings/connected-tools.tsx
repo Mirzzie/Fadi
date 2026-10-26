@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import { Loader2, Plug, RefreshCw, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   connectServerAction,
   disconnectServerAction,
@@ -37,18 +38,30 @@ const STATUS_WORDS: Record<string, string> = {
  * can do anything, and the tools it offers are listed so the choice is made knowing them.
  */
 export function ConnectedTools({ connections }: { connections: ConnectionView[] }) {
+  const fieldId = useId();
   const [pending, start] = useTransition();
   const [notice, setNotice] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ label: "", url: "", token: "", allowToAct: false });
 
-  function run(action: () => Promise<{ ok: boolean; error?: string; tools?: number }>) {
+  function run(
+    action: () => Promise<{ ok: boolean; error?: string; tools?: number }>,
+    onSuccess?: () => void
+  ) {
     setNotice(null);
     start(async () => {
-      const result = await action();
-      if (!result.ok) setNotice(result.error ?? "That didn't work.");
-      else if (typeof result.tools === "number") {
-        setNotice(`Connected — ${result.tools} tool${result.tools === 1 ? "" : "s"} available.`);
+      try {
+        const result = await action();
+        if (!result.ok) setNotice(result.error ?? "That didn't work.");
+        else {
+          onSuccess?.();
+          if (typeof result.tools === "number")
+            setNotice(
+              `Connected — ${result.tools} tool${result.tools === 1 ? "" : "s"} available.`
+            );
+        }
+      } catch {
+        setNotice("Couldn't complete that request. Your entries are still here; try again.");
       }
     });
   }
@@ -74,19 +87,33 @@ export function ConnectedTools({ connections }: { connections: ConnectionView[] 
           onSubmit={(event) => {
             event.preventDefault();
             const payload = { ...form };
-            setForm({ label: "", url: "", token: "", allowToAct: false });
-            setAdding(false);
-            run(() => connectServerAction(payload));
+            run(
+              () => connectServerAction(payload),
+              () => {
+                setForm({ label: "", url: "", token: "", allowToAct: false });
+                setAdding(false);
+              }
+            );
           }}
         >
-          <input
+          <label htmlFor={`${fieldId}-name`} className="block text-sm font-medium">
+            Server name
+          </label>
+          <Input
+            id={`${fieldId}-name`}
+            disabled={pending}
             required
             value={form.label}
             onChange={(event) => setForm({ ...form, label: event.target.value })}
             placeholder="What is it called? e.g. Home lab"
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
           />
-          <input
+          <label htmlFor={`${fieldId}-url`} className="block text-sm font-medium">
+            MCP endpoint
+          </label>
+          <Input
+            id={`${fieldId}-url`}
+            disabled={pending}
             required
             type="url"
             value={form.url}
@@ -94,7 +121,12 @@ export function ConnectedTools({ connections }: { connections: ConnectionView[] 
             placeholder="https://… its MCP endpoint"
             className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
           />
-          <input
+          <label htmlFor={`${fieldId}-token`} className="block text-sm font-medium">
+            Access token (optional)
+          </label>
+          <Input
+            id={`${fieldId}-token`}
+            disabled={pending}
             type="password"
             value={form.token}
             onChange={(event) => setForm({ ...form, token: event.target.value })}
@@ -171,7 +203,11 @@ export function ConnectedTools({ connections }: { connections: ConnectionView[] 
         </ul>
       )}
 
-      {notice ? <p className="mt-3 text-sm text-muted-foreground">{notice}</p> : null}
+      {notice ? (
+        <p role="status" className="mt-3 text-sm text-muted-foreground">
+          {notice}
+        </p>
+      ) : null}
     </section>
   );
 }

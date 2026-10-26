@@ -61,34 +61,38 @@ export function ProfileForm({
   return (
     <div className="space-y-4">
       <div className="rounded-xl border bg-card p-6 space-y-4">
-        <Field label="Full name">
+        <Field label="Full name" htmlFor="profile-fullName">
           <input
+            id="profile-fullName"
             value={form.fullName}
             onChange={(e) => set("fullName", e.target.value)}
             className={inputCls}
           />
         </Field>
-        <Field label="Email">
-          <input value={email} disabled className={cn(inputCls, "opacity-60")} />
+        <Field label="Email" htmlFor="profile-email">
+          <input id="profile-email" value={email} disabled className={cn(inputCls, "opacity-60")} />
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Target role">
+          <Field label="Target role" htmlFor="profile-targetRole">
             <input
+              id="profile-targetRole"
               value={form.targetRole}
               onChange={(e) => set("targetRole", e.target.value)}
               className={inputCls}
             />
           </Field>
-          <Field label="Location preference">
+          <Field label="Location preference" htmlFor="profile-location">
             <input
+              id="profile-location"
               value={form.location}
               onChange={(e) => set("location", e.target.value)}
               className={inputCls}
             />
           </Field>
         </div>
-        <Field label="Experience level">
+        <Field label="Experience level" htmlFor="profile-experienceLevel">
           <select
+            id="profile-experienceLevel"
             value={form.experienceLevel}
             onChange={(e) => set("experienceLevel", e.target.value)}
             className={inputCls}
@@ -101,8 +105,9 @@ export function ProfileForm({
             ))}
           </select>
         </Field>
-        <Field label="Career goal">
+        <Field label="Career goal" htmlFor="profile-careerGoal">
           <textarea
+            id="profile-careerGoal"
             value={form.careerGoal}
             onChange={(e) => set("careerGoal", e.target.value)}
             rows={3}
@@ -110,8 +115,9 @@ export function ProfileForm({
           />
         </Field>
 
-        <Field label="LinkedIn profile URL">
+        <Field label="LinkedIn profile URL" htmlFor="profile-linkedInUrl">
           <input
+            id="profile-linkedInUrl"
             value={form.linkedInUrl}
             onChange={(e) => set("linkedInUrl", e.target.value)}
             placeholder="https://www.linkedin.com/in/your-handle/"
@@ -183,8 +189,7 @@ export function ProfileForm({
             Uploaded images stay on Cloudinary. If you have published since this was added, your
             repo carries <code>fadi-portfolio.json</code>, and Portfolio can restore the entries
             that were <strong>live at that publish</strong> — not drafts, hidden entries or your
-            site settings. For everything else, <strong>Export first</strong> (Portfolio →
-            Export).
+            site settings. For everything else, <strong>Export first</strong> (Portfolio → Export).
           </p>
           {confirming === "data" ? (
             <div className="mt-3 space-y-3">
@@ -229,8 +234,9 @@ export function ProfileForm({
         <div>
           <h3 className="text-sm font-semibold text-destructive">Close my account</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Everything above, <strong>plus your login itself</strong>. Nothing is kept and there is
-            no account to sign back into — this is full, permanent deletion.
+            Deletes the career data listed above <strong>and your Fadi login</strong>. You will not
+            be able to sign back into this account. Published copies, downloads and provider-held
+            data may need separate removal.
           </p>
           {confirming === "account" ? (
             <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -273,12 +279,22 @@ export function ProfileForm({
 }
 
 const inputCls =
-  "h-10 w-full rounded-lg border border-border bg-background px-3 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15";
+  "h-10 w-full rounded-lg border border-border bg-background px-3 text-base outline-none md:text-sm focus:border-primary/40 focus:ring-2 focus:ring-primary/15";
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor: string;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
-      <label className="text-sm font-medium">{label}</label>
+      <label htmlFor={htmlFor} className="text-sm font-medium">
+        {label}
+      </label>
       {children}
     </div>
   );

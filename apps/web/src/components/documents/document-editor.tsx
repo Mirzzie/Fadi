@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AiTellCheck } from "@/components/documents/ai-tell-check";
 import { DocAdvisor } from "@/components/documents/doc-advisor";
 import { DocTemplatePicker } from "@/components/documents/doc-template-picker";
@@ -43,6 +44,8 @@ export function DocumentEditor({
   initialVersion: number;
 }) {
   const [title, setTitle] = useState(initialTitle);
+  const [templateToApply, setTemplateToApply] = useState<DocTemplate | null>(null);
+  const templateTrigger = useRef<HTMLButtonElement>(null);
   const [content, setContent] = useState(initialContent);
   const { status, markDirty, save: saveVersion } = useVersionedDocumentSave(id, initialVersion);
   const dirtyRef = useRef(false);
@@ -76,13 +79,13 @@ export function DocumentEditor({
     window.open(`/api/documents/${id}/docx`, "_blank");
   }
   function applyTemplate(t: DocTemplate) {
-    if (content.trim() && !window.confirm("Replace the current content with this template?"))
-      return;
+    if (content.trim()) return setTemplateToApply(t);
     onChange({ content: t.content });
   }
 
   return (
     <div className="mx-auto flex min-h-[70dvh] w-full min-w-0 max-w-4xl flex-col gap-3 lg:h-[calc(100dvh-9rem)]">
+      <h1 className="sr-only">{title || "Document editor"}</h1>
       {/* Toolbar */}
       <div className="flex flex-col gap-3">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
@@ -100,7 +103,11 @@ export function DocumentEditor({
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <DocumentHistoryLink id={id} />
-          <DocTemplatePicker kind={kind as DocKind} onPick={applyTemplate} />
+          <DocTemplatePicker
+            kind={kind as DocKind}
+            onPick={applyTemplate}
+            triggerRef={templateTrigger}
+          />
           <Button variant="outline" size="sm" onClick={exportDocx}>
             <Download className="size-4" aria-hidden="true" />
             DOCX
@@ -138,6 +145,20 @@ export function DocumentEditor({
 
       {/* Honest reads-human check */}
       <AiTellCheck text={content} />
+      <ConfirmDialog
+        open={Boolean(templateToApply)}
+        onOpenChange={(open) => {
+          if (!open) setTemplateToApply(null);
+        }}
+        title="Replace document text?"
+        description={`Use “${templateToApply?.name ?? ""}” in place of the current text. Existing saved revisions remain in History.`}
+        confirmLabel="Use template"
+        finalFocus={templateTrigger}
+        onConfirm={() => {
+          if (templateToApply) onChange({ content: templateToApply.content });
+          setTemplateToApply(null);
+        }}
+      />
     </div>
   );
 }

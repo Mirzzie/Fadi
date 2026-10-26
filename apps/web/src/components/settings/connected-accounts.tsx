@@ -186,8 +186,8 @@ export function ConnectedAccounts({ providers }: { providers: Provider[] }) {
       {providers.includes("linkedin") ? (
         <p className="mt-3 rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
           Connecting LinkedIn is for sign-in only — it shares your name, email, and photo, not your
-          work history. Your career source of truth still comes from the LinkedIn paste / PDF import
-          on your <span className="font-medium text-foreground">Profile</span>.
+          work history. Your career record still comes from the sources you import and review
+          in <span className="font-medium text-foreground">My career</span>.
         </p>
       ) : null}
     </section>
