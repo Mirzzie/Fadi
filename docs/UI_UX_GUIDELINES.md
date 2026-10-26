@@ -1,7 +1,12 @@
 # Fadi UI and UX guidelines
 
 **Status:** Current product standard for every new or changed surface
-**Updated:** 26 October 2026
+**Updated:** 26 October 2026 (capability seam and owner-selected visual direction)
+
+The owner-selected Conversion/Mara Voss facelift is implemented on
+`release/ui-review-20261026`, based on current main plus the reviewed facelift and nested-surface fixes. The capability rendering
+contract must reuse its shared components and design tokens, not introduce a parallel aesthetic.
+This candidate is not promoted to main and does not claim every surface is accepted.
 
 Fadi should feel like one calm, capable career partner guiding one career journey. A screen is
 successful when a person can answer three questions without learning Fadi's architecture:
@@ -91,10 +96,11 @@ Use the navigation source in `apps/web/src/components/os/navigation.ts`:
 Profile and Settings belong to the account menu. Machines, permissions, provider health, audit
 events and raw logs are contextual or advanced controls.
 
-The four destinations live in the owner's compact, hideable bottom dock on desktop and mobile.
-Do not add a competing left rail or destination tabs to the top utility bar. Lab focus mode may
-collapse navigation so it never covers the remote desktop, terminal or primary action. Reserve
-space for the dock while visible and keep its reveal control keyboard accessible.
+The owner-selected navigation is the same compact, hideable four-destination bottom dock on desktop
+and mobile. Do not add a competing left rail or destination tabs to the top utility bar. Lab focus
+mode may collapse navigation so it never covers the remote desktop, terminal or primary action.
+Capabilities do not add top-level navigation independently; the shell projects the user's composition.
+Reserve space for the dock while visible and keep its reveal control keyboard accessible.
 
 ## Product shell
 
@@ -433,12 +439,20 @@ Do not copy Paperclip's agent-company dashboard density, org chart, budgets or a
 
 Fadi retains:
 
-- three semantic palettes: Ember (warm coral), Iris (violet), Cobalt (blue, not teal/cyan);
+- Ember, Iris and Cobalt palettes, each with Light/Dark/System behaviour;
+- Mona Sans with Instrument Serif editorial accents and JetBrains Mono for identifiers;
 - the four career destinations;
 - approachable career language;
 - the Fadi presence mark, integrated into the shell rather than floating over work;
 - dark focus mode where it improves labs, terminals and live interviews;
 - Light, Dark and Follow system modes with the same hierarchy and contrast.
+
+The owner's [Conversion](https://conversion.framer.media/) and
+[Mara Voss](https://diligent-tetragon-837366.framer.app/) references add warm lighting, restrained
+glass chrome, a palette-aware pointer trail and finite entrance/hover/panel motion. Use the shared
+facelift implementations and accessibility fallbacks; do not copy template branding, testimonials
+or outcome claims. Keep editing, assessments, approvals and lab content readable and opaque.
+Capabilities cannot ship fonts, colours, CSS, animations or alternate navigation in their descriptor.
 
 `apps/web/src/app/appearance.css` owns palette and surface tokens, including public portfolio
 and export aliases. Browser-local preferences use the existing theme key plus one palette key;
@@ -476,9 +490,9 @@ hidden controls from orb guidance. These are work-local views, not top-level des
 - Use semantic colours for success, caution, danger and blocked state.
 - Keep colour, type, spacing, radius, shadow and motion in one token source.
 
-Hierarchy comes from structure, typography and whitespace. Glass is restrained chrome, not a
-substitute for readable contrast. Glow and decorative texture are limited to brand moments and
-Fadi presence; they do not wrap routine content or compete with state and action.
+Hierarchy comes from structure, typography and whitespace. Shared lighting/material/motion adds
+continuity without obscuring state or actions. Do not add repeating grids, uncontrolled ambient
+effects or a second assistant. Respect reduced motion, touch, contrast and focused-work behaviour.
 
 ### Content follows the product contract
 
@@ -491,6 +505,18 @@ verified checks; do not flatten them into one score. Avoid guaranteed jobs, univ
 
 Motion has named tokens and a purpose: orient, acknowledge or show continuity. Respect reduced
 motion. Do not use ambient animation around urgent decisions, text entry or remote desktops.
+
+### Approved capability templates
+
+Capability surfaces use the shared shell/template catalog. A template owns hierarchy, keyboard
+behaviour, focus, responsive density, theme and motion; capability data cannot override them.
+One current work context has one primary action and one completion review. A configurable workspace
+may contain several bounded regions without becoming a wall of equal actions or independent stores.
+Keep stable entity/work deep links and the existing work, permission and evidence authorities.
+
+Reflection is optional private work, not a compulsory mood card above every screen. Declining it
+does not mark a task incomplete, erase evidence, alter strategy or imply a conclusion. Its sensitive
+content stays out of ordinary screen-context capture and career exports without a specific grant.
 
 ### Reference motion rollout — owner request, 26 October 2026
 
