@@ -1,8 +1,11 @@
 import {
   type CapabilityManifest,
   type CapabilitySurfaceDescriptor,
+  type EventRejection,
   type SurfaceAction,
+  type SurfaceEventV1,
   type SurfaceRegion,
+  validateEvent,
 } from "./manifest";
 
 /**
@@ -114,4 +117,69 @@ export function practiceWorkspaceDescriptor(
     completion: { reviewRef: `practice:${c.activityId}.completion` },
     dataBindings: bindings,
   };
+}
+
+// ── Action → work-engine intent mapping ──────────────────────────────────────────────────────────
+/**
+ * The dynamic half of the seam: a validated surface event resolved to a typed intent against the
+ * EXISTING Practice work engine + evidence flow — NOT a new store. Codex's server-action adapter
+ * dispatches each intent to the real path (see the mapping doc). This resolver is pure: it performs
+ * no I/O, grants no permission, and never executes; it only decides WHICH existing capability an
+ * action maps to, after the generic `validateEvent` gate.
+ */
+export type ActivityRef = { packId: string; activityId: string };
+
+export type WorkEngineIntent =
+  /** → existing Practice step-attempt write (work run-plan + rubric.composeAnswer), yields a practice_receipt via the evidence gate. */
+  | { kind: "write_attempt"; instanceId: string; activityRef: ActivityRef; stepId: string; inputSchemaRef: string; payload: unknown }
+  /** → existing person-started, metered marking (grader-check `checkGrader`; the resumable MARKING_TASK after Phase 0). Never scheduled, never silent AI spend. */
+  | { kind: "request_marking_check"; instanceId: string; activityRef: ActivityRef; personStarted: true; providerMetered: true }
+  /** → read-only navigation; opens nothing consequential. */
+  | { kind: "navigate"; instanceId: string; target: { kind: "step" | "resource" } };
+
+export type PracticeActionResult =
+  | { ok: true; intent: WorkEngineIntent }
+  | ({ ok: false } & EventRejection)
+  | { ok: false; reason: "unsupported_action"; message: string };
+
+/** stepId is the last segment of the surfaceId `<instanceId>:<stepId>`. */
+function stepIdOf(descriptor: CapabilitySurfaceDescriptor): string {
+  const parts = descriptor.identity.surfaceId.split(":");
+  return parts[parts.length - 1] ?? "";
+}
+
+export function resolvePracticeAction(
+  instance: PracticeInstanceConfig,
+  descriptor: CapabilitySurfaceDescriptor,
+  event: SurfaceEventV1
+): PracticeActionResult {
+  const checked = validateEvent(descriptor, event);
+  if (!checked.ok) return checked;
+  const activityRef: ActivityRef = { packId: instance.packId, activityId: instance.activityId };
+
+  switch (event.actionId) {
+    case "submit_attempt":
+      return {
+        ok: true,
+        intent: {
+          kind: "write_attempt",
+          instanceId: instance.instanceId,
+          activityRef,
+          stepId: stepIdOf(descriptor),
+          inputSchemaRef: checked.action.inputSchemaRef ?? "fadi.rubric.answer@1",
+          payload: event.payload,
+        },
+      };
+    case "request_marking_check":
+      return {
+        ok: true,
+        intent: { kind: "request_marking_check", instanceId: instance.instanceId, activityRef, personStarted: true, providerMetered: true },
+      };
+    case "open_step":
+      return { ok: true, intent: { kind: "navigate", instanceId: instance.instanceId, target: { kind: "step" } } };
+    case "open_resource":
+      return { ok: true, intent: { kind: "navigate", instanceId: instance.instanceId, target: { kind: "resource" } } };
+    default:
+      return { ok: false, reason: "unsupported_action", message: `'${event.actionId}' has no Practice work-engine mapping` };
+  }
 }
