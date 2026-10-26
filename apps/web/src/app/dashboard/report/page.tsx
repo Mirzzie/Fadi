@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { PageIntro } from "@/components/layout/page-intro";
 import { CareerReportView } from "@/components/dashboard/career-report-view";
 import { GenerateReportButton } from "@/components/dashboard/generate-report-button";
 import { getCurrentAuthUser } from "@/lib/auth/session";
@@ -37,14 +38,15 @@ export default async function ReportPage() {
               <ArrowLeft className="size-3.5" aria-hidden="true" />
               Dashboard
             </Link>
-            <h1 className="mt-1 font-heading text-2xl font-semibold tracking-tight sm:text-3xl">
-              Career Intelligence Report
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {profile?.targetRole
-                ? `For your ${profile.targetRole} direction.`
-                : "Structured insights from your profile, résumé, and goals."}
-            </p>
+            <PageIntro
+              eyebrow="Today · Your direction"
+              title="Career report"
+              description={
+                profile?.targetRole
+                  ? `For your ${profile.targetRole} direction.`
+                  : "Suggestions based on your profile, résumé and goals."
+              }
+            />
           </div>
           <GenerateReportButton />
         </div>

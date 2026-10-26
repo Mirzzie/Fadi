@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import { GenerateReportButton } from "@/components/dashboard/generate-report-button";
+import { PageIntro } from "@/components/layout/page-intro";
 import { FadiBriefing } from "@/components/os/fadi-briefing";
 import { GuidedSetup } from "@/components/os/guided-setup";
 import { MomentumPanel, type MomentumView } from "@/components/resilience/momentum-panel";
@@ -86,7 +87,6 @@ type DashboardShellProps = {
 };
 
 export function DashboardShell({
-  userEmail,
   briefing,
   greeting,
   subline,
@@ -112,19 +112,15 @@ export function DashboardShell({
 
       {/* Mission Control hero — greeting + the live opportunities Fadi has lined up.
           Theme-aware, on Fadi's indigo signal field. */}
-      <section className="border-y border-border bg-card py-7 sm:py-9">
+      <section className="rounded-xl border border-border bg-card p-5 sm:p-6">
         <div>
-          <span className="inline-flex items-center gap-1.5 font-mono text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">
-            <Sparkles className="size-3 text-primary" aria-hidden="true" />
-            Mission Control
-          </span>
-          <h2 className="mt-4 font-heading text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-            {greeting ?? "Your career, run by Fadi"}
-          </h2>
-          <p className="mt-3 max-w-xl leading-relaxed text-muted-foreground">
-            {subline ??
-              "Review your profile, generate your Career Intelligence Report, and act on what matters — Fadi keeps the rest moving."}
-          </p>
+          <PageIntro
+            eyebrow={greeting ?? "Today"}
+            title="The full picture"
+            description={
+              subline ?? "Review your direction, market signals and the work you have recorded."
+            }
+          />
 
           {/* Live opportunities Fadi surfaced — the proactive heart of the OS. */}
           {opportunities.length > 0 ? (
@@ -139,7 +135,10 @@ export function DashboardShell({
                     <p className="text-[0.65rem] font-semibold uppercase tracking-wide text-primary">
                       {opp.label}
                     </p>
-                    <ArrowUpRight className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground" aria-hidden="true" />
+                    <ArrowUpRight
+                      className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
+                      aria-hidden="true"
+                    />
                   </div>
                   <p className="mt-1 line-clamp-2 text-sm text-foreground">{opp.detail}</p>
                 </Link>
@@ -149,24 +148,21 @@ export function DashboardShell({
 
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <Link
-              href="#career-report"
+              href="/dashboard/report"
               className={cn(buttonVariants({ size: "lg" }), "h-10 px-5 text-sm font-semibold")}
             >
-              Generate report
+              {latestReport ? "View career report" : "Create career report"}
               <ArrowRight className="size-4" aria-hidden="true" />
             </Link>
             <Link
               href="/dashboard/jobs"
               className={cn(
                 buttonVariants({ variant: "outline", size: "lg" }),
-                "h-10 px-5 text-sm font-semibold",
+                "h-10 px-5 text-sm font-semibold"
               )}
             >
               Browse jobs
             </Link>
-            {userEmail ? (
-              <span className="text-xs text-muted-foreground">Signed in as {userEmail}</span>
-            ) : null}
           </div>
         </div>
       </section>
@@ -237,7 +233,9 @@ export function DashboardShell({
               }}
             />
           </div>
-          <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{momentum.cadenceMessage}</p>
+          <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">
+            {momentum.cadenceMessage}
+          </p>
           <div className="mt-auto pt-4">
             <Link
               href="/dashboard/applications"
@@ -277,39 +275,47 @@ export function DashboardShell({
       <section className="space-y-3">
         <ZoneHeading>At a glance</ZoneHeading>
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          icon={TrendingUp}
-          label="Career readiness"
-          value={latestReport?.career_readiness_score != null ? String(latestReport.career_readiness_score) : "—"}
-          sub="for your target role"
-        />
-        <StatCard
-          icon={GraduationCap}
-          label="Resume quality"
-          value={latestReport?.resume_quality_score != null ? String(latestReport.resume_quality_score) : "—"}
-          sub="clarity of evidence"
-        />
-        {/* "Top job match" is a fact about live postings — an Apply number. In Prepare
+          <StatCard
+            icon={TrendingUp}
+            label="Career readiness"
+            value={
+              latestReport?.career_readiness_score != null
+                ? String(latestReport.career_readiness_score)
+                : "—"
+            }
+            sub="for your target role"
+          />
+          <StatCard
+            icon={GraduationCap}
+            label="Resume quality"
+            value={
+              latestReport?.resume_quality_score != null
+                ? String(latestReport.resume_quality_score)
+                : "—"
+            }
+            sub="clarity of evidence"
+          />
+          {/* "Top job match" is a fact about live postings — an Apply number. In Prepare
             the useful question is not how well you match today's openings but what you
             have to show, so the tile answers that instead of going blank. */}
-        <StatCard
-          icon={BriefcaseBusiness}
-          label={applying ? "Top job match" : "Builds in progress"}
-          value={
-            applying
-              ? recommendedJobsPreview.length > 0
-                ? `${Math.max(...recommendedJobsPreview.map((j) => j.matchScore ?? 0))}%`
-                : "—"
-              : String(openBuilds)
-          }
-          sub={applying ? "best current fit" : "in your Prepare plan"}
-        />
-        <StatCard
-          icon={Sparkles}
-          label="Momentum"
-          value={String(Math.round(momentum.momentum))}
-          sub={momentum.band}
-        />
+          <StatCard
+            icon={BriefcaseBusiness}
+            label={applying ? "Top job match" : "Builds in progress"}
+            value={
+              applying
+                ? recommendedJobsPreview.length > 0
+                  ? `${Math.max(...recommendedJobsPreview.map((j) => j.matchScore ?? 0))}%`
+                  : "—"
+                : String(openBuilds)
+            }
+            sub={applying ? "best current fit" : "in your Prepare plan"}
+          />
+          <StatCard
+            icon={Sparkles}
+            label="Momentum"
+            value={String(Math.round(momentum.momentum))}
+            sub={momentum.band}
+          />
         </div>
       </section>
 
@@ -319,11 +325,11 @@ export function DashboardShell({
           mode sets aside, so the panel was asking the user to be behind on work they had
           just chosen not to do. */}
       {applying ? (
-      <section className="space-y-3">
-        <ZoneHeading>Your momentum</ZoneHeading>
-        <MomentumPanel momentum={toMomentumView(momentum)} />
-        {reflection ? <MomentumReflectionCard reflection={reflection} /> : null}
-      </section>
+        <section className="space-y-3">
+          <ZoneHeading>Your momentum</ZoneHeading>
+          <MomentumPanel momentum={toMomentumView(momentum)} />
+          {reflection ? <MomentumReflectionCard reflection={reflection} /> : null}
+        </section>
       ) : null}
 
       {/* Zone: Your profile & report — compact. The full report lives on /dashboard/report
@@ -384,10 +390,8 @@ export function DashboardShell({
               {latestReport ? (
                 <>
                   {reportStale?.stale ? (
-                    <div className="rounded-md border border-amber-500/40 bg-amber-500/5 p-3 text-sm">
-                      <span className="font-medium text-amber-700 dark:text-amber-400">
-                        This report is out of date.
-                      </span>{" "}
+                    <div className="rounded-md border border-warning/40 bg-warning/5 p-3 text-sm">
+                      <span className="font-medium text-warning ">This report is out of date.</span>{" "}
                       <span className="text-muted-foreground">
                         {reportStale.reason} Regenerate it to reflect your latest history.
                       </span>
@@ -428,79 +432,84 @@ export function DashboardShell({
       <section className="space-y-3">
         <ZoneHeading>{applying ? "What's out there" : "What the market is asking for"}</ZoneHeading>
         <div className={applying ? "grid gap-4 lg:grid-cols-[1.4fr_1fr]" : "grid gap-4"}>
-        {applying ? (
-        <Card id="recommended-jobs">
-        <CardHeader className="flex flex-row items-start gap-4 space-y-0">
-          <div className="grid size-10 place-items-center rounded-md bg-primary/10 text-primary">
-            <BriefcaseBusiness className="size-5" aria-hidden="true" />
-          </div>
-          <div className="flex-1">
-            <CardTitle>Recommended jobs</CardTitle>
-            <CardDescription>
-              Local MVP job matches based on your onboarding profile and resume text.
-            </CardDescription>
-          </div>
-          <Link href="/dashboard/jobs" className={buttonVariants({ variant: "outline" })}>
-            View jobs
-            <ArrowRight className="size-4" aria-hidden="true" />
-          </Link>
-        </CardHeader>
-        <CardContent>
-          {recommendedJobsPreview.length > 0 ? (
-            <div className="grid gap-3">
-              {recommendedJobsPreview.map((job) => (
-                // unimad-style role card: logo tile, meta, and a Prepare / Apply-now
-                // button pair — both open the workspace the Jobs page uses (fit-check
-                // → draft → apply).
-                <div
-                  key={job.id}
-                  className="flex flex-col rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40"
-                >
-                  <div className="flex items-start gap-3">
-                    <span className="grid size-10 shrink-0 place-items-center rounded-md bg-primary font-heading text-sm font-bold text-primary-foreground">
-                      {job.company?.slice(0, 1)?.toUpperCase() ?? "?"}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <h3 className="truncate text-sm font-semibold">{job.title}</h3>
-                      <p className="truncate text-xs text-muted-foreground">{job.company}</p>
-                    </div>
-                    <span
-                      style={matchAccent(job.matchScore).style}
-                      className="shrink-0 rounded-full border border-dynamic bg-dynamic-soft px-2 py-0.5 text-xs font-medium tabular-nums text-dynamic"
-                    >
-                      {job.matchScore}%
-                    </span>
-                  </div>
-                  <p className="mt-2 line-clamp-1 text-xs text-muted-foreground">
-                    {[job.location, job.remoteMode, job.seniority].filter(Boolean).join(" · ")}
-                  </p>
-                  <div className="mt-3 flex gap-2">
-                    <Link
-                      href={`/dashboard/applications/${job.id}/workspace`}
-                      className={cn(buttonVariants({ variant: "outline", size: "sm" }), "flex-1 rounded-full")}
-                    >
-                      Prepare
-                    </Link>
-                    <Link
-                      href={`/dashboard/applications/${job.id}/workspace`}
-                      className={cn(buttonVariants({ size: "sm" }), "flex-1 rounded-full")}
-                    >
-                      Apply now
-                    </Link>
-                  </div>
+          {applying ? (
+            <Card id="recommended-jobs">
+              <CardHeader className="flex flex-row items-start gap-4 space-y-0">
+                <div className="grid size-10 place-items-center rounded-md bg-primary/10 text-primary">
+                  <BriefcaseBusiness className="size-5" aria-hidden="true" />
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
-              No matches yet — set your target role and location, and I&apos;ll pull live roles into your Jobs board.
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-        ) : null}
-        <MarketSignalsCard signals={marketSignals} />
+                <div className="flex-1">
+                  <CardTitle>Recommended jobs</CardTitle>
+                  <CardDescription>
+                    Local MVP job matches based on your onboarding profile and resume text.
+                  </CardDescription>
+                </div>
+                <Link href="/dashboard/jobs" className={buttonVariants({ variant: "outline" })}>
+                  View jobs
+                  <ArrowRight className="size-4" aria-hidden="true" />
+                </Link>
+              </CardHeader>
+              <CardContent>
+                {recommendedJobsPreview.length > 0 ? (
+                  <div className="grid gap-3">
+                    {recommendedJobsPreview.map((job) => (
+                      // unimad-style role card: logo tile, meta, and a Prepare / Apply-now
+                      // button pair — both open the workspace the Jobs page uses (fit-check
+                      // → draft → apply).
+                      <div
+                        key={job.id}
+                        className="flex flex-col rounded-xl border border-border bg-card p-4 transition-colors hover:border-primary/40"
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="grid size-10 shrink-0 place-items-center rounded-md bg-primary font-heading text-sm font-bold text-primary-foreground">
+                            {job.company?.slice(0, 1)?.toUpperCase() ?? "?"}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <h3 className="truncate text-sm font-semibold">{job.title}</h3>
+                            <p className="truncate text-xs text-muted-foreground">{job.company}</p>
+                          </div>
+                          <span
+                            style={matchAccent(job.matchScore).style}
+                            className="shrink-0 rounded-full border border-dynamic bg-dynamic-soft px-2 py-0.5 text-xs font-medium tabular-nums text-dynamic"
+                          >
+                            {job.matchScore}%
+                          </span>
+                        </div>
+                        <p className="mt-2 line-clamp-1 text-xs text-muted-foreground">
+                          {[job.location, job.remoteMode, job.seniority]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </p>
+                        <div className="mt-3 flex gap-2">
+                          <Link
+                            href={`/dashboard/applications/${job.id}/workspace`}
+                            className={cn(
+                              buttonVariants({ variant: "outline", size: "sm" }),
+                              "flex-1 rounded-full"
+                            )}
+                          >
+                            Prepare
+                          </Link>
+                          <Link
+                            href={`/dashboard/applications/${job.id}/workspace`}
+                            className={cn(buttonVariants({ size: "sm" }), "flex-1 rounded-full")}
+                          >
+                            Apply now
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="rounded-md border border-dashed p-4 text-sm text-muted-foreground">
+                    No matches yet — set your target role and location, and I&apos;ll pull live
+                    roles into your Jobs board.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ) : null}
+          <MarketSignalsCard signals={marketSignals} />
         </div>
       </section>
     </div>

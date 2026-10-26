@@ -40,25 +40,18 @@ export function FadiBadge({ size = "sm", showName = true, className }: FadiBadge
   return (
     <div className={cn("flex items-center gap-2", className)}>
       <div className="relative shrink-0">
-        <div
-          className={cn(
-            "flex items-center justify-center rounded-full bg-primary",
-            avatarSize,
-          )}
-        >
+        <div className={cn("flex items-center justify-center rounded-full bg-primary", avatarSize)}>
           <Sparkles className={cn("text-primary-foreground", iconSize)} aria-hidden="true" />
         </div>
         <div
           className={cn(
-            "absolute -right-0.5 bottom-0 rounded-full bg-emerald-400 ring-2 ring-background",
-            dotSize,
+            "absolute -right-0.5 bottom-0 rounded-full bg-success ring-2 ring-background",
+            dotSize
           )}
           aria-hidden="true"
         />
       </div>
-      {showName ? (
-        <span className={cn("font-semibold text-primary", nameSize)}>Fadi</span>
-      ) : null}
+      {showName ? <span className={cn("font-semibold text-primary", nameSize)}>Fadi</span> : null}
     </div>
   );
 }

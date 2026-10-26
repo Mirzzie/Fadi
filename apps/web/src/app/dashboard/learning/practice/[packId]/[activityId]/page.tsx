@@ -38,7 +38,7 @@ export default async function PracticeActivityPage({
 
   return (
     <AppShell>
-      <main className="mx-auto max-w-3xl space-y-6">
+      <div className="mx-auto max-w-3xl space-y-6">
         <LearningNavigation />
         <section className="space-y-4">
           <p className="text-xs font-medium text-primary">
@@ -66,7 +66,7 @@ export default async function PracticeActivityPage({
           </p>
           <StartSimulation packId={pack.id} activityId={activity.id} grader={grader} />
         </section>
-      </main>
+      </div>
     </AppShell>
   );
 }

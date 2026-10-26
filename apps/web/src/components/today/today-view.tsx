@@ -20,6 +20,8 @@ import {
 } from "@/app/dashboard/work-actions";
 import type { Today } from "@/lib/work/today";
 import { cn } from "@/lib/utils";
+import styles from "./today-view.module.css";
+import { useGuideTarget } from "@/components/os/use-guide-target";
 
 /**
  * The first screen, answering four questions in order: what am I trying to achieve, what do I
@@ -43,33 +45,46 @@ export function TodayView({ today }: { today: Today }) {
   }
 
   return (
-    <div className="mx-auto max-w-5xl pb-10">
-      <header className="border-b border-border pb-10 pt-4 sm:pb-14 sm:pt-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">Today</p>
-        <h1 className="mt-3 font-heading text-4xl font-semibold tracking-[-0.04em] sm:text-6xl">
-          Hey {today.firstName}.
-        </h1>
-        <p className="mt-4 max-w-xl text-muted-foreground">
-          One goal, one next move, and a clear record of what Fadi has done.
-        </p>
+    <div className={styles.page}>
+      <header className={styles.header} data-fadi-surface data-fadi-reveal>
+        <div>
+          <p className={styles.eyebrow}>Your day, in focus</p>
+          <h1 className={styles.heading}>
+            Hey <span>{today.firstName}.</span>
+          </h1>
+          <p className={styles.introduction}>A clear direction. One useful next step.</p>
+        </div>
         <CareerFocus />
       </header>
 
-      <Working today={today} pending={pending} onRun={run} />
-      <RunningPlan today={today} pending={pending} onRun={run} />
-      <Proposal today={today} pending={pending} onRun={run} />
-      <NextAction today={today} pending={pending} onRun={run} />
-      <Decisions today={today} />
-      <WhatFadiDid today={today} />
-      <Suggestions today={today} />
+      <div className={styles.workspace}>
+        <div className={styles.direction}>
+          <Working today={today} pending={pending} onRun={run} />
+        </div>
+        <div className={styles.currentWork}>
+          <RunningPlan today={today} pending={pending} onRun={run} />
+          <Proposal today={today} pending={pending} onRun={run} />
+          <NextAction today={today} pending={pending} onRun={run} />
+        </div>
+      </div>
+      <div className={styles.followThrough}>
+        <Decisions today={today} />
+        <WhatFadiDid today={today} />
+        <Suggestions today={today} />
+      </div>
 
-      {error ? <p className="text-sm text-destructive">{error}</p> : null}
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
 
-      <p className="border-t border-border pt-6 text-xs text-muted-foreground">
-        <Link href="/dashboard/overview" className="underline underline-offset-4">
+      <p className={styles.footer}>
+        <Link href="/dashboard/overview" className={styles.overviewLink}>
           See the full picture
-        </Link>{" "}
-        — market signals, momentum and your career report.
+          <ArrowRight aria-hidden="true" />
+        </Link>
+        <span>Market signals, momentum and your career report.</span>
       </p>
     </div>
   );
@@ -82,9 +97,9 @@ function CareerFocus() {
     { mode: "prepare" as const, label: "Build skills" },
   ];
   return (
-    <div className="mt-6 flex flex-wrap items-center gap-3">
-      <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">Today’s focus</span>
-      <div role="tablist" aria-label="Today's career focus" className="inline-flex border border-border bg-background p-0.5">
+    <div className={styles.focus}>
+      <span className={styles.focusLabel}>Today’s focus</span>
+      <div role="tablist" aria-label="Today's career focus" className={styles.focusChoices}>
         {choices.map((choice) => (
           <button
             key={choice.mode}
@@ -92,10 +107,7 @@ function CareerFocus() {
             role="tab"
             aria-selected={mode === choice.mode}
             onClick={() => setMode(choice.mode)}
-            className={cn(
-              "px-3 py-1 text-xs font-medium transition-colors",
-              mode === choice.mode ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted hover:text-foreground",
-            )}
+            className={cn(styles.focusChoice, mode === choice.mode && styles.focusChoiceSelected)}
           >
             {choice.label}
           </button>
@@ -117,14 +129,12 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="border-b border-border py-7 sm:py-9">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-          {title}
-        </h2>
+    <section className={styles.section}>
+      <div className={styles.sectionHeader}>
+        <h2 className={styles.sectionTitle}>{title}</h2>
         {aside}
       </div>
-      <div className="mt-4">{children}</div>
+      <div className={styles.sectionContent}>{children}</div>
     </section>
   );
 }
@@ -149,13 +159,17 @@ function Working({ today, pending, onRun }: { today: Today; pending: boolean; on
           <p className="text-sm text-muted-foreground">
             Nothing set. Say what you are working towards and Fadi will keep the rest pointed at it.
           </p>
-          <Button size="sm" onClick={() => setNaming(true)}>
+          <Button
+            variant={today.action ? "outline" : "default"}
+            size="sm"
+            onClick={() => setNaming(true)}
+          >
             Set a goal
           </Button>
         </div>
       ) : (
         <>
-          <p className="text-lg font-medium">{today.goal.title}</p>
+          <p className={styles.goalTitle}>{today.goal.title}</p>
           {today.goal.reason ? (
             <p className="mt-1 text-sm text-muted-foreground">{today.goal.reason}</p>
           ) : null}
@@ -187,8 +201,9 @@ function Working({ today, pending, onRun }: { today: Today; pending: boolean; on
             autoFocus
             value={title}
             onChange={(event) => setTitle(event.target.value)}
+            aria-label="Your goal"
             placeholder="Land a cloud support role in Dublin"
-            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            className={styles.textInput}
           />
           <Button type="submit" size="sm" disabled={pending || !title.trim()}>
             Save
@@ -221,6 +236,11 @@ function NextAction({ today, pending, onRun }: { today: Today; pending: boolean;
   const [adding, setAdding] = useState(false);
   const [title, setTitle] = useState("");
   const action = today.action;
+  const guideRef = useGuideTarget<HTMLAnchorElement>(
+    "today.next",
+    action?.title ?? "Your next step",
+    "Use this control when you are ready. I’m pointing it out—not opening it or marking the work complete."
+  );
 
   return (
     <Section
@@ -232,13 +252,18 @@ function NextAction({ today, pending, onRun }: { today: Today; pending: boolean;
       }
     >
       {action ? (
-        <div className="border-l-2 border-primary pl-4 sm:pl-6">
-          <p className="text-xl font-medium tracking-tight">{action.title}</p>
+        <div className={styles.nextAction}>
+          <p className={styles.actionTitle}>{action.title}</p>
           {action.reason ? (
             <p className="mt-1 text-sm text-muted-foreground">{action.reason}</p>
           ) : null}
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Button nativeButton={false} size="sm" render={<Link href={action.href} />}>
+            <Button
+              nativeButton={false}
+              variant={today.plan?.fadiCanContinue || today.proposal ? "outline" : "default"}
+              size="sm"
+              render={<Link ref={guideRef} href={action.href} />}
+            >
               {action.cta} <ArrowRight />
             </Button>
             {action.id ? (
@@ -288,8 +313,9 @@ function NextAction({ today, pending, onRun }: { today: Today; pending: boolean;
             autoFocus
             value={title}
             onChange={(event) => setTitle(event.target.value)}
+            aria-label="New step"
             placeholder="Tailor my CV for the Stripe role"
-            className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm"
+            className={styles.textInput}
           />
           <Button type="submit" size="sm" disabled={pending || !title.trim()}>
             Add
@@ -300,12 +326,9 @@ function NextAction({ today, pending, onRun }: { today: Today; pending: boolean;
       {today.alsoOpen.length > 0 ? (
         <ul className="mt-3 space-y-1.5">
           {today.alsoOpen.map((step) => (
-            <li
-              key={step.id}
-            className="flex items-center justify-between gap-3 border-t border-border px-1 py-2.5 text-sm"
-            >
-              <span className="min-w-0 truncate">{step.title}</span>
-              <span className="flex shrink-0 items-center gap-1">
+            <li key={step.id} className={styles.openStep}>
+              <span className="min-w-0">{step.title}</span>
+              <span className={styles.openStepActions}>
                 <Button
                   variant="ghost"
                   size="xs"
@@ -357,7 +380,7 @@ function RunningPlan({ today, pending, onRun }: { today: Today; pending: boolean
     >
       <p className="text-base font-medium">{plan.title}</p>
 
-      <ol className="mt-3 space-y-2">
+      <ol className={styles.planSteps}>
         {plan.steps.map((step) => (
           <li key={step.id} className="flex gap-2.5 text-sm">
             <StepMark status={step.status} />
@@ -485,19 +508,24 @@ function WhatFadiDid({ today }: { today: Today }) {
           Nothing yet. What Fadi does on your behalf shows up here with what came of it.
         </p>
       ) : (
-        <ul className="space-y-2">
+        <ul className={styles.receipts}>
           {today.receipts.map((receipt) => (
-            <li key={receipt.id} className="text-sm">
-              <span className={RECEIPT_TONE[receipt.status] ?? "text-foreground"}>
-                {receipt.action}
-              </span>
-              {receipt.receipt ? (
-                <span className="text-muted-foreground"> — {receipt.receipt}</span>
-              ) : null}
-              {RECEIPT_NOTE[receipt.status] ? (
-                <span className="text-muted-foreground"> — {RECEIPT_NOTE[receipt.status]}</span>
-              ) : null}
-              {receipt.error ? <span className="text-destructive"> — {receipt.error}</span> : null}
+            <li key={receipt.id} className={styles.receipt}>
+              <span className={styles.receiptTime}>{receipt.atLabel}</span>
+              <div>
+                <span className={RECEIPT_TONE[receipt.status] ?? "text-foreground"}>
+                  {receipt.action}
+                </span>
+                {receipt.receipt ? (
+                  <span className="text-muted-foreground"> — {receipt.receipt}</span>
+                ) : null}
+                {RECEIPT_NOTE[receipt.status] ? (
+                  <span className="text-muted-foreground"> — {RECEIPT_NOTE[receipt.status]}</span>
+                ) : null}
+                {receipt.error ? (
+                  <span className="text-destructive"> — {receipt.error}</span>
+                ) : null}
+              </div>
             </li>
           ))}
         </ul>

@@ -79,7 +79,7 @@ export function FlagshipProjects({
           {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : null}
           {busy ? "Researching…" : "Find my flagship projects"}
         </Button>
-        {note ? <p className="mt-2 text-xs text-amber-500">{note}</p> : null}
+        {note ? <p className="mt-2 text-xs text-warning">{note}</p> : null}
       </div>
     );
   }
@@ -191,7 +191,7 @@ export function FlagshipProjects({
           />
           Research again
         </button>
-        {note ? <span className="text-amber-500">{note}</span> : null}
+        {note ? <span className="text-warning">{note}</span> : null}
       </div>
     </div>
   );

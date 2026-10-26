@@ -45,8 +45,8 @@ export function ConnectCode({ token }: { token: string }) {
           border: 0,
           fontWeight: 600,
           cursor: "pointer",
-          background: "#0f766e",
-          color: "#fff",
+          background: "var(--primary)",
+          color: "var(--primary-foreground)",
           whiteSpace: "nowrap",
         }}
       >

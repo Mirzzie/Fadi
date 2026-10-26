@@ -24,8 +24,8 @@ const ACTOR: Record<string, string> = {
 };
 
 const TONE: Record<string, string> = {
-  denied: "text-amber-500",
-  allowed: "text-emerald-500",
+  denied: "text-warning",
+  allowed: "text-success",
   asked: "text-muted-foreground",
   unavailable: "text-muted-foreground",
   error: "text-muted-foreground",
@@ -69,7 +69,7 @@ export function ActivityTimeline() {
   return (
     <div className="space-y-3">
       {refusals.length > 0 ? (
-        <p className="flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/5 p-2.5 text-xs text-amber-500">
+        <p className="flex items-center gap-1.5 rounded-md border border-warning/40 bg-warning/5 p-2.5 text-xs text-warning">
           <AlertTriangle className="size-3.5 shrink-0" aria-hidden="true" />
           {refusals.length} refused {refusals.length === 1 ? "attempt" : "attempts"}. Nothing ran.
         </p>

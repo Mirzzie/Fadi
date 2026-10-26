@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { PageIntro } from "@/components/layout/page-intro";
 import { LearningNavigation } from "@/components/learning/learning-navigation";
 import { ProjectRuns } from "@/components/learning/project-run";
 import { getCurrentAuthUser } from "@/lib/auth/session";
@@ -17,11 +18,15 @@ export default async function LearningProjectsPage() {
 
   return (
     <AppShell>
-      <main className="mx-auto max-w-shell space-y-6">
+      <div className="mx-auto max-w-shell space-y-6">
         <LearningNavigation />
-        <h1 className="font-heading text-3xl font-semibold tracking-tight">Projects</h1>
+        <PageIntro
+          eyebrow="Practice"
+          title="Projects"
+          description="Continue your work and review the steps ahead."
+        />
         <ProjectRuns mode="all" />
-      </main>
+      </div>
     </AppShell>
   );
 }

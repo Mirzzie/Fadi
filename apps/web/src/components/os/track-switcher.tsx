@@ -6,12 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,18 +21,52 @@ import {
 } from "@/app/dashboard/tracks/actions";
 
 const INTENTS: Array<{ value: string; label: string; hint: string }> = [
-  { value: "career", label: "Career change / main goal", hint: "A direction you're committing to." },
-  { value: "exploration", label: "Exploring — cast a wide net", hint: "Any role in a space (great for freshers)." },
-  { value: "trial", label: "Trial — testing if it fits", hint: "Sample a field before committing." },
-  { value: "part_time", label: "Part-time / gig / side income", hint: "Non-mainstream, student-abroad, freelance." },
+  {
+    value: "career",
+    label: "Career change / main goal",
+    hint: "A direction you're committing to.",
+  },
+  {
+    value: "exploration",
+    label: "Exploring — cast a wide net",
+    hint: "Any role in a space (great for freshers).",
+  },
+  {
+    value: "trial",
+    label: "Trial — testing if it fits",
+    hint: "Sample a field before committing.",
+  },
+  {
+    value: "part_time",
+    label: "Part-time / gig / side income",
+    hint: "Non-mainstream, student-abroad, freelance.",
+  },
 ];
 
 // Domain-agnostic on purpose — Fadi serves every industry, not just tech.
 const DOMAINS = [
-  "Information Technology", "Cybersecurity", "Software Development", "Data & Analytics",
-  "Finance", "Accounting", "Banking", "Marketing", "Sales", "Healthcare", "Nursing",
-  "Education", "Engineering", "Design / UX", "Legal", "Human Resources", "Operations",
-  "Customer Support", "Hospitality", "Construction & Trades", "Logistics", "Science / Research",
+  "Information Technology",
+  "Cybersecurity",
+  "Software Development",
+  "Data & Analytics",
+  "Finance",
+  "Accounting",
+  "Banking",
+  "Marketing",
+  "Sales",
+  "Healthcare",
+  "Nursing",
+  "Education",
+  "Engineering",
+  "Design / UX",
+  "Legal",
+  "Human Resources",
+  "Operations",
+  "Customer Support",
+  "Hospitality",
+  "Construction & Trades",
+  "Logistics",
+  "Science / Research",
 ];
 
 const EXPERIENCE = ["student", "entry", "junior", "mid", "senior", "lead"];
@@ -100,8 +129,9 @@ export function TrackSwitcher() {
     <>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger
-          title="Switch career track"
-          className="flex max-w-[12rem] items-center gap-1.5 rounded-full border border-border/70 bg-muted/40 px-2.5 py-1 font-medium text-foreground transition-colors hover:bg-muted"
+          title={`Switch direction: ${active?.label ?? "your direction"}`}
+          aria-label={`Switch direction: ${active?.label ?? "your direction"}`}
+          className="flex min-w-0 max-w-[5rem] items-center gap-1 rounded-full border border-border/70 bg-muted/40 px-2 py-1 font-medium text-foreground transition-colors hover:bg-muted sm:max-w-[12rem] sm:gap-1.5 sm:px-2.5"
         >
           <Target className="size-3 shrink-0 text-primary" aria-hidden="true" />
           <span className="truncate">{active?.label ?? "Career track"}</span>
@@ -122,7 +152,7 @@ export function TrackSwitcher() {
                 <div
                   className={cn(
                     "group flex w-full items-start gap-2 rounded-lg px-2.5 py-2 transition-colors hover:bg-muted",
-                    t.isActive && "bg-primary/10",
+                    t.isActive && "bg-primary/10"
                   )}
                 >
                   <button
@@ -155,14 +185,14 @@ export function TrackSwitcher() {
                       }}
                       aria-label={`Delete direction ${t.label}`}
                       title="Delete this direction (its documents stay)"
-                      className="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-rose-400 group-hover:opacity-100"
+                      className="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
                     >
                       <Trash2 className="size-3.5" aria-hidden="true" />
                     </button>
                   ) : null}
                 </div>
                 {confirmDeleteId === t.id ? (
-                  <div className="mx-2.5 mb-1.5 rounded-md border border-rose-500/40 bg-rose-500/10 p-2 text-xs">
+                  <div className="mx-2.5 mb-1.5 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs">
                     <p>
                       Delete <span className="font-medium">{t.label}</span>? Your documents stay in
                       your account (untagged). Its tailored base resume and report go with it —
@@ -173,7 +203,7 @@ export function TrackSwitcher() {
                         type="button"
                         onClick={() => remove(t.id)}
                         disabled={pending}
-                        className="rounded bg-rose-500/20 px-2 py-0.5 font-medium text-rose-300 hover:bg-rose-500/30"
+                        className="rounded bg-destructive/20 px-2 py-0.5 font-medium text-destructive hover:bg-destructive/30"
                       >
                         {pending ? "Deleting…" : "Delete"}
                       </button>
@@ -185,7 +215,7 @@ export function TrackSwitcher() {
                         Cancel
                       </button>
                     </div>
-                    {deleteError ? <p className="mt-1 text-amber-400">{deleteError}</p> : null}
+                    {deleteError ? <p className="mt-1 text-warning">{deleteError}</p> : null}
                   </div>
                 ) : null}
               </li>
@@ -296,8 +326,8 @@ function NewDirectionModal({
             Start a new direction
           </DialogTitle>
           <DialogDescription className="mt-0.5 text-xs text-muted-foreground">
-            Tell me where you&apos;re headed — branch of your field or a whole new one — and I&apos;ll
-            spin up a fresh track with its own jobs, documents, and plan.
+            Tell me where you&apos;re headed — branch of your field or a whole new one — and
+            I&apos;ll spin up a fresh track with its own jobs, documents, and plan.
           </DialogDescription>
         </div>
 
@@ -314,13 +344,13 @@ function NewDirectionModal({
                     "flex items-start gap-2 rounded-lg border px-3 py-2 text-left transition-colors",
                     intent === opt.value
                       ? "border-primary/50 bg-primary/10"
-                      : "border-border/60 hover:bg-muted/50",
+                      : "border-border/60 hover:bg-muted/50"
                   )}
                 >
                   <span
                     className={cn(
                       "mt-1 size-2 shrink-0 rounded-full",
-                      intent === opt.value ? "bg-primary" : "bg-muted-foreground/40",
+                      intent === opt.value ? "bg-primary" : "bg-muted-foreground/40"
                     )}
                   />
                   <span>

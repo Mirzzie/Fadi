@@ -119,7 +119,7 @@ export function FinishReview({ runId, stepsKey }: { runId: string; stepsKey: str
             value={decision}
             onChange={(event) => setDecision(event.target.value)}
             rows={3}
-            placeholder="e.g. Kept the database in a private subnet with no NAT gateway: harder to patch, but nothing can reach it from the internet."
+            placeholder="What did you choose, what alternative did you rule out, and what trade-off did you accept?"
             className="mt-1 w-full rounded-md border border-border bg-background p-2.5 text-sm"
           />
         </label>
@@ -133,7 +133,7 @@ export function FinishReview({ runId, stepsKey }: { runId: string; stepsKey: str
             value={wentWrong}
             onChange={(event) => setWentWrong(event.target.value)}
             rows={3}
-            placeholder="e.g. My first IAM policy allowed s3:* — the analyzer flagged it, so I scoped it to the one bucket."
+            placeholder="Describe a problem you found, the evidence that helped you diagnose it, and what changed after your fix."
             className="mt-1 w-full rounded-md border border-border bg-background p-2.5 text-sm"
           />
         </label>

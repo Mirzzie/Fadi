@@ -14,6 +14,8 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { PageIntro } from "@/components/layout/page-intro";
+import { useGuideTarget } from "@/components/os/use-guide-target";
 import { cn } from "@/lib/utils";
 import {
   createDocumentAction,
@@ -60,6 +62,12 @@ export function DocumentsShell({ documents }: { documents: DocView[] }) {
     });
   }
 
+  const createGuide = useGuideTarget<HTMLButtonElement>(
+    "documents.create",
+    "Start a CV draft",
+    "This creates a draft for you to review. It does not send an application or publish your work."
+  );
+
   function create(kind: DocumentKind) {
     setError(null);
     startTransition(async () => {
@@ -80,18 +88,16 @@ export function DocumentsShell({ documents }: { documents: DocView[] }) {
     <div className="mx-auto max-w-shell space-y-10 pb-12 pt-4">
       <section className="border-b border-border/70 pb-8">
         <div className="space-y-5">
-          <div>
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-primary">Document studio</p>
-            <h2 className="text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Words ready to send.</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-              Resumes, letters, emails and value propositions—editable, versioned, and connected to
-              the opportunity they support.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2 border-t border-border/60 pt-5">
+          <PageIntro
+            eyebrow="My career"
+            title="Your documents"
+            description="Draft, review and keep versions of your CVs, letters and messages. Connect each one to the opportunity it supports."
+          />
+          <div className="flex flex-wrap gap-2">
             {KINDS.map((k) => (
               <Button
                 key={k.kind}
+                ref={k.kind === "resume" ? createGuide : undefined}
                 variant={k.kind === "resume" ? "default" : "outline"}
                 size="sm"
                 className="rounded-md"
@@ -132,56 +138,62 @@ export function DocumentsShell({ documents }: { documents: DocView[] }) {
           <span className="text-xs text-muted-foreground">{documents.length} saved</span>
         </div>
         <div className="divide-y border-y border-border/80">
-        <button
-          type="button"
-          onClick={() => create("resume")}
-          disabled={pending}
-          className="group flex w-full items-center gap-4 py-5 text-left text-muted-foreground transition-colors hover:bg-muted/30 hover:text-primary sm:px-2"
-        >
-          <span className="grid size-9 place-items-center border border-border bg-muted/30 transition-colors group-hover:border-primary/40 group-hover:bg-primary/10">
-            <Plus className="size-4" aria-hidden="true" />
-          </span>
-          <span>
-            <span className="block text-sm font-medium text-foreground">New resume</span>
-            <span className="mt-0.5 block text-xs">Start from your career record</span>
-          </span>
-        </button>
+          <button
+            type="button"
+            onClick={() => create("resume")}
+            disabled={pending}
+            className="group flex w-full items-center gap-4 py-5 text-left text-muted-foreground transition-colors hover:bg-muted/30 hover:text-primary sm:px-2"
+          >
+            <span className="grid size-9 place-items-center border border-border bg-muted/30 transition-colors group-hover:border-primary/40 group-hover:bg-primary/10">
+              <Plus className="size-4" aria-hidden="true" />
+            </span>
+            <span>
+              <span className="block text-sm font-medium text-foreground">New resume</span>
+              <span className="mt-0.5 block text-xs">Start from your career record</span>
+            </span>
+          </button>
 
-        {documents.map((doc) => {
-          const meta = KIND_META[doc.kind] ?? { label: doc.kind, icon: FileText };
-          return (
-            <div key={doc.id} className="group relative transition-colors hover:bg-muted/30">
-              <button
-                type="button"
-                onClick={() => router.push(`/dashboard/documents/${doc.id}`)}
-                className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 py-5 pr-12 text-left sm:px-2 sm:pr-14"
-              >
-                <span className="grid size-9 place-items-center bg-primary/10 text-primary">
-                  <meta.icon className="size-4" aria-hidden="true" />
-                </span>
-                <div className="min-w-0">
-                  <div className="flex items-baseline gap-2">
-                    <p className="truncate text-sm font-semibold">{doc.title}</p>
-                    <span className="shrink-0 text-[0.65rem] uppercase tracking-wide text-muted-foreground">{meta.label}</span>
+          {documents.map((doc) => {
+            const meta = KIND_META[doc.kind] ?? { label: doc.kind, icon: FileText };
+            return (
+              <div key={doc.id} className="group relative transition-colors hover:bg-muted/30">
+                <button
+                  type="button"
+                  onClick={() => router.push(`/dashboard/documents/${doc.id}`)}
+                  className="grid w-full grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-4 py-5 pr-12 text-left sm:px-2 sm:pr-14"
+                >
+                  <span className="grid size-9 place-items-center bg-primary/10 text-primary">
+                    <meta.icon className="size-4" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex items-baseline gap-2">
+                      <p className="truncate text-sm font-semibold">{doc.title}</p>
+                      <span className="shrink-0 text-[0.65rem] uppercase tracking-wide text-muted-foreground">
+                        {meta.label}
+                      </span>
+                    </div>
+                    <p className="mt-1 truncate text-xs text-muted-foreground">
+                      {doc.preview || "Empty — open to start writing."}
+                    </p>
                   </div>
-                  <p className="mt-1 truncate text-xs text-muted-foreground">{doc.preview || "Empty — open to start writing."}</p>
-                </div>
-                <p className="hidden text-xs text-muted-foreground sm:block">Updated {formatDay(doc.updatedAt)}</p>
-              </button>
-              <button
-                type="button"
-                aria-label="Delete document"
-                onClick={() => remove(doc.id)}
-                disabled={pending}
-                className={cn(
-                  "absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 focus:opacity-100",
-                )}
-              >
-                <Trash2 className="size-3.5" aria-hidden="true" />
-              </button>
-            </div>
-          );
-        })}
+                  <p className="hidden text-xs text-muted-foreground sm:block">
+                    Updated {formatDay(doc.updatedAt)}
+                  </p>
+                </button>
+                <button
+                  type="button"
+                  aria-label="Delete document"
+                  onClick={() => remove(doc.id)}
+                  disabled={pending}
+                  className={cn(
+                    "absolute right-2 top-1/2 grid size-8 -translate-y-1/2 place-items-center text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100 focus:opacity-100"
+                  )}
+                >
+                  <Trash2 className="size-3.5" aria-hidden="true" />
+                </button>
+              </div>
+            );
+          })}
         </div>
       </section>
     </div>

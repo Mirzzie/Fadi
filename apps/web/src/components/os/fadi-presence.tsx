@@ -12,6 +12,13 @@ import {
 
 import { subscribeFadiSpeaking } from "@/lib/voice/fadi-speech";
 import type { FadiRuntimeState } from "@/lib/agent/state";
+import { usePathname } from "next/navigation";
+import {
+  targetInView,
+  targetIsUsable,
+  type GuideTarget,
+  type GuideTargetId,
+} from "@/lib/agent/guide";
 
 /**
  * Fadi is ambient — one presence the whole OS shares, not a mode you toggle into.
@@ -39,6 +46,12 @@ export type FadiSeed = { text: string; nonce: number };
 export type FadiFocus = { workItemId: string; title: string };
 
 type FadiPresenceValue = {
+  guide: GuideTarget | null;
+  guideNotice: string | null;
+  guideTargetCount: number;
+  registerGuideTarget: (target: GuideTarget) => () => void;
+  startGuide: (id?: GuideTargetId) => void;
+  stopGuide: () => void;
   /** Whether the Fadi conversation panel is open. */
   open: boolean;
   openFadi: () => void;
@@ -68,6 +81,59 @@ type FadiPresenceValue = {
 const FadiPresenceContext = createContext<FadiPresenceValue | null>(null);
 
 export function FadiPresenceProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const targets = useRef(new Map<GuideTargetId, GuideTarget>());
+  const guideTrigger = useRef<HTMLElement | null>(null);
+  const [guide, setGuide] = useState<GuideTarget | null>(null);
+  const [guideNotice, setGuideNotice] = useState<string | null>(null);
+  const [guideTargetCount, setGuideTargetCount] = useState(0);
+  const stopGuide = useCallback(() => {
+    setGuide(null);
+    setGuideNotice(null);
+    const trigger = guideTrigger.current;
+    guideTrigger.current = null;
+    if (trigger)
+      requestAnimationFrame(() => {
+        if (targetIsUsable(trigger)) trigger.focus({ preventScroll: true });
+      });
+  }, []);
+  const registerGuideTarget = useCallback((target: GuideTarget) => {
+    if (targets.current.has(target.id)) return () => {};
+    targets.current.set(target.id, target);
+    setGuideTargetCount(targets.current.size);
+    return () => {
+      if (targets.current.get(target.id) !== target) return;
+      targets.current.delete(target.id);
+      setGuideTargetCount(targets.current.size);
+      setGuide((current) => (current === target ? null : current));
+    };
+  }, []);
+  const startGuide = useCallback(
+    (id?: GuideTargetId) => {
+      const target = id
+        ? targets.current.get(id)
+        : [...targets.current.values()].find(
+            (candidate) => candidate.pathname === pathname && targetIsUsable(candidate.element)
+          );
+      if (!target || target.pathname !== pathname || !targetIsUsable(target.element)) {
+        setGuide(null);
+        setGuideNotice("That control is no longer available on this page.");
+        return;
+      }
+      if (
+        !targetInView(target.element.getBoundingClientRect(), window.innerWidth, window.innerHeight)
+      ) {
+        setGuide(null);
+        setGuideNotice("Bring the next control into view, then choose Show me again.");
+        return;
+      }
+      guideTrigger.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setGuideNotice(null);
+      setGuide(target);
+    },
+    [pathname]
+  );
   const [open, setOpen] = useState(false);
   const [seed, setSeed] = useState<FadiSeed | null>(null);
   const [state, setState] = useState<FadiState>("ready");
@@ -80,7 +146,10 @@ export function FadiPresenceProvider({ children }: { children: React.ReactNode }
   // audio or the browser fallback — so the living core reacts to all of it.
   useEffect(() => subscribeFadiSpeaking(setSpeaking), []);
 
-  const openFadi = useCallback(() => setOpen(true), []);
+  const openFadi = useCallback(() => {
+    stopGuide();
+    setOpen(true);
+  }, [stopGuide]);
   // Clear any spotlight seed on close so reopening via the orb doesn't re-fire
   // the previous ⌘K question (each FadiChat mount resets its own seen-nonce).
   const closeFadi = useCallback(() => {
@@ -88,26 +157,34 @@ export function FadiPresenceProvider({ children }: { children: React.ReactNode }
     setSeed(null);
   }, []);
 
-  const openWithQuery = useCallback((text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed) {
-      setOpen(true);
-      return;
-    }
-    seedNonce.current += 1;
-    setSeed({ text: trimmed, nonce: seedNonce.current });
-    setOpen(true);
-  }, []);
-
-  const openOnWork = useCallback((next: FadiFocus, text?: string) => {
-    setFocus(next);
-    const trimmed = text?.trim();
-    if (trimmed) {
+  const openWithQuery = useCallback(
+    (text: string) => {
+      stopGuide();
+      const trimmed = text.trim();
+      if (!trimmed) {
+        setOpen(true);
+        return;
+      }
       seedNonce.current += 1;
       setSeed({ text: trimmed, nonce: seedNonce.current });
-    }
-    setOpen(true);
-  }, []);
+      setOpen(true);
+    },
+    [stopGuide]
+  );
+
+  const openOnWork = useCallback(
+    (next: FadiFocus, text?: string) => {
+      stopGuide();
+      setFocus(next);
+      const trimmed = text?.trim();
+      if (trimmed) {
+        seedNonce.current += 1;
+        setSeed({ text: trimmed, nonce: seedNonce.current });
+      }
+      setOpen(true);
+    },
+    [stopGuide]
+  );
   const clearFocus = useCallback(() => setFocus(null), []);
 
   const showNudge = useCallback((next: FadiNudge) => setNudge(next), []);
@@ -120,6 +197,12 @@ export function FadiPresenceProvider({ children }: { children: React.ReactNode }
 
   const value = useMemo<FadiPresenceValue>(
     () => ({
+      guide: guide?.pathname === pathname ? guide : null,
+      guideNotice,
+      guideTargetCount,
+      registerGuideTarget,
+      startGuide,
+      stopGuide,
       open,
       openFadi,
       closeFadi,
@@ -137,6 +220,13 @@ export function FadiPresenceProvider({ children }: { children: React.ReactNode }
       dismissNudge,
     }),
     [
+      guide,
+      pathname,
+      guideNotice,
+      guideTargetCount,
+      registerGuideTarget,
+      startGuide,
+      stopGuide,
       open,
       openFadi,
       closeFadi,

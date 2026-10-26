@@ -1,10 +1,9 @@
 "use client";
 
-import { LogOut, Settings, User } from "lucide-react";
+import { LogOut, Palette, Settings, User } from "lucide-react";
 import Link from "next/link";
 
 import { signOutAction } from "@/app/auth/actions";
-import { ThemeToggle } from "@/components/layout/theme-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,7 +22,6 @@ import {
 export function UserMenu() {
   return (
     <div className="flex items-center gap-1.5">
-      <ThemeToggle />
 
       <DropdownMenu>
         <DropdownMenuTrigger
@@ -41,6 +39,10 @@ export function UserMenu() {
           <DropdownMenuItem render={<Link href="/dashboard/settings" />}>
             <Settings className="size-3.5" aria-hidden="true" />
             Settings
+          </DropdownMenuItem>
+          <DropdownMenuItem render={<Link href="/dashboard/settings#appearance" />}>
+            <Palette className="size-3.5" aria-hidden="true" />
+            Appearance
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <form action={signOutAction}>

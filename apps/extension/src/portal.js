@@ -31,7 +31,7 @@
       ].join(";");
       document.body.appendChild(el);
     }
-    el.style.background = kind === "err" ? "#be123c" : "#0f766e";
+    el.style.background = kind === "err" ? "#b42331" : "#17623e";
     el.textContent = message;
     el.style.opacity = "1";
     clearTimeout(el._t);

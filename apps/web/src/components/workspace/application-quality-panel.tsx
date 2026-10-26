@@ -11,45 +11,49 @@ import { scoreApplicationDraft } from "@/app/dashboard/applications/actions";
 import type { ApplicationQualityResult } from "@/lib/intelligence/application-quality";
 
 function scoreColor(score: number): string {
-  if (score >= 88) return "text-emerald-300";
-  if (score >= 75) return "text-green-300";
-  if (score >= 58) return "text-amber-300";
+  if (score >= 88) return "text-success";
+  if (score >= 75) return "text-success";
+  if (score >= 58) return "text-warning";
   if (score >= 40) return "text-orange-300";
-  return "text-rose-300";
+  return "text-destructive";
 }
 
 function barColor(score: number): string {
-  if (score >= 75) return "bg-emerald-400";
-  if (score >= 58) return "bg-amber-400";
+  if (score >= 75) return "bg-success";
+  if (score >= 58) return "bg-warning";
   if (score >= 40) return "bg-orange-400";
-  return "bg-rose-400";
+  return "bg-destructive";
 }
 
 function sendLabel(r: ApplicationQualityResult["sendRecommendation"]): string {
   switch (r) {
-    case "strong": return "Ready to send — strong application";
-    case "ready": return "Ready to send";
-    case "improve_first": return "Improve before sending";
-    case "do_not_send": return "Not ready — significant gaps";
+    case "strong":
+      return "Ready to send — strong application";
+    case "ready":
+      return "Ready to send";
+    case "improve_first":
+      return "Improve before sending";
+    case "do_not_send":
+      return "Not ready — significant gaps";
   }
 }
 
 const SEND_META: Record<ApplicationQualityResult["sendRecommendation"], string> = {
-  strong: "text-emerald-300 border-emerald-500/40 bg-emerald-500/10",
-  ready: "text-green-300 border-green-500/40 bg-green-500/10",
-  improve_first: "text-amber-300 border-amber-500/40 bg-amber-500/10",
-  do_not_send: "text-rose-300 border-rose-500/40 bg-rose-500/10",
+  strong: "text-success border-success/40 bg-success/10",
+  ready: "text-success border-success/40 bg-success/10",
+  improve_first: "text-warning border-warning/40 bg-warning/10",
+  do_not_send: "text-destructive border-destructive/40 bg-destructive/10",
 };
 
 const RISK_META: Record<"high" | "medium" | "low", string> = {
-  high: "text-rose-300 border-rose-500/40 bg-rose-500/10",
-  medium: "text-amber-300 border-amber-500/40 bg-amber-500/10",
-  low: "text-emerald-300 border-emerald-500/40 bg-emerald-500/10",
+  high: "text-destructive border-destructive/40 bg-destructive/10",
+  medium: "text-warning border-warning/40 bg-warning/10",
+  low: "text-success border-success/40 bg-success/10",
 };
 
 const PRIORITY_TONE: Record<"critical" | "high" | "medium", string> = {
-  critical: "text-rose-400",
-  high: "text-amber-400",
+  critical: "text-destructive",
+  high: "text-warning",
   medium: "text-primary",
 };
 
@@ -101,26 +105,34 @@ export function ApplicationQualityPanel({
           <ClipboardCheck className="size-4 text-primary" aria-hidden="true" />
           <h2 className="text-sm font-semibold">Is it ready to send?</h2>
         </div>
-        <Button size="sm" variant={result ? "outline" : "default"} onClick={run} disabled={pending || !hasJd}>
+        <Button
+          size="sm"
+          variant={result ? "outline" : "default"}
+          onClick={run}
+          disabled={pending || !hasJd}
+        >
           {pending ? "Scoring…" : result ? "Re-score" : "Score my resume"}
         </Button>
       </div>
 
       {!hasJd ? (
         <p className="mt-2 text-sm text-muted-foreground">
-          Add the job description below and I&apos;ll score the resume you&apos;re about to send against
-          this exact posting — keyword coverage, ATS risk, and the specific fixes that matter.
+          Add the job description below and I&apos;ll score the resume you&apos;re about to send
+          against this exact posting — keyword coverage, ATS risk, and the specific fixes that
+          matter.
         </p>
       ) : !result && !error ? (
         <p className="mt-2 text-sm text-muted-foreground">
-          An honest read on your tailored resume vs. this job — graded against real hiring data
-          (11s recruiter scan, keyword coverage, AI-dismiss risk). Scores the resume drafted here, or
-          your base resume if you haven&apos;t tailored one yet.
+          Review how the drafted CV relates to this posting, including wording, coverage and
+          potential gaps. If there is no tailored draft, the review uses your base CV. These are AI
+          suggestions, not a prediction of a recruiter’s decision.
         </p>
       ) : null}
 
       {error ? (
-        <p className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm">{error}</p>
+        <p className="mt-2 rounded-md border border-warning/40 bg-warning/10 p-2 text-sm">
+          {error}
+        </p>
       ) : null}
 
       {result ? (
@@ -130,12 +142,23 @@ export function ApplicationQualityPanel({
               {result.score}
               <span className="text-sm text-muted-foreground">/100</span>
             </span>
-            <span className={cn("rounded-full border px-2.5 py-0.5 text-xs font-medium", SEND_META[result.sendRecommendation])}>
+            <span
+              className={cn(
+                "rounded-full border px-2.5 py-0.5 text-xs font-medium",
+                SEND_META[result.sendRecommendation]
+              )}
+            >
               {sendLabel(result.sendRecommendation)}
             </span>
             <span className="ml-auto flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span className={cn("rounded-full border px-2 py-0.5", RISK_META[result.atsRisk])}>ATS risk: {result.atsRisk}</span>
-              <span className={cn("rounded-full border px-2 py-0.5", RISK_META[result.aiGeneratedRisk])}>AI-dismiss risk: {result.aiGeneratedRisk}</span>
+              <span className={cn("rounded-full border px-2 py-0.5", RISK_META[result.atsRisk])}>
+                ATS risk: {result.atsRisk}
+              </span>
+              <span
+                className={cn("rounded-full border px-2 py-0.5", RISK_META[result.aiGeneratedRisk])}
+              >
+                AI-dismiss risk: {result.aiGeneratedRisk}
+              </span>
             </span>
           </div>
 
@@ -149,9 +172,14 @@ export function ApplicationQualityPanel({
                 <div key={key} className="grid grid-cols-[8.5rem_1fr_2.5rem] items-center gap-2">
                   <span className="truncate text-xs text-muted-foreground">{label}</span>
                   <span className="h-1.5 overflow-hidden rounded-full bg-muted">
-                    <span className={cn("block h-full rounded-full", barColor(dim.score))} style={{ width: `${dim.score}%` }} />
+                    <span
+                      className={cn("block h-full rounded-full", barColor(dim.score))}
+                      style={{ width: `${dim.score}%` }}
+                    />
                   </span>
-                  <span className="text-right text-xs tabular-nums text-muted-foreground">{dim.score}</span>
+                  <span className="text-right text-xs tabular-nums text-muted-foreground">
+                    {dim.score}
+                  </span>
                 </div>
               );
             })}
@@ -165,7 +193,10 @@ export function ApplicationQualityPanel({
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {result.breakdown.keywordMatch.missing.map((k, i) => (
-                  <span key={i} className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-200">
+                  <span
+                    key={i}
+                    className="rounded-md border border-warning/40 bg-warning/10 px-2 py-0.5 text-xs text-warning"
+                  >
                     {k}
                   </span>
                 ))}
@@ -175,11 +206,14 @@ export function ApplicationQualityPanel({
           {result.breakdown.keywordMatch.matched.length > 0 ? (
             <div className="space-y-1">
               <p className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                <BadgeCheck className="size-3.5 text-emerald-400" aria-hidden="true" /> Already covered
+                <BadgeCheck className="size-3.5 text-success" aria-hidden="true" /> Already covered
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {result.breakdown.keywordMatch.matched.map((k, i) => (
-                  <span key={i} className="rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-200">
+                  <span
+                    key={i}
+                    className="rounded-md border border-success/30 bg-success/10 px-2 py-0.5 text-xs text-success"
+                  >
                     {k}
                   </span>
                 ))}
@@ -191,12 +225,16 @@ export function ApplicationQualityPanel({
           {result.breakdown.formattingRisk.issues.length > 0 ? (
             <div className="space-y-1">
               <p className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                <ShieldAlert className="size-3.5 text-amber-400" aria-hidden="true" /> Formatting risks
+                <ShieldAlert className="size-3.5 text-warning" aria-hidden="true" /> Formatting
+                risks
               </p>
               <ul className="space-y-1">
                 {result.breakdown.formattingRisk.issues.map((it, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-foreground/90">
-                    <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-amber-400" aria-hidden="true" />
+                    <AlertTriangle
+                      className="mt-0.5 size-3.5 shrink-0 text-warning"
+                      aria-hidden="true"
+                    />
                     <span>{it}</span>
                   </li>
                 ))}
@@ -211,7 +249,10 @@ export function ApplicationQualityPanel({
               <ul className="space-y-1.5">
                 {result.topImprovements.map((imp, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm text-foreground/90">
-                    <ArrowUpRight className={cn("mt-0.5 size-3.5 shrink-0", PRIORITY_TONE[imp.priority])} aria-hidden="true" />
+                    <ArrowUpRight
+                      className={cn("mt-0.5 size-3.5 shrink-0", PRIORITY_TONE[imp.priority])}
+                      aria-hidden="true"
+                    />
                     <span>
                       <span className="font-medium">{imp.action}</span>
                       <span className="text-muted-foreground"> — {imp.impact}</span>
@@ -224,7 +265,8 @@ export function ApplicationQualityPanel({
 
           <p className="text-xs text-muted-foreground">
             Recruiter read time: {result.estimatedRecruiterReadTime}.{" "}
-            {result.sendRecommendation === "do_not_send" || result.sendRecommendation === "improve_first"
+            {result.sendRecommendation === "do_not_send" ||
+            result.sendRecommendation === "improve_first"
               ? "Close the gaps above before you send — a tighter match beats a fast send."
               : "Looks strong. Send it, then log the outcome below so Fadi can learn from the result."}
           </p>

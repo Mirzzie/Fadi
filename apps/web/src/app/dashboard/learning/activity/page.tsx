@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { PageIntro } from "@/components/layout/page-intro";
 import { ActivityTimeline } from "@/components/learning/activity-timeline";
 import { LearningNavigation } from "@/components/learning/learning-navigation";
 import { getCurrentAuthUser } from "@/lib/auth/session";
@@ -21,22 +22,17 @@ export default async function LearningActivityPage() {
 
   return (
     <AppShell>
-      <main className="mx-auto w-full max-w-4xl space-y-5 pb-12">
+      <div className="mx-auto w-full max-w-4xl space-y-5 pb-12">
         <LearningNavigation />
 
-        <div className="border-b border-border pb-7 pt-3">
-          <p className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-            Practice history
-          </p>
-          <h1 className="font-heading text-3xl font-semibold tracking-tight">Activity</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Everything Fadi has done on this machine and the devices you have connected, grouped by
-            what it was trying to do. Refusals are never folded away.
-          </p>
-        </div>
+        <PageIntro
+          eyebrow="Practice history"
+          title="Activity"
+          description="Review recorded actions on this computer and your connected devices, grouped by their purpose. Refusals remain visible."
+        />
 
         <ActivityTimeline />
-      </main>
+      </div>
     </AppShell>
   );
 }

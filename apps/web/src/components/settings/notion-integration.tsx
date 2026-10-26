@@ -62,7 +62,7 @@ export function NotionIntegration({ connected }: { connected: boolean }) {
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-xl font-semibold tracking-tight">Notion sync</h2>
             {isConnected ? (
-              <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+              <span className="rounded-full bg-success/15 px-2 py-0.5 text-xs font-medium text-success ">
                 Connected
               </span>
             ) : null}
@@ -77,15 +77,29 @@ export function NotionIntegration({ connected }: { connected: boolean }) {
           <form onSubmit={save} className="mt-4 space-y-3">
             <div className="space-y-1.5">
               <Label htmlFor="notion-token">Integration secret</Label>
-              <Input id="notion-token" name="token" type="password" placeholder="secret_…" autoComplete="off" />
+              <Input
+                id="notion-token"
+                name="token"
+                type="password"
+                placeholder="secret_…"
+                autoComplete="off"
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="notion-db">Database id</Label>
-              <Input id="notion-db" name="databaseId" placeholder="32-char database id" autoComplete="off" />
+              <Input
+                id="notion-db"
+                name="databaseId"
+                placeholder="32-char database id"
+                autoComplete="off"
+              />
             </div>
 
             {msg ? (
-              <p className={msg.ok ? "text-sm text-primary" : "text-sm text-destructive"} role="status">
+              <p
+                className={msg.ok ? "text-sm text-primary" : "text-sm text-destructive"}
+                role="status"
+              >
                 {msg.text}
               </p>
             ) : null}

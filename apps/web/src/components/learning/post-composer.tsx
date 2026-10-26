@@ -87,7 +87,7 @@ export function PostComposer({
         className="w-full rounded-md border border-border bg-background p-3 text-sm leading-relaxed"
       />
       {draft.warnings.length > 0 ? (
-        <ul className="space-y-1 text-xs text-amber-600 dark:text-amber-500">
+        <ul className="space-y-1 text-xs text-warning">
           {draft.warnings.map((warning) => (
             <li key={warning}>Check before posting: {warning}</li>
           ))}

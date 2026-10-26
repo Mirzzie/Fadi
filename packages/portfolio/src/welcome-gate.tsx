@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, type MouseEvent } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Sparkles, X } from "lucide-react";
 
 import {
@@ -24,6 +24,7 @@ const ROLES = [
 ];
 
 export function WelcomeGate({ interests }: { interests: string[] }) {
+  const reducedMotion = useReducedMotion();
   const options = [...interests, "all"];
   const [open, setOpen] = useState(false);
   const [role, setRole] = useState<string | null>(null);
@@ -69,7 +70,7 @@ export function WelcomeGate({ interests }: { interests: string[] }) {
         type="button"
         data-cursor
         onClick={() => setOpen(true)}
-        className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full border border-[color-mix(in_srgb,var(--pf-accent)_50%,transparent)] bg-black/60 px-4 py-2.5 text-sm text-[var(--pf-accent)] backdrop-blur transition-colors hover:bg-[var(--pf-accent)] hover:text-black"
+        className="fadi-glass fixed bottom-5 right-5 z-40 inline-flex min-h-11 items-center gap-2 rounded-full border px-4 py-2.5 text-sm text-[var(--primary)] transition-colors hover:bg-[var(--muted)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
       >
         <Sparkles className="size-4" />
         {savedLabel && savedLabel !== "Everything" ? `Tailored: ${savedLabel}` : "Tailor for me"}
@@ -81,25 +82,26 @@ export function WelcomeGate({ interests }: { interests: string[] }) {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4"
+            transition={{ duration: reducedMotion ? 0 : 0.2 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4"
             onClick={skip}
           >
             <motion.div
-              initial={{ opacity: 0, y: 20, scale: 0.98 }}
+              initial={{ opacity: 0, y: reducedMotion ? 0 : 20, scale: reducedMotion ? 1 : 0.98 }}
               animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 20, scale: 0.98 }}
-              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              exit={{ opacity: 0, y: reducedMotion ? 0 : 20, scale: reducedMotion ? 1 : 0.98 }}
+              transition={{ duration: reducedMotion ? 0 : 0.2, ease: [0.22, 1, 0.36, 1] }}
               onClick={(e: MouseEvent) => e.stopPropagation()}
-              className="w-full max-w-lg rounded-2xl border border-[color-mix(in_srgb,var(--pf-accent)_30%,transparent)] bg-[#101017] p-8 text-zinc-100 shadow-2xl"
+              className="max-h-[90dvh] w-full max-w-lg overflow-y-auto rounded-xl border border-[var(--border)] bg-[var(--card)] p-5 text-[var(--foreground)] shadow-2xl sm:p-8 [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-2 [&_button:focus-visible]:outline-[var(--ring)]"
             >
               <div className="flex items-start justify-between">
-                <p className="font-mono text-xs uppercase tracking-[0.3em] text-[var(--pf-accent)]">
+                <p className="font-mono text-xs uppercase tracking-[0.2em] text-[var(--primary)]">
                   Welcome
                 </p>
                 <button
                   type="button"
                   onClick={skip}
-                  className="text-zinc-500 hover:text-zinc-200"
+                  className="inline-flex size-11 items-center justify-center rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
                   aria-label="Skip"
                 >
                   <X className="size-5" />
@@ -107,7 +109,7 @@ export function WelcomeGate({ interests }: { interests: string[] }) {
               </div>
 
               <h2 className="mt-3 text-2xl font-medium tracking-tight">Who&apos;s visiting?</h2>
-              <p className="mt-1 text-sm text-zinc-400">
+              <p className="mt-1 text-sm text-[var(--muted-foreground)]">
                 Tell me what you&apos;re here for and the work reorders around it.
               </p>
 
@@ -118,10 +120,11 @@ export function WelcomeGate({ interests }: { interests: string[] }) {
                     type="button"
                     data-cursor
                     onClick={() => setRole(r.value)}
+                    aria-pressed={role === r.value}
                     className={`rounded-lg border px-3 py-2.5 text-sm transition-colors ${
                       role === r.value
-                        ? "border-[var(--pf-accent)] bg-[color-mix(in_srgb,var(--pf-accent)_10%,transparent)] text-[var(--pf-accent)]"
-                        : "border-zinc-800 text-zinc-300 hover:border-[color-mix(in_srgb,var(--pf-accent)_50%,transparent)]"
+                        ? "border-[var(--primary)] bg-[var(--muted)] text-[var(--primary)]"
+                        : "border-[var(--border)] text-[var(--foreground)] hover:border-[var(--primary)]"
                     }`}
                   >
                     {r.label}
@@ -129,7 +132,7 @@ export function WelcomeGate({ interests }: { interests: string[] }) {
                 ))}
               </div>
 
-              <h3 className="mt-6 text-sm font-medium text-zinc-300">What are you interested in?</h3>
+              <h3 className="mt-6 text-sm font-medium text-[var(--foreground)]">What are you interested in?</h3>
               <div className="mt-3 flex flex-wrap gap-2">
                 {options.map((i) => (
                   <button
@@ -137,10 +140,11 @@ export function WelcomeGate({ interests }: { interests: string[] }) {
                     type="button"
                     data-cursor
                     onClick={() => setInterest(i)}
+                    aria-pressed={interest === i}
                     className={`rounded-full border px-3 py-2 text-sm transition-colors ${
                       interest === i
-                        ? "border-[var(--pf-accent)] bg-[color-mix(in_srgb,var(--pf-accent)_10%,transparent)] text-[var(--pf-accent)]"
-                        : "border-zinc-800 text-zinc-300 hover:border-[color-mix(in_srgb,var(--pf-accent)_50%,transparent)]"
+                        ? "border-[var(--primary)] bg-[var(--muted)] text-[var(--primary)]"
+                        : "border-[var(--border)] text-[var(--foreground)] hover:border-[var(--primary)]"
                     }`}
                   >
                     {labelForInterest(i)}
@@ -152,7 +156,7 @@ export function WelcomeGate({ interests }: { interests: string[] }) {
                 <button
                   type="button"
                   onClick={skip}
-                  className="text-sm text-zinc-400 hover:text-zinc-200"
+                  className="min-h-11 px-3 text-sm text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
                 >
                   Skip
                 </button>
@@ -161,7 +165,7 @@ export function WelcomeGate({ interests }: { interests: string[] }) {
                   data-cursor
                   onClick={submit}
                   disabled={!interest}
-                  className="rounded-full border border-[var(--pf-accent)] bg-[color-mix(in_srgb,var(--pf-accent)_10%,transparent)] px-6 py-2.5 text-sm font-medium text-[var(--pf-accent)] transition-colors hover:bg-[var(--pf-accent)] hover:text-black disabled:opacity-40"
+                  className="min-h-11 rounded-full border border-[var(--primary)] bg-[var(--primary)] px-6 py-2.5 text-sm font-medium text-[var(--primary-foreground)] transition-opacity hover:opacity-90 disabled:opacity-50"
                 >
                   Show me
                 </button>

@@ -9,6 +9,7 @@ import { ImportJobLink } from "@/components/jobs/import-job-link";
 import { JobFilterChips } from "@/components/jobs/job-filter-chips";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useGuideTarget } from "@/components/os/use-guide-target";
 import type { EmploymentType, VisaFilter, WorkMode } from "@/lib/jobs/filters";
 
 // THE search — one plain-language box. Fadi reads location + mode from your words and pulls the
@@ -34,6 +35,11 @@ export function UnifiedJobSearch({
   selectedKeywords?: string[];
 }) {
   const router = useRouter();
+  const guideRef = useGuideTarget<HTMLInputElement>(
+    "jobs.search",
+    "Describe the work you want",
+    "Enter a role, place or work mode here. Review the search before choosing Search; guidance does not send it for you."
+  );
   const [prompt, setPrompt] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,6 +111,7 @@ export function UnifiedJobSearch({
       </div>
       <div className="mt-3 flex min-w-0 flex-col gap-2 rounded-md border border-input bg-background p-2 sm:flex-row">
         <Input
+          ref={guideRef}
           className="h-11 min-w-0 border-0 bg-transparent px-2 text-base shadow-none focus-visible:ring-2"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}

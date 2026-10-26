@@ -1,7 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { AlertTriangle, Building2, HelpCircle, Info, MessageCircle, ShieldCheck } from "lucide-react";
+import {
+  AlertTriangle,
+  Building2,
+  HelpCircle,
+  Info,
+  MessageCircle,
+  ShieldCheck,
+} from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { getCompanyBrief } from "@/app/dashboard/applications/actions";
@@ -43,12 +50,15 @@ export function CompanyBriefPanel({
 
       {!brief && !error ? (
         <p className="mt-2 text-sm text-muted-foreground">
-          Walk in able to have a real conversation: what they do, what this role owns, smart questions
-          to ask, and how your real experience connects. Understanding beats memorizing facts.
+          Walk in able to have a real conversation: what they do, what this role owns, smart
+          questions to ask, and how your real experience connects. Understanding beats memorizing
+          facts.
         </p>
       ) : null}
       {error ? (
-        <p className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm">{error}</p>
+        <p className="mt-2 rounded-md border border-warning/40 bg-warning/10 p-2 text-sm">
+          {error}
+        </p>
       ) : null}
 
       {brief ? (
@@ -58,33 +68,47 @@ export function CompanyBriefPanel({
           <Block label="Industry" value={brief.industryContext} />
 
           {brief.smartQuestions.length > 0 ? (
-            <List icon={HelpCircle} title="Smart questions to ask them" items={brief.smartQuestions} />
+            <List
+              icon={HelpCircle}
+              title="Smart questions to ask them"
+              items={brief.smartQuestions}
+            />
           ) : null}
           {brief.talkingPoints.length > 0 ? (
-            <List icon={MessageCircle} title="Your talking points (from your real experience)" items={brief.talkingPoints} />
+            <List
+              icon={MessageCircle}
+              title="Your talking points (from your real experience)"
+              items={brief.talkingPoints}
+            />
           ) : null}
 
           {/* Due diligence — scam/red-flag signals from the posting + where to verify. */}
           {brief.redFlags.length > 0 ? (
-            <div className="space-y-1 rounded-md border border-amber-500/40 bg-amber-500/10 p-2">
-              <p className="flex items-center gap-1.5 text-xs font-medium text-amber-200/90">
+            <div className="space-y-1 rounded-md border border-warning/40 bg-warning/10 p-2">
+              <p className="flex items-center gap-1.5 text-xs font-medium text-warning/90">
                 <AlertTriangle className="size-3.5" aria-hidden="true" />
                 Red flags to watch (from this posting)
               </p>
               <ul className="space-y-0.5">
                 {brief.redFlags.map((f, i) => (
-                  <li key={i} className="text-foreground/90">• {f}</li>
+                  <li key={i} className="text-foreground/90">
+                    • {f}
+                  </li>
                 ))}
               </ul>
             </div>
           ) : null}
           {brief.whereToVerify.length > 0 ? (
-            <List icon={ShieldCheck} title="Verify the real story (work-life, reputation, legitimacy)" items={brief.whereToVerify} />
+            <List
+              icon={ShieldCheck}
+              title="Verify the real story (work-life, reputation, legitimacy)"
+              items={brief.whereToVerify}
+            />
           ) : null}
 
           {/* Honesty: never present stale facts as current. */}
-          <p className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
-            <Info className="mt-0.5 size-3.5 shrink-0 text-amber-500" aria-hidden="true" />
+          <p className="flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-2 text-xs">
+            <Info className="mt-0.5 size-3.5 shrink-0 text-warning" aria-hidden="true" />
             {brief.recencyCaveat}
           </p>
         </div>
@@ -103,7 +127,15 @@ function Block({ label, value }: { label: string; value: string }) {
   );
 }
 
-function List({ icon: Icon, title, items }: { icon: typeof HelpCircle; title: string; items: string[] }) {
+function List({
+  icon: Icon,
+  title,
+  items,
+}: {
+  icon: typeof HelpCircle;
+  title: string;
+  items: string[];
+}) {
   return (
     <div className="space-y-1">
       <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
@@ -112,7 +144,9 @@ function List({ icon: Icon, title, items }: { icon: typeof HelpCircle; title: st
       </p>
       <ul className="space-y-1">
         {items.map((it, i) => (
-          <li key={i} className="text-foreground/90">• {it}</li>
+          <li key={i} className="text-foreground/90">
+            • {it}
+          </li>
         ))}
       </ul>
     </div>

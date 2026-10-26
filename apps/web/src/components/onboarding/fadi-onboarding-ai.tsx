@@ -32,7 +32,7 @@ function toSpeakable(text: string): string {
  */
 
 const GREETING =
-  "Hey — I'm Fadi, your honest career mentor. I'll get you set up in a couple of minutes, then I'll take it from there. To start: what should I call you?";
+  "Hi — I’m Fadi. Let’s bring your experience, goals and constraints into view. You’ll review the starting picture before using it. What should I call you?";
 
 const FIELD_LABELS: Array<[keyof CollectedFields, string]> = [
   ["fullName", "name"],
@@ -67,7 +67,11 @@ export function FadiOnboardingAI({
 
   // Fadi's voice — male, natural (see useSpeechOutput); + hands-free mic input.
   const { speak, stop: stopSpeaking, isSupported: ttsSupported } = useSpeechOutput({ rate: 1.0 });
-  const { state: micState, start: startListening, stop: stopListening } = useGroqVoice({
+  const {
+    state: micState,
+    start: startListening,
+    stop: stopListening,
+  } = useGroqVoice({
     onTranscript: (text) => setDraft((d) => (d ? `${d} ${text}` : text)),
   });
   const isListening = micState === "recording";
@@ -167,7 +171,9 @@ export function FadiOnboardingAI({
         <FadiOrb />
         <div className="flex-1">
           <p className="text-sm font-semibold tracking-tight">Fadi</p>
-          <p className="text-xs text-muted-foreground">Setting up your Fadi · {capturedCount}/7 captured</p>
+          <p className="text-xs text-muted-foreground">
+            Setting up your Fadi · {capturedCount}/7 captured
+          </p>
         </div>
         <div className="hidden items-center gap-1 sm:flex">
           {FIELD_LABELS.map(([k, label]) => (
@@ -176,7 +182,7 @@ export function FadiOnboardingAI({
               title={label}
               className={cn(
                 "h-1.5 w-3 rounded-full transition-colors",
-                collected && collected[k] && String(collected[k]).trim() ? "bg-primary" : "bg-muted",
+                collected && collected[k] && String(collected[k]).trim() ? "bg-primary" : "bg-muted"
               )}
             />
           ))}
@@ -191,7 +197,7 @@ export function FadiOnboardingAI({
               "grid size-8 shrink-0 place-items-center rounded-full border transition-colors",
               voiceOn
                 ? "border-primary/40 bg-primary/10 text-primary"
-                : "border-border/60 text-muted-foreground hover:text-foreground",
+                : "border-border/60 text-muted-foreground hover:text-foreground"
             )}
           >
             {voiceOn ? (
@@ -210,7 +216,7 @@ export function FadiOnboardingAI({
             key={i}
             className={cn(
               "flex items-end gap-2 duration-300 animate-in fade-in slide-in-from-bottom-1",
-              m.role === "user" ? "flex-row-reverse" : "",
+              m.role === "user" ? "flex-row-reverse" : ""
             )}
           >
             {m.role === "assistant" ? <FadiOrb size="sm" /> : null}
@@ -219,7 +225,7 @@ export function FadiOnboardingAI({
                 "max-w-[80%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
                 m.role === "assistant"
                   ? "rounded-bl-sm bg-muted/70"
-                  : "rounded-br-sm bg-primary text-primary-foreground",
+                  : "rounded-br-sm bg-primary text-primary-foreground"
               )}
             >
               {m.content}
@@ -282,7 +288,12 @@ export function FadiOnboardingAI({
         <div className="mt-2 flex items-center justify-between text-[0.7rem] text-muted-foreground">
           <span>Enter to send · Shift+Enter for a new line</span>
           {onUseForm ? (
-            <button type="button" onClick={onUseForm} className="hover:text-foreground hover:underline">
+            <button
+              type="button"
+              onClick={onUseForm}
+              disabled={!mounted}
+              className="hover:text-foreground hover:underline"
+            >
               Prefer a form?
             </button>
           ) : null}
@@ -308,7 +319,12 @@ function FadiOrb({ size = "md" }: { size?: "sm" | "md" }) {
     <span className={cn("relative grid shrink-0 place-items-center", dim)}>
       <span className="absolute inset-0 rounded-full bg-primary/20 blur-md" />
       <span className="relative grid size-full place-items-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.66_0.22_285)] ring-2 ring-primary/20">
-        <span className={cn("animate-pulse rounded-full bg-primary-foreground/90 [animation-duration:2.5s]", inner)} />
+        <span
+          className={cn(
+            "animate-pulse rounded-full bg-primary-foreground/90 [animation-duration:2.5s]",
+            inner
+          )}
+        />
       </span>
     </span>
   );

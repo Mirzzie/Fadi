@@ -1,65 +1,43 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
 import { KanbanSquare, FileText } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { cn } from "@/lib/utils";
-
-/**
- * Applications is now the single home for the whole apply flow: the pipeline board
- * AND the documents that belong to it. The Documents tab was merged in here because
- * the real workflow is one motion — paste a job description, create the application,
- * generate its documents — not a trip to a separate section.
- *
- * Slot pattern: the server page composes the two views (each a client component with
- * its own props) and passes them as `board` / `library`, so all the prop-threading
- * stays in the page and this only owns the toggle.
- */
+/** One URL-owned view, with mounted panels so switching does not discard a local draft. */
 export function ApplicationsTabs({ board, library }: { board: ReactNode; library: ReactNode }) {
-  const [tab, setTab] = useState<"pipeline" | "documents">("pipeline");
-
+  const searchParams = useSearchParams();
+  const tab = searchParams.get("view") === "documents" ? "documents" : "pipeline";
+  function changeView(value: unknown) {
+    if ((value !== "documents" && value !== "pipeline") || value === tab) return;
+    const url = new URL(window.location.href);
+    if (value === "documents") url.searchParams.set("view", "documents");
+    else url.searchParams.delete("view");
+    window.history.pushState(null, "", url.pathname + url.search + url.hash);
+  }
   return (
-    <div className="space-y-4">
-      <div className="flex border-b border-border/80 text-sm">
-        <TabButton active={tab === "pipeline"} onClick={() => setTab("pipeline")} icon={<KanbanSquare className="size-4" />}>
+    <Tabs value={tab} onValueChange={changeView} className="space-y-4">
+      <TabsList
+        variant="line"
+        aria-label="Application workspace views"
+        className="h-auto w-fit max-w-full p-1"
+      >
+        <TabsTrigger value="pipeline" className="min-h-10 px-3">
+          <KanbanSquare aria-hidden="true" />
           Pipeline
-        </TabButton>
-        <TabButton active={tab === "documents"} onClick={() => setTab("documents")} icon={<FileText className="size-4" />}>
+        </TabsTrigger>
+        <TabsTrigger value="documents" className="min-h-10 px-3">
+          <FileText aria-hidden="true" />
           Documents
-        </TabButton>
-      </div>
-
-      <div className={tab === "pipeline" ? "block" : "hidden"}>{board}</div>
-      <div className={tab === "documents" ? "block" : "hidden"}>{library}</div>
-    </div>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  icon,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  icon: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        "relative inline-flex items-center gap-1.5 px-4 py-3 font-medium transition-colors",
-        active
-          ? "text-foreground after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:bg-primary"
-          : "text-muted-foreground hover:text-foreground",
-      )}
-    >
-      {icon}
-      {children}
-    </button>
+        </TabsTrigger>
+      </TabsList>
+      <TabsContent value="pipeline" keepMounted>
+        {board}
+      </TabsContent>
+      <TabsContent value="documents" keepMounted>
+        {library}
+      </TabsContent>
+    </Tabs>
   );
 }

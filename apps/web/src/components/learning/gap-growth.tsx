@@ -120,7 +120,7 @@ export function GapGrowth({ gapTitle, gapDetail }: { gapTitle: string; gapDetail
                     </div>
                   </div>
                   {committed.has(s.title) ? (
-                    <span className="flex shrink-0 items-center gap-1 text-xs text-emerald-400">
+                    <span className="flex shrink-0 items-center gap-1 text-xs text-success">
                       <Check className="size-3.5" aria-hidden="true" /> Committed
                     </span>
                   ) : (
@@ -147,7 +147,7 @@ export function GapGrowth({ gapTitle, gapDetail }: { gapTitle: string; gapDetail
           </p>
         </div>
       )}
-      {error ? <p className="mt-1 text-xs text-amber-400">{error}</p> : null}
+      {error ? <p className="mt-1 text-xs text-warning">{error}</p> : null}
     </div>
   );
 }
@@ -245,7 +245,7 @@ export function CommitmentsList({
         </div>
       ) : null}
       {note ? (
-        <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm">{note}</p>
+        <p className="rounded-md border border-warning/40 bg-warning/10 p-2 text-sm">{note}</p>
       ) : null}
       <div className="space-y-2">
         {finished ? (
@@ -326,7 +326,7 @@ export function CommitmentsList({
           ))}
         {done.length > 0 ? (
           <p className="text-xs text-muted-foreground">
-            <Check className="mr-1 inline size-3 text-emerald-400" aria-hidden="true" />
+            <Check className="mr-1 inline size-3 text-success" aria-hidden="true" />
             Completed: {done.map((c) => c.title).join(" · ")}. On your career record.
           </p>
         ) : null}

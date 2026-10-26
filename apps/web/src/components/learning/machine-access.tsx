@@ -164,9 +164,7 @@ export function MachineAccess() {
         <History className="size-4 text-muted-foreground" aria-hidden="true" />
         <span className="flex-1">Everything Fadi did or tried</span>
         {denials.length > 0 ? (
-          <span className="text-xs text-amber-600 dark:text-amber-500">
-            {denials.length} blocked
-          </span>
+          <span className="text-xs text-warning">{denials.length} blocked</span>
         ) : null}
         <ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />
       </Link>
@@ -221,7 +219,7 @@ function WorkspaceSetting({ root, onChanged }: { root: string | null; onChanged:
             onChange={(e) => setPath(e.target.value)}
             placeholder="/home/you/fadi-labs"
             spellCheck={false}
-            className="h-7 w-full max-w-md rounded border border-border bg-background px-2 font-mono text-[11px]"
+            className="h-10 w-full max-w-md rounded-lg border border-input bg-card px-3 font-mono text-base outline-none focus-visible:ring-2 focus-visible:ring-ring md:text-sm"
           />
           <p className="text-[11px] text-muted-foreground">
             Fadi can read and write inside this folder only. Clear it to remove access.
@@ -267,7 +265,7 @@ function RecordMachine({ found, onDone }: { found: Discovered; onDone: () => voi
   const [busy, start] = useTransition();
 
   return (
-    <div className="space-y-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/5 p-2.5">
+    <div className="space-y-1.5 rounded-md border border-success/40 bg-success/5 p-2.5">
       <p className="text-xs font-medium">
         {found.ip}
         {found.name ? " (" + found.name + ")" : ""} answered.
@@ -286,9 +284,10 @@ function RecordMachine({ found, onDone }: { found: Discovered; onDone: () => voi
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <input
+          aria-label="Discovered machine name"
           value={label}
           onChange={(e) => setLabel(e.target.value)}
-          className="h-7 w-full max-w-xs rounded border border-border bg-background px-2 text-[11px]"
+          className="h-10 w-full max-w-xs rounded-lg border border-input bg-card px-3 text-base outline-none focus-visible:ring-2 focus-visible:ring-ring md:text-sm"
           placeholder="Call it something you'll recognise"
         />
         <Button

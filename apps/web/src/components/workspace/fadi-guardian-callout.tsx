@@ -17,15 +17,13 @@ export function FadiGuardianCallout({ verdict }: { verdict: GuardianVerdict }) {
       role="note"
       className={cn(
         "flex items-start gap-2.5 rounded-lg border p-3",
-        confirm
-          ? "border-rose-500/40 bg-rose-500/10"
-          : "border-amber-500/40 bg-amber-500/10",
+        confirm ? "border-destructive/40 bg-destructive/10" : "border-warning/40 bg-warning/10"
       )}
     >
       <span
         className={cn(
           "mt-0.5 grid size-6 shrink-0 place-items-center rounded-full",
-          confirm ? "bg-rose-500/20 text-rose-300" : "bg-amber-500/20 text-amber-300",
+          confirm ? "bg-destructive/20 text-destructive" : "bg-warning/20 text-warning"
         )}
         aria-hidden="true"
       >

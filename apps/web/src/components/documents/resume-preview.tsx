@@ -21,7 +21,8 @@ const TEMPLATES: Record<ResumeTemplate, TemplateStyle> = {
     root: "space-y-4",
     header: "text-center",
     name: "text-xl font-bold tracking-tight",
-    sectionHeader: "mb-1 border-b border-zinc-300 pb-0.5 text-[11px] font-bold uppercase tracking-wide text-zinc-700",
+    sectionHeader:
+      "mb-1 border-b border-zinc-300 pb-0.5 text-[11px] font-bold uppercase tracking-wide text-zinc-700",
   },
   modern: {
     root: "space-y-4",
@@ -33,7 +34,8 @@ const TEMPLATES: Record<ResumeTemplate, TemplateStyle> = {
     root: "space-y-2.5 text-[12px]",
     header: "text-center",
     name: "text-lg font-bold tracking-tight",
-    sectionHeader: "mb-0.5 border-b border-zinc-300 pb-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-600",
+    sectionHeader:
+      "mb-0.5 border-b border-zinc-300 pb-0.5 text-[10px] font-bold uppercase tracking-wide text-zinc-600",
   },
   // Maximally ATS-safe: single column, left-aligned, black text, no accent
   // colour, plain rules — the layout parsers read most reliably.
@@ -41,7 +43,8 @@ const TEMPLATES: Record<ResumeTemplate, TemplateStyle> = {
     root: "space-y-3.5",
     header: "text-left",
     name: "text-2xl font-bold tracking-tight text-zinc-900",
-    sectionHeader: "mb-1 border-b border-zinc-400 pb-0.5 text-[11px] font-bold uppercase tracking-[0.12em] text-zinc-900",
+    sectionHeader:
+      "mb-1 border-b border-zinc-400 pb-0.5 text-[11px] font-bold uppercase tracking-[0.12em] text-zinc-900",
   },
   // Refined serif, centered — still single column and ATS-safe.
   executive: {
@@ -57,12 +60,21 @@ const TEMPLATES: Record<ResumeTemplate, TemplateStyle> = {
 export function ResumePreview({
   data,
   template = "classic",
+  embedded = false,
 }: {
   data: ResumeData;
   template?: ResumeTemplate;
+  embedded?: boolean;
 }) {
+  const NameHeading = embedded ? "h3" : "h1";
+  const SectionHeading = embedded ? "h4" : "h2";
   const t = TEMPLATES[template] ?? TEMPLATES.classic;
-  const contact = [data.personal.email, data.personal.phone, data.personal.location, data.personal.links]
+  const contact = [
+    data.personal.email,
+    data.personal.phone,
+    data.personal.location,
+    data.personal.links,
+  ]
     .filter(Boolean)
     .join("  ·  ");
   const order = data.order?.length ? data.order : DEFAULT_SECTION_ORDER;
@@ -81,9 +93,9 @@ export function ResumePreview({
   function Section({ title, children }: { title: string; children: React.ReactNode }) {
     return (
       <section>
-        <h2 className={t.sectionHeader} style={accent ? { color: accent } : undefined}>
+        <SectionHeading className={t.sectionHeader} style={accent ? { color: accent } : undefined}>
           {title}
-        </h2>
+        </SectionHeading>
         {children}
       </section>
     );
@@ -287,10 +299,12 @@ export function ResumePreview({
             className="mx-auto mb-2 size-20 rounded-full object-cover"
           />
         ) : null}
-        <h1 className={t.name} style={accent ? { color: accent } : undefined}>
+        <NameHeading className={t.name} style={accent ? { color: accent } : undefined}>
           {data.personal.name || "Your Name"}
-        </h1>
-        {data.personal.headline ? <p className="text-sm text-zinc-600">{data.personal.headline}</p> : null}
+        </NameHeading>
+        {data.personal.headline ? (
+          <p className="text-sm text-zinc-600">{data.personal.headline}</p>
+        ) : null}
         {contact ? <p className={cn("mt-1 text-[11px] text-zinc-500")}>{contact}</p> : null}
       </header>
       {order.map((key) => (

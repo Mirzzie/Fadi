@@ -131,7 +131,7 @@ export function DictateButton({
         className={cn(
           "inline-flex h-8 w-8 items-center justify-center rounded-full border transition-colors",
           listening
-            ? "border-red-500/40 bg-red-500/10 text-red-500 animate-pulse"
+            ? "border-destructive/40 bg-destructive/10 text-destructive animate-pulse"
             : "border-border text-muted-foreground hover:text-foreground hover:bg-muted",
           working && "opacity-60",
         )}
@@ -151,7 +151,7 @@ export function DictateButton({
             : "Listening — just say it plainly."}
         </span>
       ) : note ? (
-        <span className="text-xs text-amber-600 dark:text-amber-500">{note}</span>
+        <span className="text-xs text-warning">{note}</span>
       ) : (
         <span className="text-xs text-muted-foreground">
           Speak to add — or select a line first to rewrite it.

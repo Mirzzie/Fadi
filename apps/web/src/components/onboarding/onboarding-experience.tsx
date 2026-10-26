@@ -16,8 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
  * microphone, no explanation. The owner watched it change mid-sentence and asked why, which is
  * the correct reaction to software quietly becoming a smaller version of itself.
  *
- * Now the missing piece is named. Fadi needs a key to do any of its work, so hiding that at the
- * front door only moves the discovery to the first document that fails to generate.
+ * Name an unavailable provider without making manual setup sound unavailable too.
  */
 type Mode = "ai" | "no-provider" | "form";
 
@@ -37,8 +36,8 @@ export function OnboardingExperience() {
         </button>
         <Card className="glow-primary">
           <CardHeader>
-            <CardTitle>Profile foundation</CardTitle>
-            <CardDescription>Complete these steps to unlock your dashboard.</CardDescription>
+            <CardTitle>Your starting point</CardTitle>
+            <CardDescription>Add your experience and direction. Review the details before using them in your career work.</CardDescription>
           </CardHeader>
           <CardContent>
             <OnboardingForm />
@@ -53,11 +52,10 @@ export function OnboardingExperience() {
       <div className="mx-auto w-full max-w-2xl">
         <Card className="glow-primary">
           <CardHeader>
-            <CardTitle>Fadi needs an AI key first</CardTitle>
+            <CardTitle>Connect an AI provider for conversation</CardTitle>
             <CardDescription>
-              Setting up by conversation — and everything after it, from reading your CV to
-              drafting a résumé — runs on your own AI provider. Nothing here works without one, so
-              this says it now rather than at the first document that fails.
+              Conversational setup and AI drafting need an available provider. Check your connection
+              in Settings, or continue with the form to record your experience and goals without AI.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap items-center gap-3">
@@ -66,7 +64,7 @@ export function OnboardingExperience() {
               className="inline-flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"
             >
               <KeyRound className="size-4" aria-hidden="true" />
-              Add a key in Settings
+              Check AI connection
             </Link>
             <button
               type="button"

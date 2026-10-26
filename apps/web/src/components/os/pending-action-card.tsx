@@ -58,7 +58,7 @@ export function PendingAction({
             can&apos;t be undone
           </span>
         ) : w.reversibility === "disruptive" ? (
-          <span className="rounded-full border border-amber-500/50 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-amber-500">
+          <span className="rounded-full border border-warning/50 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-warning">
             interrupts something
           </span>
         ) : null}
@@ -87,7 +87,7 @@ export function PendingAction({
               className={
                 "flex items-start gap-1.5 text-[11px] " +
                 (note.kind === "warn"
-                  ? "text-amber-500"
+                  ? "text-warning"
                   : note.kind === "unknown"
                     ? "text-muted-foreground italic"
                     : "text-muted-foreground")
@@ -104,7 +104,8 @@ export function PendingAction({
 
       <p className="text-[11px] text-muted-foreground">
         Asked by {ACTOR_LABEL[w.actor] ?? w.actor}
-        {originLabel(w.origin) ? " " + originLabel(w.origin) : ""}.{w.reversal ? " " + w.reversal : ""}
+        {originLabel(w.origin) ? " " + originLabel(w.origin) : ""}.
+        {w.reversal ? " " + w.reversal : ""}
       </p>
 
       {mustType ? (

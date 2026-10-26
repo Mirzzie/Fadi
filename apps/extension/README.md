@@ -64,3 +64,15 @@ origin (e.g. `https://app.fadi.example/*`) to both `content_scripts[].matches` a
 - Richer autofill field maps (Workday/Lever/Greenhouse/iCIMS).
 
 Vanilla MV3 — no build step. Not part of the Next.js app build.
+
+## Appearance
+
+The popup uses Fadi's shared Ember/Iris/Cobalt tokens, Light/Dark/System modes and a bundled
+Mona Sans Latin font. Appearance is stored in the extension's own browser origin; it does not
+read the web app's private local storage or change account data. The normal font fallback is
+used for characters outside the bundled subset. The font's upstream licence is included at
+`src/fonts/Mona-Sans-LICENSE.txt` ([upstream](https://github.com/github/mona-sans/blob/main/LICENSE)).
+
+After changing the web appearance tokens or preferences, run `npm run sync:appearance` from
+this package. The generated CSS, preference module and before-paint script are checked in, so
+loading the unpacked extension still requires no build step. No new host permission is added.

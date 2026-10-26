@@ -1,0 +1,130 @@
+/* Conversion / Mara Voss motion, adapted to Fadi's existing palettes and work surfaces. */
+:root {
+  --motion-control: 180ms;
+  --motion-panel: 350ms;
+  --motion-reveal: 550ms;
+  --ease-control: cubic-bezier(0.44, 0, 0.56, 1);
+  --ease-reveal: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+[data-fadi-pointer] {
+  pointer-events: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 80;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--brand-bright);
+  box-shadow: 0 0 20px color-mix(in srgb, var(--primary) 22%, transparent);
+  opacity: 0;
+  transition: opacity var(--motion-control) ease;
+  contain: layout style;
+}
+@media (hover: hover) and (pointer: fine) and (prefers-reduced-motion: no-preference) {
+  [data-fadi-pointer][data-active] {
+    opacity: 0.72;
+  }
+  :is([data-slot="card"], [data-slot="page-intro"], [data-fadi-surface], .fadi-glass):hover {
+    background-attachment: fixed;
+    background-image: radial-gradient(
+      300px circle at var(--surface-x, 50%) var(--surface-y, 0%),
+      color-mix(in srgb, var(--primary) 9%, transparent),
+      transparent 75%
+    );
+  }
+  [data-slot="card"] {
+    transition:
+      border-color var(--motion-control) var(--ease-control),
+      box-shadow var(--motion-panel) var(--ease-reveal);
+  }
+  [data-slot="card"]:hover {
+    border-color: color-mix(in srgb, var(--primary) 32%, var(--border));
+    box-shadow: 0 10px 32px color-mix(in srgb, var(--foreground) 5%, transparent);
+  }
+  [data-slot="button"]:not(:disabled):not([aria-disabled="true"]):hover {
+    translate: 0 -1px;
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--primary) 12%, transparent);
+  }
+  [data-slot="button"]:active {
+    translate: 0 0;
+  }
+}
+[data-slot="button"],
+[data-slot="tabs-trigger"] {
+  transition-duration: var(--motion-control);
+  transition-timing-function: var(--ease-control);
+  transition-property: color, background-color, border-color, opacity, box-shadow, translate;
+}
+[data-slot="button"]:focus-visible {
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 16%, transparent);
+}
+details[open] > :not(summary) {
+  animation: fadi-detail-reveal var(--motion-panel) var(--ease-reveal);
+}
+@keyframes fadi-detail-reveal {
+  from {
+    opacity: 0.4;
+    translate: 0 4px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+[data-slot="dialog-content"],
+[data-slot="dropdown-menu-content"],
+[data-slot="sheet-content"] {
+  transition-duration: var(--motion-panel);
+  transition-timing-function: var(--ease-reveal);
+}
+[data-slot="dialog-content"][data-starting-style],
+[data-slot="dropdown-menu-content"][data-starting-style] {
+  opacity: 0;
+  scale: 0.98;
+}
+[data-slot="dialog-content"],
+[data-slot="dropdown-menu-content"] {
+  animation: none;
+  transition-property: opacity, scale;
+}
+[data-slot="dialog-content"][data-ending-style],
+[data-slot="dropdown-menu-content"][data-ending-style] {
+  opacity: 0;
+  scale: 0.98;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-fadi-pointer] {
+    display: none;
+  }
+  details[open] > :not(summary) {
+    animation: none;
+  }
+  [data-slot="button"],
+  [data-slot="tabs-trigger"],
+  [data-slot="card"],
+  [data-slot="dialog-content"],
+  [data-slot="dropdown-menu-content"],
+  [data-slot="sheet-content"] {
+    transition: none;
+  }
+}
+@media (pointer: coarse), (prefers-contrast: more), (forced-colors: active) {
+  [data-fadi-pointer] {
+    display: none;
+  }
+  :is([data-slot="card"], [data-slot="page-intro"], [data-fadi-surface], .fadi-glass):hover {
+    background-image: none;
+  }
+}
+@media print {
+  [data-fadi-pointer] {
+    display: none;
+  }
+  details[open] > :not(summary) {
+    animation: none;
+  }
+  :is([data-slot="card"], [data-slot="page-intro"], [data-fadi-surface], .fadi-glass):hover {
+    background-image: none;
+  }
+}

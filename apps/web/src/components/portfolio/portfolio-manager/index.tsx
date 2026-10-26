@@ -22,6 +22,9 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { PageIntro } from "@/components/layout/page-intro";
+import { useGuideTarget } from "@/components/os/use-guide-target";
 import { driftNote } from "@/lib/portfolio/freshness";
 import { GithubPublishPanel } from "@/components/portfolio/github-publish";
 import { HistoryCapture } from "@/components/evidence/history-capture";
@@ -83,6 +86,12 @@ export function PortfolioManager({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<PortfolioItemView | null>(null);
+  const [importChoice, setImportChoice] = useState<{
+    payload: unknown;
+    name: string;
+    replace: boolean;
+  } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>("project");
   const [editing, setEditing] = useState<ItemForm | null>(null);
@@ -247,16 +256,20 @@ export function PortfolioManager({
       setError("That file isn't valid JSON.");
       return;
     }
-    const mode = confirm("OK = ADD to existing content.\nCancel = REPLACE all items (destructive).")
-      ? "merge"
-      : confirm("Really REPLACE all current items? This cannot be undone.")
-        ? "replace"
-        : null;
-    if (!mode) return;
+    setImportChoice({ payload, name: file.name, replace: false });
+  }
+
+  function applyImport(mode: "merge" | "replace") {
+    if (!importChoice) return;
+    const payload = importChoice.payload;
+    setError(null);
     startTransition(async () => {
       const r = await importPortfolio({ payload: payload as never, mode });
       if (!r.ok) setError(r.message);
-      else router.refresh();
+      else {
+        setImportChoice(null);
+        router.refresh();
+      }
     });
   }
 
@@ -302,104 +315,113 @@ export function PortfolioManager({
     run(() => reorderItems({ ids }));
   }
 
+  const previewGuide = useGuideTarget<HTMLAnchorElement>(
+    "portfolio.preview",
+    "Review what you share",
+    "Preview the site before changing its publication state. This link opens your portfolio; it does not publish or export anything."
+  );
   const rows = grouped[activeTab] ?? [];
   const meta = SECTION_META[activeTab];
 
   return (
     <div className="mx-auto w-full max-w-6xl pb-12 pt-4">
       {/* Header — mirrors the original portfolio CMS */}
-      <header className="mb-8 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-primary">Portfolio CMS</p>
-          <h1 className="mt-1 font-heading text-3xl font-semibold tracking-tight md:text-4xl">
-            Manage content
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Add, edit, and remove anything on your portfolio. Changes appear live.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider ${
-              isPublished
-                ? "border border-primary/40 bg-primary/10 text-primary"
-                : "bg-muted text-muted-foreground"
-            }`}
-          >
-            {isPublished ? "Published" : "Draft"}
-          </span>
-          <Button size="sm" variant="outline" onClick={togglePublishSite} disabled={pending}>
-            {isPublished ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-            {isPublished ? "Unpublish" : "Publish"}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            nativeButton={false}
-            render={<a href={publicUrl} target="_blank" rel="noreferrer" />}
-          >
-            <ExternalLink className="size-4" /> Preview site
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setAudienceOpen(true)}>
-            <Eye className="size-4" aria-hidden="true" />
-            Who&apos;s looking
-          </Button>
-          {/* One direction, one claim — the antidote to a site that spans four. */}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setFocusOpen(true)}
-            disabled={items.length === 0}
-          >
-            <Crosshair className="size-4" aria-hidden="true" />
-            Focus
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setGithubOpen(true)}>
-            <Rocket className="size-4" /> Host on the web
-          </Button>
-          {items.length > 0 && (
-            <Button size="sm" variant="outline" onClick={sync} disabled={pending}>
-              <Sparkles className="size-4" /> Sync evidence
+      <PageIntro
+        className="mb-8"
+        eyebrow="My career"
+        title="Your portfolio"
+        description="Manage the work you share. Published sites reflect your saved changes."
+        actions={
+          <>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wider ${
+                isPublished
+                  ? "border border-primary/40 bg-primary/10 text-primary"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              {isPublished ? "Published" : "Draft"}
+            </span>
+            <Button size="sm" variant="outline" onClick={togglePublishSite} disabled={pending}>
+              {isPublished ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              {isPublished ? "Unpublish" : "Publish"}
             </Button>
-          )}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={doExport}
-            disabled={pending || items.length === 0}
-          >
-            <Download className="size-4" /> Export
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => fileRef.current?.click()}
-            disabled={pending}
-          >
-            <Upload className="size-4" /> Import
-          </Button>
-          <input
-            ref={fileRef}
-            type="file"
-            accept="application/json,.json"
-            className="hidden"
-            onChange={onImportFile}
-          />
-          <Button size="sm" variant="outline" onClick={() => setDevOpen(true)}>
-            <Code2 className="size-4" /> API &amp; SDK
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setSettingsOpen(true)}>
-            <Settings className="size-4" /> Settings
-          </Button>
-        </div>
-      </header>
+            <Button
+              size="sm"
+              variant="outline"
+              nativeButton={false}
+              render={<a ref={previewGuide} href={publicUrl} target="_blank" rel="noreferrer" />}
+            >
+              <ExternalLink className="size-4" /> Preview site
+            </Button>
+            <details className="relative">
+              <summary className="cursor-pointer rounded-lg border border-border bg-card px-3 py-2 text-sm">
+                Portfolio tools
+              </summary>
+              <div className="fadi-glass absolute right-0 z-30 mt-2 flex w-72 max-w-[calc(100vw-2rem)] flex-col items-stretch gap-2 rounded-xl border p-3 shadow-lg">
+                <Button size="sm" variant="outline" onClick={() => setAudienceOpen(true)}>
+                  <Eye className="size-4" aria-hidden="true" />
+                  Who&apos;s looking
+                </Button>
+                {/* One direction, one claim — the antidote to a site that spans four. */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setFocusOpen(true)}
+                  disabled={items.length === 0}
+                >
+                  <Crosshair className="size-4" aria-hidden="true" />
+                  Focus
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setGithubOpen(true)}>
+                  <Rocket className="size-4" /> Host on the web
+                </Button>
+                {items.length > 0 && (
+                  <Button size="sm" variant="outline" onClick={sync} disabled={pending}>
+                    <Sparkles className="size-4" /> Sync evidence
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={doExport}
+                  disabled={pending || items.length === 0}
+                >
+                  <Download className="size-4" /> Export
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => fileRef.current?.click()}
+                  disabled={pending}
+                >
+                  <Upload className="size-4" /> Import
+                </Button>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="application/json,.json"
+                  className="hidden"
+                  onChange={onImportFile}
+                />
+                <Button size="sm" variant="outline" onClick={() => setDevOpen(true)}>
+                  <Code2 className="size-4" /> API &amp; SDK
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setSettingsOpen(true)}>
+                  <Settings className="size-4" /> Settings
+                </Button>
+              </div>
+            </details>
+          </>
+        }
+      />
 
       {/* PUBLISHED AND OUT OF DATE is worse than missing: a stale document is only the owner's
           problem, while a stale public page is a claim a stranger reads. Named, never acted on
           automatically — see lib/portfolio/freshness.ts. */}
       {drift.withdrawn.length + drift.reworded.length > 0 ? (
-        <div className="mb-6 flex items-start gap-3 border-y border-amber-500/30 bg-amber-500/5 p-4">
-          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-amber-500/10 text-amber-500">
+        <div className="mb-6 flex items-start gap-3 border-y border-warning/30 bg-warning/5 p-4">
+          <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-warning/10 text-warning">
             <History className="size-4" aria-hidden="true" />
           </span>
           <div className="min-w-0 space-y-1">
@@ -596,62 +618,24 @@ export function PortfolioManager({
       )}
 
       {items.length === 0 && (
-        <div className="mb-6 rounded-xl border border-primary/40 bg-primary/5 p-6">
-          <p className="text-lg font-semibold">Let&apos;s build your portfolio</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            No blank canvas — Fadi turns your career data into a site in a few clicks.
+        <div
+          className="mb-6 rounded-xl border border-border bg-card p-5 sm:p-6"
+          data-fadi-surface
+          data-fadi-reveal
+        >
+          <h2 className="text-xl font-medium tracking-tight">Start with work you want to share</h2>
+          <p className="mt-2 max-w-xl text-sm leading-relaxed text-muted-foreground">
+            Bring in projects and experience from your career record, then review each entry. You
+            can also add an item below. Preview before publishing.
           </p>
-          <ol className="mt-4 grid gap-3 sm:grid-cols-3">
-            <li className="rounded-lg border border-border bg-background/40 p-3">
-              <p className="text-sm font-medium">
-                <span className="text-primary">1.</span> Add your content
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Seed it from your Fadi evidence — projects, experience, skills.
-              </p>
-              <Button size="sm" onClick={seed} disabled={pending} className="mt-3">
-                {pending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Sparkles className="size-4" />
-                )}
-                Seed from evidence
-              </Button>
-            </li>
-            <li className="rounded-lg border border-border bg-background/40 p-3">
-              <p className="text-sm font-medium">
-                <span className="text-primary">2.</span> Pick a look
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Choose a template in Settings — Noir &amp; Gold, Aurora, or Minimal.
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => setSettingsOpen(true)}
-                className="mt-3"
-              >
-                <Settings className="size-4" /> Choose template
-              </Button>
-            </li>
-            <li className="rounded-lg border border-border bg-background/40 p-3">
-              <p className="text-sm font-medium">
-                <span className="text-primary">3.</span> Publish
-              </p>
-              <p className="mt-1 text-xs text-muted-foreground">
-                Go live at your handle — or export it to host on your own domain.
-              </p>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={togglePublishSite}
-                disabled={pending}
-                className="mt-3"
-              >
-                <Eye className="size-4" /> Publish site
-              </Button>
-            </li>
-          </ol>
+          <Button onClick={seed} disabled={pending} className="mt-5">
+            {pending ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Sparkles className="size-4" />
+            )}
+            Add from my record
+          </Button>
 
           {/* Seeding needs a CV on file. Rather than sending the user to Evidence (and
               from there to Profile), capture it here and retry the seed immediately —
@@ -722,13 +706,7 @@ export function PortfolioManager({
               onDragEnd={() => setDragId(null)}
               onDrop={() => onDropOn(item.id)}
               onEdit={() => setEditing(toForm(item))}
-              onDelete={() => {
-                const connected = Boolean(item.evidenceItemId);
-                const question = connected
-                  ? `Remove “${item.title}” from this portfolio? Its fact and proof stay in Evidence, and it will stay under Not shown until you undo that choice.`
-                  : `Delete “${item.title}”? Proof-bearing projects must be saved to Evidence first.`;
-                if (confirm(question)) run(() => deleteItem({ id: item.id }));
-              }}
+              onDelete={() => setDeleting(item)}
               onTogglePublish={() =>
                 run(() => setItemPublished({ id: item.id, published: !item.isPublished }))
               }
@@ -780,6 +758,83 @@ export function PortfolioManager({
             and host it for free on your own account.
           </p>
           <GithubPublishPanel isPublished={isPublished} />
+        </Modal>
+      )}
+      <ConfirmDialog
+        open={Boolean(deleting)}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+        title={deleting?.evidenceItemId ? "Remove from portfolio?" : "Delete portfolio item?"}
+        description={
+          deleting?.evidenceItemId
+            ? `Remove “${deleting.title}” from this portfolio? Its fact and proof stay in your career record; the item remains under Not shown.`
+            : `Delete “${deleting?.title ?? ""}”? This removes the portfolio-only item.`
+        }
+        confirmLabel={deleting?.evidenceItemId ? "Remove from portfolio" : "Delete item"}
+        destructive
+        busy={pending}
+        onConfirm={() => {
+          if (deleting) {
+            const id = deleting.id;
+            setDeleting(null);
+            run(() => deleteItem({ id }));
+          }
+        }}
+      />
+      {importChoice && (
+        <Modal
+          title={importChoice.replace ? "Replace current portfolio items?" : "Import portfolio"}
+          onClose={() => {
+            if (!pending) setImportChoice(null);
+          }}
+        >
+          <p className="text-sm text-muted-foreground">
+            {importChoice.replace
+              ? "This removes all current portfolio items and imports the file in their place. This cannot be undone here. Your canonical career record is separate."
+              : `Choose how to import “${importChoice.name}”. Adding keeps current items; replacing removes them.`}
+          </p>
+          {error && (
+            <p role="alert" className="mt-3 text-sm text-destructive">
+              {error}
+            </p>
+          )}
+          <div className="mt-5 flex flex-wrap justify-end gap-2">
+            <Button variant="ghost" disabled={pending} onClick={() => setImportChoice(null)}>
+              Cancel
+            </Button>
+            {importChoice.replace ? (
+              <>
+                <Button
+                  variant="outline"
+                  disabled={pending}
+                  onClick={() => setImportChoice({ ...importChoice, replace: false })}
+                >
+                  Back
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={pending}
+                  onClick={() => applyImport("replace")}
+                >
+                  Replace items
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="outline"
+                  disabled={pending}
+                  onClick={() => setImportChoice({ ...importChoice, replace: true })}
+                >
+                  Replace current items…
+                </Button>
+                <Button disabled={pending} onClick={() => applyImport("merge")}>
+                  Add to current items
+                </Button>
+              </>
+            )}
+          </div>
         </Modal>
       )}
     </div>

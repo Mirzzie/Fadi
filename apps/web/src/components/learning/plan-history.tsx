@@ -76,7 +76,7 @@ export function PlanHistory({
                       <p className="font-medium text-foreground">
                         {step.ordinal}. {step.title}
                         {step.status === "done" ? (
-                          <span className="ml-2 text-emerald-600">done</span>
+                          <span className="ml-2 text-success">done</span>
                         ) : null}
                       </p>
                       <p className="mt-0.5 whitespace-pre-line text-muted-foreground">

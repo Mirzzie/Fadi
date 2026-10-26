@@ -24,10 +24,10 @@ export default function DashboardError({
 
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-4 pt-24 text-center">
-      <h1 className="text-lg font-semibold">Something broke on our side</h1>
+      <h1 className="font-heading text-3xl font-medium tracking-tight">This page couldn’t load</h1>
       <p className="text-sm text-muted-foreground">
-        That&apos;s on us, not you. Your data is safe — try again, and if it keeps happening, sign
-        out and back in.
+        Try again before continuing. If you were editing, check the latest saved version when the
+        page returns.
       </p>
       <Button size="sm" onClick={reset}>
         <RotateCcw className="size-4" aria-hidden="true" />

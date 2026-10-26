@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { PageIntro } from "@/components/layout/page-intro";
 import { ActiveSessions } from "@/components/profile/active-sessions";
 import { ChangePasswordForm } from "@/components/profile/change-password-form";
 import { ProfileForm } from "@/components/profile/profile-form";
@@ -34,14 +35,11 @@ export default async function ProfilePage() {
   return (
     <AppShell>
       <div className="mx-auto max-w-3xl space-y-8 pb-12">
-        <header className="border-b border-border pb-8 pt-3">
-          <p className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Account</p>
-          <h1 className="font-heading text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Your profile.</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-            The facts Fadi uses when it reasons about your direction. Keep them current so advice
-            stays relevant.
-          </p>
-        </header>
+        <PageIntro
+          eyebrow="Account"
+          title="Your profile"
+          description="The starting facts for your direction, applications and practice. Keep them current so suggestions stay relevant."
+        />
 
         <ProfileForm
           email={user.email ?? ""}

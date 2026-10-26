@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createProfilesRepository } from "@careeros/database";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { PageIntro } from "@/components/layout/page-intro";
 import { UnifiedJobSearch } from "@/components/jobs/unified-job-search";
 import { JobsShell } from "@/components/jobs/jobs-shell";
 import { JobControlBar } from "@/components/jobs/job-control-bar";
@@ -114,16 +115,12 @@ export default async function JobsPage({
   return (
     <AppShell>
       <div className="workspace-page mb-6 pt-2">
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-          Opportunities
-        </p>
-        <h1 className="max-w-4xl font-heading text-3xl font-semibold tracking-tight sm:text-4xl">
-          Find your next role
-        </h1>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
-          Search by role, place or work mode. Compare listings with your career record.
-        </p>
-        <div className="mt-6 space-y-3 border-y border-border bg-card py-4">
+        <PageIntro
+          eyebrow="Opportunities"
+          title="Find your next role"
+          description="Search by role, place or work mode. Compare listings with your career record."
+        />
+        <div className="mt-6 space-y-3 rounded-xl border border-border bg-card p-4 sm:p-5">
           <UnifiedJobSearch
             activeRole={profile?.targetRole ?? null}
             selectedCountry={worldwide ? "any" : (getCountry(country)?.code ?? null)}
@@ -140,17 +137,17 @@ export default async function JobsPage({
             </summary>
             <div className="border-t border-border/60 pt-3">
               <JobControlBar
-              sources={sourcesHealth.sources}
-              // What each source actually put in front of them, after matching and filtering. A
-              // source's own pull count answers "did the API reply"; this answers "did it help".
-              onBoard={jobs.reduce<Record<string, number>>((counts, job) => {
-                for (const source of job.sources) counts[source] = (counts[source] ?? 0) + 1;
-                return counts;
-              }, {})}
-              lastRunAt={sourcesHealth.lastRunAt}
-              activeModes={modes}
-              activeTypes={types}
-              autoSearch={Boolean(prefs.autoSearch)}
+                sources={sourcesHealth.sources}
+                // What each source actually put in front of them, after matching and filtering. A
+                // source's own pull count answers "did the API reply"; this answers "did it help".
+                onBoard={jobs.reduce<Record<string, number>>((counts, job) => {
+                  for (const source of job.sources) counts[source] = (counts[source] ?? 0) + 1;
+                  return counts;
+                }, {})}
+                lastRunAt={sourcesHealth.lastRunAt}
+                activeModes={modes}
+                activeTypes={types}
+                autoSearch={Boolean(prefs.autoSearch)}
               />
             </div>
           </details>

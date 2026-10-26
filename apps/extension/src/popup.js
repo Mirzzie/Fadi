@@ -37,10 +37,10 @@ const connState = document.getElementById("connstate");
 function renderConnState(token) {
   if (token) {
     connState.textContent = "Connected to Fadi ✓";
-    connState.style.color = "#0f766e";
+    connState.style.color = "var(--success)";
   } else {
     connState.textContent = "Not connected — paste a connection code below.";
-    connState.style.color = "#777";
+    connState.style.color = "var(--muted-foreground)";
   }
 }
 

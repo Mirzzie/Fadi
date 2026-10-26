@@ -4,7 +4,9 @@ import { redirect } from "next/navigation";
 import { createMcpConnectionsRepository, createProfilesRepository } from "@careeros/database";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { PageIntro } from "@/components/layout/page-intro";
 import { AiProviderForm } from "@/components/settings/ai-provider-form";
+import { AppearanceSettings } from "@/components/settings/appearance-settings";
 import { AutoPrepToggle } from "@/components/settings/auto-prep-toggle";
 import { ConnectedAccounts } from "@/components/settings/connected-accounts";
 import { ConnectedTools } from "@/components/settings/connected-tools";
@@ -32,15 +34,13 @@ export default async function SettingsPage() {
   return (
     <AppShell>
       <div className="mx-auto max-w-3xl space-y-8 pb-12">
-        <header className="border-b border-border pb-8 pt-3">
-          <p className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Account</p>
-          <h1 className="font-heading text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Settings.</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground">
-            Choose how Fadi connects, prepares work and uses your own AI provider. Keys remain
-            encrypted at rest.
-          </p>
-        </header>
+        <PageIntro
+          eyebrow="Account"
+          title="Settings"
+          description="Set your appearance, connections and how Fadi prepares work. Review permissions before enabling actions that affect other services."
+        />
 
+        <AppearanceSettings />
         <AiProviderForm descriptors={PROVIDER_DESCRIPTORS} initial={settings} />
 
         <ConnectedTools

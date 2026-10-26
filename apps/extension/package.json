@@ -2,5 +2,9 @@
   "name": "@careeros/extension",
   "version": "0.1.0",
   "private": true,
-  "description": "Fadi browser extension (MV3, vanilla JS — no build step)."
+  "description": "Fadi browser extension (MV3, vanilla JS; checked-in appearance assets generated from the web design system).",
+  "scripts": {
+    "sync:appearance": "node scripts/sync-appearance.mjs"
+  },
+  "type": "module"
 }

@@ -17,22 +17,23 @@ import { UserMenu } from "./user-menu";
 export function MenuBar({ working = null }: { working?: string | null } = {}) {
   const { displayState } = useFadi();
   return (
-    <header className="sticky top-0 z-40 flex h-12 items-center justify-between border-b border-border bg-background/95 px-4 text-xs backdrop-blur-md duration-300 animate-in fade-in slide-in-from-top-2">
+    <header className="fadi-glass sticky top-0 z-40 flex h-12 items-center justify-between border-b px-3 text-xs sm:px-4">
       {/* Brand + live Fadi state */}
-      <div className="flex items-center gap-2">
+      <div className="flex min-w-0 flex-1 items-center gap-2">
         <FadiLogo className="size-5" />
-        <span className="font-semibold tracking-tight">Fadi</span>
+        <span className="hidden font-semibold tracking-tight sm:inline">Fadi</span>
         <FadiStateChip state={displayState} working={working} />
         <TrackSwitcher />
       </div>
 
       {/* Work controls only. Voice lives on the Fadi control; time lives in the OS. */}
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
         {/* ⌘K command spotlight */}
         <button
           type="button"
           onClick={() => window.dispatchEvent(new Event("fadi:command"))}
           title="Search or command (⌘K)"
+          aria-label="Search or command"
           className="flex h-7 items-center gap-2 border border-border bg-muted/30 px-2 font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
         >
           <Search className="size-3" aria-hidden="true" />
@@ -64,8 +65,8 @@ function FadiStateChip({ state, working }: { state: FadiState; working: string |
       type="button"
       onClick={() => openFadi()}
       title="Talk to Fadi"
-      aria-label={state === "ready" && !working ? "Fadi ready — open conversation" : undefined}
-      className="hidden items-center gap-1.5 px-0.5 text-muted-foreground hover:text-foreground sm:flex"
+      aria-label={`Fadi ${FADI_STATE_LABEL[state].toLowerCase()} — open conversation`}
+      className="flex min-h-8 min-w-8 items-center justify-center gap-1.5 rounded-md px-1 text-muted-foreground hover:bg-muted hover:text-foreground"
     >
       <span
         className={cn(
@@ -75,17 +76,19 @@ function FadiStateChip({ state, working }: { state: FadiState; working: string |
             : state === "blocked"
               ? "bg-destructive shadow-[0_0_6px_var(--color-destructive)]"
               : state === "waiting_for_approval"
-                ? "bg-amber-400 shadow-[0_0_6px_var(--color-amber-400,#fbbf24)] animate-pulse"
+                ? "bg-warning shadow-[0_0_6px_var(--warning)] animate-pulse"
                 : busy
                   ? "bg-primary shadow-[0_0_6px_var(--color-primary)] animate-pulse"
-                  : "bg-emerald-400 shadow-[0_0_6px_var(--color-emerald-400,#34d399)]"
+                  : "bg-success shadow-[0_0_6px_var(--success)]"
         )}
       />
       {/* What it is doing beats what it is. "Fadi active" on every screen of a product that
           runs plans is a light that is always on. */}
       {showLabel ? (
-        <span className="max-w-[16rem] truncate">
-          {state === "ready" && working ? `On: ${working}` : `Fadi ${FADI_STATE_LABEL[state].toLowerCase()}`}
+        <span className="hidden max-w-[16rem] truncate sm:inline">
+          {state === "ready" && working
+            ? `On: ${working}`
+            : `Fadi ${FADI_STATE_LABEL[state].toLowerCase()}`}
         </span>
       ) : null}
     </button>

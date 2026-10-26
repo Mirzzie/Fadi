@@ -63,7 +63,7 @@ export function AutoPrepRunner({
         </>
       ) : (
         <>
-          <Wand2 className="size-4 shrink-0 text-amber-500" aria-hidden="true" />
+          <Wand2 className="size-4 shrink-0 text-warning" aria-hidden="true" />
           <span>
             {message ?? "Auto-prep didn't finish — you can draft each document manually below."}
           </span>

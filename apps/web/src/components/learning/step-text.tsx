@@ -77,6 +77,7 @@ export function CommandBlock({
   typeable?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
   const [typed, setTyped] = useState(false);
   const canType = useCanTypeIntoLab() && typeable;
 
@@ -87,19 +88,20 @@ export function CommandBlock({
   }
 
   async function copy() {
+    setCopyError(false);
     try {
       await navigator.clipboard.writeText(code);
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // Clipboard can be refused (insecure origin, permissions); the text stays selectable.
+      setCopyError(true);
     }
   }
 
   return (
-    <div className="group overflow-hidden rounded-lg border border-border bg-zinc-950 text-zinc-100">
-      <div className="flex items-center justify-between border-b border-white/10 px-3 py-1">
-        <span className="font-mono text-[10px] uppercase tracking-wider text-zinc-400">
+    <div className="group overflow-hidden rounded-lg border border-border bg-muted text-foreground">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-1">
+        <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
           {lang ?? "command"}
         </span>
         <span className="flex items-center gap-1">
@@ -107,12 +109,12 @@ export function CommandBlock({
             <button
               type="button"
               onClick={type}
-              className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-zinc-300 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+              className="flex min-h-10 items-center gap-1 rounded px-2 text-xs text-muted-foreground hover:bg-background hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
               title="Types it into the machine's window that has focus. It does not press Enter."
             >
               {typed ? (
                 <>
-                  <Check className="size-3 text-emerald-400" aria-hidden="true" /> Typed
+                  <Check className="size-3 text-success" aria-hidden="true" /> Typed
                 </>
               ) : (
                 <>
@@ -124,12 +126,12 @@ export function CommandBlock({
           <button
             type="button"
             onClick={copy}
-            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] text-zinc-300 hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-emerald-400"
+            className="flex min-h-10 items-center gap-1 rounded px-2 text-xs text-muted-foreground hover:bg-background hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
             aria-label={copied ? "Copied" : "Copy command"}
           >
             {copied ? (
               <>
-                <Check className="size-3 text-emerald-400" aria-hidden="true" /> Copied
+                <Check className="size-3 text-success" aria-hidden="true" /> Copied
               </>
             ) : (
               <>
@@ -142,6 +144,11 @@ export function CommandBlock({
       <pre className="overflow-x-auto px-3 py-2.5 font-mono text-[13px] leading-relaxed">
         <code>{code}</code>
       </pre>
+      {copyError ? (
+        <p role="status" className="px-3 pb-3 text-sm text-destructive">
+          Clipboard access was refused. Select the command text and copy it manually.
+        </p>
+      ) : null}
     </div>
   );
 }

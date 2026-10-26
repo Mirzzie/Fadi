@@ -38,6 +38,7 @@ export function DictatableTextarea({
   return (
     <div className="space-y-2">
       <textarea
+        aria-label={label}
         ref={ref}
         className={className}
         value={value}

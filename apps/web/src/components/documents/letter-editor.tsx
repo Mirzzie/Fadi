@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { AiTellCheck } from "@/components/documents/ai-tell-check";
 import { ImproveBox } from "@/components/documents/improve-box";
 import { DocAdvisor } from "@/components/documents/doc-advisor";
@@ -32,7 +33,7 @@ import {
 } from "@/lib/documents/resume";
 
 const field =
-  "nice-scrollbar w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15";
+  "nice-scrollbar min-h-10 w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus:border-primary/40 focus:ring-2 focus:ring-primary/15";
 
 /**
  * Structured editor for the prose document kinds (cover letter / cold email /
@@ -60,6 +61,8 @@ export function LetterEditor({
 }) {
   const fields = LETTER_FIELDS[kind];
   const [title, setTitle] = useState(initialTitle);
+  const [templateToApply, setTemplateToApply] = useState<DocTemplate | null>(null);
+  const templateTrigger = useRef<HTMLButtonElement>(null);
   const [data, setData] = useState<LetterData>(() => parseLetter(initialContent, kind));
   const { status, markDirty, save: saveVersion } = useVersionedDocumentSave(id, initialVersion);
   const dirty = useRef(false);
@@ -91,7 +94,7 @@ export function LetterEditor({
   }
 
   function applyTemplate(t: DocTemplate) {
-    if (data.body.trim() && !window.confirm("Replace the current body with this template?")) return;
+    if (data.body.trim()) return setTemplateToApply(t);
     patch({ body: t.content });
   }
 
@@ -103,33 +106,37 @@ export function LetterEditor({
   }
 
   return (
-    <div className="flex h-[calc(100vh-9rem)] w-full flex-col gap-3">
+    <div className="flex w-full min-w-0 flex-col gap-3 lg:h-[calc(100dvh-9rem)]">
+      <h1 className="sr-only">{title || "Letter editor"}</h1>
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           <Link
             href="/dashboard/documents"
-            className="grid size-8 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="grid size-10 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
             aria-label="Back to documents"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
           </Link>
           <input
+            aria-label="Document title"
             value={title}
             onChange={(e) => {
               dirty.current = true;
               markDirty();
               setTitle(e.target.value);
             }}
-            className="rounded-md bg-transparent px-1 text-sm font-semibold outline-none focus:bg-accent/40"
+            className="h-10 min-w-0 flex-1 rounded-md bg-transparent px-1 text-sm font-semibold outline-none focus:bg-accent/40"
           />
           <DocumentSaveIndicator status={status} />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <DocumentHistoryLink id={id} />
           <select
             value={data.font ?? ""}
-            onChange={(e) => patch({ font: (e.target.value || undefined) as ResumeFontId | undefined })}
+            onChange={(e) =>
+              patch({ font: (e.target.value || undefined) as ResumeFontId | undefined })
+            }
             aria-label="Font"
             title="Font (ATS-safe options)"
             className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-primary/40"
@@ -143,7 +150,9 @@ export function LetterEditor({
           </select>
           <select
             value={data.fontSize ?? ""}
-            onChange={(e) => patch({ fontSize: (e.target.value || undefined) as ResumeFontSizeId | undefined })}
+            onChange={(e) =>
+              patch({ fontSize: (e.target.value || undefined) as ResumeFontSizeId | undefined })
+            }
             aria-label="Text size"
             title="Body text size"
             className="h-8 rounded-md border border-border bg-background px-2 text-xs outline-none focus:border-primary/40"
@@ -155,7 +164,11 @@ export function LetterEditor({
               </option>
             ))}
           </select>
-          <DocTemplatePicker kind={kind as DocKind} onPick={applyTemplate} />
+          <DocTemplatePicker
+            kind={kind as DocKind}
+            onPick={applyTemplate}
+            triggerRef={templateTrigger}
+          />
           <Button variant="outline" size="sm" onClick={exportDocx}>
             <Download className="size-4" aria-hidden="true" />
             DOCX
@@ -193,9 +206,9 @@ export function LetterEditor({
         ]}
       />
 
-      <div className="grid min-h-0 flex-1 gap-5 lg:grid-cols-2">
+      <div className="grid min-h-0 min-w-0 flex-1 gap-5 lg:grid-cols-2">
         {/* Live preview */}
-        <div className="nice-scrollbar min-h-0 overflow-y-auto rounded-xl border border-border/60 bg-white p-8 text-[13px] text-zinc-800 shadow-sm lg:p-10">
+        <div className="nice-scrollbar min-h-0 min-w-0 overflow-auto rounded-xl border border-border/60 bg-white p-5 text-[13px] text-zinc-800 shadow-sm sm:p-8 lg:p-10">
           <LetterPreview data={data} kind={kind} />
         </div>
 
@@ -205,19 +218,41 @@ export function LetterEditor({
             <Section title="Your details">
               <div className="grid gap-2 sm:grid-cols-2">
                 <Labeled label="Full name">
-                  <input className={field} value={data.sender.name} onChange={(e) => patchSender({ name: e.target.value })} />
+                  <input
+                    className={field}
+                    value={data.sender.name}
+                    onChange={(e) => patchSender({ name: e.target.value })}
+                  />
                 </Labeled>
                 <Labeled label="Email">
-                  <input className={field} value={data.sender.email} onChange={(e) => patchSender({ email: e.target.value })} />
+                  <input
+                    className={field}
+                    value={data.sender.email}
+                    onChange={(e) => patchSender({ email: e.target.value })}
+                  />
                 </Labeled>
                 <Labeled label="Phone">
-                  <input className={field} value={data.sender.phone} onChange={(e) => patchSender({ phone: e.target.value })} />
+                  <input
+                    className={field}
+                    value={data.sender.phone}
+                    onChange={(e) => patchSender({ phone: e.target.value })}
+                  />
                 </Labeled>
                 <Labeled label="Location">
-                  <input className={field} value={data.sender.location} onChange={(e) => patchSender({ location: e.target.value })} placeholder="Dublin, Ireland" />
+                  <input
+                    className={field}
+                    value={data.sender.location}
+                    onChange={(e) => patchSender({ location: e.target.value })}
+                    placeholder="Dublin, Ireland"
+                  />
                 </Labeled>
                 <Labeled label="Links">
-                  <input className={field} value={data.sender.links} onChange={(e) => patchSender({ links: e.target.value })} placeholder="LinkedIn · Portfolio" />
+                  <input
+                    className={field}
+                    value={data.sender.links}
+                    onChange={(e) => patchSender({ links: e.target.value })}
+                    placeholder="LinkedIn · Portfolio"
+                  />
                 </Labeled>
               </div>
             </Section>
@@ -225,7 +260,13 @@ export function LetterEditor({
 
           {fields.date ? (
             <Section title="Date">
-              <input className={field} value={data.date} onChange={(e) => patch({ date: e.target.value })} placeholder="13 June 2026" />
+              <input
+                className={field}
+                aria-label="Date"
+                value={data.date}
+                onChange={(e) => patch({ date: e.target.value })}
+                placeholder="13 June 2026"
+              />
             </Section>
           ) : null}
 
@@ -233,16 +274,33 @@ export function LetterEditor({
             <Section title="Recipient">
               <div className="grid gap-2 sm:grid-cols-2">
                 <Labeled label="Name">
-                  <input className={field} value={data.recipient.name} onChange={(e) => patchRecipient({ name: e.target.value })} placeholder="Hiring Manager" />
+                  <input
+                    className={field}
+                    value={data.recipient.name}
+                    onChange={(e) => patchRecipient({ name: e.target.value })}
+                    placeholder="Hiring Manager"
+                  />
                 </Labeled>
                 <Labeled label="Title">
-                  <input className={field} value={data.recipient.title} onChange={(e) => patchRecipient({ title: e.target.value })} />
+                  <input
+                    className={field}
+                    value={data.recipient.title}
+                    onChange={(e) => patchRecipient({ title: e.target.value })}
+                  />
                 </Labeled>
                 <Labeled label="Company">
-                  <input className={field} value={data.recipient.company} onChange={(e) => patchRecipient({ company: e.target.value })} />
+                  <input
+                    className={field}
+                    value={data.recipient.company}
+                    onChange={(e) => patchRecipient({ company: e.target.value })}
+                  />
                 </Labeled>
                 <Labeled label="Location">
-                  <input className={field} value={data.recipient.location} onChange={(e) => patchRecipient({ location: e.target.value })} />
+                  <input
+                    className={field}
+                    value={data.recipient.location}
+                    onChange={(e) => patchRecipient({ location: e.target.value })}
+                  />
                 </Labeled>
               </div>
             </Section>
@@ -250,18 +308,30 @@ export function LetterEditor({
 
           {fields.subject ? (
             <Section title={fields.subjectLabel}>
-              <input className={field} value={data.subject} onChange={(e) => patch({ subject: e.target.value })} />
+              <input
+                className={field}
+                aria-label={fields.subjectLabel}
+                value={data.subject}
+                onChange={(e) => patch({ subject: e.target.value })}
+              />
             </Section>
           ) : null}
 
           {fields.greeting ? (
             <Section title="Greeting">
-              <input className={field} value={data.greeting} onChange={(e) => patch({ greeting: e.target.value })} placeholder="Dear Hiring Manager," />
+              <input
+                className={field}
+                aria-label="Greeting"
+                value={data.greeting}
+                onChange={(e) => patch({ greeting: e.target.value })}
+                placeholder="Dear Hiring Manager,"
+              />
             </Section>
           ) : null}
 
           <Section title={fields.bodyLabel}>
             <textarea
+              aria-label={fields.bodyLabel}
               className={`${field} min-h-60`}
               value={data.body}
               onChange={(e) => patch({ body: e.target.value })}
@@ -271,17 +341,43 @@ export function LetterEditor({
 
           {fields.signOff ? (
             <Section title="Sign-off">
-              <input className={field} value={data.signOff} onChange={(e) => patch({ signOff: e.target.value })} placeholder="Sincerely," />
+              <input
+                className={field}
+                aria-label="Sign-off"
+                value={data.signOff}
+                onChange={(e) => patch({ signOff: e.target.value })}
+                placeholder="Sincerely,"
+              />
             </Section>
           ) : null}
 
           {fields.signature ? (
             <Section title="Signature">
-              <input className={field} value={data.signature} onChange={(e) => patch({ signature: e.target.value })} placeholder={data.sender.name || "Your name"} />
+              <input
+                className={field}
+                aria-label="Signature"
+                value={data.signature}
+                onChange={(e) => patch({ signature: e.target.value })}
+                placeholder={data.sender.name || "Your name"}
+              />
             </Section>
           ) : null}
         </div>
       </div>
+      <ConfirmDialog
+        open={Boolean(templateToApply)}
+        onOpenChange={(open) => {
+          if (!open) setTemplateToApply(null);
+        }}
+        title="Replace document text?"
+        description={`Use “${templateToApply?.name ?? ""}” in place of the current text. Existing saved revisions remain in History.`}
+        confirmLabel="Use template"
+        finalFocus={templateTrigger}
+        onConfirm={() => {
+          if (templateToApply) patch({ body: templateToApply.content });
+          setTemplateToApply(null);
+        }}
+      />
     </div>
   );
 }

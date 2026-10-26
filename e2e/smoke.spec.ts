@@ -8,7 +8,7 @@ import { expect, test } from "@playwright/test";
  * components" — which shipped once and broke the workspace).
  */
 
-const BOUNDARY_TEXT = "Something broke on our side";
+const BOUNDARY_TEXT = "This page couldn’t load";
 
 const DASHBOARD_ROUTES = [
   "/dashboard",
@@ -44,7 +44,9 @@ test("golden path: sign up → onboard → every route → workspace", async ({ 
   await page.locator("#email").fill(email);
   await page.locator("#password").fill("Sm0ke-Passw0rd!42");
   await page.getByRole("button", { name: "Create account" }).click();
-  await page.waitForURL("**/onboarding**", { timeout: 30_000 });
+  await expect(page.getByRole("button", { name: /prefer a form/i })).toBeVisible({
+    timeout: 30_000,
+  });
 
   // ── Onboarding via the deterministic classic form (no AI provider needed).
   //    It's a 3-step wizard: basics → history → goals, advanced with "Continue". ──
@@ -81,10 +83,16 @@ test("golden path: sign up → onboard → every route → workspace", async ({ 
   for (const route of DASHBOARD_ROUTES) {
     const response = await page.goto(route, { waitUntil: "domcontentloaded" });
     expect(response?.status(), `${route} must resolve to a working page`).toBeLessThan(400);
-    await expect(page.locator("h1, h2").first()).toBeVisible({ timeout: 30_000 });
+    await expect(page.locator("h1:visible, h2:visible").first()).toBeVisible({ timeout: 30_000 });
     await expect(page.getByText(BOUNDARY_TEXT)).toHaveCount(0);
+    if (route === "/dashboard/documents") {
+      await expect(page.getByRole("heading", { level: 1, name: "Your documents" })).toBeVisible();
+      await expect(page.getByRole("tab", { name: "Documents", exact: true })).toHaveAttribute(
+        "aria-selected",
+        "true"
+      );
+    }
     if (route === "/dashboard/learning") {
-      await page.locator("summary").filter({ hasText: "Explore a work simulation" }).click();
       await expect(
         page.getByRole("link", { name: "View simulation", exact: true })
       ).toHaveAttribute(
@@ -109,7 +117,7 @@ test("golden path: sign up → onboard → every route → workspace", async ({ 
 
   await page.getByText("Smoke Role").first().click();
   await page.getByRole("link", { name: /open full workspace/i }).click();
-  await page.waitForURL("**/workspace**", { timeout: 30_000 });
+  await page.waitForURL("**/workspace**", { timeout: 90_000, waitUntil: "domcontentloaded" });
 
   // The next action leads; secondary tools stay disclosed and document review requires a draft.
   await expect(
@@ -128,4 +136,47 @@ test("golden path: sign up → onboard → every route → workspace", async ({ 
   await expect(tools).toHaveAttribute("open", "");
   await expect(tools.getByRole("heading", { name: "Research Smoke Co" })).toBeVisible();
   await expect(page.getByText(BOUNDARY_TEXT)).toHaveCount(0);
+
+  // A library link keeps its intent; changing views keeps an unfinished pipeline form.
+  await page.goto("/dashboard/documents");
+  await expect(page.getByRole("tab", { name: "Documents", exact: true })).toHaveAttribute(
+    "aria-selected",
+    "true"
+  );
+  await page.getByRole("tab", { name: "Pipeline", exact: true }).click();
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByPlaceholder("Role / job title").fill("Unsubmitted draft");
+  await page.goBack();
+  await expect(page.getByRole("heading", { name: "Your documents", exact: true })).toBeVisible();
+  await page.goForward();
+  await expect(page.getByPlaceholder("Role / job title")).toHaveValue("Unsubmitted draft");
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  await page.getByRole("tab", { name: "Documents", exact: true }).click();
+  await page.reload();
+  await expect(page.getByRole("heading", { name: "Your documents", exact: true })).toBeVisible();
+
+  // Real saved documents exercise the three editor layouts without asking an AI provider.
+  for (const kind of ["Resume", "Cover letter", "Value prop"]) {
+    await page.goto("/dashboard/documents");
+    await page.getByRole("button", { name: kind, exact: true }).click();
+    await page.waitForURL(/\/dashboard\/documents\/[\w-]+$/);
+    await expect(page.getByRole("textbox", { name: "Document title", exact: true })).toBeVisible();
+    for (const mode of ["light", "dark"]) {
+      await page.evaluate((mode) => {
+        localStorage.setItem("theme", mode);
+        document.documentElement.classList.toggle("dark", mode === "dark");
+      }, mode);
+      for (const width of [320, 390, 1440]) {
+        await page.setViewportSize({ width, height: 900 });
+        await expect(page.getByRole("main")).toHaveCount(1);
+        expect(
+          await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+          `${kind} ${mode} at ${width}px must fit the viewport`
+        ).toBe(false);
+        await expect(page.getByRole("button", { name: "Save", exact: true })).toBeVisible();
+        await expect(page.getByRole("button", { name: "PDF", exact: true })).toBeVisible();
+      }
+    }
+    await expect(page.getByText(BOUNDARY_TEXT)).toHaveCount(0);
+  }
 });

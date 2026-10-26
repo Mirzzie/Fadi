@@ -24,17 +24,17 @@ const steps = [
   {
     title: "Career direction",
     aiCopy:
-      "First, tell me who you are and what role you want to move toward. I will use this to judge readiness.",
+      "Start with the role and location you want to explore. You can change this direction later.",
   },
   {
     title: "Profile evidence",
     aiCopy:
-      "Now the career evidence I'll reason from. Your LinkedIn is the full record — paste it or your profile URL. A resume is optional and is often tailored to one role, so I treat LinkedIn as the source of truth.",
+      "Add the experience you want Fadi to work from. Bring a CV, profile text or your own notes; you can correct your career record later.",
   },
   {
     title: "Career goals",
     aiCopy:
-      "Finally, describe what you want Fadi to optimize for. Your goals will shape the first dashboard recommendations.",
+      "Describe what matters to you in your next move. These goals help shape the initial recommendations.",
   },
 ];
 
@@ -175,10 +175,12 @@ export function OnboardingForm() {
       {activeStep === 1 ? (
         <div className="space-y-4">
           <FieldError message={form.formState.errors.linkedInProfile?.message}>
-            <Label htmlFor="linkedin-profile">Career history — LinkedIn (your source of truth)</Label>
+            <Label htmlFor="linkedin-profile">
+              Career history — profile text or your own notes
+            </Label>
             <Textarea
               id="linkedin-profile"
-              placeholder="Paste your LinkedIn About + experience (the full record), or your profile URL..."
+              placeholder="Describe your roles, responsibilities and projects, or paste profile text…"
               rows={5}
               {...form.register("linkedInProfile")}
             />

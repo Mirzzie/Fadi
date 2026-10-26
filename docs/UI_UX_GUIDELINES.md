@@ -1,7 +1,12 @@
 # Fadi UI and UX guidelines
 
 **Status:** Current product standard for every new or changed surface
-**Updated:** 19 October 2026
+**Updated:** 26 October 2026 (capability seam and owner-selected visual direction)
+
+The owner-selected Conversion/Mara Voss facelift is implemented on
+`release/ui-review-20261026`, based on current main plus the reviewed facelift and nested-surface fixes. The capability rendering
+contract must reuse its shared components and design tokens, not introduce a parallel aesthetic.
+This candidate is not promoted to main and does not claim every surface is accepted.
 
 Fadi should feel like one calm, capable career partner guiding one career journey. A screen is
 successful when a person can answer three questions without learning Fadi's architecture:
@@ -32,20 +37,20 @@ Do not average the four styles. A Fadi screen should look and feel closest to Pi
 like Paperclip, speak in Fadi's career language, and use UniMad only to check that the job-seeker
 journey is complete.
 
-| Reference | Use in Fadi | Do not copy |
-|---|---|---|
-| Paperclip | Goal-aligned work, one attention queue, work threads containing activity and decisions, persistent status, inline approvals, traceable execution | Org charts, agent employees, budgets, ticket administration, dense operator dashboards |
-| Pipecat | One live multimodal session, explicit listening/thinking/speaking/acting states, natural turn detection, interruption, typed screen commands, cancellable progress | Provider selectors, pipeline internals, developer controls, an always-on microphone |
-| UniMad | One profile grounding the job-search journey, low-clutter presentation, role positioning before documents, discovery connected to applications and interviews | A new UniBoard destination, visible specialist-agent topology, ATS scores presented as truth, marketing and coaching funnels inside the product |
-| Current Fadi | Four human destinations, career direction, canonical career record and trustworthy evidence | Card walls, infrastructure-first controls, duplicate conductors, raw logs as the experience |
+| Reference    | Use in Fadi                                                                                                                                                        | Do not copy                                                                                                                                     |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Paperclip    | Goal-aligned work, one attention queue, work threads containing activity and decisions, persistent status, inline approvals, traceable execution                   | Org charts, agent employees, budgets, ticket administration, dense operator dashboards                                                          |
+| Pipecat      | One live multimodal session, explicit listening/thinking/speaking/acting states, natural turn detection, interruption, typed screen commands, cancellable progress | Provider selectors, pipeline internals, developer controls, an always-on microphone                                                             |
+| UniMad       | One profile grounding the job-search journey, low-clutter presentation, role positioning before documents, discovery connected to applications and interviews      | A new UniBoard destination, visible specialist-agent topology, ATS scores presented as truth, marketing and coaching funnels inside the product |
+| Current Fadi | Four human destinations, career direction, canonical career record and trustworthy evidence                                                                        | Card walls, infrastructure-first controls, duplicate conductors, raw logs as the experience                                                     |
 
 The references support these choices:
 
 - Paperclip presents work as goal-aligned tasks with conversations, activity and decisions attached
-to the task, and centralises human decisions instead of scattering them across pages.
+  to the task, and centralises human decisions instead of scattering them across pages.
 - Pipecat separates the voice conversation from a UI worker that receives screen context and emits
-typed UI commands. Its turn detection and interruption model treat a pause as distinct from the end
-of a person's turn.
+  typed UI commands. Its turn detection and interruption model treat a pause as distinct from the end
+  of a person's turn.
 
 Sources: [Paperclip](https://paperclip.ing/), [Paperclip tasks](https://docs.paperclip.ing/guides/day-to-day/issues/),
 [Paperclip decisions](https://docs.paperclip.ing/guides/day-to-day/decisions/),
@@ -81,19 +86,21 @@ approval store or activity log.
 
 Use the navigation source in `apps/web/src/components/os/navigation.ts`:
 
-| Destination | User question | Areas |
-|---|---|---|
-| Today | What matters now? | Today, full picture, career report |
-| Opportunities | Where can I go and what is happening? | Roles, applications, people |
-| Practice | What should I learn, build, or rehearse? | Learning, interview practice |
-| My career | What is true about me and what do I share? | Record, documents, portfolio, directions |
+| Destination   | User question                              | Areas                                    |
+| ------------- | ------------------------------------------ | ---------------------------------------- |
+| Today         | What matters now?                          | Today, full picture, career report       |
+| Opportunities | Where can I go and what is happening?      | Roles, applications, people              |
+| Practice      | What should I learn, build, or rehearse?   | Learning, interview practice             |
+| My career     | What is true about me and what do I share? | Record, documents, portfolio, directions |
 
 Profile and Settings belong to the account menu. Machines, permissions, provider health, audit
 events and raw logs are contextual or advanced controls.
 
-The four destinations remain visible. Desktop may use a slim, collapsible left rail when this
-improves scanning; mobile uses four labelled bottom destinations. Lab focus mode may collapse
-navigation so it never covers the remote desktop, terminal or primary action.
+The owner-selected navigation is the same compact, hideable four-destination bottom dock on desktop
+and mobile. Do not add a competing left rail or destination tabs to the top utility bar. Lab focus
+mode may collapse navigation so it never covers the remote desktop, terminal or primary action.
+Capabilities do not add top-level navigation independently; the shell projects the user's composition.
+Reserve space for the dock while visible and keep its reveal control keyboard accessible.
 
 ## Product shell
 
@@ -188,13 +195,13 @@ needs evidence that it represents a distinct user decision.
 One object has one authoritative state and one conductor. Views may project it, but must not own
 separate polling, readiness, approval or completion logic.
 
-| Concept | Authority | Projections |
-|---|---|---|
-| Work progress | Work kernel and executions | Today, relevant workspace, Fadi presence |
-| Human decisions | Shared attention/approval record | Inline action, Today queue, shell count |
-| Career truth | Canonical career record and history | Résumé, portfolio, interview, public campaign |
-| Lab readiness | Project conductor and observed checks | Next action, compact Environment line |
-| Fadi live state | Shared agent session | Shell, orb, active work surface |
+| Concept         | Authority                             | Projections                                   |
+| --------------- | ------------------------------------- | --------------------------------------------- |
+| Work progress   | Work kernel and executions            | Today, relevant workspace, Fadi presence      |
+| Human decisions | Shared attention/approval record      | Inline action, Today queue, shell count       |
+| Career truth    | Canonical career record and history   | Résumé, portfolio, interview, public campaign |
+| Lab readiness   | Project conductor and observed checks | Next action, compact Environment line         |
+| Fadi live state | Shared agent session                  | Shell, orb, active work surface               |
 
 A projection never silently repairs or overwrites its source.
 
@@ -371,6 +378,35 @@ They are not the primary Evidence page experience.
 
 ## Visual system
 
+### Owner-requested Conversion reference — 21 October 2026
+
+The owner additionally selected [Conversion](https://conversion.framer.media/) to give the
+public-facing experience more warmth and character. For the landing page, adapt its focused
+composition, restrained coral accent, editorial serif emphasis, soft horizon light and compact
+FAQ disclosure. This is an explicit brand-moment exception to the routine-work decoration rules
+below, not permission to turn dashboards, editors or labs into marketing pages.
+
+Keep Pipecat's live-surface discipline and Paperclip's work organisation. Preserve the owner's
+four-destination hideable bottom dock; do not reintroduce destination tabs in the top bar.
+Conversion's marketing navigation is not an authenticated app-shell pattern.
+
+The reference's coral is `#ff4533`. Use a contrasting dark foreground for small text on this
+colour, and a darker coral foreground in light mode. Its observed typography is Satoshi plus
+Instrument Serif. The initial adaptation retained Inter; the composition pass uses self-hosted
+Mona Sans (also observed on Mara Voss) plus Instrument Serif editorial accents and JetBrains Mono
+for identifiers. This deliberately does not claim Satoshi and Mona Sans are identical faces.
+The reference remained dark under an emulated light preference: Fadi must supply a separately
+tested light counterpart and respect its existing explicit theme selection.
+
+Do not copy template testimonials, client counts, client logos, imagery or outcome promises.
+Illustrative product previews must say they are examples, not the person's account state.
+
+The additional [Mara Voss reference](https://diligent-tetragon-837366.framer.app/) contributes
+warm layered surfaces, compact translucent navigation and brief hover transitions. REA observed
+14px navigation blur and roughly 150ms transitions. Its Bone/Tangerine/Ink backdrop selector is
+not evidence of automatic light/dark support. Do not transfer its huge portfolio typography,
+portrait composition or continuous decorative motion to task screens.
+
 ### Primary direction: Pipecat
 
 The interface uses Pipecat's visual discipline as its main reference:
@@ -403,18 +439,47 @@ Do not copy Paperclip's agent-company dashboard density, org chart, budgets or a
 
 Fadi retains:
 
-- a Pipecat-inspired indigo signal family on zinc neutrals, with restrained yellow reserved for attention;
+- Ember, Iris and Cobalt palettes, each with Light/Dark/System behaviour;
+- Mona Sans with Instrument Serif editorial accents and JetBrains Mono for identifiers;
 - the four career destinations;
 - approachable career language;
 - the Fadi presence mark, integrated into the shell rather than floating over work;
 - dark focus mode where it improves labs, terminals and live interviews;
-- light and dark themes with the same hierarchy and contrast.
+- Light, Dark and Follow system modes with the same hierarchy and contrast.
 
-Existing gradients, aurora backgrounds, glass panels, large corner radii, glowing card borders and
-floating navigation are legacy patterns unless a specific brand moment justifies them. They are not
-the default visual system.
+The owner's [Conversion](https://conversion.framer.media/) and
+[Mara Voss](https://diligent-tetragon-837366.framer.app/) references add warm lighting, restrained
+glass chrome, a palette-aware pointer trail and finite entrance/hover/panel motion. Use the shared
+facelift implementations and accessibility fallbacks; do not copy template branding, testimonials
+or outcome claims. Keep editing, assessments, approvals and lab content readable and opaque.
+Capabilities cannot ship fonts, colours, CSS, animations or alternate navigation in their descriptor.
+
+`apps/web/src/app/appearance.css` owns palette and surface tokens, including public portfolio
+and export aliases. Browser-local preferences use the existing theme key plus one palette key;
+they are not account-synchronised or published as the portfolio owner's branding. Settings and
+the public appearance disclosure use the same preference implementation.
+
+Subtle glass belongs to navigation and overlays, with opaque fallbacks for unsupported blur,
+reduced transparency, high contrast and forced colours. Editors, assessments, approvals and lab
+work remain opaque. Avoid glowing card borders, repeating background grids and oversized radii.
 
 ### Component grammar
+
+Use `PageIntro` for account and work-index headings: one visible h1, a bounded description and
+optional contextual actions. Keep custom editorial composition on Today, Practice and the public
+landing page. The shell owns the main landmark and horizontal gutter; its child pages must not
+add another main or double the gutter. Routine work indexes use a 74rem maximum; document and
+lab workspaces retain their wider task-specific containers.
+
+Shared fields and standard buttons are 40px high, with 44px minimum targets on coarse pointers.
+Small desktop toolbar actions may use the compact button size. Editor toolbars wrap instead of
+overflowing; mobile editors use normal document flow rather than forcing nested viewport-height
+scroll regions. Preserve paper-template colours in exported documents and the independent root
+error fallback: these have different rendering constraints from application chrome.
+
+Contextual Pipeline/Documents views belong to the URL (`view=documents`), with browser Back and
+Forward support. Keep inactive panels mounted to preserve local drafts, while excluding their
+hidden controls from orb guidance. These are work-local views, not top-level destination tabs.
 
 - Prefer one bounded work surface over several rounded cards.
 - Use separators and spacing before adding containers.
@@ -425,12 +490,63 @@ the default visual system.
 - Use semantic colours for success, caution, danger and blocked state.
 - Keep colour, type, spacing, radius, shadow and motion in one token source.
 
-Hierarchy comes from structure, typography and whitespace. Glass, glow, animated grids and
-holographic decoration are limited to rare brand moments and Fadi presence. They do not wrap routine
-content or compete with state and action.
+Hierarchy comes from structure, typography and whitespace. Shared lighting/material/motion adds
+continuity without obscuring state or actions. Do not add repeating grids, uncontrolled ambient
+effects or a second assistant. Respect reduced motion, touch, contrast and focused-work behaviour.
+
+### Content follows the product contract
+
+Describe the current direction, applications, practice, career record and outcomes concretely.
+The Adaptive Career Loop is the wider direction, not permission to advertise unfinished research,
+strategy, continuous monitoring or automated eligibility decisions as available. Separate current
+capability from planned capability. Keep person-stated choices distinct from observed evidence and
+verified checks; do not flatten them into one score. Avoid guaranteed jobs, universal eligibility,
+"nothing invented", "always working" or "nothing leaves" claims without enforceable evidence.
 
 Motion has named tokens and a purpose: orient, acknowledge or show continuity. Respect reduced
 motion. Do not use ambient animation around urgent decisions, text entry or remote desktops.
+
+### Approved capability templates
+
+Capability surfaces use the shared shell/template catalog. A template owns hierarchy, keyboard
+behaviour, focus, responsive density, theme and motion; capability data cannot override them.
+One current work context has one primary action and one completion review. A configurable workspace
+may contain several bounded regions without becoming a wall of equal actions or independent stores.
+Keep stable entity/work deep links and the existing work, permission and evidence authorities.
+
+Reflection is optional private work, not a compulsory mood card above every screen. Declining it
+does not mark a task incomplete, erase evidence, alter strategy or imply a conclusion. Its sensitive
+content stays out of ordinary screen-context capture and career exports without a specific grant.
+
+### Reference motion rollout — owner request, 26 October 2026
+
+The owner requested the Conversion/Mara Voss effects throughout Fadi, not solely on the landing
+page. `motion.css` owns the shared timing/easing for surface entrances, controls, menus and dialogs.
+Use one surface-entry mechanism rather than stacking a route transition and a card transition on
+the same content. `SurfaceEffects` provides viewport entrances and pointer lighting across shared
+intros/cards and explicitly marked editorial regions. Content remains readable when JavaScript
+or an observer is unavailable; entering a viewport never changes work status.
+
+The 16px palette-aware trailing dot is decorative and pointer-transparent; the native pointer stays
+visible. It is not another assistant or the orb guide. Stop it while typing, scrolling, in focused
+lab/simulation workspaces, on touch, or when reduced motion is requested. Reduced motion cancels
+active decorative animations. High contrast/forced colours and printing omit the trail and lighting.
+Do not mutate streamed React content attributes for animation: native animation effects and a
+private stylesheet avoid introducing hydration differences.
+
+Portfolio and application dialogs reuse the shared dialog primitive for naming, focus containment,
+Escape and return focus. Long portfolio forms retain a visible header and action footer. Labels
+must identify their actual fields. Inactive mounted work tabs must close their portals while
+preserving the underlying local draft; the URL remains the view authority.
+
+### Contextual orb guidance
+
+Guidance is explicitly requested through **Show me**. Reposition the existing orb beside an
+application-registered target; never add a second assistant or replace the person's cursor.
+Keep the target clickable, its action unchanged and Stop/Escape available. Highlighting or
+dismissing guidance never completes work. Target removal, disabling, hiding or leaving the visible
+viewport cancels the presentation. Reduced motion removes travel. The first slice is local UI
+guidance, not a new model-command capability or an automatic cross-route tour.
 
 ## Content and feedback
 

@@ -17,16 +17,28 @@ const KINDS: Array<{ id: ReviewableKind; label: string }> = [
 ];
 
 const VERDICT: Record<ReviewVerdict, { label: string; chip: string; dot: string }> = {
-  critical: { label: "Critical", chip: "text-rose-300 border-rose-500/40 bg-rose-500/10", dot: "bg-rose-400" },
-  reframe: { label: "Reframe", chip: "text-amber-300 border-amber-500/40 bg-amber-500/10", dot: "bg-amber-400" },
-  strength: { label: "Strength", chip: "text-emerald-300 border-emerald-500/40 bg-emerald-500/10", dot: "bg-emerald-400" },
-  advantage: { label: "Advantage", chip: "text-sky-300 border-sky-500/40 bg-sky-500/10", dot: "bg-sky-400" },
+  critical: {
+    label: "Critical",
+    chip: "text-destructive border-destructive/40 bg-destructive/10",
+    dot: "bg-destructive",
+  },
+  reframe: {
+    label: "Reframe",
+    chip: "text-warning border-warning/40 bg-warning/10",
+    dot: "bg-warning",
+  },
+  strength: {
+    label: "Strength",
+    chip: "text-success border-success/40 bg-success/10",
+    dot: "bg-success",
+  },
+  advantage: { label: "Advantage", chip: "text-info border-info/40 bg-info/10", dot: "bg-info" },
 };
 
 const DECISION: Record<CvReview["hireProbability"]["decision"], { label: string; chip: string }> = {
-  shortlist: { label: "Shortlist", chip: "text-emerald-300 border-emerald-500/40 bg-emerald-500/10" },
-  maybe: { label: "Maybe pile", chip: "text-amber-300 border-amber-500/40 bg-amber-500/10" },
-  bin: { label: "Bin", chip: "text-rose-300 border-rose-500/40 bg-rose-500/10" },
+  shortlist: { label: "Shortlist", chip: "text-success border-success/40 bg-success/10" },
+  maybe: { label: "Maybe pile", chip: "text-warning border-warning/40 bg-warning/10" },
+  bin: { label: "Bin", chip: "text-destructive border-destructive/40 bg-destructive/10" },
 };
 
 /**
@@ -110,7 +122,12 @@ export function CvReviewPanel({
           <PenLine className="size-4 text-primary" aria-hidden="true" />
           <h2 className="text-sm font-semibold">Red-pen review</h2>
         </div>
-        <Button size="sm" variant={review ? "outline" : "default"} onClick={run} disabled={pending || !hasJd}>
+        <Button
+          size="sm"
+          variant={review ? "outline" : "default"}
+          onClick={run}
+          disabled={pending || !hasJd}
+        >
           {pending ? "Working…" : review ? "Re-review" : "Review like a recruiter"}
         </Button>
       </div>
@@ -127,7 +144,7 @@ export function CvReviewPanel({
               "rounded-full border px-3 py-1 text-xs font-medium transition-colors",
               kind === k.id
                 ? "border-primary/40 bg-primary/15 text-primary"
-                : "border-border text-muted-foreground hover:text-foreground",
+                : "border-border text-muted-foreground hover:text-foreground"
             )}
           >
             {k.label}
@@ -137,23 +154,26 @@ export function CvReviewPanel({
 
       {!hasJd ? (
         <p className="mt-2 text-sm text-muted-foreground">
-          Add the job description and I&apos;ll mark up each document section by section, the way the
-          hiring manager for this exact role would — no sugar-coating.
+          Add the job description and I&apos;ll mark up each document section by section, the way
+          the hiring manager for this exact role would — no sugar-coating.
         </p>
       ) : !review && !error ? (
         <p className="mt-2 text-sm text-muted-foreground">
-          A senior recruiter&apos;s written markup of the {KINDS.find((k) => k.id === kind)?.label.toLowerCase()}{" "}
-          you&apos;d send here: what the JD demands, what yours actually says, the gap, and the rewrite.
-          Blunt on purpose — then one click folds the fixes into a fresh draft.
+          A senior recruiter&apos;s written markup of the{" "}
+          {KINDS.find((k) => k.id === kind)?.label.toLowerCase()} you&apos;d send here: what the JD
+          demands, what yours actually says, the gap, and the rewrite. Blunt on purpose — then one
+          click folds the fixes into a fresh draft.
         </p>
       ) : null}
 
       {error ? (
-        <p className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-sm">{error}</p>
+        <p className="mt-2 rounded-md border border-warning/40 bg-warning/10 p-2 text-sm">
+          {error}
+        </p>
       ) : null}
       {applied ? (
-        <p className="mt-2 flex items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 p-2 text-sm">
-          <Check className="size-4 text-emerald-400" aria-hidden="true" /> {applied}
+        <p className="mt-2 flex items-center gap-1.5 rounded-md border border-success/40 bg-success/10 p-2 text-sm">
+          <Check className="size-4 text-success" aria-hidden="true" /> {applied}
         </p>
       ) : null}
 
@@ -165,10 +185,20 @@ export function CvReviewPanel({
               {review.atsScore}
               <span className="text-sm text-muted-foreground">/100 JD alignment</span>
             </span>
-            <span className={cn("rounded-full border px-2.5 py-0.5 text-xs font-medium", DECISION[review.hireProbability.decision].chip)}>
+            <span
+              className={cn(
+                "rounded-full border px-2.5 py-0.5 text-xs font-medium",
+                DECISION[review.hireProbability.decision].chip
+              )}
+            >
               {DECISION[review.hireProbability.decision].label}
             </span>
-            <Button size="sm" className="ml-auto" onClick={applyFixes} disabled={pending || Boolean(applied)}>
+            <Button
+              size="sm"
+              className="ml-auto"
+              onClick={applyFixes}
+              disabled={pending || Boolean(applied)}
+            >
               <Wand2 className="size-3.5" aria-hidden="true" />
               {pending ? "Redrafting…" : applied ? "Fixes applied" : "Apply fixes → redraft"}
             </Button>
@@ -187,7 +217,10 @@ export function CvReviewPanel({
               <p className="text-xs font-medium text-muted-foreground">Missing JD keywords</p>
               <div className="flex flex-wrap gap-1.5">
                 {review.missingKeywords.map((k, i) => (
-                  <span key={i} className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs text-amber-200">
+                  <span
+                    key={i}
+                    className="rounded-md border border-warning/40 bg-warning/10 px-2 py-0.5 text-xs text-warning"
+                  >
                     {k}
                   </span>
                 ))}
@@ -212,24 +245,49 @@ export function CvReviewPanel({
                       {s.name}
                     </span>
                     <span className="flex items-center gap-2">
-                      <span className={cn("rounded-full border px-2 py-0.5 text-[0.65rem] font-medium", v.chip)}>{v.label}</span>
-                      <ChevronDown className={cn("size-4 text-muted-foreground transition-transform", open && "rotate-180")} aria-hidden="true" />
+                      <span
+                        className={cn(
+                          "rounded-full border px-2 py-0.5 text-[0.65rem] font-medium",
+                          v.chip
+                        )}
+                      >
+                        {v.label}
+                      </span>
+                      <ChevronDown
+                        className={cn(
+                          "size-4 text-muted-foreground transition-transform",
+                          open && "rotate-180"
+                        )}
+                        aria-hidden="true"
+                      />
                     </span>
                   </button>
                   {open ? (
                     <div className="space-y-2.5 border-t px-3 py-2.5 text-sm">
                       {s.jdDemands ? (
-                        <p><span className="text-xs font-medium text-muted-foreground">What the JD demands:</span> {s.jdDemands}</p>
+                        <p>
+                          <span className="text-xs font-medium text-muted-foreground">
+                            What the JD demands:
+                          </span>{" "}
+                          {s.jdDemands}
+                        </p>
                       ) : null}
                       {s.cvSays ? (
-                        <p className="text-muted-foreground"><span className="text-xs font-medium">Yours says:</span> {s.cvSays}</p>
+                        <p className="text-muted-foreground">
+                          <span className="text-xs font-medium">Yours says:</span> {s.cvSays}
+                        </p>
                       ) : null}
                       {s.diagnosis ? (
-                        <p><span className="text-xs font-medium text-rose-300">Diagnosis:</span> {s.diagnosis}</p>
+                        <p>
+                          <span className="text-xs font-medium text-destructive">Diagnosis:</span>{" "}
+                          {s.diagnosis}
+                        </p>
                       ) : null}
                       {s.rewrite ? (
-                        <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-2.5">
-                          <p className="text-xs font-medium text-emerald-300">Recruiter rewrite (your content, sharpened)</p>
+                        <div className="rounded-md border border-success/30 bg-success/5 p-2.5">
+                          <p className="text-xs font-medium text-success">
+                            Recruiter rewrite (your content, sharpened)
+                          </p>
                           <p className="mt-1 whitespace-pre-wrap text-foreground/90">{s.rewrite}</p>
                         </div>
                       ) : null}
@@ -240,21 +298,25 @@ export function CvReviewPanel({
             })}
           </div>
 
-          {(review.topCriticalFixes.length > 0 || review.quickWins.length > 0) ? (
+          {review.topCriticalFixes.length > 0 || review.quickWins.length > 0 ? (
             <div className="grid gap-3 sm:grid-cols-2">
               {review.topCriticalFixes.length > 0 ? (
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-rose-300">Must fix before sending</p>
+                  <p className="text-xs font-medium text-destructive">Must fix before sending</p>
                   <ol className="list-inside list-decimal space-y-0.5 text-sm text-foreground/90">
-                    {review.topCriticalFixes.map((f, i) => (<li key={i}>{f}</li>))}
+                    {review.topCriticalFixes.map((f, i) => (
+                      <li key={i}>{f}</li>
+                    ))}
                   </ol>
                 </div>
               ) : null}
               {review.quickWins.length > 0 ? (
                 <div className="space-y-1">
-                  <p className="text-xs font-medium text-emerald-300">Quick wins</p>
+                  <p className="text-xs font-medium text-success">Quick wins</p>
                   <ol className="list-inside list-decimal space-y-0.5 text-sm text-foreground/90">
-                    {review.quickWins.map((f, i) => (<li key={i}>{f}</li>))}
+                    {review.quickWins.map((f, i) => (
+                      <li key={i}>{f}</li>
+                    ))}
                   </ol>
                 </div>
               ) : null}
@@ -262,9 +324,9 @@ export function CvReviewPanel({
           ) : null}
 
           <p className="text-xs text-muted-foreground">
-            Rewrites reshape only what&apos;s genuinely yours — fill every [ADD REAL NUMBER] with your real
-            figure before sending. &ldquo;Apply fixes&rdquo; redrafts the document with this markup folded in;
-            it lands in the documents list above for your final edit.
+            Rewrites reshape only what&apos;s genuinely yours — fill every [ADD REAL NUMBER] with
+            your real figure before sending. &ldquo;Apply fixes&rdquo; redrafts the document with
+            this markup folded in; it lands in the documents list above for your final edit.
           </p>
         </div>
       ) : null}

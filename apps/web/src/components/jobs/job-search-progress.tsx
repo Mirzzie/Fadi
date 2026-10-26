@@ -79,8 +79,8 @@ export function JobSearchProgress({ status }: { status: SyncProgress | null }) {
         running
           ? "border-primary/30 bg-primary/5 text-foreground"
           : failed || partial
-            ? "border-amber-500/30 bg-amber-500/5 text-amber-800 dark:text-amber-200"
-            : "border-emerald-500/30 bg-emerald-500/5 text-emerald-800 dark:text-emerald-200"
+            ? "border-warning/30 bg-warning/5 text-warning "
+            : "border-success/30 bg-success/5 text-success "
       }`}
     >
       <div className="flex items-center gap-2.5">
@@ -92,13 +92,11 @@ export function JobSearchProgress({ status }: { status: SyncProgress | null }) {
         ) : (
           <span
             aria-hidden
-            className={`h-2 w-2 shrink-0 rounded-full ${failed || partial ? "bg-amber-400" : "bg-emerald-400"}`}
+            className={`h-2 w-2 shrink-0 rounded-full ${failed || partial ? "bg-warning" : "bg-success"}`}
           />
         )}
         <span className="font-medium">
-          {running
-            ? "Fadi is searching the web for roles"
-            : completion}
+          {running ? "Fadi is searching the web for roles" : completion}
         </span>
         {running && status.total > 0 && (
           <span className="text-muted-foreground">

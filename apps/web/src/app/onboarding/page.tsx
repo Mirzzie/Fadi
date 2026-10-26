@@ -27,7 +27,7 @@ export default async function OnboardingPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <SiteHeader />
+      <SiteHeader showAuthLinks={false} />
       <main className="px-4 py-10 sm:px-6">
         <OnboardingShell />
       </main>

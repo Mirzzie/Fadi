@@ -1,39 +1,31 @@
 <!doctype html>
-<html>
+<html lang="en" data-palette="ember" data-appearance="system">
   <head>
     <meta charset="utf-8" />
-    <style>
-      :root { color-scheme: light dark; }
-      body { width: 300px; margin: 0; font: 13px/1.4 system-ui, sans-serif; padding: 14px; }
-      h1 { font-size: 14px; margin: 0 0 2px; }
-      p.sub { margin: 0 0 12px; color: #777; font-size: 11px; }
-      button { width: 100%; padding: 9px; border: 0; border-radius: 8px; font-weight: 600; cursor: pointer; margin-bottom: 8px; }
-      .primary { background: #0f766e; color: #fff; }
-      .ghost { background: transparent; color: #0f766e; border: 1px solid #0f766e33; font-weight: 500; }
-      #status { font-size: 12px; min-height: 16px; margin-top: 4px; }
-      .ok { color: #0f766e; } .err { color: #be123c; }
-      .row { display: flex; gap: 6px; align-items: center; margin-top: 10px; }
-      input { flex: 1; padding: 6px; border: 1px solid #ccc4; border-radius: 6px; font: inherit; }
-      label { font-size: 11px; color: #777; }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fadi · Save and prepare</title>
+    <script src="appearance-bootstrap.generated.js"></script>
+    <link rel="stylesheet" href="appearance.generated.css" />
+    <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
     <h1>Fadi</h1>
     <p class="sub">Save this job to your pipeline, or autofill the application.</p>
-    <button id="scrapeall" class="primary">Scrape all jobs on this page</button>
+    <button id="scrapeall" class="primary">Capture jobs from this page</button>
     <button id="save" class="ghost">Save just this job</button>
     <button id="autofill" class="ghost">Autofill this application</button>
     <button id="evidence" class="ghost">Clip selection to Evidence</button>
     <button id="contact" class="ghost">Add referral (LinkedIn)</button>
-    <div id="status"></div>
+    <div id="status" role="status" aria-live="polite"></div>
     <hr style="border: 0; border-top: 1px solid #8883; margin: 12px 0" />
     <label style="display: flex; align-items: center; gap: 8px; font-size: 12px; margin-bottom: 10px; cursor: pointer">
       <input id="autocapture" type="checkbox" style="width: auto; margin: 0" />
       Auto-capture jobs on LinkedIn &amp; Indeed
     </label>
-    <div id="connstate" style="font-size: 11px; margin-bottom: 6px; color: #777">Not connected.</div>
+    <div id="connstate" style="font-size: 11px; margin-bottom: 6px; color: var(--muted-foreground)">Not connected.</div>
+    <label for="token">Connection code</label>
     <div class="row">
-      <input id="token" placeholder="Paste connection code" />
+      <input id="token" type="password" autocomplete="off" placeholder="Paste connection code" />
     </div>
     <div class="row">
       <button id="getcode" class="ghost" style="flex: 1; margin: 0">Get code</button>
@@ -43,6 +35,15 @@
       <label for="base">Fadi&nbsp;URL</label>
       <input id="base" placeholder="http://localhost:3000" />
     </div>
+    <details class="appearance-disclosure">
+      <summary>Appearance</summary>
+      <label for="palette">Colour palette</label>
+      <select id="palette"><option value="ember">Ember · warm coral</option><option value="iris">Iris · soft violet</option><option value="cobalt">Cobalt · clear blue</option></select>
+      <label for="brightness">Brightness</label>
+      <select id="brightness"><option value="system">Follow system</option><option value="light">Light</option><option value="dark">Dark</option></select>
+      <p id="appearance-note" role="status">Applies to this extension in this browser.</p>
+    </details>
+    <script type="module" src="appearance.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

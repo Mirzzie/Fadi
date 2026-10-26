@@ -1,0 +1,333 @@
+.page {
+  width: 100%;
+  max-width: 74rem;
+  margin-inline: auto;
+  padding-block: clamp(0.75rem, 2vw, 1.75rem) 2rem;
+  counter-reset: today-section;
+}
+
+.header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.75rem;
+  padding-block: 0 clamp(1.75rem, 3vw, 2.75rem);
+}
+
+.eyebrow,
+.focusLabel {
+  color: var(--muted-foreground);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.heading {
+  margin-top: 0.875rem;
+  font-family: var(--font-inter), sans-serif;
+  font-size: clamp(2rem, 3.5vw, 3.125rem);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.055em;
+  overflow-wrap: anywhere;
+}
+
+.heading span {
+  font-family: var(--font-editorial), Georgia, serif;
+  font-weight: 400;
+  font-style: italic;
+  letter-spacing: -0.045em;
+}
+
+.introduction {
+  margin-top: 0.875rem;
+  color: var(--muted-foreground);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.focus {
+  display: grid;
+  gap: 0.625rem;
+  flex-shrink: 0;
+}
+
+.focusChoices {
+  display: inline-flex;
+  gap: 0.25rem;
+  border: 1px solid var(--border);
+  border-radius: 0.875rem;
+  padding: 0.25rem;
+  background: var(--muted);
+}
+
+.focusChoice {
+  min-height: 2.5rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: 0.625rem;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: color 150ms ease, background-color 150ms ease;
+}
+
+.focusChoice:hover {
+  color: var(--foreground);
+}
+
+.focusChoiceSelected {
+  color: var(--foreground);
+  background: var(--card);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--foreground) 8%, transparent);
+}
+
+.focusChoice:focus-visible,
+.textInput:focus-visible,
+.overviewLink:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.6fr);
+  border: 1px solid var(--border);
+  border-radius: 1.25rem;
+  overflow: clip;
+  background: var(--card);
+  box-shadow: 0 12px 36px -28px color-mix(in srgb, var(--foreground) 22%, transparent);
+}
+
+.direction,
+.currentWork {
+  min-width: 0;
+  padding-inline: clamp(1.25rem, 2.5vw, 2rem);
+}
+
+.direction {
+  border-right: 1px solid var(--border);
+  background: color-mix(in srgb, var(--muted) 52%, var(--card));
+}
+
+.section {
+  min-width: 0;
+  padding-block: 1.5rem;
+  counter-increment: today-section;
+}
+
+.section + .section {
+  border-top: 1px solid var(--border);
+}
+
+.sectionHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.sectionTitle {
+  display: flex;
+  align-items: baseline;
+  gap: 0.625rem;
+  color: var(--muted-foreground);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sectionTitle::before {
+  content: counter(today-section, decimal-leading-zero);
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-weight: 400;
+  letter-spacing: 0;
+  opacity: 0.75;
+}
+
+.sectionContent {
+  margin-top: 1rem;
+  overflow-wrap: anywhere;
+}
+
+.goalTitle {
+  font-family: var(--font-inter), sans-serif;
+  font-size: clamp(1.125rem, 1.8vw, 1.5rem);
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: -0.025em;
+}
+
+.actionTitle {
+  max-width: 34ch;
+  font-family: var(--font-inter), sans-serif;
+  font-size: clamp(1.25rem, 2vw, 1.75rem);
+  font-weight: 500;
+  line-height: 1.3;
+  letter-spacing: -0.03em;
+}
+
+.nextAction {
+  padding-bottom: 0.375rem;
+}
+
+.nextAction > p + p {
+  max-width: 62ch;
+  margin-top: 0.625rem;
+  line-height: 1.7;
+}
+
+.nextAction > div {
+  margin-top: 1.25rem;
+}
+
+.textInput {
+  min-width: 0;
+  min-height: 2.75rem;
+  flex: 1 1 10rem;
+  border: 1px solid var(--input);
+  border-radius: 0.625rem;
+  padding: 0.625rem 0.75rem;
+  background: var(--background);
+  color: var(--foreground);
+  font-size: 0.875rem;
+}
+
+.planSteps {
+  margin-top: 1.25rem;
+  display: grid;
+  gap: 1rem;
+  border-left: 1px solid var(--border);
+  padding-left: 1rem;
+}
+
+.openStep {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  border-top: 1px solid var(--border);
+  padding-block: 0.75rem;
+  font-size: 0.875rem;
+}
+
+.openStepActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.followThrough {
+  margin-top: 1.5rem;
+  padding-inline: clamp(0.25rem, 1.5vw, 1rem);
+}
+
+.receipts {
+  display: grid;
+  gap: 1rem;
+}
+
+.receipt {
+  display: grid;
+  grid-template-columns: minmax(5rem, 7rem) minmax(0, 1fr);
+  gap: 1rem;
+  font-size: 0.875rem;
+  line-height: 1.65;
+}
+
+.receiptTime {
+  padding-top: 0.125rem;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--border);
+  padding: 1.25rem clamp(0.25rem, 1.5vw, 1rem) 0;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+
+.overviewLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2rem;
+  color: var(--foreground);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.overviewLink svg {
+  width: 0.875rem;
+  transition: transform 150ms ease;
+}
+
+.overviewLink:hover svg {
+  transform: translateX(3px);
+}
+
+@media (max-width: 48rem) {
+  .header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+
+  .focus {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.625rem 0.875rem;
+  }
+
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+    border-radius: 1rem;
+  }
+
+  .direction {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .section {
+    padding-block: 1.25rem;
+  }
+}
+
+@media (max-width: 25rem) {
+  .receipt {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.25rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .focusChoice,
+  .overviewLink svg {
+    transition: none;
+  }
+
+  .overviewLink:hover svg {
+    transform: none;
+  }
+}
+
+@media (prefers-contrast: more), (forced-colors: active) {
+  .workspace,
+  .focusChoiceSelected {
+    box-shadow: none;
+  }
+}

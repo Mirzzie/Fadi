@@ -40,7 +40,7 @@ export function TuneTheStory({ interests }: { interests: string[] }) {
           className={`rounded-full border px-4 py-2 text-sm transition-colors ${
             active === o
               ? "border-[var(--pf-accent)] bg-[color-mix(in_srgb,var(--pf-accent)_10%,transparent)] text-[var(--pf-accent)]"
-              : "border-zinc-800 text-zinc-300 hover:border-[color-mix(in_srgb,var(--pf-accent)_50%,transparent)]"
+              : "border-[var(--pf-line)] text-[var(--pf-ink-2)] hover:border-[var(--pf-accent)]"
           }`}
         >
           {labelForInterest(o)}

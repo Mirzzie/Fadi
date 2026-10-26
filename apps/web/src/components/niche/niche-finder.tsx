@@ -4,7 +4,6 @@ import {
   AlertTriangle,
   ArrowRight,
   Check,
-  Compass,
   Gauge,
   Loader2,
   Sparkles,
@@ -13,9 +12,13 @@ import {
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
-import { findNichesAction, type NicheFinderActionResult } from "@/app/dashboard/niche-finder/actions";
+import {
+  findNichesAction,
+  type NicheFinderActionResult,
+} from "@/app/dashboard/niche-finder/actions";
 import { createTrackAction } from "@/app/dashboard/tracks/actions";
 import { Button } from "@/components/ui/button";
+import { PageIntro } from "@/components/layout/page-intro";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,10 +35,10 @@ const COMPETITION_LABEL: Record<string, string> = {
 };
 
 const COMPETITION_TONE: Record<string, string> = {
-  low: "text-emerald-400",
-  moderate: "text-sky-400",
-  high: "text-amber-400",
-  very_high: "text-rose-400",
+  low: "text-success",
+  moderate: "text-info",
+  high: "text-warning",
+  very_high: "text-destructive",
 };
 
 export function NicheFinder() {
@@ -75,14 +78,11 @@ export function NicheFinder() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-8 pb-12">
-      <header className="border-b border-border pb-8 pt-3">
-        <p className="mb-3 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">Direction</p>
-        <h1 className="font-heading text-4xl font-semibold tracking-[-0.045em] sm:text-5xl">Choose with evidence.</h1>
-        <p className="mt-3 text-sm leading-6 text-muted-foreground">
-          Compare possible directions using demand, pay ranges, competition, and the time and cost
-          involved. Review the inputs before choosing where to focus.
-        </p>
-      </header>
+      <PageIntro
+        eyebrow="Your direction"
+        title="Explore your options"
+        description="Compare possible directions using demand, pay ranges, competition, and the time and cost involved. Review the inputs before choosing where to focus."
+      />
 
       <div className="space-y-5 border-y border-border bg-card p-5">
         <div className="space-y-1.5">
@@ -155,7 +155,7 @@ export function NicheFinder() {
         </Button>
         {pending ? (
           <p className="text-center text-xs text-muted-foreground">
-            Fetching real postings for each option and grounding the verdict — this takes ~15–30s.
+            Comparing available information. This can take a moment.
           </p>
         ) : null}
       </div>
@@ -166,15 +166,16 @@ export function NicheFinder() {
 function Results({ result, onReset }: { result: Result; onReset: () => void }) {
   return (
     <div className="mx-auto max-w-3xl space-y-6 pb-12">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Compass className="size-5 text-primary" aria-hidden="true" />
-          <h1 className="font-heading text-xl font-semibold tracking-tight">Your niche reality check</h1>
-        </div>
-        <Button variant="ghost" size="sm" onClick={onReset}>
-          Start over
-        </Button>
-      </div>
+      <PageIntro
+        eyebrow="Your direction"
+        title="Compare your options"
+        description="Review these suggestions and their sources before deciding."
+        actions={
+          <Button variant="ghost" size="sm" onClick={onReset}>
+            Start over
+          </Button>
+        }
+      />
 
       <div className="border-y border-border bg-card p-5">
         <p className="text-sm leading-relaxed">{result.overview}</p>
@@ -193,8 +194,8 @@ function Results({ result, onReset }: { result: Result; onReset: () => void }) {
           </p>
           <p className="text-sm leading-relaxed">{result.recommendation}</p>
         </div>
-        <div className="border-y border-amber-500/30 bg-amber-500/5 p-5">
-          <p className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-amber-400">
+        <div className="border-y border-warning/30 bg-warning/5 p-5">
+          <p className="mb-1 flex items-center gap-1.5 text-sm font-semibold text-warning">
             <AlertTriangle className="size-4" aria-hidden="true" /> Reality check
           </p>
           <p className="text-sm leading-relaxed">{result.realityCheck}</p>
@@ -221,7 +222,11 @@ function NicheCard({ niche, rank }: { niche: Niche; rank: number }) {
         targetRole,
         domain: niche.domain || undefined,
         intent: "career",
-        careerGoal: `Break into ${niche.name}. ${niche.pathway.map((p) => p.step).join(" → ")}`.slice(0, 1900),
+        careerGoal:
+          `Break into ${niche.name}. ${niche.pathway.map((p) => p.step).join(" → ")}`.slice(
+            0,
+            1900
+          ),
       });
       if (res.ok) {
         setStarted(true);
@@ -248,14 +253,23 @@ function NicheCard({ niche, rank }: { niche: Niche; rank: number }) {
       </div>
 
       <div className="grid grid-cols-2 gap-px bg-border/40 sm:grid-cols-4">
-        <Stat icon={<Gauge className="size-3.5" />} label="Fit" value={`${niche.fitScore}`} suffix="/100" />
+        <Stat
+          icon={<Gauge className="size-3.5" />}
+          label="Fit"
+          value={`${niche.fitScore}`}
+          suffix="/100"
+        />
         <Stat
           icon={<TrendingUp className="size-3.5" />}
           label="Odds (12mo)"
           value={`${niche.successProbability}`}
           suffix="%"
         />
-        <Stat label="Competition" valueClass={COMPETITION_TONE[niche.competition]} value={COMPETITION_LABEL[niche.competition] ?? niche.competition} />
+        <Stat
+          label="Competition"
+          valueClass={COMPETITION_TONE[niche.competition]}
+          value={COMPETITION_LABEL[niche.competition] ?? niche.competition}
+        />
         <Stat label="Live postings" value={`${niche.evidence.livePostingsSeen}`} />
       </div>
 
@@ -270,13 +284,13 @@ function NicheCard({ niche, rank }: { niche: Niche; rank: number }) {
         <div className="grid gap-4 sm:grid-cols-2">
           {niche.transferableStrengths.length ? (
             <div>
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-emerald-400">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-success">
                 Carries over
               </p>
               <ul className="space-y-1 text-sm">
                 {niche.transferableStrengths.map((s, i) => (
                   <li key={i} className="flex gap-1.5">
-                    <Check className="mt-0.5 size-3.5 shrink-0 text-emerald-400" aria-hidden="true" />
+                    <Check className="mt-0.5 size-3.5 shrink-0 text-success" aria-hidden="true" />
                     {s}
                   </li>
                 ))}
@@ -285,13 +299,16 @@ function NicheCard({ niche, rank }: { niche: Niche; rank: number }) {
           ) : null}
           {niche.gaps.length ? (
             <div>
-              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-400">
+              <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-warning">
                 Real gaps
               </p>
               <ul className="space-y-1 text-sm">
                 {niche.gaps.map((g, i) => (
                   <li key={i} className="flex gap-1.5">
-                    <ArrowRight className="mt-0.5 size-3.5 shrink-0 text-amber-400" aria-hidden="true" />
+                    <ArrowRight
+                      className="mt-0.5 size-3.5 shrink-0 text-warning"
+                      aria-hidden="true"
+                    />
                     {g}
                   </li>
                 ))}
@@ -333,15 +350,18 @@ function NicheCard({ niche, rank }: { niche: Niche; rank: number }) {
               {niche.evidence.salarySamples.length ? (
                 <p>Salary signals: {niche.evidence.salarySamples.join(" | ")}</p>
               ) : null}
-              {niche.evidence.sources.length ? <p>Sources: {niche.evidence.sources.join(", ")}</p> : null}
+              {niche.evidence.sources.length ? (
+                <p>Sources: {niche.evidence.sources.join(", ")}</p>
+              ) : null}
             </div>
           </details>
         ) : null}
 
         <div className="flex justify-end pt-1">
           {started ? (
-            <span className="flex items-center gap-1.5 text-sm text-emerald-400">
-              <Check className="size-4" aria-hidden="true" /> Track created — switch to it from the top bar
+            <span className="flex items-center gap-1.5 text-sm text-success">
+              <Check className="size-4" aria-hidden="true" /> Track created — switch to it from the
+              top bar
             </span>
           ) : (
             <Button variant="outline" size="sm" onClick={startAsTrack} disabled={pending}>

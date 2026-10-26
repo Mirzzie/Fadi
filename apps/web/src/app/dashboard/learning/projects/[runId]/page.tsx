@@ -22,10 +22,10 @@ export default async function LearningProjectWorkspacePage({
 
   return (
     <AppShell>
-      <main className="mx-auto w-full max-w-[112rem] space-y-6">
+      <div className="mx-auto w-full max-w-[112rem] space-y-6">
         <LearningNavigation />
         <ProjectWorkspace runId={runId} />
-      </main>
+      </div>
     </AppShell>
   );
 }

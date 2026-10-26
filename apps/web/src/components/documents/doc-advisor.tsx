@@ -36,9 +36,9 @@ const seenStore = {
 
 const STATUS_COPY: Record<string, { text: (g: DocGuidance) => string; tone: string }> = {
   empty: { text: (g) => `Target ${g.words.min}–${g.words.max} words`, tone: "text-muted-foreground" },
-  short: { text: (g) => `under target (${g.words.min}–${g.words.max})`, tone: "text-amber-600 dark:text-amber-400" },
-  long: { text: (g) => `over target (${g.words.min}–${g.words.max})`, tone: "text-amber-600 dark:text-amber-400" },
-  ok: { text: () => "in the recruiter-recommended range", tone: "text-emerald-600 dark:text-emerald-400" },
+  short: { text: (g) => `under target (${g.words.min}–${g.words.max})`, tone: "text-warning" },
+  long: { text: (g) => `over target (${g.words.min}–${g.words.max})`, tone: "text-warning" },
+  ok: { text: () => "in the recruiter-recommended range", tone: "text-success" },
 };
 
 /**

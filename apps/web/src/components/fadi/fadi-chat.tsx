@@ -671,9 +671,9 @@ function renderToolResult(r: FadiToolResultView) {
     return (
       <a
         href="/dashboard/applications"
-        className="group flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-3 transition-colors hover:border-emerald-500/50"
+        className="group flex items-center gap-3 rounded-lg border border-success/30 bg-success/5 p-3 transition-colors hover:border-success/50"
       >
-        <span className="grid size-9 shrink-0 place-items-center rounded-md bg-emerald-500/15 text-emerald-400">
+        <span className="grid size-9 shrink-0 place-items-center rounded-md bg-success/15 text-success">
           <FileText className="size-5" aria-hidden="true" />
         </span>
         <span className="min-w-0">
@@ -802,7 +802,7 @@ function FadiOrb({ state }: { state: FadiRuntimeState }) {
   return (
     <div className="relative grid size-10 shrink-0 place-items-center">
       {state === "listening" ? (
-        <span className="absolute size-10 animate-ping rounded-full bg-emerald-400/40" />
+        <span className="absolute size-10 animate-ping rounded-full bg-success/40" />
       ) : null}
       {state === "speaking" ? (
         <>
@@ -814,7 +814,7 @@ function FadiOrb({ state }: { state: FadiRuntimeState }) {
         className={cn(
           "relative grid size-7 place-items-center rounded-full bg-gradient-to-br from-primary to-[oklch(0.66_0.22_285)] shadow",
           state === "ready" && "animate-pulse",
-          state === "listening" && "ring-2 ring-emerald-400/50"
+          state === "listening" && "ring-2 ring-success/50"
         )}
       >
         {state === "understanding" ? (

@@ -4,9 +4,14 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { AppShell } from "@/components/layout/app-shell";
+import { PageIntro } from "@/components/layout/page-intro";
 import { RestoreRevisionButton } from "@/components/documents/restore-revision-button";
+import { ResumePreview } from "@/components/documents/resume-preview";
+import { LetterPreview } from "@/components/documents/letter-preview";
 import { getCurrentAuthUser } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database/client";
+import { parseResume, resumeToPlainText, type ResumeTemplate } from "@/lib/documents/resume";
+import { isProseKind, parseLetter, letterToPlainText } from "@/lib/documents/letter";
 import { createDocumentsRepository, type DocumentRevisionSnapshot } from "@careeros/database";
 
 export const metadata: Metadata = { title: "Document history" };
@@ -50,31 +55,33 @@ export default async function DocumentHistoryPage({ params }: { params: Promise<
 
   return (
     <AppShell>
-      <main className="mx-auto max-w-4xl space-y-6">
+      <div className="mx-auto max-w-4xl space-y-6">
         <header className="flex items-start gap-3">
           <Link
             href={`/dashboard/documents/${document.id}`}
-            className="mt-1 grid size-8 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
+            className="mt-1 grid size-10 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
             aria-label="Back to document"
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
           </Link>
-          <div>
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Document history
-            </p>
-            <h1 className="text-2xl font-semibold">{document.title}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Every accepted save is retained. Restoring creates a new version and does not erase
-              later work.
-            </p>
-          </div>
+          <PageIntro
+            compact
+            eyebrow="Document history"
+            title={document.title}
+            description="Every accepted save is retained. Restoring creates a new version and does not erase later work."
+          />
         </header>
 
         <section className="space-y-3">
           {revisions.map((revision) => {
             const isCurrent = revision.version === document.version;
-            const excerpt = revision.snapshot.content.replace(/\s+/g, " ").trim();
+            const readable =
+              document.kind === "resume"
+                ? resumeToPlainText(parseResume(revision.snapshot.content))
+                : isProseKind(document.kind)
+                  ? letterToPlainText(parseLetter(revision.snapshot.content, document.kind))
+                  : revision.snapshot.content;
+            const excerpt = readable.replace(/\s+/g, " ").trim();
             return (
               <article
                 key={revision.id}
@@ -85,7 +92,7 @@ export default async function DocumentHistoryPage({ params }: { params: Promise<
                     <div className="flex items-center gap-2">
                       <h2 className="font-semibold">Version {revision.version}</h2>
                       {isCurrent ? (
-                        <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-500">
+                        <span className="rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
                           Current
                         </span>
                       ) : null}
@@ -104,25 +111,40 @@ export default async function DocumentHistoryPage({ params }: { params: Promise<
                   ) : null}
                 </div>
 
-                <p className="mt-3 text-sm font-medium">{revision.snapshot.title}</p>
-                <p className="mt-1 line-clamp-3 text-sm text-muted-foreground">
+                <p className="mt-3 break-words text-sm font-medium">{revision.snapshot.title}</p>
+                <p className="mt-1 line-clamp-3 break-words text-sm leading-relaxed text-muted-foreground">
                   {excerpt || "Empty document"}
                 </p>
-                {excerpt.length > 240 ? (
+                {revision.snapshot.content.trim() ? (
                   <details className="mt-3 rounded-md border border-border/60 bg-background/60 p-3">
                     <summary className="cursor-pointer text-xs font-medium">
-                      View stored content
+                      Preview this version
                     </summary>
-                    <pre className="nice-scrollbar mt-3 max-h-80 overflow-auto whitespace-pre-wrap break-words text-xs text-muted-foreground">
-                      {revision.snapshot.content}
-                    </pre>
+                    <div className="nice-scrollbar mt-3 max-h-80 min-w-0 overflow-auto rounded-md bg-white p-4 text-sm text-zinc-800">
+                      {document.kind === "resume" ? (
+                        <ResumePreview
+                          embedded
+                          data={parseResume(revision.snapshot.content)}
+                          template={(revision.snapshot.template ?? "classic") as ResumeTemplate}
+                        />
+                      ) : isProseKind(document.kind) ? (
+                        <LetterPreview
+                          data={parseLetter(revision.snapshot.content, document.kind)}
+                          kind={document.kind}
+                        />
+                      ) : (
+                        <div className="whitespace-pre-wrap break-words leading-relaxed">
+                          {readable}
+                        </div>
+                      )}
+                    </div>
                   </details>
                 ) : null}
               </article>
             );
           })}
         </section>
-      </main>
+      </div>
     </AppShell>
   );
 }

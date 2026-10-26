@@ -1,4 +1,12 @@
-import { BriefcaseBusiness, CalendarClock, Info, Layers, MapPin, Signal, Wallet } from "lucide-react";
+import {
+  BriefcaseBusiness,
+  CalendarClock,
+  Info,
+  Layers,
+  MapPin,
+  Signal,
+  Wallet,
+} from "lucide-react";
 
 import { JobActions } from "@/components/jobs/job-actions";
 import { JobDescription } from "@/components/jobs/job-description";
@@ -43,7 +51,9 @@ export function JobsShell({
     <div className="workspace-page space-y-4 pb-8">
       <header className="flex flex-wrap items-end justify-between gap-2">
         <div>
-          <h2 className="text-xl font-semibold tracking-tight">Roles for {activeRole ?? "your direction"}</h2>
+          <h2 className="text-xl font-semibold tracking-tight">
+            Roles for {activeRole ?? "your direction"}
+          </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {jobs.length} {jobs.length === 1 ? "listing" : "listings"} in this view.
           </p>
@@ -61,8 +71,8 @@ export function JobsShell({
       ) : null}
 
       {coverageNotice ? (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm">
-          <Info className="mt-0.5 size-4 shrink-0 text-amber-500" aria-hidden="true" />
+        <div className="flex items-start gap-3 rounded-xl border border-warning/40 bg-warning/10 p-4 text-sm">
+          <Info className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden="true" />
           <p className="text-foreground/90">{coverageNotice}</p>
         </div>
       ) : null}
@@ -79,11 +89,14 @@ export function JobsShell({
                       <h3 className="text-lg font-semibold tracking-tight">{job.title}</h3>
                       <FitBadge fit={fit} />
                       {job.applicationStatus ? (
-                        <Badge variant="outline" className="capitalize">{job.applicationStatus}</Badge>
+                        <Badge variant="outline" className="capitalize">
+                          {job.applicationStatus}
+                        </Badge>
                       ) : null}
                     </div>
                     <p className="mt-0.5 text-sm text-muted-foreground">
-                      {job.company} · {job.location ?? "Location not listed"} · {postedAgo(job.postedAt)}
+                      {job.company} · {job.location ?? "Location not listed"} ·{" "}
+                      {postedAgo(job.postedAt)}
                     </p>
                     <p className="mt-2 line-clamp-2 text-sm text-foreground/85">{fit.reason}</p>
                     <details className="mt-2 text-sm">
@@ -96,7 +109,9 @@ export function JobsShell({
                         {job.matchedKeywords.length > 0 ? (
                           <div className="flex flex-wrap gap-1.5">
                             {job.matchedKeywords.map((keyword) => (
-                              <Badge key={`${job.id}-${keyword}`} variant="outline">{keyword}</Badge>
+                              <Badge key={`${job.id}-${keyword}`} variant="outline">
+                                {keyword}
+                              </Badge>
                             ))}
                           </div>
                         ) : null}
@@ -133,7 +148,7 @@ export function JobsShell({
                       : "No postings came back from the live sources yet. Add a country/city above, or check back shortly as sources refresh."}
               </span>
               {searchOutcome && searchOutcome.failed.length > 0 ? (
-                <span className="block text-amber-500">
+                <span className="block text-warning">
                   {searchOutcome.failed.length === 1
                     ? `${searchOutcome.failed[0]} failed on the last pull`
                     : `${searchOutcome.failed.length} sources failed on the last pull (${searchOutcome.failed.join(", ")})`}
@@ -142,9 +157,10 @@ export function JobsShell({
               ) : null}
               {searchOutcome && searchOutcome.noCoverage.length > 0 ? (
                 <span className="block">
-                  {searchOutcome.noCoverage.join(", ")} {searchOutcome.noCoverage.length === 1 ? "does" : "do"}{" "}
-                  not cover this country at all — nothing was asked of{" "}
-                  {searchOutcome.noCoverage.length === 1 ? "it" : "them"}.
+                  {searchOutcome.noCoverage.join(", ")}{" "}
+                  {searchOutcome.noCoverage.length === 1 ? "does" : "do"} not cover this country at
+                  all — nothing was asked of {searchOutcome.noCoverage.length === 1 ? "it" : "them"}
+                  .
                 </span>
               ) : null}
             </CardDescription>
@@ -156,9 +172,9 @@ export function JobsShell({
 }
 
 const FIT_TONE: Record<FitPresentation["tone"], string> = {
-  strong: "border-emerald-500/35 bg-emerald-500/10 text-emerald-600 dark:text-emerald-300",
+  strong: "border-success/35 bg-success/10 text-success ",
   possible: "border-primary/35 bg-primary/10 text-primary",
-  caution: "border-amber-500/35 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+  caution: "border-warning/35 bg-warning/10 text-warning ",
   muted: "border-border bg-muted/50 text-muted-foreground",
 };
 

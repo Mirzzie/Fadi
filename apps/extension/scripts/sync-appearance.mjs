@@ -1,0 +1,12 @@
+import { readFile, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
+const require = createRequire(new URL('../../web/package.json', import.meta.url));
+const ts = require('typescript');
+const source = new URL('../../web/src/lib/appearance/preferences.ts', import.meta.url);
+const compiled = ts.transpileModule(await readFile(source, 'utf8'), { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2020 } }).outputText;
+const dest = new URL('../src/preferences.generated.js', import.meta.url);
+await writeFile(dest, '// Generated from web appearance/preferences.ts; run npm run sync:appearance.\n' + compiled);
+const prefs = await import(dest.href);
+await writeFile(new URL('../src/appearance-bootstrap.generated.js', import.meta.url), '// Generated from the shared before-paint bootstrap.\n' + prefs.APPEARANCE_BOOTSTRAP + '\n');
+await writeFile(new URL('../src/appearance.generated.css', import.meta.url), '/* Generated from apps/web/src/app/appearance.css; do not edit. */\n' + await readFile(new URL('../../web/src/app/appearance.css', import.meta.url), 'utf8'));
+console.log('Updated extension appearance from shared web sources.');
